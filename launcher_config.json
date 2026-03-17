@@ -1,0 +1,37 @@
+{
+  "version": "2026.03.13.2003",
+  "services": {
+    "auto_start": false,
+    "start_sequence": [
+      "music",
+      "api",
+      "frontend",
+      "backend"
+    ]
+  },
+  "ui": {
+    "window_size": {
+      "width": 1200,
+      "height": 1138
+    },
+    "last_tab": 0
+  },
+  "service_settings": {
+    "music": {
+      "auto_open": true
+    },
+    "api": {
+      "auto_open": false
+    },
+    "frontend": {
+      "auto_open": true
+    },
+    "backend": {
+      "auto_open": false
+    }
+  },
+  "browser": {
+    "default": "Chrome",
+    "custom_path": ""
+  }
+}

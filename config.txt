@@ -1,0 +1,5 @@
+;!@Install@!UTF-8!
+Title="ACE-Step 启动器"
+BeginPrompt="正在启动 ACE-Step 启动器..."
+RunProgram="powershell.exe -ExecutionPolicy Bypass -File launch-ace-step.ps1"
+;!@InstallEnd@!
