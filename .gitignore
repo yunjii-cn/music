@@ -293,3 +293,6 @@ Thumbs.db
 .Spotlight-V100
 .Trashes
 ehthumbs.db
+
+# Windows special device files
+nul
