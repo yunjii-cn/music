@@ -269,6 +269,10 @@ lokr_output/
 BAK/
 build-release/
 
+# Git backup directories
+.git.bak/
+.git.bak.empty/
+
 # Large dependency files
 *.whl
 *.tar.gz
