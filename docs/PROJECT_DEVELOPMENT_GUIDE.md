@@ -42,9 +42,18 @@
 │   └── ui/                     # UI组件
 ├── assets/                     # 静态资源 (保留)
 ├── docs/                       # 文档 (保留)
-├── launcher/                   # 启动器模块 (核心)
-│   ├── main.py                 # 启动器主程序 (核心)
-│   └── version_manager.py      # 版本管理器 (核心)
+├── build/                      # 启动器版本开发文件夹 (核心)
+│   ├── 云集智能音乐创意台-vYYYY.MM.DD.HHMM/
+│   │   ├── main.py
+│   │   ├── version_manager.py
+│   │   ├── icon.ico
+│   │   ├── launcher_config.json
+│   │   ├── requirements.txt
+│   │   └── launcher.spec
+│   └── ...
+├── dist/                       # 所有版本的EXE输出目录 (统一)
+│   ├── 云集智能音乐创意台-vYYYY.MM.DD.HHMM.exe
+│   └── ...
 ├── scripts/                    # 工具脚本 (核心脚本保留)
 ├── presets/                    # 预设配置 (保留)
 │
@@ -55,7 +64,7 @@
 ├── 4、run_npmgui.ps1          # 青龙训练器前端启动 (核心)
 │
 │ # ========== 打包工具 ==========
-├── build-correct.py           # 正确的打包脚本 (核心)
+├── build-version.py           # 版本化打包脚本 - **使用此脚本** (核心)
 │
 │ # ========== 配置文件 ==========
 ├── .gitignore                 # Git忽略配置 (保留)
@@ -74,10 +83,12 @@
 
 ## 核心文件说明
 
-### 🚀 启动器模块 (`launcher/`)
+### 🚀 启动器版本文件夹 (`build/`)
 
-| 文件 | 用途 | 说明 |
-|------|------|------|
+| 文件/目录 | 用途 | 说明 |
+|-----------|------|------|
+| `build/` | 启动器版本目录 | 所有版本的独立开发文件夹 |
+| `build/云集智能音乐创意台-vYYYY.MM.DD.HHMM/` | 单个版本文件夹 | 每个版本都是完整的开发环境 |
 | `main.py` | 启动器主程序 | PyQt6 GUI界面，统一管理所有服务 |
 | `version_manager.py` | 版本管理器 | Git版本切换和管理 |
 
@@ -94,7 +105,7 @@
 
 | 文件 | 用途 |
 |------|------|
-| `build-correct.py` | 标准打包脚本 - **使用此脚本** |
+| `build-version.py` | 版本化打包脚本 - **使用此脚本** |
 
 ### 📚 文档文件
 
@@ -103,6 +114,7 @@
 | `README.md` | 项目主说明 |
 | `AGENTS.md` | AI代理开发指南 |
 | `CONTRIBUTING.md` | 贡献指南 |
+| `WORKFLOW_OPTIMIZATION.md` | 工作流程优化说明 |
 
 ---
 
@@ -121,25 +133,37 @@ git checkout main
 ### 2. 开发流程
 
 #### 步骤1: 功能开发
-- 在 `main` 分支进行日常开发
+- 在 `build/` 目录下最新版本文件夹进行日常开发
+- 或直接在指定的版本文件夹中开发
 - 修改代码后测试
 - 确保功能正常
 
 #### 步骤2: 打包测试
 ```bash
-# 运行标准打包脚本
-python build-correct.py
+# 运行版本化打包脚本
+python build-version.py
 
 # 脚本会自动:
-# 1. 清理构建目录
-# 2. 构建EXE文件
-# 3. 检测Git更改
-# 4. 自动提交并推送到main分支
+# 1. 找到 build/ 目录下最新版本
+# 2. 复制最新版本创建新版本文件夹
+# 3. 在新版本文件夹中构建EXE
+# 4. 将EXE移动到根目录 dist/ 文件夹
+# 5. 清理版本文件夹内的临时构建文件
 ```
 
 #### 步骤3: 测试验证
 - 使用生成的EXE文件测试
 - 验证所有功能正常
+
+#### 步骤4: 在特定版本基础上开发
+1. 直接进入 `build/` 下对应的版本文件夹进行开发
+2. 修改完成后，可以使用该版本文件夹内的工具构建
+3. 或复制该版本文件夹创建新版本
+
+#### 步骤5: 回滚到旧版本
+1. 直接使用 `build/` 目录下对应的旧版本文件夹
+2. 可以在旧版本基础上修改和构建
+3. 不需要复杂的Git操作
 
 ---
 
@@ -167,7 +191,7 @@ stable (稳定版 + 标签)
 
 #### 1. 开发分支 (main)
 - **日常开发在此分支进行**
-- 运行 `python build-correct.py` 会自动提交和推送
+- 运行 `python build-version.py` 会自动提交和推送
 - 适用于快速迭代和功能开发
 
 #### 2. 测试分支 (beta)
@@ -204,21 +228,21 @@ git push origin stable --tags
 
 ## 打包和发布
 
-### 使用标准打包脚本
+### 使用版本化打包脚本
 
-**唯一推荐使用**: `build-correct.py`
+**唯一推荐使用**: `build-version.py`
 
 ```bash
-python build-correct.py
+python build-version.py
 ```
 
 **脚本功能**:
-1. ✅ 清理构建目录
-2. ✅ 构建单文件EXE
-3. ✅ 检测文件更改
-4. ✅ 生成详细提交信息
-5. ✅ 自动提交到Git
-6. ✅ 自动推送到当前分支
+1. ✅ 自动找到 `build/` 目录下最新版本
+2. ✅ 复制最新版本创建新版本文件夹
+3. ✅ 清理构建目录
+4. ✅ 构建单文件EXE
+5. ✅ 将EXE移动到根目录 `dist/` 文件夹
+6. ✅ 清理版本文件夹内的临时构建文件
 
 ### 输出位置
 
@@ -234,6 +258,7 @@ dist/
 ### ❌ 已废弃的文件 (将被清理)
 
 #### 废弃的打包脚本
+- ❌ `build-correct.py`
 - ❌ `build-exe.bat`
 - ❌ `build-single.bat`
 - ❌ `build-versioned.bat`
@@ -280,23 +305,12 @@ dist/
 - ❌ `QUICKSTART-VERSION-MANAGER.md`
 - ❌ `PROJECT_STRUCTURE.md` (被本文档替代)
 
-#### launcher目录中的备份文件
-- ❌ `launcher/main.py.backup`
-- ❌ `launcher/main.py.backup2`
-- ❌ `launcher/main.py.fixed`
-- ❌ `launcher/main.py.git-original`
-- ❌ `launcher/main.py.original`
-- ❌ `launcher/build.bat`
-- ❌ `launcher/build.py`
+#### 旧版本文件夹中的嵌套结构
+- ❌ 旧版本的 `src/launcher/` 嵌套结构（保留旧版本文件夹，但新开发使用简化结构）
+- ❌ 旧版本的 `config/` 单独目录（保留旧版本文件夹，但新开发使用简化结构）
 
-#### scripts目录中的废弃文件
-- ❌ `scripts/cleanup*.py`
-- ❌ `scripts/cleanup-report.txt`
-- ❌ `scripts/create-versioned-launcher.py`
-- ❌ `scripts/organize_project.py`
-- ❌ `scripts/rename-launchers.py`
-- ❌ `scripts/verify_structure.py`
-- ❌ `scripts/项目结构优化报告.md`
+#### 根目录的launcher文件夹
+- ❌ 根目录的 `launcher/` 文件夹（已废弃，使用 `build/` 中的版本文件夹）
 
 ### ✅ 保留的核心文件
 
@@ -310,11 +324,10 @@ dist/
 4、run_npmgui.ps1
 
 # 打包工具
-build-correct.py
+build-version.py
 
-# 启动器
-launcher/main.py
-launcher/version_manager.py
+# 启动器版本文件夹（完整目录）
+build/
 
 # 项目配置
 .gitignore
@@ -326,6 +339,7 @@ README.md
 LICENSE
 CONTRIBUTING.md
 SECURITY.md
+WORKFLOW_OPTIMIZATION.md
 ico.png
 
 # 核心包 (完整目录)
@@ -350,17 +364,18 @@ scripts/new_pr_branch.ps1
 当新的AI助手开始工作时，请按以下步骤操作:
 
 1. **阅读本文档** - 了解项目结构
-2. **查看 `launcher/main.py`** - 理解启动器逻辑
-3. **查看 `build-correct.py`** - 理解打包流程
+2. **查看 `build/` 目录下最新版本的 `main.py`** - 理解启动器逻辑
+3. **查看 `build-version.py`** - 理解打包流程
 4. **不要修改核心启动脚本** - 除非明确要求
 
 ### 修改原则
 
 - ✅ **只修改明确要求的文件**
-- ✅ **使用标准打包脚本** `build-correct.py`
+- ✅ **使用版本化打包脚本** `build-version.py`
 - ✅ **保持main分支用于开发**
 - ✅ **充分测试后再合并到beta**
 - ✅ **稳定版本才合并到stable**
+- ✅ **所有启动器开发在 build/ 目录的版本文件夹中进行**
 
 ### 避免的操作
 
@@ -369,6 +384,8 @@ scripts/new_pr_branch.ps1
 - ❌ 不要使用废弃的打包方式
 - ❌ 不要删除核心文件
 - ❌ 不要跳过本文档直接开始编码
+- ❌ 不要在根目录创建新的 launcher/ 文件夹
+- ❌ 不要在版本文件夹内保留临时的 build/ 和 dist/
 
 ---
 
@@ -381,9 +398,10 @@ scripts/new_pr_branch.ps1
 - ✅ 明确的分支管理策略
 - ✅ 完整的遗留文件清理清单
 - ✅ AI助手上下文指南
+- ✅ 版本化的启动器开发流程
 
 **请确保所有开发工作都遵循本文档的规范！**
 
 ---
 
-*最后更新: 2026-03-20*
+*最后更新: 2026-03-29*
