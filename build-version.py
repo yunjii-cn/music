@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+"""
+云集智能音乐创意台 - 版本化构建工具
+
+使用方法：
+  python build-version.py                    # 从最新版本创建新版本并构建
+  python build-version.py <版本文件夹名>     # 使用指定版本文件夹构建
+  python build-version.py --push             # 从最新版本创建新版本并自动推送
+  python build-version.py -p <版本文件夹名>  # 使用指定版本构建并自动推送
+
+选项：
+  --push, -p    构建完成后自动提交并推送到远程仓库
+"""
 import os
 import sys
 import subprocess
@@ -165,18 +177,94 @@ def cleanup_version_build(version_dir, keep_dist=False):
                 pass
 
 
+def git_push_new_version(version_name):
+    """自动提交并推送到远程仓库"""
+    print()
+    print("=" * 60)
+    print("  准备推送到远程仓库...")
+    print("=" * 60)
+    
+    os.chdir(ROOT_DIR)
+    
+    # 检查是否是git仓库
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        if result.stdout.strip() != "true":
+            print("  跳过：不在git仓库中")
+            return False
+    except Exception:
+        print("  跳过：不在git仓库中")
+        return False
+    
+    # 检查是否有未提交的更改
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        if not result.stdout.strip():
+            print("  没有需要提交的更改")
+            return False
+    except Exception as e:
+        print(f"  检查git状态失败：{e}")
+        return False
+    
+    # 添加所有更改
+    try:
+        print("  添加更改到git...")
+        subprocess.run(["git", "add", "-A"], check=True)
+    except Exception as e:
+        print(f"  添加更改失败：{e}")
+        return False
+    
+    # 提交更改
+    commit_message = f"build: 构建新版本 {version_name}\n\n- 自动化构建新版本"
+    try:
+        print("  提交更改...")
+        subprocess.run(["git", "commit", "-m", commit_message], check=True)
+    except Exception as e:
+        print(f"  提交失败：{e}")
+        return False
+    
+    # 推送到远程仓库
+    try:
+        print("  推送到远程仓库...")
+        subprocess.run(["git", "push"], check=True)
+        print("  ✓ 成功推送到远程仓库！")
+        return True
+    except Exception as e:
+        print(f"  推送失败：{e}")
+        return False
+
+
 def main():
     print("=" * 60)
     print("  云集智能音乐创意台 - 版本化构建工具")
     print("=" * 60)
     print()
     
+    # 解析命令行参数
+    auto_push = False
+    specified_version = None
+    
+    for arg in sys.argv[1:]:
+        if arg in ["--push", "-p"]:
+            auto_push = True
+        else:
+            specified_version = arg
+    
     try:
         target_version_dir = None
         
         # 检查是否有指定版本参数
-        if len(sys.argv) > 1:
-            specified_version = sys.argv[1]
+        if specified_version:
             version_dir = BUILD_DIR / specified_version
             if version_dir.exists() and version_dir.is_dir():
                 target_version_dir = version_dir
@@ -226,6 +314,11 @@ def main():
             print(f"  源代码文件夹：{target_version_dir}")
             print(f"  EXE 文件：{exe_path}")
             print("=" * 60)
+            
+            # 自动推送到远程仓库（如果启用）
+            version_name = target_version_dir.name
+            if auto_push:
+                git_push_new_version(version_name)
         else:
             print("\n打包失败：未找到生成的EXE文件")
             sys.exit(1)
