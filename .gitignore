@@ -40,7 +40,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -55,6 +54,9 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# dist目录用于存放版本化EXE文件，不被忽略
+# dist/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
