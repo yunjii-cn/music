@@ -16,6 +16,7 @@ import sys
 import subprocess
 import shutil
 import re
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -23,6 +24,57 @@ VERSION = datetime.now().strftime("%Y.%m.%d.%H%M")
 ROOT_DIR = Path(__file__).resolve().parent
 BUILD_DIR = ROOT_DIR / "build"
 DIST_DIR = ROOT_DIR / "dist"
+VERSION_HISTORY_FILE = ROOT_DIR / "version_history.json"
+
+
+def load_version_history():
+    """加载版本历史"""
+    if VERSION_HISTORY_FILE.exists():
+        try:
+            with open(VERSION_HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_version_history(history):
+    """保存版本历史"""
+    try:
+        with open(VERSION_HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"警告：保存版本历史失败：{e}")
+
+
+def get_version_description():
+    """获取版本描述"""
+    print()
+    print("=" * 60)
+    print("  请输入本次版本的修改内容")
+    print("=" * 60)
+    print()
+    print("请输入修改内容（每行一条，按Ctrl+Z或Ctrl+C结束输入）：")
+    print()
+    
+    changes = []
+    line_num = 1
+    try:
+        while True:
+            line = input(f"  {line_num}. ").strip()
+            if line:
+                changes.append(line)
+                line_num += 1
+    except (EOFError, KeyboardInterrupt):
+        pass
+    
+    if not changes:
+        print()
+        print("提示：未输入修改内容，将使用默认描述")
+        changes = ["优化和修复"]
+    
+    print()
+    return changes
 
 
 def get_latest_version():
@@ -177,7 +229,31 @@ def cleanup_version_build(version_dir, keep_dist=False):
                 pass
 
 
-def git_push_new_version(version_name):
+def record_version(version_name, changes):
+    """记录版本到历史"""
+    history = load_version_history()
+    
+    version_info = {
+        "version": version_name,
+        "changes": changes,
+        "build_time": datetime.now().isoformat(),
+        "version_number": VERSION
+    }
+    
+    history[version_name] = version_info
+    save_version_history(history)
+    
+    # 同时复制到dist目录，让用户也能看到
+    if DIST_DIR.exists():
+        try:
+            shutil.copy2(VERSION_HISTORY_FILE, DIST_DIR / "version_history.json")
+        except Exception as e:
+            print(f"警告：复制版本历史到dist失败：{e}")
+    
+    return version_info
+
+
+def git_push_new_version(version_name, changes):
     """自动提交并推送到远程仓库"""
     print()
     print("=" * 60)
@@ -224,8 +300,13 @@ def git_push_new_version(version_name):
         print(f"  添加更改失败：{e}")
         return False
     
+    # 构建提交信息
+    commit_lines = [f"build: 构建新版本 {version_name}", ""]
+    for change in changes:
+        commit_lines.append(f"- {change}")
+    commit_message = "\n".join(commit_lines)
+    
     # 提交更改
-    commit_message = f"build: 构建新版本 {version_name}\n\n- 自动化构建新版本"
     try:
         print("  提交更改...")
         subprocess.run(["git", "commit", "-m", commit_message], check=True)
@@ -233,10 +314,20 @@ def git_push_new_version(version_name):
         print(f"  提交失败：{e}")
         return False
     
+    # 创建git标签
+    try:
+        tag_name = f"v{VERSION}"
+        print(f"  创建git标签：{tag_name}")
+        tag_message = f"版本 {version_name}\n\n" + "\n".join([f"- {c}" for c in changes])
+        subprocess.run(["git", "tag", "-a", tag_name, "-m", tag_message], check=True)
+    except Exception as e:
+        print(f"  创建标签失败：{e}")
+    
     # 推送到远程仓库
     try:
         print("  推送到远程仓库...")
-        subprocess.run(["git", "push"], check=True)
+        subprocess.run(["git", "push", "origin", "main"], check=True)
+        subprocess.run(["git", "push", "origin", "--tags"], check=True)
         print("  ✓ 成功推送到远程仓库！")
         return True
     except Exception as e:
@@ -292,6 +383,9 @@ def main():
             
             target_version_dir = create_new_version(latest_version)
         
+        # 获取版本描述
+        changes = get_version_description()
+        
         print()
         
         clean_build(target_version_dir)
@@ -303,6 +397,10 @@ def main():
         success, exe_path = move_to_dist(target_version_dir)
         print()
         
+        # 记录版本历史
+        version_name = target_version_dir.name
+        record_version(version_name, changes)
+        
         # 如果EXE没有移动到根dist目录，则保留版本目录下的dist
         keep_dist = exe_path is not None and str(exe_path).startswith(str(target_version_dir))
         cleanup_version_build(target_version_dir, keep_dist=keep_dist)
@@ -313,12 +411,12 @@ def main():
             print("  构建完成！")
             print(f"  源代码文件夹：{target_version_dir}")
             print(f"  EXE 文件：{exe_path}")
+            print(f"  版本历史：{VERSION_HISTORY_FILE}")
             print("=" * 60)
             
             # 自动推送到远程仓库（如果启用）
-            version_name = target_version_dir.name
             if auto_push:
-                git_push_new_version(version_name)
+                git_push_new_version(version_name, changes)
         else:
             print("\n打包失败：未找到生成的EXE文件")
             sys.exit(1)
