@@ -49,12 +49,19 @@ def save_version_history(history):
 
 def get_version_description():
     """获取版本描述"""
+    # 检查是否在非交互式环境中
+    import sys
+    if not sys.stdin.isatty():
+        print()
+        print("非交互式环境，使用默认版本描述")
+        return ["优化和修复"]
+    
     print()
     print("=" * 60)
     print("  请输入本次版本的修改内容")
     print("=" * 60)
     print()
-    print("请输入修改内容（每行一条，按Ctrl+Z或Ctrl+C结束输入）：")
+    print("请输入修改内容（每行一条，输入空行结束）：")
     print()
     
     changes = []
@@ -62,9 +69,10 @@ def get_version_description():
     try:
         while True:
             line = input(f"  {line_num}. ").strip()
-            if line:
-                changes.append(line)
-                line_num += 1
+            if not line:
+                break
+            changes.append(line)
+            line_num += 1
     except (EOFError, KeyboardInterrupt):
         pass
     
@@ -344,12 +352,21 @@ def main():
     # 解析命令行参数
     auto_push = False
     specified_version = None
+    changes = None
     
-    for arg in sys.argv[1:]:
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        arg = args[i]
         if arg in ["--push", "-p"]:
             auto_push = True
+        elif arg in ["--desc", "-d"] and i + 1 < len(args):
+            # 从--desc参数读取版本描述（用|分隔多行）
+            changes = args[i + 1].split('|')
+            i += 1
         else:
             specified_version = arg
+        i += 1
     
     try:
         target_version_dir = None
@@ -384,7 +401,8 @@ def main():
             target_version_dir = create_new_version(latest_version)
         
         # 获取版本描述
-        changes = get_version_description()
+        if changes is None:
+            changes = get_version_description()
         
         print()
         
