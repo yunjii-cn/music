@@ -1,5 +1,5 @@
 {
-  "version": "2026.03.22.2356",
+  "version": "2026.03.21.0156",
   "services": {
     "auto_start": false,
     "start_sequence": [
@@ -12,7 +12,7 @@
   "ui": {
     "window_size": {
       "width": 1200,
-      "height": 930
+      "height": 898
     },
     "last_tab": 0
   },
