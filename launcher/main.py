@@ -922,12 +922,11 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        # 去除窗口标题栏，使用自定义标题栏
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        # 恢复系统顶栏
+        self.setWindowTitle("云集智能音乐创意台")
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #0D0D0D;
-                border: 1px solid #333333;
             }
         """)
         
