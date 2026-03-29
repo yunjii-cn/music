@@ -51,14 +51,34 @@ def get_version_description():
     """获取版本描述"""
     # 检查是否在非交互式环境中（管道输入）
     import sys
+    import io
     if not sys.stdin.isatty():
-        # 从stdin读取版本描述
+        # 从stdin读取版本描述 - 尝试多种编码
         try:
-            stdin_content = sys.stdin.read().strip()
-            if stdin_content:
-                print()
-                print(f"使用管道输入的版本描述")
-                return [stdin_content]
+            # 尝试UTF-8
+            try:
+                stdin_content = sys.stdin.read()
+                if stdin_content:
+                    stdin_content = stdin_content.strip()
+                    if stdin_content:
+                        print()
+                        print(f"使用管道输入的版本描述")
+                        return [stdin_content]
+            except:
+                pass
+            
+            # 如果上面失败，尝试用GBK重新打开stdin
+            try:
+                # 重新打开stdin用GBK编码
+                import os
+                sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='gbk', errors='replace')
+                stdin_content = sys.stdin.read().strip()
+                if stdin_content:
+                    print()
+                    print(f"使用管道输入的版本描述 (GBK)")
+                    return [stdin_content]
+            except:
+                pass
         except:
             pass
         
@@ -308,6 +328,9 @@ def record_version(version_name, changes):
 
 def git_push_new_version(version_name, changes):
     """自动提交并推送到远程仓库"""
+    import tempfile
+    import os
+    
     print()
     print("=" * 60)
     print("  准备推送到远程仓库...")
@@ -372,20 +395,41 @@ def git_push_new_version(version_name, changes):
     # 构建提交信息（直接使用版本描述）
     commit_message = "\n".join(changes)
     
-    # 提交更改
+    # 提交更改（使用临时文件避免编码问题）
     try:
         print("  提交更改...")
-        subprocess.run(["git", "commit", "-m", commit_message], check=True)
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.txt', delete=False) as f:
+            f.write(commit_message)
+            temp_commit_file = f.name
+        
+        try:
+            subprocess.run(["git", "commit", "-F", temp_commit_file], check=True)
+        finally:
+            try:
+                os.unlink(temp_commit_file)
+            except:
+                pass
     except Exception as e:
         print(f"  提交失败：{e}")
         return False
     
-    # 创建git标签
+    # 创建git标签（使用临时文件避免编码问题）
     try:
         tag_name = f"v{VERSION}"
         print(f"  创建git标签：{tag_name}")
         tag_message = f"版本 {version_name}\n\n" + "\n".join([f"- {c}" for c in changes])
-        subprocess.run(["git", "tag", "-a", tag_name, "-m", tag_message], check=True)
+        
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.txt', delete=False) as f:
+            f.write(tag_message)
+            temp_tag_file = f.name
+        
+        try:
+            subprocess.run(["git", "tag", "-a", tag_name, "-F", temp_tag_file], check=True)
+        finally:
+            try:
+                os.unlink(temp_tag_file)
+            except:
+                pass
     except Exception as e:
         print(f"  创建标签失败：{e}")
     
