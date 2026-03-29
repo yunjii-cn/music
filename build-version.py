@@ -177,24 +177,19 @@ def build_exe(version_dir):
 
 
 def move_to_dist(version_dir):
-    """将构建的EXE移动到根目录dist文件夹和version文件夹"""
+    """将构建的EXE移动到根目录dist文件夹（不自动复制到version文件夹）"""
     print("整理输出文件...")
     source_dist = version_dir / "dist"
     target_dist = DIST_DIR
-    version_dir_target = ROOT_DIR / "version"
     
     if not target_dist.exists():
         target_dist.mkdir(parents=True)
-    
-    if not version_dir_target.exists():
-        version_dir_target.mkdir(parents=True)
     
     exe_name = f"云集智能音乐创意台-v{VERSION}.exe"
     source_exe = source_dist / exe_name
     
     if source_exe.exists():
         target_exe = target_dist / exe_name
-        version_exe = version_dir_target / exe_name
         
         # 尝试删除目标文件（如果存在）
         moved = False
@@ -214,18 +209,12 @@ def move_to_dist(version_dir):
             final_exe = target_exe
             moved = True
         
-        # 同时复制到version文件夹
-        if moved:
-            try:
-                shutil.copy2(str(final_exe), str(version_exe))
-                print(f"  EXE已复制到version文件夹：{version_exe}")
-            except Exception as e:
-                print(f"  警告：无法复制到version文件夹：{e}")
-        
         if moved:
             print(f"  EXE已移动到：{final_exe}")
         else:
             print(f"  EXE保存在：{final_exe}")
+        
+        print("  [提示] version文件夹需要手动添加精选版本")
         
         size_mb = final_exe.stat().st_size / (1024 * 1024)
         print(f"  文件大小：{size_mb:.2f} MB")
