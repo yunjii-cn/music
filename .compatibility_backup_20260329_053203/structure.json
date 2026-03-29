@@ -1,13 +1,13 @@
 {
-  "last_known_version": "2026.03.29.0504",
-  "folder_structure": {
+  "version": "2026.03.29.0504",
+  "structure": {
     "config": {
       "exists": true,
       "files": [
         {
           "name": "init_config.json",
-          "size": 364,
-          "last_updated": "2026-03-29T05:32:08.742096"
+          "size": 333,
+          "last_updated": "2026-03-29T04:58:38.385230"
         }
       ],
       "last_updated": "2026-03-29T04:58:38.384724"
@@ -236,5 +236,5 @@
       "exists": false
     }
   },
-  "last_updated": "2026-03-29T15:10:15.008740"
+  "backup_time": "2026-03-29T05:32:03.991797"
 }

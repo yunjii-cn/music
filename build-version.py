@@ -168,19 +168,24 @@ def build_exe(version_dir):
 
 
 def move_to_dist(version_dir):
-    """将构建的EXE移动到根目录dist文件夹"""
+    """将构建的EXE移动到根目录dist文件夹和version文件夹"""
     print("整理输出文件...")
     source_dist = version_dir / "dist"
     target_dist = DIST_DIR
+    version_dir_target = ROOT_DIR / "version"
     
     if not target_dist.exists():
         target_dist.mkdir(parents=True)
+    
+    if not version_dir_target.exists():
+        version_dir_target.mkdir(parents=True)
     
     exe_name = f"云集智能音乐创意台-v{VERSION}.exe"
     source_exe = source_dist / exe_name
     
     if source_exe.exists():
         target_exe = target_dist / exe_name
+        version_exe = version_dir_target / exe_name
         
         # 尝试删除目标文件（如果存在）
         moved = False
@@ -199,6 +204,14 @@ def move_to_dist(version_dir):
             shutil.move(str(source_exe), str(target_exe))
             final_exe = target_exe
             moved = True
+        
+        # 同时复制到version文件夹
+        if moved:
+            try:
+                shutil.copy2(str(final_exe), str(version_exe))
+                print(f"  EXE已复制到version文件夹：{version_exe}")
+            except Exception as e:
+                print(f"  警告：无法复制到version文件夹：{e}")
         
         if moved:
             print(f"  EXE已移动到：{final_exe}")
@@ -258,6 +271,14 @@ def record_version(version_name, changes):
         except Exception as e:
             print(f"警告：复制版本历史到dist失败：{e}")
     
+    # 同时复制到version目录
+    version_dir_target = ROOT_DIR / "version"
+    if version_dir_target.exists():
+        try:
+            shutil.copy2(VERSION_HISTORY_FILE, version_dir_target / "version_history.json")
+        except Exception as e:
+            print(f"警告：复制版本历史到version失败：{e}")
+    
     return version_info
 
 
@@ -285,22 +306,38 @@ def git_push_new_version(version_name, changes):
         print("  跳过：不在git仓库中")
         return False
     
-    # 检查是否有未提交的更改
+    # 检查version目录是否有变化
     try:
+        print("  检查version目录变化...")
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "version/"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        version_changed = len(result.stdout.strip()) > 0
+        
+        # 检查其他文件是否有变化（源代码、构建脚本等）
         result = subprocess.run(
             ["git", "status", "--porcelain"],
             capture_output=True,
             text=True,
             check=True
         )
-        if not result.stdout.strip():
+        other_changed = False
+        for line in result.stdout.strip().split('\n'):
+            if line and not line.startswith('?? version/') and not line.startswith(' M version/'):
+                other_changed = True
+                break
+        
+        if not version_changed and not other_changed:
             print("  没有需要提交的更改")
             return False
     except Exception as e:
         print(f"  检查git状态失败：{e}")
         return False
     
-    # 添加所有更改
+    # 添加所有更改（包括version目录和源代码）
     try:
         print("  添加更改到git...")
         subprocess.run(["git", "add", "-A"], check=True)

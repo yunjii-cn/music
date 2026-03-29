@@ -55,11 +55,14 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# dist目录用于存放版本化EXE文件，不被忽略
-# dist/
+# dist目录用于存放构建的EXE文件，不提交到Git
+dist/
 
-# 忽略dist目录下的用户配置文件
-dist/config/
+# version目录用于存放精选的稳定版本（手动管理）
+# version/
+
+# tools目录用于存放下载的工具（Git便携版、Python便携版等）
+tools/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
