@@ -49,9 +49,19 @@ def save_version_history(history):
 
 def get_version_description():
     """获取版本描述"""
-    # 检查是否在非交互式环境中
+    # 检查是否在非交互式环境中（管道输入）
     import sys
     if not sys.stdin.isatty():
+        # 从stdin读取版本描述
+        try:
+            stdin_content = sys.stdin.read().strip()
+            if stdin_content:
+                print()
+                print(f"使用管道输入的版本描述")
+                return [stdin_content]
+        except:
+            pass
+        
         print()
         print("非交互式环境，使用默认版本描述")
         return ["优化和修复"]
