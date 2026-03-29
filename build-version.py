@@ -118,6 +118,15 @@ def create_new_version(source_version_dir):
     shutil.copytree(source_version_dir, new_version_dir)
     print(f"  新版本文件夹：{new_version_dir}")
     
+    # 同时复制build-version.py到新版本文件夹，方便回滚
+    build_script_source = ROOT_DIR / "build-version.py"
+    build_script_target = new_version_dir / "build-version.py"
+    try:
+        shutil.copy2(build_script_source, build_script_target)
+        print(f"  已复制构建脚本到：{build_script_target.name}")
+    except Exception as e:
+        print(f"  警告：复制构建脚本失败：{e}")
+    
     return new_version_dir
 
 
@@ -387,7 +396,7 @@ def main():
     print()
     
     # 解析命令行参数
-    auto_push = False
+    auto_push = True  # 默认自动推送
     specified_version = None
     changes = None
     
@@ -395,8 +404,8 @@ def main():
     i = 0
     while i < len(args):
         arg = args[i]
-        if arg in ["--push", "-p"]:
-            auto_push = True
+        if arg in ["--no-push", "-np"]:
+            auto_push = False
         elif arg in ["--desc", "-d"] and i + 1 < len(args):
             # 从--desc参数读取版本描述（用|分隔多行）
             changes = args[i + 1].split('|')
