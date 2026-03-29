@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 云集智能音乐创意台 - 版本化构建工具
 
 使用方法：
   python build-version.py                    # 从最新版本创建新版本并构建
   python build-version.py <版本文件夹名>     # 使用指定版本文件夹构建
+  python build-version.py --desc "描述内容" <版本文件夹名>  # 使用指定版本和描述
   python build-version.py --push             # 从最新版本创建新版本并自动推送
   python build-version.py -p <版本文件夹名>  # 使用指定版本构建并自动推送
 
 选项：
   --push, -p    构建完成后自动提交并推送到远程仓库
+  --desc, -d    指定版本描述（推荐用这个避免编码问题）
 """
 import os
 import sys
@@ -19,6 +22,12 @@ import re
 import json
 from pathlib import Path
 from datetime import datetime
+
+# 强制设置编码为UTF-8
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 VERSION = datetime.now().strftime("%Y.%m.%d.%H%M")
 ROOT_DIR = Path(__file__).resolve().parent
