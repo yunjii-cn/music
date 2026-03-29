@@ -148,6 +148,17 @@ def build_exe(version_dir):
     print(f"构建 EXE (v{VERSION})...")
     os.chdir(version_dir)
     
+    # 检查并确保脚本文件存在
+    scripts_to_include = []
+    for script_name in ["install-env.ps1", "download_python_312.py", "start.ps1"]:
+        script_path = version_dir / script_name
+        if script_path.exists():
+            scripts_to_include.append(script_name)
+            print(f"  包含脚本: {script_name}")
+        else:
+            print(f"  警告: 脚本不存在: {script_name}")
+    
+    # 构建PyInstaller参数
     pyinstaller_args = [
         sys.executable, "-m", "PyInstaller",
         "--name", f"云集智能音乐创意台-v{VERSION}",
@@ -172,6 +183,11 @@ def build_exe(version_dir):
         "--exclude-module", "acestep",
         "main.py"
     ]
+    
+    # 添加脚本文件到打包
+    for script_name in scripts_to_include:
+        pyinstaller_args.extend(["--add-data", f"{script_name};."])
+    
     print("  运行 PyInstaller...")
     subprocess.run(pyinstaller_args, check=True)
 
