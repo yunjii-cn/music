@@ -359,11 +359,8 @@ def git_push_new_version(version_name, changes):
         print(f"  添加更改失败：{e}")
         return False
     
-    # 构建提交信息
-    commit_lines = [f"build: 构建新版本 {version_name}", ""]
-    for change in changes:
-        commit_lines.append(f"- {change}")
-    commit_message = "\n".join(commit_lines)
+    # 构建提交信息（直接使用版本描述）
+    commit_message = "\n".join(changes)
     
     # 提交更改
     try:
