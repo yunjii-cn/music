@@ -4,29 +4,25 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
-  const backendUrl = env.BACKEND_URL || 'http://127.0.0.1:3001';
-  const devPort = parseInt(env.VITE_PORT || '3000', 10);
-  const devHost = env.VITE_HOST || '0.0.0.0';
   return {
     server: {
-      port: devPort,
-      host: devHost,
-      allowedHosts: ['all'],
+      port: 3000,
+      host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: backendUrl,
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
         },
         '/audio': {
-          target: backendUrl,
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
         },
         '/editor': {
-          target: backendUrl,
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
         },
         '/blog': {
-          target: backendUrl,
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
         },
       },

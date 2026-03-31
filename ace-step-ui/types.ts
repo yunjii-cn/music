@@ -20,7 +20,6 @@ export interface Song {
   creator?: string;
   creator_avatar?: string;
   ditModel?: string; // DiT model used for generation (e.g., 'acestep-v15-sft')
-  taskType?: string; // Task type used for generation (e.g., 'text2music', 'cover')
 }
 
 export interface Playlist {
@@ -102,11 +101,6 @@ export interface GenerationParams {
   repaintingEnd?: number;
   instruction?: string;
   audioCoverStrength?: number;
-  coverNoiseStrength?: number;
-  enableNormalization?: boolean;
-  normalizationDb?: number;
-  latentShift?: number;
-  latentRescale?: number;
   taskType?: string;
   useAdg?: boolean;
   cfgIntervalStart?: number;

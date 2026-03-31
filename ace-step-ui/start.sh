@@ -8,28 +8,14 @@ if [ -f .env ]; then
     export $(cat .env | grep -v '^#' | xargs)
 fi
 
-# ============= ACE-Step Configuration | ACE-Step 配置 =============
-# Set ACE-Step installation path (parent directory)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ACESTEP_PATH="${ACESTEP_PATH:-$(dirname "$SCRIPT_DIR")}"
-# Set Python executable path (virtual environment)
-if [ -z "$PYTHON_PATH" ]; then
-    if [ -f "$ACESTEP_PATH/.venv/bin/python" ]; then
-        PYTHON_PATH="$ACESTEP_PATH/.venv/bin/python"
-    elif [ -f "$ACESTEP_PATH/venv/bin/python" ]; then
-        PYTHON_PATH="$ACESTEP_PATH/venv/bin/python"
-    fi
-fi
-
+# Check ACE-Step path
 if [ ! -d "$ACESTEP_PATH" ]; then
-    echo "Error: ACE-Step not found at $ACESTEP_PATH"
-    echo "Set ACESTEP_PATH or run ./setup.sh first."
+    echo "Error: ACESTEP_PATH not set or invalid. Run ./setup.sh first."
     exit 1
 fi
 
 echo "Starting ACE-Step UI..."
-echo "ACE-Step Path: $ACESTEP_PATH"
-echo "Python Path:   ${PYTHON_PATH:-not found}"
+echo "ACE-Step: $ACESTEP_PATH"
 echo ""
 
 # Start backend in background

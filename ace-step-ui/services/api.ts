@@ -100,13 +100,12 @@ export interface Song {
   key_scale?: string;
   time_signature?: string;
   tags: string[];
-  is_public?: boolean;
+  is_public: boolean;
   like_count?: number;
   view_count?: number;
   user_id?: string;
   created_at: string;
   creator?: string;
-  creator_avatar?: string;
   ditModel?: string;
   generation_params?: any;
 }
@@ -162,16 +161,7 @@ export const songsApi = {
     const s = result.song;
     const rawUrl = s.audio_url || s.audioUrl;
     const resolvedUrl = getAudioUrl(rawUrl, s.id);
-
-    const generationParams = (() => {
-      try {
-        if (!s.generation_params) return undefined;
-        return typeof s.generation_params === 'string' ? JSON.parse(s.generation_params) : s.generation_params;
-      } catch {
-        return undefined;
-      }
-    })();
-
+    
     return {
       song: {
         id: s.id,
@@ -203,8 +193,6 @@ export const songsApi = {
         bpm: s.bpm,
         key_scale: s.key_scale,
         time_signature: s.time_signature,
-        generation_params: s.generation_params,
-        generationParams,
       }
     };
   },
@@ -300,11 +288,6 @@ export interface GenerationParams {
   repaintingEnd?: number;
   instruction?: string;
   audioCoverStrength?: number;
-  coverNoiseStrength?: number;
-  enableNormalization?: boolean;
-  normalizationDb?: number;
-  latentShift?: number;
-  latentRescale?: number;
   taskType?: string;
   useAdg?: boolean;
   cfgIntervalStart?: number;
@@ -327,9 +310,6 @@ export interface GenerationParams {
 }
 
 export interface GenerationJob {
-  id?: string;
-  params?: unknown;
-  created_at?: string;
   jobId: string;
   status: 'pending' | 'queued' | 'running' | 'succeeded' | 'failed';
   queuePosition?: number;
@@ -355,9 +335,6 @@ export const generateApi = {
 
   getHistory: (token: string): Promise<{ jobs: GenerationJob[] }> =>
     api('/api/generate/history', { token }),
-
-  deleteJob: (jobId: string, token: string): Promise<{ success: boolean }> =>
-    api(`/api/generate/job/${jobId}`, { method: 'DELETE', token }),
 
   uploadAudio: async (file: File, token: string): Promise<{ url: string; key: string }> => {
     const formData = new FormData();
@@ -416,13 +393,6 @@ export const generateApi = {
     message: string;
     scale: number;
   }> => api('/api/lora/scale', { method: 'POST', body: params, token }),
-
-  getLoraStatus: (token: string): Promise<{
-    lora_loaded: boolean;
-    use_lora: boolean;
-    lora_scale: number;
-    adapter_type: string | null;
-  }> => api('/api/lora/status', { token }),
 };
 
 // Users API
@@ -592,7 +562,6 @@ export interface TrainingStatus {
   is_training: boolean;
   should_stop: boolean;
   current_step?: number;
-  total_steps?: number;
   current_loss?: number;
   current_epoch?: number;
   status?: string;
@@ -642,10 +611,6 @@ export const trainingApi = {
     format_lyrics?: boolean;
     transcribe_lyrics?: boolean;
     only_unlabeled?: boolean;
-    lm_model_path?: string;
-    save_path?: string;
-    chunk_size?: number;
-    batch_size?: number;
   }, token: string): Promise<{
     message: string;
     labeled_count: number;
@@ -657,10 +622,6 @@ export const trainingApi = {
     format_lyrics?: boolean;
     transcribe_lyrics?: boolean;
     only_unlabeled?: boolean;
-    lm_model_path?: string;
-    save_path?: string;
-    chunk_size?: number;
-    batch_size?: number;
   }, token: string): Promise<{
     task_id: string;
     message: string;
@@ -673,9 +634,6 @@ export const trainingApi = {
     progress: string;
     current: number;
     total: number;
-    save_path?: string | null;
-    last_updated_index?: number | null;
-    last_updated_sample?: any | null;
     result?: {
       message: string;
       labeled_count: number;
@@ -683,23 +641,6 @@ export const trainingApi = {
     };
     error?: string;
   }> => api(`/api/training/dataset/auto-label-status/${taskId}`, { method: 'GET', token }),
-
-  getAutoLabelStatusLatest: (token: string): Promise<{
-    task_id: string | null;
-    status: 'idle' | 'running' | 'completed' | 'failed';
-    progress: string;
-    current: number;
-    total: number;
-    save_path?: string | null;
-    last_updated_index?: number | null;
-    last_updated_sample?: any | null;
-    result?: {
-      message: string;
-      labeled_count: number;
-      samples: any[];
-    };
-    error?: string;
-  }> => api('/api/training/dataset/auto-label-status', { method: 'GET', token }),
 
   saveDataset: (params: {
     save_path: string;
@@ -715,7 +656,6 @@ export const trainingApi = {
 
   preprocessDataset: (params: {
     output_dir: string;
-    skip_existing?: boolean;
   }, token: string): Promise<{
     message: string;
     output_dir: string;
@@ -724,7 +664,6 @@ export const trainingApi = {
 
   preprocessDatasetAsync: (params: {
     output_dir: string;
-    skip_existing?: boolean;
   }, token: string): Promise<{
     task_id: string;
     message: string;
@@ -744,48 +683,6 @@ export const trainingApi = {
     };
     error?: string;
   }> => api(`/api/training/dataset/preprocess-status/${taskId}`, { method: 'GET', token }),
-
-  getPreprocessStatusLatest: (token: string): Promise<{
-    task_id: string | null;
-    status: 'idle' | 'running' | 'completed' | 'failed';
-    progress: string;
-    current: number;
-    total: number;
-    result?: {
-      message: string;
-      output_dir: string;
-      num_tensors: number;
-    };
-    error?: string;
-  }> => api('/api/training/dataset/preprocess-status', { method: 'GET', token }),
-
-  transcribeLyrics: (params: {
-    model_path?: string;
-    force_all?: boolean;
-    return_instrumental_lyrics?: boolean;
-  }, token: string): Promise<{
-    task_id: string;
-    message: string;
-    total: number;
-  }> => api('/api/training/dataset/transcribe', { method: 'POST', body: params, token }),
-
-  getTranscribeStatus: (token: string): Promise<{
-    task_id: string | null;
-    status: 'idle' | 'running' | 'completed' | 'failed';
-    progress: string;
-    current: number;
-    total: number;
-    save_path?: string;
-    last_updated_index?: number | null;
-    last_updated_sample?: any;
-    result?: {
-      message: string;
-      transcribed: number;
-      instrumental: number;
-      errors: number;
-    };
-    error?: string;
-  }> => api('/api/training/dataset/transcribe-status', { method: 'GET', token }),
 
   getSamples: (token: string): Promise<{
     dataset_name: string;
@@ -836,9 +733,7 @@ export const trainingApi = {
     training_shift?: number;
     training_seed?: number;
     lora_output_dir?: string;
-    network_weights?: string;
     use_fp8?: boolean;
-    gradient_checkpointing?: boolean;
   }, token: string): Promise<{
     message: string;
     tensor_dir: string;
@@ -846,32 +741,6 @@ export const trainingApi = {
     config: any;
     fp8_enabled?: boolean;
   }> => api('/api/training/start', { method: 'POST', body: params, token }),
-
-  startLoKRTraining: (params: {
-    tensor_dir: string;
-    lokr_linear_dim?: number;
-    lokr_linear_alpha?: number;
-    lokr_factor?: number;
-    lokr_decompose_both?: boolean;
-    lokr_use_tucker?: boolean;
-    lokr_use_scalar?: boolean;
-    lokr_weight_decompose?: boolean;
-    learning_rate?: number;
-    train_epochs?: number;
-    train_batch_size?: number;
-    gradient_accumulation?: number;
-    save_every_n_epochs?: number;
-    training_shift?: number;
-    training_seed?: number;
-    output_dir?: string;
-    network_weights?: string;
-    gradient_checkpointing?: boolean;
-  }, token: string): Promise<{
-    message: string;
-    tensor_dir: string;
-    output_dir: string;
-    config: any;
-  }> => api('/api/training/start_lokr', { method: 'POST', body: params, token }),
 
   stopTraining: (token: string): Promise<{
     message: string;
