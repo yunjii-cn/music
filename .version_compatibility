@@ -1,5 +1,5 @@
 {
-  "last_known_version": "2026.04.01.0416",
+  "last_known_version": "2026.04.01.0435",
   "folder_structure": {
     "config": {
       "exists": true,
@@ -236,5 +236,5 @@
       "exists": false
     }
   },
-  "last_updated": "2026-04-01T04:18:50.301237"
+  "last_updated": "2026-04-01T04:45:43.143144"
 }
