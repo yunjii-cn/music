@@ -187,23 +187,29 @@ def build_exe(version_dir):
     print(f"构建 EXE (v{VERSION})...")
     os.chdir(version_dir)
     
-    # 检查并确保脚本文件存在
-    scripts_to_include = []
-    for script_name in ["install-env.ps1", "download_python_312.py", "start.ps1"]:
+    # 检查并确保脚本文件存在（但不打包进EXE）
+    scripts_to_copy = []
+    script_names = ["install-env.ps1", "download_python_312.py", "download_nodejs.py", "start.ps1", "icon.ico"]
+    
+    # 检查并添加 3、run_server.ps1（如果存在）
+    run_server_script = version_dir / "3、run_server.ps1"
+    if run_server_script.exists():
+        script_names.append("3、run_server.ps1")
+    
+    for script_name in script_names:
         script_path = version_dir / script_name
         if script_path.exists():
-            scripts_to_include.append(script_name)
-            print(f"  包含脚本: {script_name}")
+            scripts_to_copy.append(script_name)
+            print(f"  保留外部文件: {script_name}")
         else:
-            print(f"  警告: 脚本不存在: {script_name}")
+            print(f"  警告: 文件不存在: {script_name}")
     
-    # 构建PyInstaller参数
+    # 构建PyInstaller参数（只打包核心文件和脚本）
     pyinstaller_args = [
         sys.executable, "-m", "PyInstaller",
         "--name", f"云集智能音乐创意台-v{VERSION}",
         "--onefile", "--windowed",
         "--icon", "icon.ico",
-        "--add-data", "icon.ico;.",
         "--clean", "--noconfirm",
         "--hidden-import", "PyQt6",
         "--hidden-import", "PyQt6.QtCore",
@@ -223,16 +229,28 @@ def build_exe(version_dir):
         "main.py"
     ]
     
-    # 添加脚本文件到打包
-    for script_name in scripts_to_include:
-        pyinstaller_args.extend(["--add-data", f"{script_name};."])
+    # 只添加 icon.ico 到打包列表，脚本不打包到 EXE 里
+    files_to_add = [
+        "icon.ico"
+    ]
+    
+    for file_name in files_to_add:
+        file_path = version_dir / file_name
+        if file_path.exists():
+            pyinstaller_args.insert(-1, "--add-data")
+            pyinstaller_args.insert(-1, f"{file_name};.")
+            print(f"  已添加打包文件: {file_name}")
+        else:
+            print(f"  跳过不存在的文件: {file_name}")
+    
+    # 不添加脚本文件到打包，让它们保持外部
     
     print("  运行 PyInstaller...")
     subprocess.run(pyinstaller_args, check=True)
 
 
 def move_to_dist(version_dir):
-    """将构建的EXE移动到根目录dist文件夹（不自动复制到version文件夹）"""
+    """将构建的EXE和外部文件移动到根目录dist文件夹"""
     print("整理输出文件...")
     source_dist = version_dir / "dist"
     target_dist = DIST_DIR
@@ -268,6 +286,56 @@ def move_to_dist(version_dir):
             print(f"  EXE已移动到：{final_exe}")
         else:
             print(f"  EXE保存在：{final_exe}")
+        
+        # 创建 scripts 文件夹并复制项目根目录 scripts 里的所有脚本
+        scripts_dir = target_dist / "scripts"
+        if not scripts_dir.exists():
+            scripts_dir.mkdir(parents=True)
+        
+        # 从项目根目录的 scripts 文件夹复制所有脚本
+        project_scripts_dir = Path(__file__).parent / "scripts"
+        if project_scripts_dir.exists() and project_scripts_dir.is_dir():
+            for item in project_scripts_dir.iterdir():
+                if item.is_file():
+                    try:
+                        shutil.copy2(str(item), str(scripts_dir / item.name))
+                        print(f"  已复制脚本到 scripts/: {item.name}")
+                    except Exception as e:
+                        print(f"  警告：复制 {item.name} 失败：{e}")
+        
+        # 复制 .env.example 文件到 dist 目录
+        env_example_source = version_dir / ".env.example"
+        env_example_target = target_dist / ".env.example"
+        if env_example_source.exists():
+            try:
+                shutil.copy2(str(env_example_source), str(env_example_target))
+                print(f"  已复制 .env.example 到 dist/")
+            except Exception as e:
+                print(f"  警告：复制 .env.example 失败：{e}")
+        
+        # 复制 acestep 文件夹到 dist 目录
+        acestep_source = version_dir / "acestep"
+        acestep_target = target_dist / "acestep"
+        if acestep_source.exists() and acestep_source.is_dir():
+            try:
+                if acestep_target.exists():
+                    shutil.rmtree(acestep_target)
+                shutil.copytree(str(acestep_source), str(acestep_target))
+                print(f"  已复制 acestep 文件夹到 dist/")
+            except Exception as e:
+                print(f"  警告：复制 acestep 失败：{e}")
+        
+        # 复制 ace-step-ui 文件夹到 dist 目录（包含前后端）
+        ace_step_ui_source = version_dir / "ace-step-ui"
+        ace_step_ui_target = target_dist / "ace-step-ui"
+        if ace_step_ui_source.exists() and ace_step_ui_source.is_dir():
+            try:
+                if ace_step_ui_target.exists():
+                    shutil.rmtree(ace_step_ui_target)
+                shutil.copytree(str(ace_step_ui_source), str(ace_step_ui_target))
+                print(f"  已复制 ace-step-ui 文件夹到 dist/")
+            except Exception as e:
+                print(f"  警告：复制 ace-step-ui 失败：{e}")
         
         print("  [提示] version文件夹需要手动添加精选版本")
         
@@ -488,11 +556,11 @@ def main():
             if version_dir.exists() and version_dir.is_dir():
                 target_version_dir = version_dir
                 print(f"使用指定版本：{target_version_dir.name}")
-                # 从指定版本名提取版本号
-                match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', target_version_dir.name)
-                if match:
-                    global VERSION
-                    VERSION = match.group(1)
+                # 不覆盖 VERSION，保持使用当前真实时间
+                # match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', target_version_dir.name)
+                # if match:
+                #     global VERSION
+                #     VERSION = match.group(1)
             else:
                 print(f"错误：指定的版本文件夹不存在：{specified_version}")
                 sys.exit(1)
