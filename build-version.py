@@ -385,20 +385,24 @@ def record_version(version_name, changes):
     history[version_name] = version_info
     save_version_history(history)
     
-    # 同时复制到dist目录，让用户也能看到
+    # 同时复制到dist/scripts目录，让用户也能看到
     if DIST_DIR.exists():
+        dist_scripts_dir = DIST_DIR / "scripts"
+        dist_scripts_dir.mkdir(exist_ok=True)
         try:
-            shutil.copy2(VERSION_HISTORY_FILE, DIST_DIR / "version_history.json")
+            shutil.copy2(VERSION_HISTORY_FILE, dist_scripts_dir / "version_history.json")
         except Exception as e:
-            print(f"警告：复制版本历史到dist失败：{e}")
+            print(f"警告：复制版本历史到dist/scripts失败：{e}")
     
-    # 同时复制到version目录
+    # 同时复制到version/scripts目录
     version_dir_target = ROOT_DIR / "version"
     if version_dir_target.exists():
+        version_scripts_dir = version_dir_target / "scripts"
+        version_scripts_dir.mkdir(exist_ok=True)
         try:
-            shutil.copy2(VERSION_HISTORY_FILE, version_dir_target / "version_history.json")
+            shutil.copy2(VERSION_HISTORY_FILE, version_scripts_dir / "version_history.json")
         except Exception as e:
-            print(f"警告：复制版本历史到version失败：{e}")
+            print(f"警告：复制版本历史到version/scripts失败：{e}")
     
     return version_info
 
