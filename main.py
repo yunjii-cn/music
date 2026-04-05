@@ -949,12 +949,23 @@ class MainWindow(QMainWindow):
             self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         print(f"Initial base_dir: {self.base_dir}")
-        while not os.path.exists(os.path.join(self.base_dir, 'acestep')) and not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1')):
+        
+        # 查找项目根目录（包含 acestep 文件夹的目录）
+        # 新目录结构：scripts/ 在根目录，脚本在 scripts/ 中
+        max_levels = 5  # 最多向上查找5层
+        current_level = 0
+        while (not os.path.exists(os.path.join(self.base_dir, 'acestep')) and 
+               not os.path.exists(os.path.join(self.base_dir, 'scripts', '2、run_gradio.ps1')) and
+               not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1'))):
             parent_dir = os.path.dirname(self.base_dir)
-            if parent_dir == self.base_dir:
+            if parent_dir == self.base_dir or current_level >= max_levels:
+                # 到达根目录或超过最大查找层数，停止
                 break
             self.base_dir = parent_dir
+            current_level += 1
             print(f"Updated base_dir: {self.base_dir}")
+        
+        print(f"Final base_dir: {self.base_dir}")
         
         self.config = ConfigManager(self.base_dir)
         
