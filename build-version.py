@@ -287,7 +287,7 @@ def move_to_dist(version_dir):
         else:
             print(f"  EXE保存在：{final_exe}")
         
-        # 创建 scripts 文件夹并复制项目根目录 scripts 里的所有脚本
+        # 创建 scripts 文件夹并复制所有项目文件
         scripts_dir = target_dist / "scripts"
         if not scripts_dir.exists():
             scripts_dir.mkdir(parents=True)
