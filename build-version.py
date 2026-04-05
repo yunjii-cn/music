@@ -303,13 +303,24 @@ def move_to_dist(version_dir):
                     except Exception as e:
                         print(f"  警告：复制 {item.name} 失败：{e}")
         
-        # 复制 pyproject.toml 文件到 dist/scripts 目录
+        # 复制 pyproject.toml 文件到 dist/scripts 目录，并修正相对路径
         pyproject_source = version_dir / "pyproject.toml"
         pyproject_target = scripts_dir / "pyproject.toml"
         if pyproject_source.exists():
             try:
-                shutil.copy2(str(pyproject_source), str(pyproject_target))
-                print(f"  已复制 pyproject.toml 到 scripts/")
+                # 读取原始内容
+                with open(pyproject_source, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # 修正相对路径：从 scripts/ 目录看，acestep/ 在上一级
+                # 将 "acestep/" 替换为 "../acestep/"
+                content = content.replace('path = "acestep/', 'path = "../acestep/')
+                
+                # 写入修正后的内容
+                with open(pyproject_target, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                print(f"  已复制 pyproject.toml 到 scripts/（路径已修正）")
             except Exception as e:
                 print(f"  警告：复制 pyproject.toml 失败：{e}")
         
