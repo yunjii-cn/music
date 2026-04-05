@@ -576,9 +576,9 @@
   "云集智能音乐创意台-v2026.04.05.2037": {
     "version": "云集智能音乐创意台-v2026.04.05.2037",
     "changes": [
-      "修复pyproject.toml路径和依赖安装问题"
+      "修正pyproject.toml相对路径并在scripts目录执行uv sync"
     ],
-    "build_time": "2026-04-05T20:56:33.843058",
-    "version_number": "2026.04.05.2055"
+    "build_time": "2026-04-05T20:58:18.849247",
+    "version_number": "2026.04.05.2057"
   }
 }
