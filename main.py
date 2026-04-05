@@ -922,6 +922,8 @@ class ServiceCard(QFrame):
 
 class MainWindow(QMainWindow):
     """主窗口"""
+    log_signal = pyqtSignal(str, str)
+    enable_buttons_signal = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -949,23 +951,12 @@ class MainWindow(QMainWindow):
             self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         print(f"Initial base_dir: {self.base_dir}")
-        
-        # 查找项目根目录（包含 acestep 文件夹的目录）
-        # 新目录结构：scripts/ 在根目录，脚本在 scripts/ 中
-        max_levels = 5  # 最多向上查找5层
-        current_level = 0
-        while (not os.path.exists(os.path.join(self.base_dir, 'acestep')) and 
-               not os.path.exists(os.path.join(self.base_dir, 'scripts', '2、run_gradio.ps1')) and
-               not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1'))):
+        while not os.path.exists(os.path.join(self.base_dir, 'acestep')) and not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1')):
             parent_dir = os.path.dirname(self.base_dir)
-            if parent_dir == self.base_dir or current_level >= max_levels:
-                # 到达根目录或超过最大查找层数，停止
+            if parent_dir == self.base_dir:
                 break
             self.base_dir = parent_dir
-            current_level += 1
             print(f"Updated base_dir: {self.base_dir}")
-        
-        print(f"Final base_dir: {self.base_dir}")
         
         self.config = ConfigManager(self.base_dir)
         
@@ -1016,6 +1007,10 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_monitor()
         self._setup_tray()
+        
+        # 连接日志信号
+        self.log_signal.connect(self._append_log_to_ui)
+        self.enable_buttons_signal.connect(self._enable_buttons)
         
         size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
         self.resize(size["width"], size["height"])
@@ -1644,24 +1639,19 @@ class MainWindow(QMainWindow):
         if service_id in self.service_cards:
             self.service_cards[service_id].update_status(is_running)
     
-    def _log(self, message: str, color: str = "#00FF00"):
-        """添加日志"""
+    def _append_log_to_ui(self, message: str, color: str):
+        """在主线程中添加日志到UI（由信号调用）"""
         if not hasattr(self, 'log_output') or self.log_output is None:
             return
         timestamp = datetime.now().strftime("%H:%M:%S")
         html = f'<span style="color: #888888;">[{timestamp}]</span> <span style="color: {color};">{message}</span>'
-        
-        def append_log():
-            if hasattr(self, 'log_output') and self.log_output is not None:
-                self.log_output.append(html)
-                scrollbar = self.log_output.verticalScrollBar()
-                scrollbar.setValue(scrollbar.maximum())
-        
-        try:
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(0, append_log)
-        except:
-            append_log()
+        self.log_output.append(html)
+        scrollbar = self.log_output.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+    
+    def _log(self, message: str, color: str = "#00FF00"):
+        """添加日志（线程安全）"""
+        self.log_signal.emit(message, color)
     
     def _start_project(self, project_id: str):
         """启动单个项目"""
@@ -2768,18 +2758,7 @@ class MainWindow(QMainWindow):
             self._log(f"错误详情: {traceback.format_exc()}", "#F44336")
         finally:
             self.is_starting = False
-            
-            def enable_buttons_safe():
-                try:
-                    self._enable_buttons()
-                except:
-                    pass
-            
-            try:
-                from PyQt6.QtCore import QTimer
-                QTimer.singleShot(0, enable_buttons_safe)
-            except:
-                enable_buttons_safe()
+            self.enable_buttons_signal.emit()
     
     def _generate_startup_diagnosis(self, project_id: str, started_services: List[str], all_success: bool):
         """生成启动诊断分析报告"""

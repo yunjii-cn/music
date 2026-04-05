@@ -38,8 +38,7 @@ dependencies = [
     "numba>=0.63.1",
     "vector-quantize-pytorch>=1.27.15",
     "torchcodec>=0.9.1; platform_machine != 'aarch64'",
-    "torchao>=0.14.1,<0.16.0; platform_machine != 'aarch64'",
-    "torchao; platform_machine == 'aarch64'",
+    "torchao; platform_machine != 'aarch64'",
     "toml",
     # MLX dependencies (Apple Silicon native acceleration - macOS only)
     "mlx>=0.25.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
@@ -49,9 +48,8 @@ dependencies = [
     "lycoris-lora",
     "lightning>=2.0.0",
     "tensorboard>=2.0.0",
-    # Local third-party packages
-    # nano-vllm source is configured in [tool.uv.sources]
-    "nano-vllm; sys_platform != 'darwin' or platform_machine != 'arm64'",
+    # Local third-party packages (暂时禁用，避免路径问题)
+    # "nano-vllm; sys_platform != 'darwin' or platform_machine != 'arm64'",
     "modelscope",
     "tensorboard>=2.20.0",
     "typer-slim>=0.21.1",
@@ -76,7 +74,7 @@ required-environments = [
 ]
 
 [tool.uv.sources]
-nano-vllm = { path = "acestep/third_parts/nano-vllm" }
+# nano-vllm = { path = "acestep/third_parts/nano-vllm" }
 torch = [
     { index = "pytorch-cu128", marker = "sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },

@@ -312,17 +312,52 @@ def move_to_dist(version_dir):
                 with open(pyproject_source, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
-                # 修正相对路径：从 scripts/ 目录看，acestep/ 在上一级
+                # 修正1：相对路径 - 从 scripts/ 目录看，acestep/ 在上一级
                 # 将 "acestep/" 替换为 "../acestep/"
                 content = content.replace('path = "acestep/', 'path = "../acestep/')
+                
+                # 修正2：移除 force-include 配置（避免路径问题导致构建失败）
+                # 删除整个 [tool.hatch.build.targets.wheel.force-include] 部分
+                import re
+                content = re.sub(
+                    r'\n\[tool\.hatch\.build\.targets\.wheel\.force-include\]\n.*?(?=\n\[|\Z)',
+                    '',
+                    content,
+                    flags=re.DOTALL
+                )
                 
                 # 写入修正后的内容
                 with open(pyproject_target, 'w', encoding='utf-8') as f:
                     f.write(content)
                 
-                print(f"  已复制 pyproject.toml 到 scripts/（路径已修正）")
+                print(f"  已复制 pyproject.toml 到 scripts/（路径已修正，force-include已移除）")
             except Exception as e:
                 print(f"  警告：复制 pyproject.toml 失败：{e}")
+        
+        # 创建 README.md 文件(避免构建失败)
+        readme_target = scripts_dir / "README.md"
+        if not readme_target.exists():
+            try:
+                readme_content = """# ACE-Step 项目配置
+
+此目录包含 ACE-Step 项目的依赖配置文件 (pyproject.toml)。
+
+## 依赖管理
+
+使用 uv 包管理器安装依赖:
+
+```bash
+cd scripts
+uv sync
+```
+
+这将根据 pyproject.toml 安装所有必需的依赖到 .venv 虚拟环境中。
+"""
+                with open(readme_target, 'w', encoding='utf-8') as f:
+                    f.write(readme_content)
+                print(f"  已创建 README.md 到 scripts/")
+            except Exception as e:
+                print(f"  警告：创建 README.md 失败：{e}")
         
         # 复制 flash_attn wheel 文件到 dist/scripts 目录
         flash_attn_wheel = "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl"
