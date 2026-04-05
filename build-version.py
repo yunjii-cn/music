@@ -303,13 +303,34 @@ def move_to_dist(version_dir):
                     except Exception as e:
                         print(f"  警告：复制 {item.name} 失败：{e}")
         
-        # 复制 .env.example 文件到 dist 目录
+        # 复制 pyproject.toml 文件到 dist/scripts 目录
+        pyproject_source = version_dir / "pyproject.toml"
+        pyproject_target = scripts_dir / "pyproject.toml"
+        if pyproject_source.exists():
+            try:
+                shutil.copy2(str(pyproject_source), str(pyproject_target))
+                print(f"  已复制 pyproject.toml 到 scripts/")
+            except Exception as e:
+                print(f"  警告：复制 pyproject.toml 失败：{e}")
+        
+        # 复制 flash_attn wheel 文件到 dist/scripts 目录
+        flash_attn_wheel = "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl"
+        flash_attn_source = version_dir / flash_attn_wheel
+        flash_attn_target = scripts_dir / flash_attn_wheel
+        if flash_attn_source.exists():
+            try:
+                shutil.copy2(str(flash_attn_source), str(flash_attn_target))
+                print(f"  已复制 flash_attn wheel 到 scripts/")
+            except Exception as e:
+                print(f"  警告：复制 flash_attn wheel 失败：{e}")
+        
+        # 复制 .env.example 文件到 dist/scripts 目录
         env_example_source = version_dir / ".env.example"
-        env_example_target = target_dist / ".env.example"
+        env_example_target = scripts_dir / ".env.example"
         if env_example_source.exists():
             try:
                 shutil.copy2(str(env_example_source), str(env_example_target))
-                print(f"  已复制 .env.example 到 dist/")
+                print(f"  已复制 .env.example 到 scripts/")
             except Exception as e:
                 print(f"  警告：复制 .env.example 失败：{e}")
         

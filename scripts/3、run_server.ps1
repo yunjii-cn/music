@@ -6,9 +6,9 @@ param(
 )
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
-# Set environment variables
-Set-Location $PSScriptRoot
-$env:PYTHONPATH = "$PSScriptRoot$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
+# Set environment variables - 工作目录设为脚本父目录（项目根目录）
+Set-Location (Split-Path $PSScriptRoot -Parent)
+$env:PYTHONPATH = "$(Split-Path $PSScriptRoot -Parent)$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
 
 $Env:HF_HOME = "huggingface"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"

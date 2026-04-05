@@ -552,9 +552,17 @@
   "云集智能音乐创意台-v2026.04.03.2320": {
     "version": "云集智能音乐创意台-v2026.04.03.2320",
     "changes": [
-      "修复：1.在_start_project_services和_generate_startup_diagnosis中添加完整try-except，避免闪退；2.所有异常都有日志和traceback"
+      "修复：1.复制flash_attn wheel文件到build和项目根目录；2.修改build-version.py添加复制flash_attn到dist目录；3.保持所有其他修复"
     ],
-    "build_time": "2026-04-04T22:21:42.039011",
-    "version_number": "2026.04.04.2216"
+    "build_time": "2026-04-05T18:25:24.438420",
+    "version_number": "2026.04.05.1819"
+  },
+  "云集智能音乐创意台-v2026.04.05.1945": {
+    "version": "云集智能音乐创意台-v2026.04.05.1945",
+    "changes": [
+      "优化和修复"
+    ],
+    "build_time": "2026-04-05T19:47:31.047379",
+    "version_number": "2026.04.05.1945"
   }
 }
