@@ -1639,9 +1639,18 @@ class MainWindow(QMainWindow):
             return
         timestamp = datetime.now().strftime("%H:%M:%S")
         html = f'<span style="color: #888888;">[{timestamp}]</span> <span style="color: {color};">{message}</span>'
-        self.log_output.append(html)
-        scrollbar = self.log_output.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        
+        def append_log():
+            if hasattr(self, 'log_output') and self.log_output is not None:
+                self.log_output.append(html)
+                scrollbar = self.log_output.verticalScrollBar()
+                scrollbar.setValue(scrollbar.maximum())
+        
+        try:
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, append_log)
+        except:
+            append_log()
     
     def _start_project(self, project_id: str):
         """启动单个项目"""
@@ -2748,10 +2757,18 @@ class MainWindow(QMainWindow):
             self._log(f"错误详情: {traceback.format_exc()}", "#F44336")
         finally:
             self.is_starting = False
+            
+            def enable_buttons_safe():
+                try:
+                    self._enable_buttons()
+                except:
+                    pass
+            
             try:
-                self._enable_buttons()
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, enable_buttons_safe)
             except:
-                pass
+                enable_buttons_safe()
     
     def _generate_startup_diagnosis(self, project_id: str, started_services: List[str], all_success: bool):
         """生成启动诊断分析报告"""
