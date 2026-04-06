@@ -5,10 +5,18 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location "$ScriptDir\ace-step-ui"
 
 # 查找 npm 命令的完整路径
+# 首先检查便携版 Node.js
+$portableNodeDir = "$ScriptDir\node-v22.22.2-win-x64\node-v22.22.2-win-x64"
 $nodePath = Get-Command node -ErrorAction SilentlyContinue
 if ($nodePath) {
     $nodeDir = Split-Path -Parent $nodePath.Path
     $npmCmd = "$nodeDir\npm.cmd"
+} elseif (Test-Path "$portableNodeDir\node.exe") {
+    # 使用便携版 Node.js
+    Write-Output "Using portable Node.js: $portableNodeDir"
+    $npmCmd = "$portableNodeDir\npm.cmd"
+    # 将便携版 Node.js 添加到 PATH，确保子进程也能找到
+    $env:PATH = "$portableNodeDir;$env:PATH"
 } else {
     # 如果找不到 node，尝试使用系统路径中的 npm
     $npmCmd = "npm"

@@ -1855,8 +1855,6 @@ class MainWindow(QMainWindow):
                         
                         if not all_ready:
                             time.sleep(10)
-                            waited = int(time.time() - start_time)
-                            self._log(f"等待服务就绪... (已等待 {waited} 秒)", "#888888")
                     
                     waited = int(time.time() - start_time)
                     if all_ready:
@@ -2133,8 +2131,97 @@ class MainWindow(QMainWindow):
                 self._log(f"[错误] 检查 PowerShell 失败: {e}", "#F44336")
                 return
             
-            # 2. 检查并安装 uv
-            self._log("2. 检查并安装 uv...")
+            # 2. 检查 Node.js
+            self._log("2. 检查 Node.js...")
+            node_available = False
+            
+            try:
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                
+                portable_node_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                node_paths = [
+                    "node.exe",
+                    "C:/Program Files/nodejs/node.exe",
+                    "C:/Program Files (x86)/nodejs/node.exe",
+                    os.path.join(portable_node_dir, "node.exe")
+                ]
+                
+                for node_exe in node_paths:
+                    try:
+                        process = subprocess.Popen(
+                            [node_exe, "--version"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            startupinfo=startupinfo
+                        )
+                        stdout, stderr = process.communicate(timeout=5)
+                        if process.returncode == 0 and stdout.strip():
+                            self._log(f"✓ Node.js 已安装: {stdout.strip()}")
+                            node_available = True
+                            break
+                    except:
+                        continue
+                
+                if not node_available:
+                    self._log("[信息] Node.js 未安装，尝试使用 winget 自动安装...", "#FF9800")
+                    
+                    winget_available = False
+                    try:
+                        process = subprocess.Popen(
+                            ["winget", "--version"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            startupinfo=startupinfo
+                        )
+                        stdout, stderr = process.communicate(timeout=10)
+                        if process.returncode == 0:
+                            winget_available = True
+                            self._log(f"✓ winget 可用: {stdout.strip()}")
+                    except:
+                        pass
+                    
+                    if winget_available:
+                        self._log("正在使用 winget 安装 Node.js 22...")
+                        self._log("这可能需要几分钟，请稍候...")
+                        
+                        try:
+                            process = subprocess.Popen(
+                                ["winget", "install", "--id", "OpenJS.NodeJS.LTS.22", "--silent", "--accept-package-agreements", "--accept-source-agreements"],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                startupinfo=startupinfo
+                            )
+                            
+                            while process.poll() is None:
+                                line = process.stdout.readline()
+                                if line:
+                                    self._log(f"[Node.js 安装] {line.strip()}")
+                                line_err = process.stderr.readline()
+                                if line_err:
+                                    self._log(f"[Node.js 安装错误] {line_err.strip()}", "#F44336")
+                            
+                            if process.returncode == 0:
+                                self._log("✓ Node.js 22 安装成功！", "#4CAF50")
+                                self._log("[信息] 请重新运行部署维护以完成后续步骤", "#FF9800")
+                                return
+                            else:
+                                self._log(f"[错误] Node.js 安装失败，返回码: {process.returncode}", "#F44336")
+                        except Exception as e:
+                            self._log(f"[错误] Node.js 安装失败: {e}", "#F44336")
+                    else:
+                        self._log("[错误] winget 不可用", "#F44336")
+                        self._log("[建议] 请手动安装 Node.js 22+ 或使用 winget", "#FF9800")
+                        return
+            except Exception as e:
+                self._log(f"[错误] 检查 Node.js 失败: {e}", "#F44336")
+                return
+            
+            # 3. 检查并安装 uv
+            self._log("3. 检查并安装 uv...")
             uv_path = os.path.expanduser("~/.local/bin/uv.exe")
             
             if not os.path.exists(uv_path):
@@ -2209,8 +2296,8 @@ class MainWindow(QMainWindow):
             else:
                 self._log("✓ uv 已安装")
             
-            # 3. 检查并创建虚拟环境
-            self._log("3. 检查并创建虚拟环境...")
+            # 4. 检查并创建虚拟环境
+            self._log("4. 检查并创建虚拟环境...")
             venv_path = os.path.join(self.base_dir, ".venv")
             
             if not os.path.exists(venv_path):
@@ -2248,8 +2335,8 @@ class MainWindow(QMainWindow):
             else:
                 self._log("✓ 虚拟环境已存在")
             
-            # 4. 安装项目依赖
-            self._log("4. 安装项目依赖...")
+            # 5. 安装项目依赖
+            self._log("5. 安装项目依赖...")
             try:
                 pyproject_toml_path = os.path.join(self.base_dir, "scripts", "pyproject.toml")
                 scripts_dir = os.path.join(self.base_dir, "scripts")
@@ -2284,8 +2371,8 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self._log(f"[警告] 安装项目依赖失败: {e}", "#FF9800")
             
-            # 5. 检查并初始化git子模块
-            self._log("5. 检查git子模块...")
+            # 6. 检查并初始化git子模块
+            self._log("6. 检查git子模块...")
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
             git_dir = os.path.join(ace_step_ui_path, ".git")
             
@@ -2326,8 +2413,8 @@ class MainWindow(QMainWindow):
             else:
                 self._log("[警告] ace-step-ui 目录不存在，跳过子模块检查", "#FF9800")
             
-            # 6. 安装前端依赖
-            self._log("6. 安装前端依赖...")
+            # 7. 安装前端依赖
+            self._log("7. 安装前端依赖...")
             if os.path.exists(ace_step_ui_path):
                 package_json_path = os.path.join(ace_step_ui_path, "package.json")
                 if os.path.exists(package_json_path):
@@ -2383,8 +2470,8 @@ class MainWindow(QMainWindow):
             else:
                 self._log("[警告] ace-step-ui 目录不存在，跳过前端依赖安装", "#FF9800")
             
-            # 7. 检查启动脚本
-            self._log("7. 检查启动脚本...")
+            # 8. 检查启动脚本
+            self._log("8. 检查启动脚本...")
             scripts = [
                 "2、run_gradio.ps1",
                 "3、run_server.ps1",
@@ -2403,8 +2490,8 @@ class MainWindow(QMainWindow):
                 self._log(f"[警告] 缺少启动脚本: {', '.join(missing_scripts)}", "#FF9800")
                 self._log("请确保这些脚本存在或从原始项目中复制", "#FF9800")
             
-            # 8. 检查环境变量
-            self._log("8. 检查环境变量...")
+            # 9. 检查环境变量
+            self._log("9. 检查环境变量...")
             try:
                 # 检查 PATH 环境变量是否包含 uv 的路径
                 path_env = os.environ.get("PATH", "")
@@ -2659,8 +2746,101 @@ class MainWindow(QMainWindow):
                 self._log(f"[错误] 检查 PowerShell 失败: {e}", "#F44336")
                 return
             
-            # 2. 检查环境是否已安装
-            self._log("2. 检查环境安装状态...")
+            # 2. 检查 Node.js
+            self._log("2. 检查 Node.js...")
+            node_available = False
+            node_path = None
+            
+            try:
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                
+                # 检查常见的 Node.js 安装位置
+                portable_node_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                node_paths = [
+                    "node.exe",
+                    "C:/Program Files/nodejs/node.exe",
+                    "C:/Program Files (x86)/nodejs/node.exe",
+                    os.path.join(portable_node_dir, "node.exe")
+                ]
+                
+                for node_exe in node_paths:
+                    try:
+                        process = subprocess.Popen(
+                            [node_exe, "--version"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            startupinfo=startupinfo
+                        )
+                        stdout, stderr = process.communicate(timeout=5)
+                        if process.returncode == 0 and stdout.strip():
+                            self._log(f"✓ Node.js 已安装: {stdout.strip()}")
+                            node_available = True
+                            node_path = node_exe
+                            break
+                    except:
+                        continue
+                
+                if not node_available:
+                    self._log("[信息] Node.js 未安装，尝试使用 winget 自动安装...", "#FF9800")
+                    
+                    # 检查 winget 是否可用
+                    winget_available = False
+                    try:
+                        process = subprocess.Popen(
+                            ["winget", "--version"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            startupinfo=startupinfo
+                        )
+                        stdout, stderr = process.communicate(timeout=10)
+                        if process.returncode == 0:
+                            winget_available = True
+                            self._log(f"✓ winget 可用: {stdout.strip()}")
+                    except:
+                        pass
+                    
+                    if winget_available:
+                        self._log("正在使用 winget 安装 Node.js 22...")
+                        self._log("这可能需要几分钟，请稍候...")
+                        
+                        try:
+                            process = subprocess.Popen(
+                                ["winget", "install", "--id", "OpenJS.NodeJS.LTS.22", "--silent", "--accept-package-agreements", "--accept-source-agreements"],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                startupinfo=startupinfo
+                            )
+                            
+                            while process.poll() is None:
+                                line = process.stdout.readline()
+                                if line:
+                                    self._log(f"[Node.js 安装] {line.strip()}")
+                                line_err = process.stderr.readline()
+                                if line_err:
+                                    self._log(f"[Node.js 安装错误] {line_err.strip()}", "#F44336")
+                            
+                            if process.returncode == 0:
+                                self._log("✓ Node.js 22 安装成功！", "#4CAF50")
+                                self._log("[信息] 请重新运行部署维护以完成后续步骤", "#FF9800")
+                                return
+                            else:
+                                self._log(f"[错误] Node.js 安装失败，返回码: {process.returncode}", "#F44336")
+                        except Exception as e:
+                            self._log(f"[错误] Node.js 安装失败: {e}", "#F44336")
+                    else:
+                        self._log("[错误] winget 不可用", "#F44336")
+                        self._log("[建议] 请手动安装 Node.js 22+ 或使用 winget", "#FF9800")
+                        return
+            except Exception as e:
+                self._log(f"[错误] 检查 Node.js 失败: {e}", "#F44336")
+                return
+            
+            # 3. 检查环境是否已安装
+            self._log("3. 检查环境安装状态...")
             
             uv_path = os.path.expanduser("~/.local/bin/uv.exe")
             venv_path = os.path.join(self.base_dir, ".venv")
@@ -2683,7 +2863,7 @@ class MainWindow(QMainWindow):
                 install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
                 if os.path.exists(install_script):
                     try:
-                        self._log("3. 执行环境安装脚本...")
+                        self._log("4. 执行环境安装脚本...")
                         
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -2723,11 +2903,11 @@ class MainWindow(QMainWindow):
                     return
             else:
                 # 环境已安装，执行智能修复
-                self._log("3. 环境已安装，执行智能修复...")
+                self._log("5. 环境已安装，执行智能修复...")
                 self._smart_fix_environment()
             
-            # 4. 最终检查
-            self._log("4. 最终检查...")
+            # 6. 最终检查
+            self._log("6. 最终检查...")
             
             # 检查启动脚本
             scripts = [
@@ -2891,8 +3071,6 @@ class MainWindow(QMainWindow):
             if process.state() == 0:
                 self._log(f"[错误] {service_name} 进程已退出", "#F44336")
                 return False
-                
-            self._log(f"等待 {service_name} 就绪... (已等待 {waited} 秒)", "#888888")
         
         self._log(f"[错误] {service_name} 启动超时 (已等待 {waited} 秒)", "#F44336")
         return False
