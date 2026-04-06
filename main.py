@@ -1875,8 +1875,12 @@ class MainWindow(QMainWindow):
                             else:
                                 base_service_id = service_id
                             
-                            if self.config.get(f"service_settings.{base_service_id}.auto_open", False):
-                                self._open_service(service_id)
+                            auto_open = self.config.get(f"service_settings.{base_service_id}.auto_open", True)
+                            if auto_open:
+                                if project_id == "qinglong" and base_service_id == "frontend":
+                                    self._open_service(service_id)
+                                elif project_id != "qinglong":
+                                    self._open_service(service_id)
                 except Exception as e:
                     self._log(f"[警告] 等待服务就绪或打开浏览器失败: {e}", "#FF9800")
             
