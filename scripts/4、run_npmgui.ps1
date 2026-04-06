@@ -46,11 +46,23 @@ if (-not (Test-Path "server\node_modules")) {
     exit 1
 }
 
+# 检查端口是否被占用
+function Test-Port {
+    param($port)
+    try {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $tcp.Connect("127.0.0.1", $port)
+        $tcp.Close()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 # 启动后端服务
 Write-Output "Starting backend server..."
 try {
-    # 在后台启动后端服务
-    $backendProcess = Start-Process $npmCmd -ArgumentList "run dev" -WorkingDirectory "server" -NoNewWindow -PassThru
+    $backendProcess = Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "cd '$(Get-Location)\\server'; & '$npmCmd' run dev" -NoNewWindow -PassThru
     Write-Output "Backend server started with PID: $($backendProcess.Id)"
 } catch {
     Write-Error "Failed to start backend server: $_"
@@ -59,25 +71,55 @@ try {
 
 # 等待后端启动
 Write-Output "Waiting for backend to start..."
-Start-Sleep -Seconds 3
+$backendReady = $false
+$maxWait = 60
+$waited = 0
+while (-not $backendReady -and $waited -lt $maxWait) {
+    if (Test-Port 3001) {
+        $backendReady = $true
+        Write-Output "✓ Backend server is ready!"
+    } else {
+        Start-Sleep -Seconds 2
+        $waited += 2
+    }
+}
+
+if (-not $backendReady) {
+    Write-Error "Backend server failed to start within $maxWait seconds"
+    if ($backendProcess) {
+        try { $backendProcess.Kill() } catch {}
+    }
+    exit 1
+}
 
 # 启动前端服务
 Write-Output "Starting frontend..."
 try {
-    # 在后台启动前端服务
-    $frontendProcess = Start-Process $npmCmd -ArgumentList "run dev" -NoNewWindow -PassThru
+    $frontendProcess = Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "cd '$(Get-Location)'; & '$npmCmd' run dev" -NoNewWindow -PassThru
     Write-Output "Frontend started with PID: $($frontendProcess.Id)"
 } catch {
     Write-Error "Failed to start frontend: $_"
     # 停止后端服务
     if ($backendProcess) {
-        $backendProcess.Kill()
+        try { $backendProcess.Kill() } catch {}
     }
     exit 1
 }
 
 # 等待前端启动
-Start-Sleep -Seconds 2
+Write-Output "Waiting for frontend to start..."
+$frontendReady = $false
+$maxWait = 30
+$waited = 0
+while (-not $frontendReady -and $waited -lt $maxWait) {
+    if (Test-Port 3000) {
+        $frontendReady = $true
+        Write-Output "✓ Frontend is ready!"
+    } else {
+        Start-Sleep -Seconds 2
+        $waited += 2
+    }
+}
 
 Write-Output ""
 Write-Output "=================================="
@@ -106,10 +148,10 @@ try {
     # 停止服务
     Write-Output "Stopping services..."
     if ($frontendProcess) {
-        $frontendProcess.Kill()
+        try { $frontendProcess.Kill() } catch {}
     }
     if ($backendProcess) {
-        $backendProcess.Kill()
+        try { $backendProcess.Kill() } catch {}
     }
     Write-Output "Services stopped"
 }

@@ -105,21 +105,21 @@ PROJECTS = {
     "qinglong": {
         "name": "青龙 LoRA 训练器",
         "services": {
-            "frontend": {
-                "name": "青龙前端",
-                "port": 3000,
-                "script": "scripts/4、run_npmgui.ps1",
-                "url": "http://localhost:3000",
-                "color": "#E53935",
-                "icon": "🎨"
-            },
             "backend": {
                 "name": "青龙后端",
                 "port": 3001,
-                "script": "",
+                "script": "scripts/5、run_qinglong_backend.ps1",
                 "url": "http://localhost:3001",
                 "color": "#E53935",
                 "icon": "⚙️"
+            },
+            "frontend": {
+                "name": "青龙前端",
+                "port": 3000,
+                "script": "scripts/6、run_qinglong_frontend.ps1",
+                "url": "http://localhost:3000",
+                "color": "#E53935",
+                "icon": "🎨"
             }
         }
     }
@@ -1244,21 +1244,21 @@ class MainWindow(QMainWindow):
     def _create_home_page(self):
         """创建首页"""
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setSpacing(8)
-        layout.setContentsMargins(12, 12, 12, 12)
+        self.home_layout = QVBoxLayout(page)
+        self.home_layout.setSpacing(8)
+        self.home_layout.setContentsMargins(12, 12, 12, 12)
         
         # 日志区域（高度紧凑结构：系统信息+日志融合）
-        log_group = QFrame()
-        log_group.setFrameShape(QFrame.Shape.StyledPanel)
-        log_group.setStyleSheet("""
+        self.log_group = QFrame()
+        self.log_group.setFrameShape(QFrame.Shape.StyledPanel)
+        self.log_group.setStyleSheet("""
             QFrame {
                 background-color: #1A1A1A;
                 border: 1px solid #333333;
                 border-radius: 6px;
             }
         """)
-        log_layout = QVBoxLayout(log_group)
+        log_layout = QVBoxLayout(self.log_group)
         log_layout.setSpacing(6)
         log_layout.setContentsMargins(10, 10, 10, 10)
         
@@ -1285,6 +1285,55 @@ class MainWindow(QMainWindow):
         self.system_info_label.setWordWrap(False)
         header_layout.addWidget(self.system_info_label, 1)
         
+        # 自动滚动开关
+        self.auto_scroll_switch = QPushButton("🔄 自动滚动")
+        self.auto_scroll_switch.setCheckable(True)
+        self.auto_scroll_switch.setChecked(True)
+        self.auto_scroll_switch.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.auto_scroll_switch.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: white;
+                border: 1px solid #388E3C;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: #2E7D32;
+            }
+            QPushButton:!checked {
+                background-color: #424242;
+                border-color: #616161;
+            }
+        """)
+        self.auto_scroll_switch.clicked.connect(self._on_auto_scroll_toggled)
+        header_layout.addWidget(self.auto_scroll_switch)
+        
+        # 展开窗口开关
+        self.expand_switch = QPushButton("📐 展开窗口")
+        self.expand_switch.setCheckable(True)
+        self.expand_switch.setChecked(False)
+        self.expand_switch.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.expand_switch.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                color: white;
+                border: 1px solid #616161;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: #1565C0;
+                border-color: #1976D2;
+            }
+        """)
+        self.expand_switch.clicked.connect(self._on_expand_toggled)
+        header_layout.addWidget(self.expand_switch)
+        
         log_layout.addWidget(header_container)
         
         # 分隔线（更细）
@@ -1310,7 +1359,13 @@ class MainWindow(QMainWindow):
         """)
         log_layout.addWidget(self.log_output)
         
-        layout.addWidget(log_group, 1)
+        self.home_layout.addWidget(self.log_group, 1)
+        
+        # 服务区域容器（用于展开/收起）
+        self.services_container = QWidget()
+        self.services_layout = QVBoxLayout(self.services_container)
+        self.services_layout.setSpacing(8)
+        self.services_layout.setContentsMargins(0, 0, 0, 0)
         
         # 创建设置面板容器
         settings_container = QWidget()
@@ -1417,7 +1472,7 @@ class MainWindow(QMainWindow):
         browser_panel.set_content(browser_content)
         settings_layout.addWidget(browser_panel)
         
-        layout.addWidget(settings_container)
+        self.services_layout.addWidget(settings_container)
         
         music_project = PROJECTS["music"]
         self.music_group = QFrame()
@@ -1434,7 +1489,7 @@ class MainWindow(QMainWindow):
             self.service_cards[full_service_id] = card
             col += 1
         
-        layout.addWidget(self.music_group)
+        self.services_layout.addWidget(self.music_group)
         
         qinglong_project = PROJECTS["qinglong"]
         self.qinglong_group = QFrame()
@@ -1451,7 +1506,7 @@ class MainWindow(QMainWindow):
             self.service_cards[full_service_id] = card
             col += 1
         
-        layout.addWidget(self.qinglong_group)
+        self.services_layout.addWidget(self.qinglong_group)
         
         # 功能按钮区域
         start_btn_layout = QVBoxLayout()
@@ -1554,9 +1609,47 @@ class MainWindow(QMainWindow):
         start_buttons.addWidget(self.btn_start_qinglong)
         
         start_btn_layout.addLayout(start_buttons)
-        layout.addLayout(start_btn_layout)
+        self.services_layout.addLayout(start_btn_layout)
+        
+        self.home_layout.addWidget(self.services_container)
         
         return page
+    
+    def _on_auto_scroll_toggled(self, checked):
+        """自动滚动开关切换"""
+        if checked:
+            self.auto_scroll_switch.setStyleSheet("""
+                QPushButton {
+                    background-color: #2E7D32;
+                    color: white;
+                    border: 1px solid #388E3C;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            self.auto_scroll_switch.setStyleSheet("""
+                QPushButton {
+                    background-color: #424242;
+                    color: white;
+                    border: 1px solid #616161;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+            """)
+    
+    def _on_expand_toggled(self, checked):
+        """展开窗口开关切换"""
+        if checked:
+            self.services_container.hide()
+            self.expand_switch.setText("📐 收起窗口")
+        else:
+            self.services_container.show()
+            self.expand_switch.setText("📐 展开窗口")
     
     def _create_version_page(self):
         """创建版本管理器页面"""
@@ -1656,8 +1749,10 @@ class MainWindow(QMainWindow):
         timestamp = datetime.now().strftime("%H:%M:%S")
         html = f'<span style="color: #888888;">[{timestamp}]</span> <span style="color: {color};">{message}</span>'
         self.log_output.append(html)
-        scrollbar = self.log_output.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        # 只有在自动滚动开关打开时才滚动到底部
+        if hasattr(self, 'auto_scroll_switch') and self.auto_scroll_switch.isChecked():
+            scrollbar = self.log_output.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
     
     def _log(self, message: str, color: str = "#00FF00"):
         """添加日志（线程安全）"""
@@ -1751,11 +1846,14 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     self._log(f"[警告] 检查虚拟环境依赖失败: {e}，尝试继续启动...", "#FF9800")
                 
-                ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
+                ace_step_ui_path = os.path.join(self.base_dir, "scripts", "ace-step-ui")
                 if os.path.exists(ace_step_ui_path):
                     node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
                     if not os.path.exists(node_modules_path):
-                        self._log("[警告] ace-step-ui node_modules 不存在，尝试直接启动...", "#FF9800")
+                        self._log("[警告] ace-step-ui node_modules 不存在，请先运行部署维护", "#FF9800")
+                        self.is_starting = False
+                        self._enable_buttons()
+                        return
             
             if project_id in ["qinglong", "music"]:
                 try:
@@ -1823,31 +1921,77 @@ class MainWindow(QMainWindow):
                     self._enable_buttons()
                     return
             
-            service_threads = []
-            service_results = {}
+            if project_id == "qinglong":
+                # 青龙训练器：先启动后端，等后端就绪后再启动前端
+                self._log("青龙训练器：先后端，后前端")
                 
-            def start_service_thread(service_id, service):
-                full_service_id = f"{project_id}_{service_id}"
-                success = self._start_single_service(project_id, full_service_id, service["name"])
-                service_results[full_service_id] = success
-                if success:
-                    started_services.append(full_service_id)
+                # 1. 启动后端
+                backend_service_id = "qinglong_backend"
+                backend_service = project["services"]["backend"]
+                self._log(f"正在启动 {backend_service['name']}...")
+                backend_success = self._start_single_service(project_id, backend_service_id, backend_service["name"])
                 
-            for service_id, service in project["services"].items():
-                thread = threading.Thread(
-                    target=start_service_thread,
-                    args=(service_id, service)
-                )
-                service_threads.append(thread)
-                thread.start()
-                
-            for thread in service_threads:
-                thread.join()
-                
-            for full_service_id, success in service_results.items():
-                if not success:
+                if not backend_success:
+                    self._log(f"[错误] {backend_service['name']} 启动失败", "#F44336")
                     all_success = False
-                    break
+                else:
+                    started_services.append(backend_service_id)
+                    
+                    # 等待后端就绪
+                    self._log(f"等待 {backend_service['name']} 就绪...")
+                    backend_ready = False
+                    max_wait = 60
+                    waited = 0
+                    while waited < max_wait and not backend_ready:
+                        if self.monitor._check_port(backend_service["port"]):
+                            backend_ready = True
+                        else:
+                            time.sleep(2)
+                            waited += 2
+                    
+                    if not backend_ready:
+                        self._log(f"[错误] {backend_service['name']} 启动超时", "#F44336")
+                        all_success = False
+                    else:
+                        self._log(f"✓ {backend_service['name']} 已就绪")
+                        
+                        # 2. 启动前端
+                        frontend_service_id = "qinglong_frontend"
+                        frontend_service = project["services"]["frontend"]
+                        self._log(f"正在启动 {frontend_service['name']}...")
+                        frontend_success = self._start_single_service(project_id, frontend_service_id, frontend_service["name"])
+                        
+                        if frontend_success:
+                            started_services.append(frontend_service_id)
+                        else:
+                            all_success = False
+            else:
+                # 其他项目：并行启动所有服务
+                service_threads = []
+                service_results = {}
+                    
+                def start_service_thread(service_id, service):
+                    full_service_id = f"{project_id}_{service_id}"
+                    success = self._start_single_service(project_id, full_service_id, service["name"])
+                    service_results[full_service_id] = success
+                    if success:
+                        started_services.append(full_service_id)
+                    
+                for service_id, service in project["services"].items():
+                    thread = threading.Thread(
+                        target=start_service_thread,
+                        args=(service_id, service)
+                    )
+                    service_threads.append(thread)
+                    thread.start()
+                    
+                for thread in service_threads:
+                    thread.join()
+                    
+                for full_service_id, success in service_results.items():
+                    if not success:
+                        all_success = False
+                        break
             
             if all_success and started_services:
                 try:
@@ -2474,25 +2618,42 @@ class MainWindow(QMainWindow):
                         self._log("[信息] 正在重新安装前端依赖...")
                         self._log("[信息] 这可能需要几分钟，请稍候...")
                         try:
-                            # 检查 npm 是否可用
-                            startupinfo = subprocess.STARTUPINFO()
-                            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                            # 查找 npm 命令路径
+                            scripts_dir = os.path.join(self.base_dir, "scripts")
+                            portable_node24_dir = os.path.join(scripts_dir, "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                            portable_node22_dir = os.path.join(scripts_dir, "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                             
-                            # 先检查 npm 是否存在
-                            npm_check = subprocess.Popen(
-                                ["npm", "--version"],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                text=True,
-                                startupinfo=startupinfo
-                            )
-                            npm_check.wait()
+                            npm_cmd = None
+                            # 先尝试便携版 Node.js 24
+                            if os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
+                                self._log(f"[信息] 使用便携版 Node.js 24: {portable_node24_dir}")
+                                npm_cmd = os.path.join(portable_node24_dir, "npm.cmd")
+                                # 更新环境变量 PATH
+                                os.environ["PATH"] = f"{portable_node24_dir};{os.environ.get('PATH', '')}"
+                            # 再尝试便携版 Node.js 22
+                            elif os.path.exists(os.path.join(portable_node22_dir, "node.exe")):
+                                self._log(f"[信息] 使用便携版 Node.js 22: {portable_node22_dir}")
+                                npm_cmd = os.path.join(portable_node22_dir, "npm.cmd")
+                                # 更新环境变量 PATH
+                                os.environ["PATH"] = f"{portable_node22_dir};{os.environ.get('PATH', '')}"
+                            # 最后尝试系统 npm
+                            else:
+                                try:
+                                    import shutil
+                                    npm_cmd = shutil.which("npm")
+                                    if npm_cmd:
+                                        self._log("[信息] 使用系统 npm")
+                                except Exception:
+                                    pass
                             
-                            if npm_check.returncode == 0:
+                            if npm_cmd and os.path.exists(npm_cmd):
+                                startupinfo = subprocess.STARTUPINFO()
+                                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                                
                                 # 先安装根目录依赖
                                 self._log("[信息] 安装根目录依赖...")
                                 process = subprocess.Popen(
-                                    ["npm", "install"],
+                                    [npm_cmd, "install"],
                                     cwd=ace_step_ui_path,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT,
@@ -2521,7 +2682,7 @@ class MainWindow(QMainWindow):
                                 if os.path.exists(server_path):
                                     self._log("[信息] 安装 server 目录依赖...")
                                     process2 = subprocess.Popen(
-                                        ["npm", "install"],
+                                        [npm_cmd, "install"],
                                         cwd=server_path,
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT,
@@ -2545,7 +2706,7 @@ class MainWindow(QMainWindow):
                                         process2.kill()
                                         self._log("[警告] server 目录依赖安装超时(10分钟)，跳过继续", "#FF9800")
                             else:
-                                self._log("[警告] npm 未安装，跳过前端依赖安装", "#FF9800")
+                                self._log("[警告] npm 未找到，跳过前端依赖安装", "#FF9800")
                         except Exception as e:
                             self._log(f"[警告] 安装前端依赖失败: {e}", "#FF9800")
                     else:
@@ -2560,7 +2721,8 @@ class MainWindow(QMainWindow):
             scripts = [
                 "2、run_gradio.ps1",
                 "3、run_server.ps1",
-                "4、run_npmgui.ps1"
+                "5、run_qinglong_backend.ps1",
+                "6、run_qinglong_frontend.ps1"
             ]
             missing_scripts = []
             for script in scripts:
