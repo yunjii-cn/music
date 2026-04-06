@@ -1844,9 +1844,9 @@ class MainWindow(QMainWindow):
                     self._log("等待所有服务就绪...")
                     all_ready = False
                     max_wait = 60
-                    waited = 0
+                    start_time = time.time()
                     
-                    while waited < max_wait and not all_ready:
+                    while (time.time() - start_time) < max_wait and not all_ready:
                         all_ready = True
                         for service_id in started_services:
                             if not self.monitor._check_port(SERVICES[service_id]["port"]):
@@ -1854,12 +1854,13 @@ class MainWindow(QMainWindow):
                                 break
                         
                         if not all_ready:
-                            time.sleep(2)
-                            waited += 2
-                            self._log(f"等待服务就绪... ({waited}/{max_wait} 秒)", "#888888")
+                            time.sleep(10)
+                            waited = int(time.time() - start_time)
+                            self._log(f"等待服务就绪... (已等待 {waited} 秒)", "#888888")
                     
+                    waited = int(time.time() - start_time)
                     if all_ready:
-                        self._log("✓ 所有服务已就绪，正在打开浏览器...")
+                        self._log(f"✓ 所有服务已就绪 (耗时 {waited} 秒)，正在打开浏览器...")
                         for service_id in started_services:
                             if "_" in service_id:
                                 base_service_id = service_id.split("_", 1)[1]
@@ -2878,21 +2879,22 @@ class MainWindow(QMainWindow):
         
         max_wait = 60
         waited = 0
+        start_time = time.time()
         while waited < max_wait:
-            time.sleep(2)
-            waited += 2
+            time.sleep(10)
+            waited = int(time.time() - start_time)
             
             if self.monitor._check_port(SERVICES[service_id]["port"]):
-                self._log(f"✓ {service_name} 已就绪", "#E53935")
+                self._log(f"✓ {service_name} 已就绪 (耗时 {waited} 秒)", "#E53935")
                 return True
             
             if process.state() == 0:
                 self._log(f"[错误] {service_name} 进程已退出", "#F44336")
                 return False
                 
-            self._log(f"等待 {service_name} 就绪... ({waited}/{max_wait} 秒)", "#888888")
+            self._log(f"等待 {service_name} 就绪... (已等待 {waited} 秒)", "#888888")
         
-        self._log(f"[错误] {service_name} 启动超时", "#F44336")
+        self._log(f"[错误] {service_name} 启动超时 (已等待 {waited} 秒)", "#F44336")
         return False
     
     def _on_service_output(self, service_id: str, output: str):

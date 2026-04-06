@@ -17,9 +17,10 @@ param(
 )
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
-# Set environment variables
-Set-Location $PSScriptRoot
-$env:PYTHONPATH = "$PSScriptRoot$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
+# Set environment variables - go up one directory to project root
+$project_root = Split-Path -Parent $PSScriptRoot
+Set-Location $project_root
+$env:PYTHONPATH = "$project_root$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
 
 $Env:HF_HOME = "huggingface"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
@@ -36,7 +37,6 @@ $Env:UV_INDEX_STRATEGY = "unsafe-best-match"
 #$Env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 $ext_args = [System.Collections.ArrayList]::new()
-$uv_args = [System.Collections.ArrayList]::new()
 
 # ============= Build Arguments | 构建参数 =====================
 # Server configuration
@@ -98,14 +98,21 @@ if ($AuthPassword -ne "none") {
   [void]$ext_args.Add($AuthPassword)
 }
 
-# run train
-$uv_path = "$HOME\.local\bin\uv.exe"
-if (-not (Test-Path $uv_path)) {
-    Write-Error "uv not found at $uv_path. Please install uv first."
+# Directly use virtual environment python to avoid uv issues
+$venv_dir = ".venv"
+$python_exe = Join-Path $venv_dir "Scripts\python.exe"
+
+if (-not (Test-Path $python_exe)) {
+    Write-Error "Virtual environment not found at $venv_dir. Please run deployment maintenance first."
     exit 1
 }
-# Use --no-sync to avoid reinstalling packages every time (fixes flash_attn reinstall issues)
-[void]$uv_args.Add("--no-sync")
-& $uv_path run $uv_args acestep $ext_args
+
+Write-Output "Starting Gradio UI..."
+Write-Output "Python path: $env:PYTHONPATH"
+Write-Output "Working directory: $(Get-Location)"
+Write-Output "Using Python: $python_exe"
+
+# Run Gradio UI directly with virtual environment python
+& $python_exe acestep/acestep_v15_pipeline.py $ext_args
 
 Write-Output "Start finished"

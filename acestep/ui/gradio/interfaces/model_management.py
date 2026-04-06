@@ -118,11 +118,11 @@ def create_model_management_section(language='en'):
                 elem_id="download-button"
             )
         
-        # Download progress
-        components['download_progress'] = gr.Progress(
-            visible=False,
-            elem_id="download-progress"
-        )
+   # Download progress (disabled for Gradio 6.2.0 compatibility)
+        # components['download_progress'] = gr.Progress(
+        #     visible=False,
+        #     elem_id="download-progress"
+        # )
         
         components['download_status'] = gr.Textbox(
             label=t('model_management.download_status'),
@@ -134,15 +134,12 @@ def create_model_management_section(language='en'):
     # Define download function
     def download_model(model_name):
         if not model_name:
-            return "", "Please select a model to download"
+            return "Please select a model to download"
         
         # Map display name to actual model name
         actual_model_name = model_name
         if model_name == "Main Model":
             actual_model_name = "main"
-        
-        # Show progress
-        progress = gr.Progress()
         
         try:
             if actual_model_name == "main":
@@ -151,17 +148,17 @@ def create_model_management_section(language='en'):
                 success, message = download_submodel(actual_model_name)
             
             if success:
-                return "", f"Success: {message}"
+                return f"Success: {message}"
             else:
-                return "", f"Error: {message}"
+                return f"Error: {message}"
         except Exception as e:
-            return "", f"Error: {str(e)}"
+            return f"Error: {str(e)}"
     
     # Connect download button
     components['download_button'].click(
         fn=download_model,
         inputs=[components['model_to_download']],
-        outputs=[components['download_progress'], components['download_status']]
+        outputs=[components['download_status']]
     )
     
     return components

@@ -61,12 +61,63 @@ Write-Output ""
 $venv_dir = ".venv"
 $venv_activate = "$venv_dir\Scripts\Activate.ps1"
 
+# 检查现有虚拟环境的 PyTorch 版本
+$needs_reinstall = $false
 if (Test-Path $venv_activate) {
-    Write-Output "✅ 使用现有虚拟环境 (.venv)"
+    Write-Output "🔍 检查现有虚拟环境..."
     . $venv_activate
-} else {
+    
+    # 检查 PyTorch 版本
+    $torch_ok = $false
+    try {
+        $torch_version = python -c "import torch; print(torch.__version__)" 2>&1
+        if ($LASTEXITCODE -eq 0 -and $torch_version -like "*2.9.0*") {
+            Write-Output "✅ PyTorch 版本正确: $torch_version"
+            $torch_ok = $true
+        } else {
+            Write-Warning "⚠️ PyTorch 版本不匹配: $torch_version"
+        }
+    } catch {
+        Write-Warning "⚠️ 无法检测 PyTorch 版本"
+    }
+    
+    # 检查 torchaudio
+    $torchaudio_ok = $false
+    try {
+        $torchaudio_version = python -c "import torchaudio; print(torchaudio.__version__)" 2>&1
+        if ($LASTEXITCODE -eq 0 -and $torchaudio_version -like "*2.9.0*") {
+            Write-Output "✅ torchaudio 版本正确: $torchaudio_version"
+            $torchaudio_ok = $true
+        } else {
+            Write-Warning "⚠️ torchaudio 版本不匹配: $torchaudio_version"
+        }
+    } catch {
+        Write-Warning "⚠️ 无法检测 torchaudio 版本"
+    }
+    
+    if (-not $torch_ok -or -not $torchaudio_ok) {
+        Write-Output ""
+        Write-Warning "⚠️ 检测到 PyTorch 生态系统版本不匹配"
+        Write-Output "   正在重新安装虚拟环境..."
+        $needs_reinstall = $true
+        
+        # 退出虚拟环境
+        deactivate
+        
+        # 删除旧的虚拟环境
+        Write-Output "   正在删除旧的虚拟环境..."
+        Remove-Item -Path $venv_dir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Output "   ✅ 旧虚拟环境已删除"
+    }
+}
+
+# 创建或使用虚拟环境
+if (-not (Test-Path $venv_activate)) {
     Write-Output "📦 创建新虚拟环境 (.venv)"
     ~/.local/bin/uv venv -p 3.12 --seed
+    . $venv_activate
+} else {
+    Write-Output "✅ 使用现有虚拟环境 (.venv)"
     . $venv_activate
 }
 
@@ -84,8 +135,8 @@ Check "❌ 安装基础依赖失败"
 
 Write-Output ""
 Write-Output "📦 安装 PyTorch 生态系统..."
-Write-Output "   正在安装 torch, torchvision, torchaudio (CUDA 12.8)..."
-~/.local/bin/uv pip install torch==2.9.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+Write-Output "   正在安装 torch 2.9.0, torchvision 0.24.0, torchaudio 2.9.0 (CUDA 12.8)..."
+~/.local/bin/uv pip install torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu128
 Check "❌ PyTorch 安装失败"
 Write-Output "✅ PyTorch 生态系统安装完成"
 
@@ -98,6 +149,23 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 Write-Output ""
+Write-Output "📦 安装 flash_attn (性能优化)..."
+$flash_attn_wheel = "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl"
+$flash_attn_path = Join-Path $PSScriptRoot $flash_attn_wheel
+if (Test-Path $flash_attn_path) {
+    Write-Output "   正在安装 flash_attn..."
+    ~/.local/bin/uv pip install $flash_attn_path
+    if ($LASTEXITCODE -eq 0) {
+        Write-Output "✅ flash_attn 安装完成"
+    } else {
+        Write-Warning "⚠️ flash_attn 安装失败，继续..."
+    }
+} else {
+    Write-Warning "⚠️ flash_attn wheel 文件不存在: $flash_attn_wheel"
+    Write-Output "   跳过 flash_attn 安装（不影响核心功能）"
+}
+
+Write-Output ""
 Write-Output "============================================================"
 Write-Output "  环境安装完成！"
 Write-Output "============================================================"
@@ -106,5 +174,5 @@ Write-Output "✅ 虚拟环境位置: $venv_dir/"
 Write-Output "✅ Python版本: $(python --version)"
 Write-Output ""
 Write-Output "下一步："
-Write-Output "1. 运行软件启动服务"
-Write-Output "2. 在部署维护中下载所需模型"
+Write-Output "1. 点击启动按钮运行服务"
+Write-Output "2. 在模型管理中下载所需模型"

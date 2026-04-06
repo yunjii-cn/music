@@ -21,13 +21,13 @@ $Env:UV_NO_BUILD_ISOLATION = "1"
 $Env:UV_NO_CACHE = "0"
 $Env:UV_LINK_MODE = "symlink"
 $Env:UV_INDEX_STRATEGY = "unsafe-best-match"
+$Env:ACESTEP_NO_INIT = "true"
 #$Env:CUDA_VISIBLE_DEVICES = "1"  # 设置GPU id，0表示使用第一个GPU，-1表示不使用GPU
 
 #$Env:HTTP_PROXY = "http://127.0.0.1:7890"
 #$Env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 $ext_args = [System.Collections.ArrayList]::new()
-$uv_args = [System.Collections.ArrayList]::new()
 
 # ============= Build Arguments | 构建参数 =====================
 # Server configuration
@@ -36,14 +36,30 @@ $uv_args = [System.Collections.ArrayList]::new()
 [void]$ext_args.Add("--host")
 [void]$ext_args.Add($ServerHost)
 
-# run train
-$uv_path = "$HOME\.local\bin\uv.exe"
-if (-not (Test-Path $uv_path)) {
-    Write-Error "uv not found at $uv_path. Please install uv first."
+# Directly use virtual environment python to avoid uv pyproject.toml checks
+$venv_dir = ".venv"
+$python_exe = Join-Path $venv_dir "Scripts\python.exe"
+
+if (-not (Test-Path $python_exe)) {
+    Write-Error "Virtual environment not found at $venv_dir. Please run deployment maintenance first."
     exit 1
 }
-# Use --no-sync to avoid reinstalling packages every time (fixes flash_attn reinstall issues)
-[void]$uv_args.Add("--no-sync")
-& $uv_path run $uv_args acestep/api_server.py $ext_args
+
+Write-Output "Starting API server..."
+Write-Output "Python path: $env:PYTHONPATH"
+Write-Output "Working directory: $(Get-Location)"
+Write-Output "Using Python: $python_exe"
+
+# First test if we can import the necessary modules
+Write-Output "Testing imports..."
+try {
+    & $python_exe -c "import torch; print(f'Torch: {torch.__version__}')"
+    & $python_exe -c "import torchaudio; print(f'Torchaudio: {torchaudio.__version__}')"
+} catch {
+    Write-Output "Import test failed, but continuing..."
+}
+
+# Run API server directly with virtual environment python
+& $python_exe acestep/api_server.py $ext_args
 
 Write-Output "Start finished"
