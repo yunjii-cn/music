@@ -1613,6 +1613,16 @@ class MainWindow(QMainWindow):
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setToolTip(f"ACE-Step 启动器 v{VERSION}")
         
+        try:
+            if hasattr(sys, '_MEIPASS'):
+                icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
+            else:
+                icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
+            if os.path.exists(icon_path):
+                self.tray_icon.setIcon(QIcon(icon_path))
+        except Exception as e:
+            pass
+        
         tray_menu = QMenu()
         
         show_action = QAction("显示", self)
@@ -2139,12 +2149,14 @@ class MainWindow(QMainWindow):
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
-                portable_node_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                portable_node24_dir = os.path.join(self.base_dir, "scripts", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                portable_node22_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
-                    os.path.join(portable_node_dir, "node.exe")
+                    os.path.join(portable_node24_dir, "node.exe"),
+                    os.path.join(portable_node22_dir, "node.exe")
                 ]
                 
                 for node_exe in node_paths:
@@ -2342,6 +2354,7 @@ class MainWindow(QMainWindow):
                 scripts_dir = os.path.join(self.base_dir, "scripts")
                 if os.path.exists(pyproject_toml_path):
                     self._log("[信息] 使用 pyproject.toml 安装依赖...")
+                    self._log("[信息] 这可能需要几分钟，请稍候...")
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                     
@@ -2349,23 +2362,26 @@ class MainWindow(QMainWindow):
                         [uv_path, "sync"],
                         cwd=scripts_dir,
                         stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
                         text=True,
                         startupinfo=startupinfo
                     )
                     
-                    while process.poll() is None:
-                        line = process.stdout.readline()
-                        if line:
-                            self._log(f"[安装依赖] {line.strip()}")
-                        line_err = process.stderr.readline()
-                        if line_err:
-                            self._log(f"[安装依赖错误] {line_err.strip()}", "#F44336")
-                    
-                    if process.returncode == 0:
-                        self._log("✓ 项目依赖安装完成")
-                    else:
-                        self._log("[警告] 项目依赖安装可能失败，请检查日志", "#FF9800")
+                    try:
+                        stdout, _ = process.communicate(timeout=300)
+                        
+                        if stdout:
+                            for line in stdout.splitlines():
+                                if line.strip():
+                                    self._log(f"[安装依赖] {line.strip()}")
+                        
+                        if process.returncode == 0:
+                            self._log("✓ 项目依赖安装完成")
+                        else:
+                            self._log(f"[警告] 项目依赖安装返回码: {process.returncode}", "#FF9800")
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        self._log("[警告] 依赖安装超时(5分钟)，跳过继续", "#FF9800")
                 else:
                     self._log("[警告] pyproject.toml 不存在，跳过依赖安装", "#FF9800")
             except Exception as e:
@@ -2389,23 +2405,26 @@ class MainWindow(QMainWindow):
                             ["git", "submodule", "update", "--init", "--recursive"],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
                             text=True,
                             startupinfo=startupinfo
                         )
                         
-                        while process.poll() is None:
-                            line = process.stdout.readline()
-                            if line:
-                                self._log(f"[初始化子模块] {line.strip()}")
-                            line_err = process.stderr.readline()
-                            if line_err:
-                                self._log(f"[初始化子模块错误] {line_err.strip()}", "#FF9800")
-                        
-                        if process.returncode == 0:
-                            self._log("✓ git子模块初始化完成")
-                        else:
-                            self._log("[警告] git子模块初始化失败，可能影响UI功能", "#FF9800")
+                        try:
+                            stdout, _ = process.communicate(timeout=300)
+                            
+                            if stdout:
+                                for line in stdout.splitlines():
+                                    if line.strip():
+                                        self._log(f"[初始化子模块] {line.strip()}")
+                            
+                            if process.returncode == 0:
+                                self._log("✓ git子模块初始化完成")
+                            else:
+                                self._log(f"[警告] git子模块初始化返回码: {process.returncode}", "#FF9800")
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            self._log("[警告] git子模块初始化超时(5分钟)，跳过继续", "#FF9800")
                     except Exception as e:
                         self._log(f"[警告] 初始化git子模块失败: {e}", "#FF9800")
                 else:
@@ -2413,14 +2432,43 @@ class MainWindow(QMainWindow):
             else:
                 self._log("[警告] ace-step-ui 目录不存在，跳过子模块检查", "#FF9800")
             
-            # 7. 安装前端依赖
-            self._log("7. 安装前端依赖...")
+            # 7. 安装/修复前端依赖
+            self._log("7. 安装/修复前端依赖...")
             if os.path.exists(ace_step_ui_path):
                 package_json_path = os.path.join(ace_step_ui_path, "package.json")
                 if os.path.exists(package_json_path):
                     node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+                    server_node_modules_path = os.path.join(ace_step_ui_path, "server", "node_modules")
+                    
+                    # 检查是否需要重新安装
+                    need_reinstall = False
                     if not os.path.exists(node_modules_path):
-                        self._log("[信息] 前端依赖未安装，正在安装...")
+                        need_reinstall = True
+                        self._log("[信息] 前端依赖未安装，需要安装...")
+                    elif not os.path.exists(server_node_modules_path):
+                        need_reinstall = True
+                        self._log("[信息] server 依赖未安装，需要安装...")
+                    else:
+                        # 检查 better-sqlite3 模块是否存在
+                        better_sqlite3_path = os.path.join(server_node_modules_path, "better-sqlite3")
+                        if not os.path.exists(better_sqlite3_path):
+                            need_reinstall = True
+                            self._log("[信息] better-sqlite3 模块缺失，需要重新安装...")
+                    
+                    if need_reinstall:
+                        self._log("[信息] 正在清理旧的 node_modules...")
+                        try:
+                            import shutil
+                            if os.path.exists(node_modules_path):
+                                shutil.rmtree(node_modules_path, ignore_errors=True)
+                            if os.path.exists(server_node_modules_path):
+                                shutil.rmtree(server_node_modules_path, ignore_errors=True)
+                            self._log("✓ 旧的 node_modules 已清理")
+                        except Exception as e:
+                            self._log(f"[警告] 清理 node_modules 失败: {e}", "#FF9800")
+                        
+                        self._log("[信息] 正在重新安装前端依赖...")
+                        self._log("[信息] 这可能需要几分钟，请稍候...")
                         try:
                             # 检查 npm 是否可用
                             startupinfo = subprocess.STARTUPINFO()
@@ -2437,34 +2485,67 @@ class MainWindow(QMainWindow):
                             npm_check.wait()
                             
                             if npm_check.returncode == 0:
-                                # 安装前端依赖
+                                # 先安装根目录依赖
+                                self._log("[信息] 安装根目录依赖...")
                                 process = subprocess.Popen(
                                     ["npm", "install"],
                                     cwd=ace_step_ui_path,
                                     stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT,
                                     text=True,
                                     startupinfo=startupinfo
                                 )
                                 
-                                while process.poll() is None:
-                                    line = process.stdout.readline()
-                                    if line:
-                                        self._log(f"[安装前端依赖] {line.strip()}")
-                                    line_err = process.stderr.readline()
-                                    if line_err:
-                                        self._log(f"[安装前端依赖错误] {line_err.strip()}", "#F44336")
+                                try:
+                                    stdout, _ = process.communicate(timeout=600)
+                                    
+                                    if stdout:
+                                        for line in stdout.splitlines():
+                                            if line.strip():
+                                                self._log(f"[安装根目录依赖] {line.strip()}")
+                                    
+                                    if process.returncode == 0:
+                                        self._log("✓ 根目录依赖安装完成")
+                                    else:
+                                        self._log(f"[警告] 根目录依赖安装返回码: {process.returncode}", "#FF9800")
+                                except subprocess.TimeoutExpired:
+                                    process.kill()
+                                    self._log("[警告] 根目录依赖安装超时(10分钟)，跳过继续", "#FF9800")
                                 
-                                if process.returncode == 0:
-                                    self._log("✓ 前端依赖安装完成")
-                                else:
-                                    self._log("[警告] 前端依赖安装失败，可能影响UI功能", "#FF9800")
+                                # 再安装 server 目录依赖
+                                server_path = os.path.join(ace_step_ui_path, "server")
+                                if os.path.exists(server_path):
+                                    self._log("[信息] 安装 server 目录依赖...")
+                                    process2 = subprocess.Popen(
+                                        ["npm", "install"],
+                                        cwd=server_path,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT,
+                                        text=True,
+                                        startupinfo=startupinfo
+                                    )
+                                    
+                                    try:
+                                        stdout2, _ = process2.communicate(timeout=600)
+                                        
+                                        if stdout2:
+                                            for line in stdout2.splitlines():
+                                                if line.strip():
+                                                    self._log(f"[安装server依赖] {line.strip()}")
+                                        
+                                        if process2.returncode == 0:
+                                            self._log("✓ server 目录依赖安装完成")
+                                        else:
+                                            self._log(f"[警告] server 目录依赖安装返回码: {process2.returncode}", "#FF9800")
+                                    except subprocess.TimeoutExpired:
+                                        process2.kill()
+                                        self._log("[警告] server 目录依赖安装超时(10分钟)，跳过继续", "#FF9800")
                             else:
                                 self._log("[警告] npm 未安装，跳过前端依赖安装", "#FF9800")
                         except Exception as e:
                             self._log(f"[警告] 安装前端依赖失败: {e}", "#FF9800")
                     else:
-                        self._log("✓ 前端依赖已安装")
+                        self._log("✓ 前端依赖已安装且无需修复")
                 else:
                     self._log("[警告] package.json 不存在，跳过前端依赖安装", "#FF9800")
             else:
@@ -2756,12 +2837,14 @@ class MainWindow(QMainWindow):
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
                 # 检查常见的 Node.js 安装位置
-                portable_node_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                portable_node24_dir = os.path.join(self.base_dir, "scripts", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                portable_node22_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
-                    os.path.join(portable_node_dir, "node.exe")
+                    os.path.join(portable_node24_dir, "node.exe"),
+                    os.path.join(portable_node22_dir, "node.exe")
                 ]
                 
                 for node_exe in node_paths:
@@ -2864,6 +2947,7 @@ class MainWindow(QMainWindow):
                 if os.path.exists(install_script):
                     try:
                         self._log("4. 执行环境安装脚本...")
+                        self._log("[信息] 这可能需要几分钟，请稍候...")
                         
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -2873,25 +2957,29 @@ class MainWindow(QMainWindow):
                             ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", install_script],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
                             text=True,
                             startupinfo=startupinfo
                         )
                         
                         self._log("✅ 安装脚本已启动！", "#4CAF50")
                         
-                        while process.poll() is None:
-                            line = process.stdout.readline()
-                            if line:
-                                self._log(f"[安装] {line.strip()}")
-                            line_err = process.stderr.readline()
-                            if line_err:
-                                self._log(f"[安装错误] {line_err.strip()}", "#F44336")
-                        
-                        if process.returncode == 0:
-                            self._log("✅ 环境安装完成", "#4CAF50")
-                        else:
-                            self._log(f"[错误] 环境安装失败，返回码: {process.returncode}", "#F44336")
+                        try:
+                            stdout, _ = process.communicate(timeout=1800)
+                            
+                            if stdout:
+                                for line in stdout.splitlines():
+                                    if line.strip():
+                                        self._log(f"[安装] {line.strip()}")
+                            
+                            if process.returncode == 0:
+                                self._log("✅ 环境安装完成", "#4CAF50")
+                            else:
+                                self._log(f"[错误] 环境安装失败，返回码: {process.returncode}", "#F44336")
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            self._log("[错误] 环境安装超时(30分钟)，请手动运行安装脚本", "#F44336")
+                            self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
                         return
                     except Exception as e:
                         self._log(f"[错误] 运行安装脚本失败: {e}", "#F44336")
@@ -3104,20 +3192,44 @@ class MainWindow(QMainWindow):
         if service_id in self.service_processes:
             process = self.service_processes[service_id]
             if process.state() != 0:
-                process.terminate()
-                self._log(f"✓ {service['name']} 进程已终止")
+                try:
+                    process.terminate()
+                    self._log(f"✓ {service['name']} 进程已终止")
+                except:
+                    pass
         
         port = service["port"]
         try:
-            for conn in psutil.net_connections():
-                if conn.laddr.port == port and conn.status == 'LISTEN':
-                    try:
-                        p = psutil.Process(conn.pid)
-                        p.terminate()
-                        p.wait(timeout=3)
-                        self._log(f"已终止占用端口 {port} 的进程")
-                    except:
-                        pass
+            import subprocess
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            
+            result = subprocess.run(
+                ["netstat", "-ano", "-p", "TCP"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                startupinfo=startupinfo,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    if f":{port}" in line and "LISTENING" in line:
+                        parts = line.split()
+                        if len(parts) >= 5:
+                            pid = parts[-1]
+                            try:
+                                subprocess.run(
+                                    ["taskkill", "/F", "/PID", pid],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    startupinfo=startupinfo,
+                                    timeout=5
+                                )
+                                self._log(f"已终止占用端口 {port} 的进程 (PID: {pid})")
+                            except:
+                                pass
         except:
             pass
     
