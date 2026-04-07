@@ -2,7 +2,10 @@
 # 进入 UI 目录并运行安装脚本
 # 使用脚本所在目录的绝对路径
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location "$ScriptDir\ace-step-ui"
+
+# 修复路径问题：ace-step-ui 在 scripts 的父目录（即 dist/）下
+$ParentDir = Split-Path -Parent $ScriptDir
+Set-Location "$ParentDir\ace-step-ui"
 
 # 查找 npm 命令的完整路径
 # 首先检查便携版 Node.js（优先使用 Node.js 24）
