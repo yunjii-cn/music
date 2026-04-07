@@ -135,7 +135,9 @@ def get_latest_version():
             match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', dir_path.name)
             if match:
                 version_str = match.group(1)
-                version_dirs.append((version_str, dir_path))
+                # 只选择包含 main.py 的有效源代码目录
+                if (dir_path / "main.py").exists():
+                    version_dirs.append((version_str, dir_path))
     
     if not version_dirs:
         return None
@@ -237,8 +239,8 @@ def build_exe(version_dir):
     for file_name in files_to_add:
         file_path = version_dir / file_name
         if file_path.exists():
-            pyinstaller_args.insert(-1, "--add-data")
-            pyinstaller_args.insert(-1, f"{file_name};.")
+            pyinstaller_args.append("--add-data")
+            pyinstaller_args.append(f"{file_name};.")
             print(f"  已添加打包文件: {file_name}")
         else:
             print(f"  跳过不存在的文件: {file_name}")
