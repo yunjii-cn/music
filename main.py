@@ -1846,7 +1846,7 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     self._log(f"[警告] 检查虚拟环境依赖失败: {e}，尝试继续启动...", "#FF9800")
                 
-                ace_step_ui_path = os.path.join(self.base_dir, "scripts", "ace-step-ui")
+                ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
                 if os.path.exists(ace_step_ui_path):
                     node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
                     if not os.path.exists(node_modules_path):
@@ -2297,14 +2297,14 @@ class MainWindow(QMainWindow):
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
-                portable_node24_dir = os.path.join(self.base_dir, "scripts", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                portable_node22_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
-                    os.path.join(portable_node24_dir, "node.exe"),
-                    os.path.join(portable_node22_dir, "node.exe")
+                    os.path.join(portable_node22_dir, "node.exe"),
+                    os.path.join(portable_node24_dir, "node.exe")
                 ]
                 
                 for node_exe in node_paths:
@@ -2597,11 +2597,68 @@ class MainWindow(QMainWindow):
                         need_reinstall = True
                         self._log("[信息] server 依赖未安装，需要安装...")
                     else:
-                        # 检查 better-sqlite3 模块是否存在
+                        # 检查 better-sqlite3 模块是否存在且能正常加载
                         better_sqlite3_path = os.path.join(server_node_modules_path, "better-sqlite3")
                         if not os.path.exists(better_sqlite3_path):
                             need_reinstall = True
                             self._log("[信息] better-sqlite3 模块缺失，需要重新安装...")
+                        else:
+                            # 尝试用当前 Node.js 测试 better-sqlite3 是否能正常加载
+                            self._log("[信息] 检测 better-sqlite3 是否与当前 Node.js 版本匹配...")
+                            try:
+                                # 查找 Node.js（优先使用 Node.js 22）
+                                test_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                                test_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                                
+                                test_node_exe = None
+                                if os.path.exists(os.path.join(test_node22_dir, "node.exe")):
+                                    test_node_exe = os.path.join(test_node22_dir, "node.exe")
+                                elif os.path.exists(os.path.join(test_node24_dir, "node.exe")):
+                                    test_node_exe = os.path.join(test_node24_dir, "node.exe")
+                                
+                                if test_node_exe:
+                                    # 创建测试脚本
+                                    test_script = os.path.join(server_node_modules_path, "..", "test_better_sqlite3.js")
+                                    with open(test_script, "w", encoding="utf-8") as f:
+                                        f.write("""
+try {
+    const Database = require('better-sqlite3');
+    console.log('better-sqlite3 loaded successfully');
+    process.exit(0);
+} catch (e) {
+    console.error('Error loading better-sqlite3:', e.message);
+    process.exit(1);
+}
+""")
+                                    
+                                    # 运行测试
+                                    startupinfo = subprocess.STARTUPINFO()
+                                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                                    
+                                    test_process = subprocess.Popen(
+                                        [test_node_exe, test_script],
+                                        cwd=os.path.join(ace_step_ui_path, "server"),
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        text=True,
+                                        startupinfo=startupinfo
+                                    )
+                                    
+                                    test_stdout, test_stderr = test_process.communicate(timeout=10)
+                                    
+                                    # 清理测试文件
+                                    if os.path.exists(test_script):
+                                        os.remove(test_script)
+                                    
+                                    if test_process.returncode != 0:
+                                        need_reinstall = True
+                                        self._log("[信息] better-sqlite3 版本不匹配，需要重新安装...")
+                                        if test_stderr:
+                                            self._log(f"[调试] {test_stderr.strip()}")
+                                    else:
+                                        self._log("✓ better-sqlite3 版本匹配")
+                            except Exception as e:
+                                self._log(f"[警告] 检测 better-sqlite3 失败: {e}，尝试继续...", "#FF9800")
                     
                     if need_reinstall:
                         self._log("[信息] 正在清理旧的 node_modules...")
@@ -2619,23 +2676,22 @@ class MainWindow(QMainWindow):
                         self._log("[信息] 这可能需要几分钟，请稍候...")
                         try:
                             # 查找 npm 命令路径
-                            scripts_dir = os.path.join(self.base_dir, "scripts")
-                            portable_node24_dir = os.path.join(scripts_dir, "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                            portable_node22_dir = os.path.join(scripts_dir, "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                            portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                            portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                             
                             npm_cmd = None
-                            # 先尝试便携版 Node.js 24
-                            if os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
-                                self._log(f"[信息] 使用便携版 Node.js 24: {portable_node24_dir}")
-                                npm_cmd = os.path.join(portable_node24_dir, "npm.cmd")
-                                # 更新环境变量 PATH
-                                os.environ["PATH"] = f"{portable_node24_dir};{os.environ.get('PATH', '')}"
-                            # 再尝试便携版 Node.js 22
-                            elif os.path.exists(os.path.join(portable_node22_dir, "node.exe")):
+                            # 先尝试便携版 Node.js 22（推荐，有 better-sqlite3 预编译二进制）
+                            if os.path.exists(os.path.join(portable_node22_dir, "node.exe")):
                                 self._log(f"[信息] 使用便携版 Node.js 22: {portable_node22_dir}")
                                 npm_cmd = os.path.join(portable_node22_dir, "npm.cmd")
                                 # 更新环境变量 PATH
                                 os.environ["PATH"] = f"{portable_node22_dir};{os.environ.get('PATH', '')}"
+                            # 再尝试便携版 Node.js 24
+                            elif os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
+                                self._log(f"[信息] 使用便携版 Node.js 24: {portable_node24_dir}")
+                                npm_cmd = os.path.join(portable_node24_dir, "npm.cmd")
+                                # 更新环境变量 PATH
+                                os.environ["PATH"] = f"{portable_node24_dir};{os.environ.get('PATH', '')}"
                             # 最后尝试系统 npm
                             else:
                                 try:
@@ -3003,14 +3059,14 @@ class MainWindow(QMainWindow):
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
                 # 检查常见的 Node.js 安装位置
-                portable_node24_dir = os.path.join(self.base_dir, "scripts", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                portable_node22_dir = os.path.join(self.base_dir, "scripts", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
-                    os.path.join(portable_node24_dir, "node.exe"),
-                    os.path.join(portable_node22_dir, "node.exe")
+                    os.path.join(portable_node22_dir, "node.exe"),
+                    os.path.join(portable_node24_dir, "node.exe")
                 ]
                 
                 for node_exe in node_paths:
