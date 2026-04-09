@@ -1,13 +1,15 @@
 ﻿Set-Location $PSScriptRoot
+$projectRoot = $PSScriptRoot
 
-$Env:HF_HOME = "huggingface"
+# 设置环境变量 - 所有缓存都存储在项目目录，避免占用C盘
+$Env:HF_HOME = Join-Path $projectRoot "huggingface"
 $Env:HF_ENDPOINT="https://hf-mirror.com"
 $Env:PIP_DISABLE_PIP_VERSION_CHECK = 1
 $Env:PIP_NO_CACHE_DIR = 1
 #$Env:PIP_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple"
 $Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 $Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
-$Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
+$Env:UV_CACHE_DIR = Join-Path $projectRoot ".uv_cache"
 $Env:UV_NO_BUILD_ISOLATION = "1"
 $Env:UV_NO_CACHE = "0"
 $Env:UV_LINK_MODE = "symlink"

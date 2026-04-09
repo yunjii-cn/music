@@ -22,11 +22,12 @@ $project_root = Split-Path -Parent $PSScriptRoot
 Set-Location $project_root
 $env:PYTHONPATH = "$project_root$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
 
-$Env:HF_HOME = "huggingface"
+# 设置环境变量 - 所有缓存都存储在项目目录，避免占用C盘
+$Env:HF_HOME = Join-Path $project_root "huggingface"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
-$Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
+$Env:UV_CACHE_DIR = Join-Path $project_root ".uv_cache"
 $Env:UV_NO_BUILD_ISOLATION = "1"
 $Env:UV_NO_CACHE = "0"
 $Env:UV_LINK_MODE = "symlink"
