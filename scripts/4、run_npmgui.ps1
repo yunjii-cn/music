@@ -38,15 +38,59 @@ Write-Output "Starting ACE-Step UI..."
 
 # 检查依赖是否安装
 if (-not (Test-Path "node_modules")) {
-    Write-Error "Error: Dependencies not installed!"
-    Write-Error "Please run setup.bat first."
-    exit 1
+    Write-Output "Dependencies not installed, installing now..."
+    
+    # 配置 npm 使用项目虚拟环境中的 Python（用于 node-gyp 编译）
+    $venvPython = "$ScriptDir\..\.venv\Scripts\python.exe"
+    if (Test-Path $venvPython) {
+        Write-Output "[信息] 配置 npm 使用虚拟环境 Python: $venvPython"
+        & $npmCmd config set python "$venvPython"
+        $env:PYTHON = $venvPython
+        $env:npm_config_python = $venvPython
+    } else {
+        Write-Output "[警告] 未找到虚拟环境 Python，将使用系统 Python"
+    }
+    
+    # 配置国内镜像加速
+    Write-Output "[信息] 配置 npm 国内镜像..."
+    & $npmCmd config set registry https://registry.npmmirror.com
+    
+    # 安装依赖
+    Write-Output "[信息] 开始安装前端依赖..."
+    & $npmCmd install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Error: Frontend dependencies installation failed!"
+        exit 1
+    }
+    Write-Output "✓ Frontend dependencies installed"
 }
 
 if (-not (Test-Path "server\node_modules")) {
-    Write-Error "Error: Server dependencies not installed!"
-    Write-Error "Please run setup.bat first."
-    exit 1
+    Write-Output "Server dependencies not installed, installing now..."
+    
+    # 配置 npm 使用项目虚拟环境中的 Python（用于 node-gyp 编译）
+    $venvPython = "$ScriptDir\..\.venv\Scripts\python.exe"
+    if (Test-Path $venvPython) {
+        Write-Output "[信息] 配置 npm 使用虚拟环境 Python: $venvPython"
+        & $npmCmd config set python "$venvPython"
+        $env:PYTHON = $venvPython
+        $env:npm_config_python = $venvPython
+    }
+    
+    # 配置国内镜像加速
+    Write-Output "[信息] 配置 npm 国内镜像..."
+    & $npmCmd config set registry https://registry.npmmirror.com
+    
+    # 安装 server 依赖
+    Write-Output "[信息] 开始安装 server 依赖..."
+    Set-Location "server"
+    & $npmCmd install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Error: Server dependencies installation failed!"
+        exit 1
+    }
+    Set-Location ".."
+    Write-Output "✓ Server dependencies installed"
 }
 
 # 检查端口是否被占用
