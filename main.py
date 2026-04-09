@@ -3173,35 +3173,25 @@ try {
                         
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = 0
                         
-                        process = subprocess.Popen(
+                        # 使用 subprocess.run 不捕获输出，避免阻塞
+                        result = subprocess.run(
                             ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", install_script],
                             cwd=self.base_dir,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
+                            capture_output=False,
                             text=True,
+                            timeout=1800,
                             startupinfo=startupinfo
                         )
                         
-                        self._log("✅ 安装脚本已启动！", "#4CAF50")
-                        
-                        try:
-                            stdout, _ = process.communicate(timeout=1800)
-                            
-                            if stdout:
-                                for line in stdout.splitlines():
-                                    if line.strip():
-                                        self._log(f"[安装] {line.strip()}")
-                            
-                            if process.returncode == 0:
-                                self._log("✅ 环境安装完成", "#4CAF50")
-                            else:
-                                self._log(f"[错误] 环境安装失败，返回码: {process.returncode}", "#F44336")
-                        except subprocess.TimeoutExpired:
-                            process.kill()
-                            self._log("[错误] 环境安装超时(30分钟)，请手动运行安装脚本", "#F44336")
-                            self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
+                        if result.returncode == 0:
+                            self._log("✅ 环境安装完成", "#4CAF50")
+                        else:
+                            self._log(f"[错误] 环境安装失败，返回码: {result.returncode}", "#F44336")
+                        return
+                    except subprocess.TimeoutExpired:
+                        self._log("[错误] 环境安装超时(30分钟)，请手动运行安装脚本", "#F44336")
+                        self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
                         return
                     except Exception as e:
                         self._log(f"[错误] 运行安装脚本失败: {e}", "#F44336")
