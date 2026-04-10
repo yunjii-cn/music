@@ -293,7 +293,7 @@ class ModelDownloadThread(QThread):
             self.log_received.emit(f"开始下载模型: {self.model_name}")
             
             # 构建下载命令 - 使用虚拟环境中的Python
-            venv_python = os.path.join(self.base_dir, ".venv", "Scripts", "python.exe")
+            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
             
             # 检查虚拟环境是否存在
             if not os.path.exists(venv_python):
@@ -393,7 +393,7 @@ class ModelDeleteThread(QThread):
         try:
             self.log_received.emit(f"开始删除模型: {self.model_name}")
             
-            venv_python = os.path.join(self.base_dir, ".venv", "Scripts", "python.exe")
+            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
             
             if not os.path.exists(venv_python):
                 self.log_received.emit("[错误] 虚拟环境不存在")
@@ -1814,7 +1814,7 @@ class MainWindow(QMainWindow):
                 return
             
             if project_id == "qinglong":
-                venv_path = os.path.join(self.base_dir, ".venv")
+                venv_path = os.path.join(self.base_dir, "scripts", ".venv")
                 if not os.path.exists(venv_path):
                     self._log("[错误] 虚拟环境不存在，请先运行部署维护", "#F44336")
                     self.is_starting = False
@@ -1828,6 +1828,8 @@ class MainWindow(QMainWindow):
                     startupinfo.wShowWindow = 0
                     
                     python_exe = os.path.join(venv_path, "Scripts", "python.exe")
+                    self._log(f"[信息] 检查虚拟环境 Python: {python_exe}")
+                    
                     process = subprocess.Popen(
                         [python_exe, "-c", "import loguru"],
                         cwd=self.base_dir,
@@ -1839,10 +1841,12 @@ class MainWindow(QMainWindow):
                     stdout, stderr = process.communicate(timeout=10)
                     
                     if process.returncode != 0:
-                        self._log("[错误] 虚拟环境依赖未安装，请先运行部署维护", "#F44336")
-                        self.is_starting = False
-                        self._enable_buttons()
-                        return
+                        self._log(f"[警告] 虚拟环境依赖检查失败 (返回码: {process.returncode})", "#FF9800")
+                        if stderr:
+                            self._log(f"[调试] 错误信息: {stderr.strip()}", "#FF9800")
+                        self._log("[信息] 尝试继续启动，依赖可能已安装...", "#FF9800")
+                    else:
+                        self._log("✓ 虚拟环境依赖检查通过")
                 except Exception as e:
                     self._log(f"[警告] 检查虚拟环境依赖失败: {e}，尝试继续启动...", "#FF9800")
                 
@@ -2130,7 +2134,7 @@ class MainWindow(QMainWindow):
         
         uv_path = os.path.expanduser("~/.local/bin/uv.exe")
         if os.path.exists(uv_path):
-            venv_path = os.path.join(self.base_dir, ".venv")
+            venv_path = os.path.join(self.base_dir, "scripts", ".venv")
             if os.path.exists(venv_path):
                 ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
                 if os.path.exists(ace_step_ui_path):
@@ -2226,11 +2230,8 @@ class MainWindow(QMainWindow):
         self._log("开始智能环境修复...")
         self._log("=======================================")
         
-        # 禁用按钮以防止重复操作
-        self.btn_deploy_maintain.setEnabled(False)
-        self.btn_start_music.setEnabled(False)
-        self.btn_start_qinglong.setEnabled(False)
-        self.btn_stop_all.setEnabled(False)
+        has_errors = False
+        has_warnings = False
         
         try:
             # 1. 检查并修复 PowerShell
@@ -2458,7 +2459,8 @@ class MainWindow(QMainWindow):
             
             # 4. 检查并创建虚拟环境
             self._log("4. 检查并创建虚拟环境...")
-            venv_path = os.path.join(self.base_dir, ".venv")
+            scripts_dir = os.path.join(self.base_dir, "scripts")
+            venv_path = os.path.join(scripts_dir, ".venv")
             
             if not os.path.exists(venv_path):
                 self._log("[信息] 虚拟环境不存在，正在创建...")
@@ -2469,7 +2471,7 @@ class MainWindow(QMainWindow):
                     
                     process = subprocess.Popen(
                         [uv_path, "venv"],
-                        cwd=self.base_dir,
+                        cwd=scripts_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
@@ -2498,8 +2500,7 @@ class MainWindow(QMainWindow):
             # 5. 安装项目依赖
             self._log("5. 安装项目依赖...")
             try:
-                pyproject_toml_path = os.path.join(self.base_dir, "scripts", "pyproject.toml")
-                scripts_dir = os.path.join(self.base_dir, "scripts")
+                pyproject_toml_path = os.path.join(scripts_dir, "pyproject.toml")
                 if os.path.exists(pyproject_toml_path):
                     self._log("[信息] 使用 pyproject.toml 安装依赖...")
                     self._log("[信息] 这可能需要几分钟，请稍候...")
@@ -2680,18 +2681,18 @@ try {
                             portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                             
                             npm_cmd = None
-                            # 先尝试便携版 Node.js 22（推荐，有 better-sqlite3 预编译二进制）
-                            if os.path.exists(os.path.join(portable_node22_dir, "node.exe")):
-                                self._log(f"[信息] 使用便携版 Node.js 22: {portable_node22_dir}")
-                                npm_cmd = os.path.join(portable_node22_dir, "npm.cmd")
-                                # 更新环境变量 PATH
-                                os.environ["PATH"] = f"{portable_node22_dir};{os.environ.get('PATH', '')}"
-                            # 再尝试便携版 Node.js 24
-                            elif os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
+                            # 先尝试便携版 Node.js 24
+                            if os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
                                 self._log(f"[信息] 使用便携版 Node.js 24: {portable_node24_dir}")
                                 npm_cmd = os.path.join(portable_node24_dir, "npm.cmd")
                                 # 更新环境变量 PATH
                                 os.environ["PATH"] = f"{portable_node24_dir};{os.environ.get('PATH', '')}"
+                            # 再尝试便携版 Node.js 22
+                            elif os.path.exists(os.path.join(portable_node22_dir, "node.exe")):
+                                self._log(f"[信息] 使用便携版 Node.js 22: {portable_node22_dir}")
+                                npm_cmd = os.path.join(portable_node22_dir, "npm.cmd")
+                                # 更新环境变量 PATH
+                                os.environ["PATH"] = f"{portable_node22_dir};{os.environ.get('PATH', '')}"
                             # 最后尝试系统 npm
                             else:
                                 try:
@@ -2701,6 +2702,13 @@ try {
                                         self._log("[信息] 使用系统 npm")
                                 except Exception:
                                     pass
+                            
+                            # 设置 Python 环境变量，使用 uv 虚拟环境中的 Python 用于编译 better-sqlite3
+                            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+                            if os.path.exists(venv_python):
+                                self._log(f"[信息] 设置 Python 路径: {venv_python}")
+                                os.environ["PYTHON"] = venv_python
+                                os.environ["npm_config_python"] = venv_python
                             
                             if npm_cmd and os.path.exists(npm_cmd):
                                 startupinfo = subprocess.STARTUPINFO()
@@ -2729,9 +2737,11 @@ try {
                                         self._log("✓ 根目录依赖安装完成")
                                     else:
                                         self._log(f"[警告] 根目录依赖安装返回码: {process.returncode}", "#FF9800")
+                                        has_warnings = True
                                 except subprocess.TimeoutExpired:
                                     process.kill()
                                     self._log("[警告] 根目录依赖安装超时(10分钟)，跳过继续", "#FF9800")
+                                    has_warnings = True
                                 
                                 # 再安装 server 目录依赖
                                 server_path = os.path.join(ace_step_ui_path, "server")
@@ -2758,9 +2768,11 @@ try {
                                             self._log("✓ server 目录依赖安装完成")
                                         else:
                                             self._log(f"[警告] server 目录依赖安装返回码: {process2.returncode}", "#FF9800")
+                                            has_warnings = True
                                     except subprocess.TimeoutExpired:
                                         process2.kill()
                                         self._log("[警告] server 目录依赖安装超时(10分钟)，跳过继续", "#FF9800")
+                                        has_warnings = True
                             else:
                                 self._log("[警告] npm 未找到，跳过前端依赖安装", "#FF9800")
                         except Exception as e:
@@ -2920,11 +2932,22 @@ try {
             
             self._log("")
             self._log("========================================")
-            self._log("智能环境修复完成！", "#E53935")
+            if has_errors:
+                self._log("智能环境修复完成，但存在错误！", "#F44336")
+                self._log("=======================================")
+                self._log("环境存在问题，请检查错误日志并手动解决！", "#F44336")
+            elif has_warnings:
+                self._log("智能环境修复完成，但存在警告！", "#FF9800")
+                self._log("=======================================")
+                self._log("环境基本可用，但建议检查警告信息！", "#FF9800")
+            else:
+                self._log("智能环境修复完成！", "#E53935")
+                self._log("=======================================")
+                self._log("环境已准备就绪，您可以开始使用云集智能音乐创意台了！", "#E53935")
             self._log("=======================================")
-            self._log("环境已准备就绪，您可以开始使用云集智能音乐创意台了！", "#E53935")
             self._log("")
-            self._log("[提示] 模型管理面板已自动展开，您可以查看和下载模型", "#4CAF50")
+            if not has_errors:
+                self._log("[提示] 模型管理面板已自动展开，您可以查看和下载模型", "#4CAF50")
             
             # 自动展开模型管理面板
             if hasattr(self, 'model_panel') and not self.model_panel.is_expanded:
@@ -2936,12 +2959,6 @@ try {
             self._log(f"[错误] 智能修复失败: {e}", "#F44336")
             import traceback
             self._log(f"错误详情: {traceback.format_exc()}", "#F44336")
-        finally:
-            # 重新启用按钮
-            self.btn_deploy_maintain.setEnabled(True)
-            self.btn_start_music.setEnabled(True)
-            self.btn_start_qinglong.setEnabled(True)
-            self.btn_stop_all.setEnabled(True)
     
     def _ensure_scripts_available(self):
         """确保脚本文件在 scripts/ 目录可用"""
@@ -3148,7 +3165,7 @@ try {
             self._log("3. 检查环境安装状态...")
             
             uv_path = os.path.expanduser("~/.local/bin/uv.exe")
-            venv_path = os.path.join(self.base_dir, ".venv")
+            venv_path = os.path.join(self.base_dir, "scripts", ".venv")
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
             
             environment_installed = False
@@ -3226,12 +3243,6 @@ try {
             
             if script_missing:
                 self._log("[建议] 请确保所有启动脚本都存在", "#FF9800")
-            
-            self._log("")
-            self._log("=======================================")
-            self._log("部署维护完成！", "#E53935")
-            self._log("=======================================")
-            self._log("环境已准备就绪，您可以开始使用云集智能音乐创意台了！", "#E53935")
             
         except Exception as e:
             self._log(f"[错误] 部署维护失败: {e}", "#F44336")

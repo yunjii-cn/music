@@ -100,7 +100,7 @@ if ($AuthPassword -ne "none") {
 }
 
 # Directly use virtual environment python to avoid uv issues
-$venv_dir = ".venv"
+$venv_dir = "scripts\.venv"
 $python_exe = Join-Path $venv_dir "Scripts\python.exe"
 
 if (-not (Test-Path $python_exe)) {

@@ -37,7 +37,7 @@ $ext_args = [System.Collections.ArrayList]::new()
 [void]$ext_args.Add($ServerHost)
 
 # Directly use virtual environment python to avoid uv pyproject.toml checks
-$venv_dir = ".venv"
+$venv_dir = "scripts\.venv"
 $python_exe = Join-Path $venv_dir "Scripts\python.exe"
 
 if (-not (Test-Path $python_exe)) {
@@ -49,17 +49,19 @@ Write-Output "Starting API server..."
 Write-Output "Python path: $env:PYTHONPATH"
 Write-Output "Working directory: $(Get-Location)"
 Write-Output "Using Python: $python_exe"
+Write-Output "Venv dir: $venv_dir"
 
 # First test if we can import the necessary modules
 Write-Output "Testing imports..."
 try {
-    & $python_exe -c "import torch; print(f'Torch: {torch.__version__}')"
-    & $python_exe -c "import torchaudio; print(f'Torchaudio: {torchaudio.__version__}')"
+    Write-Output "Testing loguru..."
+    & $python_exe -c "import loguru; print('✓ Loguru: OK')"
 } catch {
-    Write-Output "Import test failed, but continuing..."
+    Write-Output "Loguru test failed, but continuing..."
 }
 
 # Run API server directly with virtual environment python
+Write-Output "Starting API server..."
 & $python_exe acestep/api_server.py $ext_args
 
 Write-Output "Start finished"
