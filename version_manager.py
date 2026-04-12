@@ -1,6 +1,7 @@
 """
 版本管理器模块 - 混合模式版本管理器
 支持Git源代码版本管理和EXE文件版本管理
+支持从码云(Gitee) Releases自动下载更新
 """
 
 import subprocess
@@ -9,6 +10,7 @@ import os
 import re
 import datetime
 import json
+import zipfile
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
@@ -19,6 +21,13 @@ from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 from subprocess import SW_HIDE, CREATE_NO_WINDOW
 from git_detector import GitDetector, GitInstallDialog
+
+try:
+    import urllib.request
+    import urllib.error
+    HAS_URLLIB = True
+except ImportError:
+    HAS_URLLIB = False
 
 
 class HybridVersionManagerDialog(QDialog):
@@ -44,6 +53,15 @@ class HybridVersionManagerDialog(QDialog):
         self.is_exe_mode = hasattr(sys, 'frozen')
         self.has_git_repo = self._check_git_repo()
         self.current_mode = "exe" if self.is_exe_mode else "git"
+        
+        # 码云 Releases 配置
+        self.gitee_owner = "yunjii"
+        self.gitee_repo = "ace"
+        self.gitee_releases = []
+        
+        # 下载相关
+        self.download_thread = None
+        self.is_downloading = False
         
         self._setup_ui()
         self._load_version_history()
@@ -135,6 +153,27 @@ class HybridVersionManagerDialog(QDialog):
         
         top_bar.addStretch()
         
+        # 检查更新按钮
+        check_update_btn = QPushButton("📥 检查更新")
+        check_update_btn.clicked.connect(self._check_gitee_updates)
+        check_update_btn.setMinimumWidth(90)
+        check_update_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1565C0;
+                border: 1px solid #1976D2;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 12px;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+                border-color: #1976D2;
+            }
+        """)
+        top_bar.addWidget(check_update_btn)
+        
         refresh_btn = QPushButton("🔄 刷新")
         refresh_btn.clicked.connect(self._load_versions)
         refresh_btn.setMinimumWidth(70)
@@ -217,6 +256,51 @@ class HybridVersionManagerDialog(QDialog):
         current_layout.addWidget(self.current_info_label)
         
         layout.addWidget(current_frame)
+        
+        # 下载进度条区域
+        self.download_progress_container = QFrame()
+        self.download_progress_container.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 6px;
+                padding: 12px;
+            }
+        """)
+        download_progress_layout = QVBoxLayout(self.download_progress_container)
+        download_progress_layout.setSpacing(8)
+        
+        # 进度标题
+        self.download_progress_title = QLabel("准备下载")
+        self.download_progress_title.setStyleSheet("font-weight: bold; color: #E53935; font-size: 13px;")
+        download_progress_layout.addWidget(self.download_progress_title)
+        
+        # 进度条
+        self.download_progress_bar = QProgressBar()
+        self.download_progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #2D2D2D;
+                border: 1px solid #444444;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+            }
+            QProgressBar::chunk {
+                background-color: #1565C0;
+                border-radius: 4px;
+            }
+        """)
+        self.download_progress_bar.setValue(0)
+        self.download_progress_bar.setMaximum(100)
+        download_progress_layout.addWidget(self.download_progress_bar)
+        
+        # 进度描述
+        self.download_progress_desc = QLabel("")
+        self.download_progress_desc.setStyleSheet("font-size: 11px; color: #AAAAAA;")
+        download_progress_layout.addWidget(self.download_progress_desc)
+        
+        self.download_progress_container.hide()
+        layout.addWidget(self.download_progress_container)
         
         # 分隔线
         separator = QFrame()
@@ -1473,6 +1557,366 @@ class ModelManagerDialog(QDialog):
         self.is_downloading = False
         self.progress_container.hide()
         self._update_ui()
+    
+    def _check_gitee_updates(self):
+        """检查码云 Releases 更新"""
+        if not HAS_URLLIB:
+            QMessageBox.warning(self, "提示", "缺少 urllib 模块，无法检查更新")
+            return
+        
+        if self.is_downloading:
+            QMessageBox.warning(self, "提示", "正在下载中，请先完成当前下载")
+            return
+        
+        self.check_update_thread = GiteeCheckUpdateThread(
+            self.gitee_owner, 
+            self.gitee_repo,
+            self
+        )
+        self.check_update_thread.finished.connect(self._on_gitee_check_finished)
+        self.check_update_thread.error_occurred.connect(self._on_gitee_check_error)
+        
+        QMessageBox.information(self, "检查更新", "正在检查码云 Releases 更新...")
+        self.check_update_thread.start()
+    
+    def _on_gitee_check_finished(self, releases):
+        """码云更新检查完成"""
+        self.gitee_releases = releases
+        
+        if not releases:
+            QMessageBox.information(self, "检查更新", "未找到可用的 Releases")
+            return
+        
+        msg = f"找到 {len(releases)} 个 Releases\n\n"
+        for i, release in enumerate(releases[:3]):
+            msg += f"{i+1}. {release.get('tag_name', '未知')}\n"
+        if len(releases) > 3:
+            msg += f"... 还有 {len(releases) - 3} 个\n"
+        msg += "\n是否查看并下载？"
+        
+        reply = QMessageBox.question(
+            self,
+            "检查更新",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self._show_gitee_releases_dialog()
+    
+    def _on_gitee_check_error(self, error_msg):
+        """码云更新检查错误"""
+        QMessageBox.critical(self, "错误", f"检查更新失败:\n{error_msg}")
+    
+    def _show_gitee_releases_dialog(self):
+        """显示码云 Releases 对话框"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("码云 Releases")
+        dialog.setMinimumSize(700, 500)
+        dialog.setStyleSheet("QDialog { background-color: #0D0D0D; }")
+        
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        # 标题
+        title_label = QLabel("选择要下载的版本")
+        title_label.setFont(QFont("Microsoft YaHei", 14, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #FFFFFF;")
+        layout.addWidget(title_label)
+        
+        # Releases 列表
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        
+        container = QWidget()
+        list_layout = QVBoxLayout(container)
+        list_layout.setSpacing(8)
+        
+        for release in self.gitee_releases:
+            item = self._create_release_item(release, dialog)
+            list_layout.addWidget(item)
+        
+        list_layout.addStretch()
+        scroll.setWidget(container)
+        layout.addWidget(scroll, stretch=1)
+        
+        # 关闭按钮
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.accept)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2D2D2D;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                padding: 10px 20px;
+                color: #F0F0F0;
+            }
+            QPushButton:hover {
+                background-color: #424242;
+            }
+        """)
+        layout.addWidget(close_btn)
+        
+        dialog.exec()
+    
+    def _create_release_item(self, release, parent_dialog):
+        """创建 Release 项"""
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 6px;
+                padding: 12px;
+            }
+            QFrame:hover {
+                border-color: #555555;
+                background-color: #252525;
+            }
+        """)
+        
+        layout = QVBoxLayout(frame)
+        layout.setSpacing(8)
+        
+        # 顶部：版本号和日期
+        top_layout = QHBoxLayout()
+        
+        tag_name = release.get('tag_name', '未知')
+        tag_label = QLabel(tag_name)
+        tag_label.setFont(QFont("Consolas", 12, QFont.Weight.Bold))
+        tag_label.setStyleSheet("color: #E53935;")
+        top_layout.addWidget(tag_label)
+        
+        top_layout.addStretch()
+        
+        created_at = release.get('created_at', '')
+        if created_at:
+            try:
+                dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                date_label = QLabel(dt.strftime('%Y-%m-%d %H:%M'))
+                date_label.setStyleSheet("color: #888888; font-size: 11px;")
+                top_layout.addWidget(date_label)
+            except:
+                pass
+        
+        layout.addLayout(top_layout)
+        
+        # 描述
+        body = release.get('body', '')
+        if body:
+            body_label = QLabel(body[:200] + ('...' if len(body) > 200 else ''))
+            body_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+            body_label.setWordWrap(True)
+            layout.addWidget(body_label)
+        
+        # 下载按钮
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        assets = release.get('assets', [])
+        if assets:
+            for asset in assets:
+                asset_name = asset.get('name', '')
+                if asset_name.endswith('.exe') or asset_name.endswith('.zip'):
+                    download_btn = QPushButton(f"下载 {asset_name}")
+                    download_btn.clicked.connect(
+                        lambda checked, a=asset, r=release, pd=parent_dialog: 
+                            self._download_release_asset(a, r, pd)
+                    )
+                    download_btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #1565C0;
+                            border: 1px solid #1976D2;
+                            border-radius: 4px;
+                            padding: 6px 16px;
+                            color: white;
+                            font-weight: bold;
+                        }
+                        QPushButton:hover {
+                            background-color: #1976D2;
+                        }
+                    """)
+                    btn_layout.addWidget(download_btn)
+        
+        layout.addLayout(btn_layout)
+        
+        return frame
+    
+    def _download_release_asset(self, asset, release, parent_dialog):
+        """下载 Release 附件"""
+        if self.is_downloading:
+            QMessageBox.warning(self, "提示", "正在下载中，请先完成当前下载")
+            return
+        
+        asset_name = asset.get('name', '')
+        download_url = asset.get('browser_download_url', '')
+        
+        if not download_url:
+            QMessageBox.warning(self, "提示", "无法获取下载链接")
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            "确认下载",
+            f"确定要下载 {asset_name} 吗？\n\n"
+            f"文件将保存到 version/ 文件夹",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            parent_dialog.accept()
+            
+            self.download_thread = GiteeDownloadThread(
+                download_url,
+                asset_name,
+                str(Path(self.base_dir) / "version"),
+                self
+            )
+            self.download_thread.progress.connect(self._on_download_progress)
+            self.download_thread.finished.connect(self._on_download_finished)
+            self.download_thread.error_occurred.connect(self._on_download_error)
+            
+            self.is_downloading = True
+            self.download_progress_title.setText(f"正在下载: {asset_name}")
+            self.download_progress_bar.setValue(0)
+            self.download_progress_desc.setText("准备下载...")
+            self.download_progress_container.show()
+            
+            self.download_thread.start()
+    
+    def _on_download_progress(self, value, desc):
+        """下载进度更新"""
+        if 0 <= value <= 100:
+            self.download_progress_bar.setValue(int(value))
+        if desc:
+            self.download_progress_desc.setText(desc)
+    
+    def _on_download_finished(self, file_path):
+        """下载完成"""
+        self.is_downloading = False
+        self.download_progress_container.hide()
+        
+        QMessageBox.information(
+            self,
+            "下载完成",
+            f"文件已保存到:\n{file_path}\n\n"
+            f"点击 刷新 按钮查看新版本"
+        )
+        
+        self._load_versions()
+    
+    def _on_download_error(self, error_msg):
+        """下载错误"""
+        self.is_downloading = False
+        self.download_progress_container.hide()
+        QMessageBox.critical(self, "下载失败", error_msg)
+
+
+class GiteeCheckUpdateThread(QThread):
+    """检查码云 Releases 线程"""
+    finished = pyqtSignal(list)
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, owner, repo, parent=None):
+        super().__init__(parent)
+        self.owner = owner
+        self.repo = repo
+    
+    def run(self):
+        try:
+            api_url = f"https://gitee.com/api/v5/repos/{self.owner}/{self.repo}/releases"
+            
+            req = urllib.request.Request(api_url)
+            req.add_header('User-Agent', 'AceStep-Version-Manager/1.0')
+            
+            with urllib.request.urlopen(req, timeout=30) as response:
+                data = response.read().decode('utf-8')
+                releases = json.loads(data)
+                self.finished.emit(releases)
+                
+        except urllib.error.URLError as e:
+            self.error_occurred.emit(f"网络错误: {str(e)}")
+        except json.JSONDecodeError as e:
+            self.error_occurred.emit(f"数据解析错误: {str(e)}")
+        except Exception as e:
+            self.error_occurred.emit(f"未知错误: {str(e)}")
+
+
+class GiteeDownloadThread(QThread):
+    """从码云下载文件线程"""
+    progress = pyqtSignal(int, str)
+    finished = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, url, filename, save_dir, parent=None):
+        super().__init__(parent)
+        self.url = url
+        self.filename = filename
+        self.save_dir = save_dir
+    
+    def run(self):
+        try:
+            os.makedirs(self.save_dir, exist_ok=True)
+            save_path = os.path.join(self.save_dir, self.filename)
+            
+            self.progress.emit(0, "连接中...")
+            
+            req = urllib.request.Request(self.url)
+            req.add_header('User-Agent', 'AceStep-Version-Manager/1.0')
+            
+            with urllib.request.urlopen(req, timeout=300) as response:
+                total_size = int(response.headers.get('Content-Length', 0))
+                downloaded = 0
+                block_size = 8192
+                
+                with open(save_path, 'wb') as f:
+                    while True:
+                        buffer = response.read(block_size)
+                        if not buffer:
+                            break
+                        
+                        f.write(buffer)
+                        downloaded += len(buffer)
+                        
+                        if total_size > 0:
+                            percent = int(downloaded * 100 / total_size)
+                            mb_downloaded = downloaded / (1024 * 1024)
+                            mb_total = total_size / (1024 * 1024)
+                            self.progress.emit(
+                                percent,
+                                f"{mb_downloaded:.1f} MB / {mb_total:.1f} MB"
+                            )
+                        else:
+                            mb_downloaded = downloaded / (1024 * 1024)
+                            self.progress.emit(
+                                0,
+                                f"已下载: {mb_downloaded:.1f} MB"
+                            )
+            
+            self.progress.emit(100, "下载完成")
+            
+            if self.filename.endswith('.zip'):
+                self.progress.emit(0, "正在解压...")
+                self._extract_zip(save_path, self.save_dir)
+            
+            self.finished.emit(save_path)
+            
+        except urllib.error.URLError as e:
+            self.error_occurred.emit(f"网络错误: {str(e)}")
+        except Exception as e:
+            self.error_occurred.emit(f"下载失败: {str(e)}")
+    
+    def _extract_zip(self, zip_path, extract_to):
+        """解压 ZIP 文件"""
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_to)
+        except Exception as e:
+            print(f"解压失败: {e}")
 
 
 # 保持向后兼容的别名
