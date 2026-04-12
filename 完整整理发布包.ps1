@@ -127,3 +127,29 @@ Write-Output "- ✅ scripts 目录包含脚本和 lora_data_prepare"
 Write-Output "- ✅ ace-step-ui 排除了 node_modules"
 Write-Output "- ✅ 包含根目录必要文件（LICENSE等）"
 Write-Output ""
+
+# 10. 打包成 ZIP
+Write-Output "[10/10] 打包成 ZIP..."
+$zipName = Split-Path $versionDir -Leaf
+$zipPath = Join-Path (Split-Path $versionDir -Parent) "$zipName.zip"
+
+if (Test-Path $zipPath) {
+    Remove-Item -Path $zipPath -Force
+}
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory($versionDir, $zipPath)
+
+$zipSizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+Write-Output "✓ 完成"
+Write-Output ""
+
+Write-Output "========================================"
+Write-Output "   ✅ 全部完成！"
+Write-Output "========================================"
+Write-Output ""
+Write-Output "发布包位置："
+Write-Output "  文件夹: $versionDir"
+Write-Output "  ZIP包:   $zipPath  ($zipSizeMB MB)"
+Write-Output ""
+Write-Output "可以将 ZIP 包上传到码云 Releases 了！"
