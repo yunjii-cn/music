@@ -9,6 +9,15 @@ Write-Output "  云集智能音乐创意台 - 环境安装脚本"
 Write-Output "============================================================"
 Write-Output ""
 
+# 配置国内镜像源
+Write-Output "🔧 配置国内镜像源..."
+$Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+$Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
+$Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
+Write-Output "   PyPI 镜像: https://pypi.tuna.tsinghua.edu.cn/simple/"
+Write-Output "   PyTorch 镜像: https://download.pytorch.org/whl/cu128"
+Write-Output ""
+
 # Function to check last command and exit on failure
 function Check {
     param([string]$Message)
@@ -136,7 +145,7 @@ Check "❌ 安装基础依赖失败"
 Write-Output ""
 Write-Output "📦 安装 PyTorch 生态系统..."
 Write-Output "   正在安装 torch 2.9.0, torchvision 0.24.0, torchaudio 2.9.0 (CUDA 12.8)..."
-~/.local/bin/uv pip install torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu128
+~/.local/bin/uv pip install torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0
 Check "❌ PyTorch 安装失败"
 Write-Output "✅ PyTorch 生态系统安装完成"
 

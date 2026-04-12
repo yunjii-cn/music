@@ -13,7 +13,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
-    QComboBox, QTabWidget
+    QComboBox, QTabWidget, QProgressBar
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -1042,6 +1042,7 @@ class ModelManagerDialog(QDialog):
             }
         """)
         
+        self.is_downloading = False
         self._setup_ui()
         self._update_ui()
     
@@ -1050,6 +1051,52 @@ class ModelManagerDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 下载进度条区域
+        self.progress_container = QFrame()
+        self.progress_container.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 6px;
+                padding: 10px;
+            }
+        """)
+        progress_layout = QVBoxLayout(self.progress_container)
+        progress_layout.setSpacing(8)
+        progress_layout.setContentsMargins(10, 8, 10, 8)
+        
+        # 进度标题
+        self.progress_title = QLabel("准备下载")
+        self.progress_title.setStyleSheet("font-weight: bold; color: #E53935; font-size: 13px;")
+        progress_layout.addWidget(self.progress_title)
+        
+        # 进度条
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #2D2D2D;
+                border: 1px solid #444444;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+            }
+            QProgressBar::chunk {
+                background-color: #E53935;
+                border-radius: 4px;
+            }
+        """)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(100)
+        progress_layout.addWidget(self.progress_bar)
+        
+        # 进度描述
+        self.progress_desc = QLabel("")
+        self.progress_desc.setStyleSheet("font-size: 11px; color: #AAAAAA;")
+        progress_layout.addWidget(self.progress_desc)
+        
+        self.progress_container.hide()
+        layout.addWidget(self.progress_container)
         
         # 顶部标题栏
         top_bar = QHBoxLayout()
@@ -1404,6 +1451,28 @@ class ModelManagerDialog(QDialog):
             self.main_window._delete_model(model_name)
             # 使用定时器更新UI
             QTimer.singleShot(100, self._update_ui)
+    
+    def show_progress(self, title="正在下载"):
+        """显示进度条"""
+        self.is_downloading = True
+        self.progress_title.setText(title)
+        self.progress_bar.setValue(0)
+        self.progress_desc.setText("")
+        self.progress_container.show()
+        self._update_ui()
+    
+    def update_progress(self, value, desc=""):
+        """更新进度条"""
+        if 0 <= value <= 100:
+            self.progress_bar.setValue(int(value))
+        if desc:
+            self.progress_desc.setText(desc)
+    
+    def hide_progress(self):
+        """隐藏进度条"""
+        self.is_downloading = False
+        self.progress_container.hide()
+        self._update_ui()
 
 
 # 保持向后兼容的别名

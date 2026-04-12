@@ -278,6 +278,7 @@ class ModelDownloadThread(QThread):
     """模型下载线程 - 异步下载模型，避免UI阻塞"""
     log_received = pyqtSignal(str)
     download_finished = pyqtSignal(bool, str)
+    progress_updated = pyqtSignal(int, str)
     
     def __init__(self, model_name: str, base_dir: str, download_source: str, parent=None):
         super().__init__(parent)
@@ -286,11 +287,16 @@ class ModelDownloadThread(QThread):
         self.download_source = download_source
         self.process = None
         self._should_stop = False
+        self.current_progress = 0
     
     def run(self):
         """执行模型下载"""
         try:
             self.log_received.emit(f"开始下载模型: {self.model_name}")
+            
+            # 初始化进度
+            self.current_progress = 5
+            self.progress_updated.emit(self.current_progress, "准备下载...")
             
             # 构建下载命令 - 使用虚拟环境中的Python
             venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
@@ -300,6 +306,9 @@ class ModelDownloadThread(QThread):
                 self.log_received.emit("[错误] 虚拟环境不存在，请先运行环境检测")
                 self.download_finished.emit(False, "虚拟环境不存在")
                 return
+            
+            self.current_progress = 10
+            self.progress_updated.emit(self.current_progress, "检查环境...")
             
             cmd_args = [venv_python, "-m", "acestep.model_downloader"]
             if self.model_name != "main":
@@ -318,6 +327,9 @@ class ModelDownloadThread(QThread):
                 "-Command", f"cd '{self.base_dir}'; {cmd_str}"
             ]
             
+            self.current_progress = 15
+            self.progress_updated.emit(self.current_progress, "连接下载源...")
+            
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             creationflags = subprocess.CREATE_NO_WINDOW
@@ -334,13 +346,35 @@ class ModelDownloadThread(QThread):
                 creationflags=creationflags
             )
             
+            # 模拟下载进度
+            import random
+            start_time = time.time()
+            last_progress = self.current_progress
+            
             # 读取输出
             while self.process.poll() is None and not self._should_stop:
                 line = self.process.stdout.readline()
                 if line:
                     self.log_received.emit(f"[模型下载] {line.strip()}")
+                    # 根据时间模拟进度
+                    elapsed = time.time() - start_time
+                    if elapsed > 0.5:
+                        # 随机增加进度
+                        if self.current_progress < 95:
+                            increment = random.uniform(0.5, 3.0)
+                            self.current_progress = min(95, self.current_progress + increment)
+                            self.progress_updated.emit(int(self.current_progress), "下载中...")
+                        start_time = time.time()
                 else:
                     time.sleep(0.05)
+                    # 即使没有输出也缓慢增加进度
+                    elapsed = time.time() - start_time
+                    if elapsed > 1.0:
+                        if self.current_progress < 95:
+                            increment = random.uniform(0.3, 1.0)
+                            self.current_progress = min(95, self.current_progress + increment)
+                            self.progress_updated.emit(int(self.current_progress), "下载中...")
+                        start_time = time.time()
             
             # 读取剩余的输出
             if not self._should_stop:
@@ -350,6 +384,8 @@ class ModelDownloadThread(QThread):
             
             exit_code = self.process.poll()
             if exit_code == 0 and not self._should_stop:
+                self.current_progress = 100
+                self.progress_updated.emit(100, "下载完成!")
                 self.log_received.emit(f"✓ 模型 {self.model_name} 下载成功")
                 self.download_finished.emit(True, self.model_name)
             elif not self._should_stop:
@@ -1851,13 +1887,13 @@ class MainWindow(QMainWindow):
                     self._log(f"[警告] 检查虚拟环境依赖失败: {e}，尝试继续启动...", "#FF9800")
                 
                 ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
+                self._log(f"[调试] 启动时 ace-step-ui 路径: {ace_step_ui_path}")
                 if os.path.exists(ace_step_ui_path):
                     node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+                    self._log(f"[调试] 启动时 node_modules 路径: {node_modules_path}")
                     if not os.path.exists(node_modules_path):
-                        self._log("[警告] ace-step-ui node_modules 不存在，请先运行部署维护", "#FF9800")
-                        self.is_starting = False
-                        self._enable_buttons()
-                        return
+                        self._log("[警告] ace-step-ui node_modules 不存在，尝试直接启动...", "#FF9800")
+                        self._log("[提示] 如果启动失败，请先运行部署维护安装依赖", "#FF9800")
             
             if project_id in ["qinglong", "music"]:
                 try:
@@ -2224,6 +2260,74 @@ class MainWindow(QMainWindow):
         self._log("环境检测完成！", "#E53935")
         self._log("========================================")
     
+    def _install_minimal_dependencies(self, venv_python, uv_path, scripts_dir, env):
+        """安装最小化的关键依赖（备用方案）"""
+        self._log("[信息] 正在安装关键依赖...")
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        
+        minimal_deps = [
+            "loguru",
+            "psutil",
+            "fastapi",
+            "uvicorn",
+            "toml"
+        ]
+        
+        for dep in minimal_deps:
+            try:
+                self._log(f"[信息] 正在安装: {dep}")
+                process = subprocess.Popen(
+                    [uv_path, "pip", "install", dep],
+                    cwd=scripts_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    startupinfo=startupinfo,
+                    env=env
+                )
+                stdout, _ = process.communicate(timeout=120)
+                if process.returncode == 0:
+                    self._log(f"✓ {dep} 安装完成")
+                else:
+                    self._log(f"[警告] {dep} 安装返回码: {process.returncode}", "#FF9800")
+            except Exception as e:
+                self._log(f"[警告] 安装 {dep} 失败: {e}", "#FF9800")
+    
+    def _verify_dependencies(self, venv_python):
+        """验证关键依赖是否安装"""
+        self._log("[信息] 验证关键依赖...")
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        
+        deps_to_check = ["loguru", "psutil"]
+        all_ok = True
+        
+        for dep in deps_to_check:
+            try:
+                process = subprocess.Popen(
+                    [venv_python, "-c", f"import {dep}"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    startupinfo=startupinfo
+                )
+                stdout, stderr = process.communicate(timeout=10)
+                if process.returncode == 0:
+                    self._log(f"✓ {dep} 已安装")
+                else:
+                    self._log(f"[警告] {dep} 未安装", "#FF9800")
+                    all_ok = False
+            except Exception as e:
+                self._log(f"[警告] 检查 {dep} 失败: {e}", "#FF9800")
+                all_ok = False
+        
+        if all_ok:
+            self._log("✓ 关键依赖验证通过")
+        else:
+            self._log("[警告] 部分关键依赖缺失", "#FF9800")
+    
     def _smart_fix_environment(self):
         """智能修复环境 - 自动检测并修复所有环境问题"""
         self._log("========================================")
@@ -2500,24 +2604,37 @@ class MainWindow(QMainWindow):
             # 5. 安装项目依赖
             self._log("5. 安装项目依赖...")
             try:
+                venv_python = os.path.join(scripts_dir, ".venv", "Scripts", "python.exe")
                 pyproject_toml_path = os.path.join(scripts_dir, "pyproject.toml")
+                install_env_ps1 = os.path.join(scripts_dir, "install-env.ps1")
+                
                 if os.path.exists(pyproject_toml_path):
-                    self._log("[信息] 使用 pyproject.toml 安装依赖...")
-                    self._log("[信息] 这可能需要几分钟，请稍候...")
+                    # 方案1: 尝试使用 uv sync
+                    self._log("[信息] 方案1: 使用 uv sync 安装完整依赖...")
+                    self._log("[信息] 这可能需要较长时间，请耐心等待...")
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                     
+                    # 设置国内镜像源
+                    env = os.environ.copy()
+                    env["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+                    env["UV_EXTRA_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
+                    
+                    success = False
+                    
+                    # 尝试 uv sync
                     process = subprocess.Popen(
                         [uv_path, "sync"],
                         cwd=scripts_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        env=env
                     )
                     
                     try:
-                        stdout, _ = process.communicate(timeout=300)
+                        stdout, _ = process.communicate(timeout=1200)
                         
                         if stdout:
                             for line in stdout.splitlines():
@@ -2526,15 +2643,56 @@ class MainWindow(QMainWindow):
                         
                         if process.returncode == 0:
                             self._log("✓ 项目依赖安装完成")
+                            success = True
                         else:
-                            self._log(f"[警告] 项目依赖安装返回码: {process.returncode}", "#FF9800")
+                            self._log(f"[警告] uv sync 返回码: {process.returncode}", "#FF9800")
                     except subprocess.TimeoutExpired:
                         process.kill()
-                        self._log("[警告] 依赖安装超时(5分钟)，跳过继续", "#FF9800")
+                        self._log("[警告] uv sync 超时(20分钟)", "#FF9800")
+                    
+                    # 如果 uv sync 失败，尝试方案2: 使用 install-env.ps1
+                    if not success and os.path.exists(install_env_ps1):
+                        self._log("[信息] 方案2: 使用 install-env.ps1 安装依赖...")
+                        try:
+                            # 使用 PowerShell 执行脚本
+                            ps_process = subprocess.Popen(
+                                ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", install_env_ps1],
+                                cwd=scripts_dir,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True
+                            )
+                            
+                            stdout_ps, _ = ps_process.communicate(timeout=1800)
+                            
+                            if stdout_ps:
+                                for line in stdout_ps.splitlines():
+                                    if line.strip():
+                                        self._log(f"[install-env] {line.strip()}")
+                            
+                            if ps_process.returncode == 0:
+                                self._log("✓ 使用 install-env.ps1 安装完成")
+                                success = True
+                            else:
+                                self._log(f"[警告] install-env.ps1 返回码: {ps_process.returncode}", "#FF9800")
+                        except subprocess.TimeoutExpired:
+                            ps_process.kill()
+                            self._log("[警告] install-env.ps1 超时(30分钟)", "#FF9800")
+                        except Exception as e:
+                            self._log(f"[警告] install-env.ps1 执行失败: {e}", "#FF9800")
+                    
+                    # 如果都失败了，使用方案3: 最小化依赖
+                    if not success:
+                        self._log("[信息] 方案3: 安装最小化关键依赖...", "#FF9800")
+                        self._install_minimal_dependencies(venv_python, uv_path, scripts_dir, env)
+                        self._log("[警告] 仅安装了最小化依赖，部分功能可能不可用", "#FF9800")
                 else:
                     self._log("[警告] pyproject.toml 不存在，跳过依赖安装", "#FF9800")
             except Exception as e:
                 self._log(f"[警告] 安装项目依赖失败: {e}", "#FF9800")
+            
+            # 验证关键依赖是否安装
+            self._verify_dependencies(venv_python)
             
             # 6. 检查并初始化git子模块
             self._log("6. 检查git子模块...")
@@ -2583,11 +2741,15 @@ class MainWindow(QMainWindow):
             
             # 7. 安装/修复前端依赖
             self._log("7. 安装/修复前端依赖...")
+            self._log(f"[调试] ace-step-ui 路径: {ace_step_ui_path}")
             if os.path.exists(ace_step_ui_path):
+                self._log(f"[调试] ace-step-ui 目录存在")
                 package_json_path = os.path.join(ace_step_ui_path, "package.json")
                 if os.path.exists(package_json_path):
+                    self._log(f"[调试] package.json 存在")
                     node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
                     server_node_modules_path = os.path.join(ace_step_ui_path, "server", "node_modules")
+                    self._log(f"[调试] node_modules 路径: {node_modules_path}")
                     
                     # 检查是否需要重新安装
                     need_reinstall = False
@@ -2950,10 +3112,13 @@ try {
                 self._log("[提示] 模型管理面板已自动展开，您可以查看和下载模型", "#4CAF50")
             
             # 自动展开模型管理面板
-            if hasattr(self, 'model_panel') and not self.model_panel.is_expanded:
-                from PyQt6.QtCore import QTimer
-                # 使用延迟执行，确保UI已完全准备好
-                QTimer.singleShot(100, lambda: self._expand_model_panel())
+            try:
+                if hasattr(self, 'model_panel') and not self.model_panel.is_expanded:
+                    from PyQt6.QtCore import QTimer
+                    # 使用延迟执行，确保UI已完全准备好
+                    QTimer.singleShot(100, lambda: self._expand_model_panel())
+            except Exception as e:
+                self._log(f"[警告] 展开模型面板失败: {e}", "#FF9800")
             
         except Exception as e:
             self._log(f"[错误] 智能修复失败: {e}", "#F44336")
@@ -3005,6 +3170,7 @@ try {
         self._log("========================================")
         self._log("开始部署维护...")
         self._log("========================================")
+        self._log(f"[调试] 当前工作目录: {self.base_dir}")
         
         # 确保脚本文件存在（再次尝试提取）
         self._ensure_scripts_available()
@@ -3205,7 +3371,7 @@ try {
                             self._log("✅ 环境安装完成", "#4CAF50")
                         else:
                             self._log(f"[错误] 环境安装失败，返回码: {result.returncode}", "#F44336")
-                        return
+                            return
                     except subprocess.TimeoutExpired:
                         self._log("[错误] 环境安装超时(30分钟)，请手动运行安装脚本", "#F44336")
                         self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
@@ -3218,10 +3384,10 @@ try {
                     self._log("[错误] 安装脚本不存在", "#F44336")
                     self._log("[建议] 请确保 scripts/install-env.ps1 脚本存在", "#FF9800")
                     return
-            else:
-                # 环境已安装，执行智能修复
-                self._log("5. 环境已安装，执行智能修复...")
-                self._smart_fix_environment()
+            
+            # 无论环境是否已安装，都执行智能修复（安装前端依赖等）
+            self._log("5. 执行智能修复（安装前端依赖等）...")
+            self._smart_fix_environment()
             
             # 6. 最终检查
             self._log("6. 最终检查...")
@@ -3815,6 +3981,10 @@ try {
         # 刷新UI以显示暂停按钮
         self._update_model_management_ui()
         
+        # 显示进度条
+        if hasattr(self, 'model_manager_widget') and self.model_manager_widget:
+            self.model_manager_widget.show_progress(f"正在下载: {model_name}")
+        
         # 创建下载线程
         self.model_download_thread = ModelDownloadThread(
             model_name, 
@@ -3825,6 +3995,7 @@ try {
         # 连接信号
         self.model_download_thread.log_received.connect(self._log)
         self.model_download_thread.download_finished.connect(self._on_download_finished)
+        self.model_download_thread.progress_updated.connect(self._on_download_progress_updated)
         
         # 禁用所有模型按钮
         self._set_model_buttons_enabled(False)
@@ -3832,10 +4003,19 @@ try {
         # 启动下载线程
         self.model_download_thread.start()
     
+    def _on_download_progress_updated(self, value: int, desc: str):
+        """下载进度更新回调"""
+        if hasattr(self, 'model_manager_widget') and self.model_manager_widget:
+            self.model_manager_widget.update_progress(value, desc)
+    
     def _on_download_finished(self, success: bool, model_name: str):
         """下载完成回调"""
         self.is_downloading = False
         self.current_operation_model = None
+        
+        # 隐藏进度条
+        if hasattr(self, 'model_manager_widget') and self.model_manager_widget:
+            self.model_manager_widget.hide_progress()
         
         if success:
             # 更新模型状态

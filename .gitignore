@@ -275,7 +275,13 @@ lokr_output/
 
 # Backup directories
 BAK/
+BAK_*/
 build-release/
+
+# Version directory - only keep version_history.json, not the packages
+version/*/
+version/*.exe
+version/*.zip
 
 # Git backup directories
 .git.bak/

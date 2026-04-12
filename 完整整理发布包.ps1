@@ -1,7 +1,7 @@
 # 完整的发布包整理脚本
 $ErrorActionPreference = "Continue"
 
-$versionDir = "e:\AI应用\云集智能音乐创意台\version\云集智能音乐创意台-v2026.04.11.0031"
+$versionDir = "e:\AI应用\云集智能音乐创意台\version\云集智能音乐创意台-v2026.04.11.1827"
 $rootDir = "e:\AI应用\云集智能音乐创意台"
 
 Write-Output "========================================"
@@ -30,7 +30,7 @@ Write-Output ""
 
 # 3. 复制 EXE
 Write-Output "[3/9] 复制 EXE..."
-Copy-Item -Path "$rootDir\dist\云集智能音乐创意台-v2026.04.11.0031.exe" -Destination "$versionDir\" -Force
+Copy-Item -Path "$rootDir\dist\云集智能音乐创意台-v2026.04.11.1827.exe" -Destination "$versionDir\" -Force
 Write-Output "✓ 完成"
 Write-Output ""
 
