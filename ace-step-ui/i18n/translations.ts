@@ -590,6 +590,40 @@ export const translations = {
     editableUsedForTraining: 'editable, used for training',
     useGlobalRatio: 'Use Global Ratio',
     thisSample: 'this sample',
+
+    // Model Descriptions
+    modelDescriptions: {
+      'acestep-v15-base': 'Base model, suitable for high-quality scenarios, requires more inference steps',
+      'acestep-v15-sft': 'Supervised fine-tuned model, optimized for specific tasks based on the base model',
+      'acestep-v15-turbo': 'Fast model, suitable for quick results, recommended 8 steps',
+      'acestep-v15-turbo-shift1': 'Fast model (shift 1), balanced between speed and quality',
+      'acestep-v15-turbo-shift3': 'Fast model (shift 3), default recommended fast model, balanced quality and speed',
+      'acestep-v15-turbo-continuous': 'Continuous fast model, suitable for smooth transition scenarios'
+    },
+
+    // Training Panel Additional Translations
+    yes: 'Yes',
+    no: 'No',
+    autoLabelingStatus: '🤖 Auto-labeling: {current}/{total} samples',
+    starting: 'Starting',
+    failedToLoadDataset: 'Failed to load dataset',
+    failedToLoadDatasetNoResponse: 'Failed to load dataset: No response from server',
+    failedToScanDirectory: 'Failed to scan directory',
+    failedToScanNoResponse: 'Failed to scan: No response from server',
+    failedToStartAutoLabeling: 'Failed to start auto-labeling',
+    failedToStartAutoLabelingNoResponse: 'Failed to start auto-labeling: No response from server',
+    failedToCheckLabelingStatus: 'Failed to check labeling status',
+    failedToSaveDataset: 'Failed to save dataset',
+    failedToSaveNoResponse: 'Failed to save: No response from server',
+    failedToStartPreprocessing: 'Failed to start preprocessing',
+    failedToStartPreprocessingNoResponse: 'Failed to start preprocessing: No response from server',
+    failedToCheckPreprocessingStatus: 'Failed to check preprocessing status',
+    failedToLoadDatasetInfo: 'Failed to load dataset info',
+    failedToLoadDatasetInfoNoResponse: 'Failed to load dataset info: No response from server',
+    failedToStartTraining: 'Failed to start training',
+    failedToStartTrainingNoResponse: 'Failed to start training: No response from server',
+    failedToStopTraining: 'Failed to stop training',
+    failedToStopTrainingNoResponse: 'Failed to stop training: No response from server'
   },
   zh: {
     // Navigation
@@ -1180,6 +1214,40 @@ export const translations = {
     editableUsedForTraining: '可编辑，用于训练',
     useGlobalRatio: '使用全局比例',
     thisSample: '此样本',
+
+    // Model Descriptions
+    modelDescriptions: {
+      'acestep-v15-base': '基础模型，适合追求高质量的场景，需要较多推理步数',
+      'acestep-v15-sft': '监督微调模型，在基础模型基础上优化了特定任务',
+      'acestep-v15-turbo': '快速模型，适合需要快速出结果的场景，推荐使用8步',
+      'acestep-v15-turbo-shift1': '快速模型（偏移1），平衡速度和质量的折中方案',
+      'acestep-v15-turbo-shift3': '快速模型（偏移3），默认推荐的快速模型，平衡了质量和速度',
+      'acestep-v15-turbo-continuous': '连续快速模型，适合需要流畅过渡的场景'
+    },
+
+    // Training Panel Additional Translations
+    yes: '是',
+    no: '否',
+    autoLabelingStatus: '🤖 自动标注：{current}/{total} 个样本',
+    starting: '正在启动',
+    failedToLoadDataset: '加载数据集失败',
+    failedToLoadDatasetNoResponse: '加载数据集失败：服务器无响应',
+    failedToScanDirectory: '扫描目录失败',
+    failedToScanNoResponse: '扫描失败：服务器无响应',
+    failedToStartAutoLabeling: '启动自动标注失败',
+    failedToStartAutoLabelingNoResponse: '启动自动标注失败：服务器无响应',
+    failedToCheckLabelingStatus: '检查标注状态失败',
+    failedToSaveDataset: '保存数据集失败',
+    failedToSaveNoResponse: '保存失败：服务器无响应',
+    failedToStartPreprocessing: '启动预处理失败',
+    failedToStartPreprocessingNoResponse: '启动预处理失败：服务器无响应',
+    failedToCheckPreprocessingStatus: '检查预处理状态失败',
+    failedToLoadDatasetInfo: '加载数据集信息失败',
+    failedToLoadDatasetInfoNoResponse: '加载数据集信息失败：服务器无响应',
+    failedToStartTraining: '启动训练失败',
+    failedToStartTrainingNoResponse: '启动训练失败：服务器无响应',
+    failedToStopTraining: '停止训练失败',
+    failedToStopTrainingNoResponse: '停止训练失败：服务器无响应'
   },
   ja: {
     // Navigation

@@ -1240,23 +1240,23 @@ class MainWindow(QMainWindow):
         self.btn_home.clicked.connect(lambda: self._switch_page(0))
         nav_bar_layout.addWidget(self.btn_home)
         
-        # 软件更新按钮
-        self.btn_version_nav = QPushButton("🔄 软件更新")
-        self.btn_version_nav.setCheckable(True)
-        self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_version_nav.setStyleSheet(menu_button_style)
-        self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_version_nav.clicked.connect(lambda: self._switch_page(1))
-        nav_bar_layout.addWidget(self.btn_version_nav)
-        
         # 模型管理按钮
         self.btn_model_nav = QPushButton("📦 模型管理")
         self.btn_model_nav.setCheckable(True)
         self.btn_model_nav.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_model_nav.setStyleSheet(menu_button_style)
         self.btn_model_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_model_nav.clicked.connect(lambda: self._switch_page(2))
+        self.btn_model_nav.clicked.connect(lambda: self._switch_page(1))
         nav_bar_layout.addWidget(self.btn_model_nav)
+        
+        # 软件更新按钮
+        self.btn_version_nav = QPushButton("🔄 软件更新")
+        self.btn_version_nav.setCheckable(True)
+        self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_version_nav.setStyleSheet(menu_button_style)
+        self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
+        nav_bar_layout.addWidget(self.btn_version_nav)
         
         main_layout.addWidget(nav_bar)
         
@@ -1267,13 +1267,13 @@ class MainWindow(QMainWindow):
         self.home_page = self._create_home_page()
         self.page_stack.addWidget(self.home_page)
         
-        # 页面1：版本管理器
-        self.version_page = self._create_version_page()
-        self.page_stack.addWidget(self.version_page)
-        
-        # 页面2：模型管理器
+        # 页面1：模型管理器
         self.model_page = self._create_model_page()
         self.page_stack.addWidget(self.model_page)
+        
+        # 页面2：版本管理器
+        self.version_page = self._create_version_page()
+        self.page_stack.addWidget(self.version_page)
         
         main_layout.addWidget(self.page_stack, 1)
     

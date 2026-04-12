@@ -1129,47 +1129,60 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               
               {/* Floating Model Menu */}
               {showModelMenu && availableModels.length > 0 && (
-                <div className="absolute top-full right-0 mt-1 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="absolute top-full right-0 mt-1 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
                   <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                    {availableModels.map(model => (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          setSelectedModel(model.id);
-                          localStorage.setItem('ace-model', model.id);
-                          // Auto-adjust parameters for non-turbo models
-                          if (!isTurboModel(model.id)) {
-                            setInferenceSteps(20);
-                            setUseAdg(true);
-                          }
-                          setShowModelMenu(false);
-                        }}
-                        className={`w-full px-4 py-3 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-b-0 ${
-                          selectedModel === model.id ? 'bg-zinc-50 dark:bg-zinc-800/50' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-zinc-900 dark:text-white">
-                              {getModelDisplayName(model.id)}
-                            </span>
-                            {fetchedModels.find(m => m.name === model.id)?.is_preloaded && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                {fetchedModels.find(m => m.name === model.id)?.is_active ? '● Active' : '● Ready'}
+                    {availableModels.map(model => {
+                      const fetchedModel = fetchedModels.find(m => m.name === model.id);
+                      const isAvailable = fetchedModel?.is_preloaded ?? false;
+                      const modelDescription = (t as any).modelDescriptions?.[model.id] || '';
+                      
+                      return (
+                        <button
+                          key={model.id}
+                          onClick={() => {
+                            setSelectedModel(model.id);
+                            localStorage.setItem('ace-model', model.id);
+                            // Auto-adjust parameters for non-turbo models
+                            if (!isTurboModel(model.id)) {
+                              setInferenceSteps(20);
+                              setUseAdg(true);
+                            }
+                            setShowModelMenu(false);
+                          }}
+                          className={`w-full px-4 py-3 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-b-0 ${
+                            selectedModel === model.id ? 'bg-zinc-50 dark:bg-zinc-800/50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                {getModelDisplayName(model.id)}
                               </span>
+                              {isAvailable ? (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                  {fetchedModel?.is_active ? '● 激活中' : '● 可用'}
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
+                                  ● 未加载
+                                </span>
+                              )}
+                            </div>
+                            {selectedModel === model.id && (
+                              <div className="w-4 h-4 rounded-full bg-pink-500 flex items-center justify-center">
+                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
                             )}
                           </div>
-                          {selectedModel === model.id && (
-                            <div className="w-4 h-4 rounded-full bg-pink-500 flex items-center justify-center">
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            </div>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">{model.id}</p>
+                          {modelDescription && (
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500 line-clamp-2">{modelDescription}</p>
                           )}
-                        </div>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{model.id}</p>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

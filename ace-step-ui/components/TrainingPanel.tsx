@@ -123,7 +123,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
       filename: s.filename,
       duration: s.duration?.toFixed(1) || 'N/A',
       lyrics: s.lyrics || '',
-      labeled: s.labeled ? 'Yes' : 'No',
+      labeled: s.labeled ? t('yes') : t('no'),
       bpm: s.bpm?.toString() || '',
       key: s.keyscale || '',
       caption: s.caption || '',
@@ -242,14 +242,14 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
     try {
       const result = await trainingApi.loadDataset({ dataset_path: loadJsonPath }, token);
       if (!result) {
-        setLoadJsonStatus('Failed to load dataset: No response from server');
+        setLoadJsonStatus(t('failedToLoadDatasetNoResponse'));
         return;
       }
       setLoadJsonStatus(result.message || 'Dataset loaded');
       setDatasetName(result.dataset_name || '');
       setAudioFiles(transformSamples(result.samples || []));
     } catch (error: any) {
-      setLoadJsonStatus(`${t('error')}: ${error?.message || 'Failed to load dataset'}`);
+      setLoadJsonStatus(`${t('error')}: ${error?.message || t('failedToLoadDataset')}`);
     }
   };
 
@@ -265,13 +265,13 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
         all_instrumental: allInstrumental,
       }, token);
       if (!result) {
-        setScanStatus('Failed to scan: No response from server');
+        setScanStatus(t('failedToScanNoResponse'));
         return;
       }
       setScanStatus(result.message || 'Scan completed');
       setAudioFiles(transformSamples(result.samples || []));
     } catch (error: any) {
-      setScanStatus(`${t('error')}: ${error?.message || 'Failed to scan directory'}`);
+      setScanStatus(`${t('error')}: ${error?.message || t('failedToScanDirectory')}`);
     }
   };
 
@@ -287,11 +287,11 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
       }, token);
 
       if (!startResult || !startResult.task_id) {
-        setLabelProgress('Failed to start auto-labeling: No response from server');
+        setLabelProgress(t('failedToStartAutoLabelingNoResponse'));
         return;
       }
       const taskId = startResult.task_id;
-      setLabelProgress(`${startResult.message || 'Starting'} (0/${startResult.total || 0})`);
+      setLabelProgress(`${startResult.message || t('starting')} (0/${startResult.total || 0})`);
       setLabelStatus({ current: 0, total: startResult.total || 0, status: 'running' });
 
       // Clear any previous poll before starting a new one
@@ -328,7 +328,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
         } catch (pollError: any) {
           clearInterval(pollInterval);
           labelPollRef.current = null;
-          setLabelProgress(`${t('error')}: ${pollError?.message || 'Failed to check labeling status'}`);
+          setLabelProgress(`${t('error')}: ${pollError?.message || t('failedToCheckLabelingStatus')}`);
           setLabelStatus(null);
         }
       }, 2000); // Poll every 2 seconds
@@ -336,7 +336,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
       labelPollRef.current = pollInterval;
 
     } catch (error: any) {
-      setLabelProgress(`${t('error')}: ${error?.message || 'Failed to start auto-labeling'}`);
+      setLabelProgress(`${t('error')}: ${error?.message || t('failedToStartAutoLabeling')}`);
     }
   };
 
@@ -405,12 +405,12 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
         genre_ratio: genreRatio,
       }, token);
       if (!result) {
-        setSaveStatus('Failed to save: No response from server');
+        setSaveStatus(t('failedToSaveNoResponse'));
         return;
       }
       setSaveStatus(result.message || 'Dataset saved');
     } catch (error: any) {
-      setSaveStatus(`${t('error')}: ${error?.message || 'Failed to save dataset'}`);
+      setSaveStatus(`${t('error')}: ${error?.message || t('failedToSaveDataset')}`);
     }
   };
 
@@ -425,11 +425,11 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
       }, token);
       
       if (!startResult || !startResult.task_id) {
-        setPreprocessProgress('Failed to start preprocessing: No response from server');
+        setPreprocessProgress(t('failedToStartPreprocessingNoResponse'));
         return;
       }
       const taskId = startResult.task_id;
-      setPreprocessProgress(`${startResult.message || 'Starting'} (0/${startResult.total || 0})`);
+      setPreprocessProgress(`${startResult.message || t('starting')} (0/${startResult.total || 0})`);
       setPreprocessStatus({ current: 0, total: startResult.total || 0, status: 'running' });
       
       // Poll for status
@@ -456,7 +456,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
           }
         } catch (pollError: any) {
           clearInterval(pollInterval);
-          setPreprocessProgress(`${t('error')}: ${pollError?.message || 'Failed to check preprocessing status'}`);
+          setPreprocessProgress(`${t('error')}: ${pollError?.message || t('failedToCheckPreprocessingStatus')}`);
           setPreprocessStatus(null);
         }
       }, 2000); // Poll every 2 seconds
@@ -465,7 +465,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
       return () => clearInterval(pollInterval);
       
     } catch (error: any) {
-      setPreprocessProgress(`${t('error')}: ${error?.message || 'Failed to start preprocessing'}`);
+      setPreprocessProgress(`${t('error')}: ${error?.message || t('failedToStartPreprocessing')}`);
     }
   };
 
@@ -475,7 +475,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
     try {
       const result = await trainingApi.loadTensorInfo({ tensor_dir: trainingTensorDir }, token);
       if (!result) {
-        setTrainingDatasetInfo('Failed to load dataset info: No response from server');
+        setTrainingDatasetInfo(t('failedToLoadDatasetInfoNoResponse'));
         return;
       }
       setTrainingDatasetInfo(
@@ -485,7 +485,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
           .replace('{labeled}', (result.num_samples || 0).toString())}\n${result.message || ''}`
       );
     } catch (error: any) {
-      setTrainingDatasetInfo(`${t('error')}: ${error?.message || 'Failed to load dataset info'}`);
+      setTrainingDatasetInfo(`${t('error')}: ${error?.message || t('failedToLoadDatasetInfo')}`);
     }
   };
 
@@ -509,13 +509,13 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
         use_fp8: useFP8,
       }, token);
       if (!result) {
-        setTrainingProgress('Failed to start training: No response from server');
+        setTrainingProgress(t('failedToStartTrainingNoResponse'));
         return;
       }
       setIsTraining(true);
       setTrainingProgress(result.message || 'Training started');
     } catch (error: any) {
-      setTrainingProgress(`${t('error')}: ${error?.message || 'Failed to start training'}`);
+      setTrainingProgress(`${t('error')}: ${error?.message || t('failedToStartTraining')}`);
     }
   };
 
@@ -524,12 +524,12 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
     try {
       const result = await trainingApi.stopTraining(token);
       if (!result) {
-        setTrainingProgress('Failed to stop training: No response from server');
+        setTrainingProgress(t('failedToStopTrainingNoResponse'));
         return;
       }
       setTrainingProgress(result.message || 'Training stopped');
     } catch (error: any) {
-      setTrainingProgress(`${t('error')}: ${error?.message || 'Failed to stop training'}`);
+      setTrainingProgress(`${t('error')}: ${error?.message || t('failedToStopTraining')}`);
     }
   };
 
@@ -658,7 +658,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
                           <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{file.duration}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded text-xs ${
-                              file.labeled === 'Yes'
+                              file.labeled === t('yes')
                                 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                                 : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
                             }`}>
@@ -814,7 +814,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
                   <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 rounded-lg p-4 border-2 border-violet-200 dark:border-violet-800 space-y-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-zinc-700 dark:text-zinc-200 font-medium">
-                        🤖 Auto-labeling: {current}/{total} samples
+                        {t('autoLabelingStatus', { current, total })}
                       </span>
                       <span className="text-xs font-mono text-violet-600 dark:text-violet-400 font-semibold">
                         {progressPercent.toFixed(1)}%
