@@ -23,6 +23,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Generate waveform data from audio file
   useEffect(() => {
@@ -46,8 +47,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         const barWidth = 2;
         const gap = 1;
         const barTotalWidth = barWidth + gap;
-        const canvasWidth = canvasRef.current?.clientWidth || 800;
-        const samples = Math.max(200, Math.floor(canvasWidth / barTotalWidth));
+        // 使用一个足够大的默认值，确保波形覆盖整个宽度
+        const canvasWidth = canvasRef.current?.clientWidth || containerRef.current?.clientWidth || 1000;
+        const samples = Math.max(400, Math.floor(canvasWidth / barTotalWidth));
         const blockSize = Math.max(1, Math.floor(channelData.length / samples));
         const peaks: number[] = [];
         
@@ -108,6 +110,10 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
+    // 计算缩放因子，确保波形覆盖整个宽度
+    const totalBarWidth = totalBars * (barWidth + gap);
+    const scaleX = totalBarWidth > 0 ? width / totalBarWidth : 1;
+
     // Draw waveform bars
     waveformData.peaks.forEach((peak, index) => {
       // Smooth the peak with neighboring values for cleaner look
@@ -117,12 +123,13 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       
       // Scale to height with minimum visible size
       const barHeight = Math.max(3, smoothedPeak * (height - 8));
-      const x = index * (barWidth + gap);
-      const barEndX = x + barWidth;
+      // 应用缩放因子
+      const x = index * (barWidth + gap) * scaleX;
+      const actualBarWidth = barWidth * scaleX;
       
       // Determine if bar is played based on exact pixel position
       // A bar is considered played if its center is before the played position
-      const barCenterX = x + barWidth / 2;
+      const barCenterX = x + actualBarWidth / 2;
       const isPlayed = barCenterX <= playedPixelWidth;
 
       // Theme-aware colors
@@ -145,7 +152,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       const y = centerY - barH / 2;
       
       ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, barH, 1);
+      ctx.roundRect(x, y, Math.max(1, actualBarWidth), barH, 1);
       ctx.fill();
     });
   }, [waveformData, currentTime, duration]);
@@ -165,18 +172,20 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
   if (isLoading || !waveformData) {
     return (
-      <div className="w-full h-full flex items-center justify-center">
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center">
         <div className="w-full h-0.5 bg-zinc-300/20 dark:bg-zinc-600/20" />
       </div>
     );
   }
 
   return (
-    <canvas
-      ref={canvasRef}
-      onClick={handleClick}
-      className="w-full h-full cursor-pointer"
-      style={{ width: '100%', height: '100%' }}
-    />
+    <div ref={containerRef} className="w-full h-full">
+      <canvas
+        ref={canvasRef}
+        onClick={handleClick}
+        className="w-full h-full cursor-pointer"
+        style={{ width: '100%', height: '100%' }}
+      />
+    </div>
   );
 };

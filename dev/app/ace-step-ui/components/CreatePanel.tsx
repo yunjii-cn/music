@@ -1134,7 +1134,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     {availableModels.map(model => {
                       const fetchedModel = fetchedModels.find(m => m.name === model.id);
                       const isAvailable = fetchedModel?.is_preloaded ?? false;
-                      const modelDescription = (t as any).modelDescriptions?.[model.id] || '';
+                      
+                      const descriptions: Record<string, string> = {
+                        'acestep-v15-base': '基础模型，适合从零开始创作，生成风格多样的音乐。',
+                        'acestep-v15-sft': 'SFT微调模型，更适合风格延续和参考创作，旋律还原度较高。',
+                        'acestep-v15-turbo': 'Turbo快速模型，生成速度快，适合快速迭代和测试想法。',
+                        'acestep-v15-turbo-shift1': 'Turbo Shift 1模型，平衡速度与质量，是日常创作的首选。',
+                        'acestep-v15-turbo-shift3': 'Turbo Shift 3模型，质量更好的快速模型，推荐用于正式创作。',
+                        'acestep-v15-turbo-continuous': 'Turbo Continuous模型，适合长音频生成，稳定性极佳。'
+                      };
+                      const modelDescription = descriptions[model.id] || '';
                       
                       return (
                         <button
@@ -2019,11 +2028,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 onChange={(e) => { const v = e.target.value; setLmModel(v); localStorage.setItem('ace-lmModel', v); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
               >
-                <option value="acestep-5Hz-lm-0.6B">{t('lmModel06B')}</option>
-                <option value="acestep-5Hz-lm-1.7B">{t('lmModel17B')}</option>
-                <option value="acestep-5Hz-lm-4B">{t('lmModel4B')}</option>
+                <option value="acestep-5Hz-lm-0.6B">{t('lmModel06B')} - ⚡ 最快速度</option>
+                <option value="acestep-5Hz-lm-1.7B">{t('lmModel17B')} - 🎵 推荐之选</option>
+                <option value="acestep-5Hz-lm-4B">{t('lmModel4B')} - 🌟 最高质量</option>
               </select>
-              <p className="text-[10px] text-zinc-500">{t('lmModelHint')}</p>
+              <div className="space-y-1">
+                <p className="text-[10px] text-zinc-500">
+                  {lmModel === 'acestep-5Hz-lm-0.6B' ? t('lmModel06BDesc') :
+                   lmModel === 'acestep-5Hz-lm-1.7B' ? t('lmModel17BDesc') :
+                   t('lmModel4BDesc')}
+                </p>
+                <p className="text-[10px] text-zinc-400">{t('lmModelHint')}</p>
+              </div>
             </div>
 
             {/* Seed */}
