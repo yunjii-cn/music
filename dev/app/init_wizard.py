@@ -18,7 +18,6 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 from git_detector import GitDetector, GitInstallDialog
 from git_downloader import ensure_git_available_silent
-from python_downloader import ensure_python_312_silent, is_python_312
 
 
 class InitStep:
@@ -366,24 +365,6 @@ class InitWizardDialog(QDialog):
         self.close_btn.setEnabled(True)
         
         if success:
-            # 静默检查Python 3.12是否可用（不弹对话框）
-            python_cmd = None
-            try:
-                python_cmd, python_ok = ensure_python_312_silent(self.base_dir)
-                if python_ok and python_cmd:
-                    # 更新配置，记录Python路径
-                    import json
-                    config_file = self.base_dir / 'config' / 'init_config.json'
-                    if config_file.exists():
-                        with open(config_file, 'r', encoding='utf-8') as f:
-                            config = json.load(f)
-                        config['python_312_available'] = True
-                        config['python_312_path'] = python_cmd
-                        with open(config_file, 'w', encoding='utf-8') as f:
-                            json.dump(config, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                print(f"Python配置失败：{e}")
-            
             # 静默检查Git是否可用（不弹对话框）
             git_cmd = None
             try:
