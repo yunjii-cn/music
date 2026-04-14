@@ -42,9 +42,13 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
       .then(audioBuffer => {
         const channelData = audioBuffer.getChannelData(0);
-        // More samples for finer bars
-        const samples = Math.min(800, Math.floor(canvasRef.current?.clientWidth || 600));
-        const blockSize = Math.floor(channelData.length / samples);
+        // 根据 canvas 宽度计算足够的采样点，确保覆盖整个宽度
+        const barWidth = 2;
+        const gap = 1;
+        const barTotalWidth = barWidth + gap;
+        const canvasWidth = canvasRef.current?.clientWidth || 800;
+        const samples = Math.max(200, Math.floor(canvasWidth / barTotalWidth));
+        const blockSize = Math.max(1, Math.floor(channelData.length / samples));
         const peaks: number[] = [];
         
         for (let i = 0; i < samples; i++) {

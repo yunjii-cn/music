@@ -296,7 +296,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                             className="group flex flex-col items-center gap-1 p-2.5 text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all duration-200"
                         >
                             <Video size={18} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
-                            <span className="text-[9px] font-medium">Video</span>
+                            <span className="text-[9px] font-medium">{t('video')}</span>
                         </button>
                         <button
                             onClick={() => {
@@ -308,7 +308,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                             className="group flex flex-col items-center gap-1 p-2.5 text-zinc-500 hover:text-amber-600 dark:text-zinc-400 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-xl transition-all duration-200"
                         >
                             <Edit3 size={18} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
-                            <span className="text-[9px] font-medium">Editor</span>
+                            <span className="text-[9px] font-medium">{t('editor')}</span>
                         </button>
                         <button
                             onClick={() => onReuse && onReuse(song)}
@@ -316,7 +316,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                             className="group flex flex-col items-center gap-1 p-2.5 text-zinc-500 hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all duration-200"
                         >
                             <Repeat size={18} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
-                            <span className="text-[9px] font-medium">Reuse</span>
+                            <span className="text-[9px] font-medium">{t('reuse')}</span>
                         </button>
                         <button
                             onClick={() => {
@@ -331,7 +331,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                             className="group flex flex-col items-center gap-1 p-2.5 text-zinc-500 hover:text-violet-600 dark:text-zinc-400 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 rounded-xl transition-all duration-200"
                         >
                             <Layers size={18} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
-                            <span className="text-[9px] font-medium">Stems</span>
+                            <span className="text-[9px] font-medium">{t('stems')}</span>
                         </button>
                     </div>
 

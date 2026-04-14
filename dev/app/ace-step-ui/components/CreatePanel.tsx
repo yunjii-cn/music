@@ -1268,8 +1268,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 max={300}
                 step={5}
                 onChange={setBpm}
-                formatDisplay={(val) => val === 0 ? 'Auto' : val.toString()}
-                autoLabel="Auto"
+                formatDisplay={(val) => val === 0 ? t('auto') : val.toString()}
+                autoLabel={t('auto')}
               />
 
               {/* Key & Time Signature */}
@@ -1281,7 +1281,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     onChange={setKeyScale}
                     className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                   >
-                    <option value="">Auto</option>
+                    <option value="">{t('auto')}</option>
                     {KEY_SIGNATURES.filter(k => k).map(key => (
                       <option key={key} value={key}>{key}</option>
                     ))}
@@ -1294,7 +1294,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     onChange={setTimeSignature}
                     className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                   >
-                    <option value="">Auto</option>
+                    <option value="">{t('auto')}</option>
                     {TIME_SIGNATURES.filter(t => t).map(time => (
                       <option key={time} value={time}>{time}</option>
                     ))}
@@ -1858,7 +1858,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 onChange={(e) => setKeyScale(e.target.value)}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
               >
-                <option value="">Auto</option>
+                <option value="">{t('auto')}</option>
                 {KEY_SIGNATURES.filter(k => k).map(key => (
                   <option key={key} value={key}>{key}</option>
                 ))}
@@ -1871,7 +1871,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 onChange={(e) => setTimeSignature(e.target.value)}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
               >
-                <option value="">Auto</option>
+                <option value="">{t('auto')}</option>
                 {TIME_SIGNATURES.filter(t => t).map(time => (
                   <option key={time} value={time}>{time}</option>
                 ))}

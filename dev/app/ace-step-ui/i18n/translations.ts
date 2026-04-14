@@ -7,16 +7,16 @@ export const translations = {
     library: 'Library',
     search: 'Search',
     training: 'Training',
-    
+
     // Theme
     lightMode: 'Light Mode',
     darkMode: 'Dark Mode',
-    
+
     // Auth
     signIn: 'Sign In',
     signOut: 'Sign Out',
     settings: 'Settings',
-    
+
     // Username Modal
     welcomeTitle: 'Welcome to ACE-Step UI',
     welcomeSubtitle: 'Enter your name to get started creating AI music',
@@ -28,7 +28,7 @@ export const translations = {
     usernameMinLength: 'Username must be at least 2 characters',
     usernameInvalidChars: 'Username can only contain letters, numbers, underscores, and dashes',
     failedToSetUsername: 'Failed to set username',
-    
+
     // Toasts
     songNotAvailable: 'This song is no longer available.',
     unableToPlay: 'Unable to play this song.',
@@ -40,26 +40,28 @@ export const translations = {
     failedToAddSong: 'Failed to add song to playlist',
     songDeleted: 'Song deleted successfully',
     failedToDeleteSong: 'Failed to delete song',
-    
+
     // Sidebar
     aceStepUI: 'ACE-Step UI',
-    
+
     // Common
     cancel: 'Cancel',
+    default: 'Default',
     save: 'Save',
     delete: 'Delete',
     edit: 'Edit',
     share: 'Share',
     download: 'Download',
+    collapse: 'Collapse',
     play: 'Play',
     pause: 'Pause',
     normalSpeed: 'Normal',
     next: 'Next',
     previous: 'Previous',
-    
+
     // Placeholders
     searchPlaceholder: 'Search...',
-    
+
     // Settings
     language: 'Language',
     english: 'English',
@@ -83,15 +85,15 @@ export const translations = {
     done: 'Done',
     light: 'Light',
     dark: 'Dark',
-    
+
     // Mobile
     createSong: 'Create Song',
     viewList: 'View List',
-    
+
     // CreatePanel - Modes
     simple: 'Simple',
     custom: 'Custom',
-    
+
     // CreatePanel - Sections
     audio: 'AUDIO',
     lyrics: 'LYRICS',
@@ -99,7 +101,7 @@ export const translations = {
     title: 'Title',
     musicParameters: 'Music Parameters',
     advancedSettings: 'Advanced Settings',
-    
+
     // CreatePanel - LoRA
     loraPath: 'LoRA Path',
     loraPathPlaceholder: 'Enter LoRA model path...',
@@ -110,13 +112,13 @@ export const translations = {
     loraUnload: 'Unload',
     loraScale: 'LoRA Scale',
     loraScaleDescription: 'Adjust the influence strength of the LoRA model',
-    
+
     // CreatePanel - Audio
-    reference: 'Reference',
-    cover: 'Cover',
+    reference: 'Style Ref',
+    cover: 'Content Ref',
     fromLibrary: 'From library',
     upload: 'Upload',
-    
+
     // CreatePanel - Lyrics
     lyricsPlaceholder: 'Your lyrics here...',
     leaveLyricsEmpty: 'Leave empty for instrumental or toggle below',
@@ -174,15 +176,23 @@ export const translations = {
     vocalVietnamese: 'Vietnamese',
     vocalCantonese: 'Cantonese',
     vocalChineseMandarin: 'Chinese (Mandarin)',
-    
+
     // CreatePanel - Style
     stylePlaceholder: 'e.g. upbeat pop rock, emotional ballad, 90s hip hop',
     genreMoodInstruments: 'Genre, mood, instruments, vibe',
     refreshGenres: 'Refresh genre suggestions',
     mainGenre: 'Main Genre',
     subGenre: 'Sub Genre',
+    searchGenre: 'Search genres...',
+    selectGenre: 'Select genre...',
+    otherGenres: 'Other Genres',
+    majorGenres: 'Major Genres',
+    subGenres: 'Sub Genres',
+    clearSelection: 'Clear',
+    selectSubGenre: 'Select sub genre',
+    clearGenreSelection: 'Clear genre selection',
     nameSong: 'Name your song',
-    
+
     // CreatePanel - Parameters
     bpm: 'BPM',
     auto: 'Auto',
@@ -190,7 +200,13 @@ export const translations = {
     seconds: 's',
     keyScale: 'Key & Scale',
     timeSignature: 'Time Signature',
-    
+    autoOption: 'Auto',
+
+    // CreatePanel - Model Status
+    modelActive: '● Active',
+    modelReady: '● Ready',
+    backendNotStarted: 'ACE-Step backend not started yet, using default model list',
+
     // CreatePanel - Advanced
     randomSeed: 'Random Seed',
     thinking: 'Thinking',
@@ -210,8 +226,15 @@ export const translations = {
     taskType: 'Task Type',
     textToMusic: 'Text → Music',
     audioCoverStrength: 'Audio Cover Strength',
+    coverNoiseStrength: 'Cover Noise Strength',
+    enableNormalization: 'Normalize Audio',
+    normalizationDb: 'Normalization dB',
+    latentShift: 'Latent Shift',
+    latentRescale: 'Latent Rescale',
     repaintingStart: 'Repainting Start',
     repaintingEnd: 'Repainting End',
+    repaintingRange: 'Repainting Range',
+    cfgInterval: 'CFG Interval',
     instruction: 'Instruction',
     lmTemperature: 'LM Temperature',
     higherMoreRandom: 'Higher = more random (0-2)',
@@ -225,7 +248,7 @@ export const translations = {
     useWhenCfgScaleGreater: 'Use when LM CFG Scale > 1.0',
     lmTopK: 'LM Top-K',
     lmTopP: 'LM Top-P',
-    
+
     // Guidance section
     guidance: 'GUIDANCE',
     advancedCfgScheduling: 'Advanced CFG scheduling controls.',
@@ -245,6 +268,7 @@ export const translations = {
     useCotCaption: 'Use CoT Caption',
     useCotLanguage: 'Use CoT Language',
     autogen: 'Autogen',
+    autogenHint: 'Auto-generate missing fields when possible.',
     constrainedDecodingDebug: 'Constrained Decoding Debug',
     formatCaption: 'Format Caption',
     getScores: 'Get Scores',
@@ -268,20 +292,40 @@ export const translations = {
     odeDeterministic: 'ODE (deterministic)',
     sdeStochastic: 'SDE (stochastic)',
     min: 'min',
-    
+
+    // CreatePanel - Misc
+    instructionDefault: 'Fill the audio semantic mask based on the given conditions:',
+    untitled: 'Untitled',
+    pleaseSignInToUseLoRA: 'Please sign in to use LoRA',
+    pleaseEnterLoRAPath: 'Please enter a LoRA path',
+    loraOperationFailed: 'LoRA operation failed',
+    failedToUnloadLoRA: 'Failed to unload LoRA',
+    pleaseSignInToUploadAudio: 'Please sign in to upload audio',
+    contentRefRequiredForTask: 'This task requires content reference audio. Please upload one.',
+    uploadFailed: 'Upload failed',
+    formatFailed: 'Format failed',
+    formatFailedLLMNotInitialized: 'Format failed. Make sure the LLM is initialized.',
+    formatFailedLLMNotAvailable: 'Format failed. The LLM may not be available.',
+    maleVocals: 'Male vocals',
+    femaleVocals: 'Female vocals',
+    failedToFetchReferenceTracks: 'Failed to fetch reference tracks',
+    failedToTranscribe: 'Failed to transcribe',
+    transcriptionFailed: 'Transcription failed',
+    failedToDeleteTrack: 'Failed to delete track',
+
     // CreatePanel - Drag & Drop
     dropToUseAudio: 'Drop to use audio',
     dropToUpload: 'Drop to upload',
-    usingAsReference: 'Using as Reference',
-    usingAsCover: 'Using as Cover',
-    uploadingAsReference: 'Uploading as Reference',
-    uploadingAsCover: 'Uploading as Cover',
-    
+    usingAsReference: 'Using as Style Reference',
+    usingAsCover: 'Using as Content Reference',
+    uploadingAsReference: 'Uploading as Style Reference',
+    uploadingAsCover: 'Uploading as Content Reference',
+
     // CreatePanel - Vocal Gender
     vocalGender: 'Vocal Gender',
     male: 'Male',
     female: 'Female',
-    
+
     // CreatePanel - LM Backend & Model
     lmBackendLabel: 'LM Backend',
     lmBackendPt: 'PT (~1.6 GB VRAM)',
@@ -292,18 +336,24 @@ export const translations = {
     lmModel17B: '1.7B (Balanced, ~1.5 GB VRAM)',
     lmModel4B: '4B (Best quality, ~4 GB VRAM)',
     lmModelHint: 'Controls the LLM used for lyrics/style enhancement. Auto-downloads if not present.',
-    
+    audioCoverStrengthTooltip: 'How much the source audio shapes the result.',
+    coverNoiseStrengthTooltip: 'Controls melody retention in Remix mode. Recommended: use SFT model with value 0.1–0.25. (0 = pure noise/no cover, 1 = closest to original audio).',
+    enableNormalizationTooltip: 'Apply loudness normalization to the output audio.',
+    normalizationDbTooltip: 'Target loudness in dB for normalization (-10 to 0). Default: -1.0 dB.',
+    latentShiftTooltip: 'Additive shift on DiT latents before VAE decode. Default 0 = no shift. Range: -0.2 to 0.2.',
+    latentRescaleTooltip: 'Multiplicative rescale on DiT latents before VAE decode. Default 1.0 = no rescale. Range: 0.5 to 1.5.',
+
     // CreatePanel - Transcription
     transcribing: 'Transcribing...',
     transcribingWithWhisper: 'Transcribing with Whisper…',
-    
+
     // CreatePanel - Library Tabs
     uploaded: 'Uploaded',
     createdTab: 'Created',
-    useTrack: 'Use',
+    useTrack: 'Select',
     noCreatedSongsYet: 'No created songs yet',
     generateSongsToReuse: 'Generate songs to reuse them as cover or reference',
-    
+
     // CreatePanel - Actions
     generate: 'Generate',
     generating: 'Generating...',
@@ -311,25 +361,25 @@ export const translations = {
     formatLyrics: 'Format Lyrics',
     formatting: 'Formatting...',
     clearAll: 'Clear All',
-    
+
     // Simple Mode
     describeYourSong: 'DESCRIBE YOUR SONG',
     songDescriptionPlaceholder: 'A happy pop song about summer adventures with friends...',
     quickSettings: 'QUICK SETTINGS',
     key: 'Key',
     time: 'Time',
-    
+
     // CreatePanel - Errors
     loginToGenerate: 'Please login to generate music',
-    uploadFailed: 'Upload failed',
-    formatFailed: 'Format failed',
-    formatFailedDetail: 'Format failed. Make sure the LLM is initialized.',
-    formatFailedLlmUnavailable: 'Format failed. The LLM may not be available.',
     deleteSongConfirm: 'Are you sure you want to delete "{title}"? This action cannot be undone.',
+
+    // SongList - Selection
+    selectedCount: '{count} selected',
+    selectAll: 'Select all',
     profileUpdateFailed: 'Failed to update profile',
     ffmpegLoadFailed: 'Failed to load video encoder. Please refresh and try again.',
     videoRenderFailed: 'Video rendering failed. Please try again.',
-    
+
     // SongList / Filters
     searchYourSongs: 'Search your songs...',
     filters: 'Filters',
@@ -341,14 +391,34 @@ export const translations = {
     selectSongToView: 'Select a song to view details',
     noSongsMatchFilters: 'No songs match your filters.',
     clearFilters: 'Clear filters',
-    
+    workspaces: 'Workspaces',
+    myWorkspace: 'My Workspace',
+    queuePosition: 'Queue #',
+
     // RightSidebar - Song Details
     songDetails: 'Song Details',
     created: 'Created',
     styleTags: 'STYLE & TAGS',
     lyricsSection: 'LYRICS',
     copyLyrics: 'Copy',
-    
+
+    // RightSidebar - Generation Metadata
+    generationParameters: 'GENERATION PARAMETERS',
+    metaBpm: 'BPM',
+    metaKey: 'Key',
+    metaTimeSignature: 'Time Sig.',
+    metaDuration: 'Duration',
+    metaInferenceSteps: 'Steps',
+    metaCfg: 'CFG',
+    metaSeed: 'Seed',
+    metaModel: 'Model',
+    metaInferMethod: 'Method',
+    metaAudioFormat: 'Format',
+    metaShift: 'Shift',
+    metaLmModel: 'LM Model',
+    metaGenres: 'Genres',
+    metaDefault: 'Default',
+
     // Languages
     japanese: 'Japanese',
     spanish: 'Spanish',
@@ -373,12 +443,16 @@ export const translations = {
     swedish: 'Swedish',
     romanian: 'Romanian',
     greek: 'Greek',
-    
+
     // Task Types
     audio2audio: 'Audio → Audio',
     coverTask: 'Cover',
     repaintTask: 'Repaint',
-    
+    extractTask: 'Extract',
+    legoTask: 'Lego',
+    completeTask: 'Complete',
+    requiresBaseModel: 'Requires Base model',
+
     // Search Page
     searchSongsPlaceholder: 'Search for songs, playlists, creators, or genres',
     songsMatching: 'Songs matching',
@@ -394,7 +468,7 @@ export const translations = {
     noPlaylistsYet: 'No public playlists yet. Create one and share your favorites!',
     genres: 'Genres',
     songs: 'songs',
-    
+
     // Library View
     yourLibrary: 'Your Library',
     newPlaylist: 'New Playlist',
@@ -402,7 +476,12 @@ export const translations = {
     playlists: 'Playlists',
     playlist: 'Playlist',
     byYou: 'By You',
-    
+    allSongs: 'All Songs',
+    uploads: 'Uploads',
+    noSongsYet: 'No songs yet.',
+    noUploadsYet: 'No uploads yet.',
+    deleteUpload: 'Delete upload',
+
     // User Profile
     back: 'Back',
     loadingProfile: 'Loading profile...',
@@ -428,7 +507,7 @@ export const translations = {
     uploadingBanner: 'Uploading Banner...',
     saving: 'Saving...',
     saveChanges: 'Save Changes',
-    
+
     // Playlist Modals
     createPlaylist: 'Create Playlist',
     playlistName: 'Name',
@@ -438,7 +517,7 @@ export const translations = {
     addToPlaylist: 'Add to Playlist',
     createNewPlaylist: 'Create New Playlist',
     noExistingPlaylists: 'No existing playlists.',
-    
+
     // Edit Profile Modal (Settings)
     usernameLabel: 'Username',
     usernamePlaceholder: 'username',
@@ -446,16 +525,26 @@ export const translations = {
     usernameTakenError: 'Username is already taken',
     usernameUpdateFailedError: 'Failed to update username',
     usernameRequirements: 'Letters, numbers, underscores, and hyphens only',
-    
+
     // Song Details (RightSidebar)
     more: 'more',
     copy: 'Copy',
     copied: 'Copied!',
     copyAllTags: 'Copy all tags',
-    
+    sources: 'Sources',
+    referenceAudio: 'Style Ref',
+    coverAudio: 'Content Ref',
+    instrumentalTrack: 'Instrumental Track',
+    noLyricsGenerated: 'No lyrics generated',
+    video: 'Video',
+    editor: 'Editor',
+    reuse: 'Reuse',
+    stems: 'Stems',
+
     // Song Dropdown Menu
     createVideo: 'Create Video',
     editAudio: 'Edit Audio',
+    extractAudio: 'Extract Audio',
     extractStems: 'Extract Stems',
     reusePrompt: 'Reuse Prompt',
     deleteSong: 'Delete Song',
@@ -468,13 +557,15 @@ export const translations = {
     songsDeletedPartial: 'Deleted {succeeded}/{total} songs',
     deleteUploadConfirm: 'Delete this upload? This action cannot be undone.',
     cannotBeUndone: 'This action cannot be undone.',
-    
+
     // Player
     nowPlaying: 'Now Playing',
     downloadAudio: 'Download Audio',
+    like: 'Like',
     openInEditor: 'Open in Editor',
     anonymous: 'Anonymous',
-    
+    selectSongToPlay: 'Select a song to play',
+
     // PlaylistDetail
     loadingPlaylist: 'Loading playlist...',
     playlistNotFound: 'Playlist not found',
@@ -482,13 +573,13 @@ export const translations = {
     dateAdded: 'Date Added',
     justNow: 'Just now',
     unknown: 'Unknown',
-    
+
     // SongProfile
     loadingSong: 'Loading song...',
     songNotFound: 'Song not found',
     similar: 'Similar',
     by: 'By',
-    
+
     // ShareModal
     shareSong: 'Share Song',
     shareOnX: 'Share on X',
@@ -501,12 +592,12 @@ export const translations = {
     copyLink: 'Copy Link',
     emailSubject: 'Check out this AI song',
     emailBody: 'Hey!\n\nI created this AI-generated song and thought you\'d love it:\n\n"{title}" by {creator}\n{style}\n\nListen here: {url}\n\nMade with ACE-Step UI - free and open source local AI music generation!',
-    
+
     // Reference Modal
-    referenceModalTitle: 'Reference',
-    coverModalTitle: 'Cover',
-    referenceModalDescription: 'Create songs inspired by a reference track',
-    coverModalDescription: 'Transform an existing track into a new version',
+    referenceModalTitle: 'Style Reference',
+    coverModalTitle: 'Content Reference',
+    referenceModalDescription: 'Upload a style reference track for tone/genre guidance',
+    coverModalDescription: 'Upload content audio to remix, repaint, or transform',
     uploadAudio: 'Upload audio',
     uploadingAudio: 'Uploading...',
     audioFormats: 'MP3, WAV, FLAC',
@@ -514,10 +605,108 @@ export const translations = {
     loadingTracks: 'Loading tracks...',
     noTracksYet: 'No tracks yet',
     uploadAudioFilesAsReferences: 'Upload audio files to use them as references',
-    
+
+    // Video Generator
+    videoGenerator: 'Video Generator',
+    videoStudio: 'Video Studio',
+    createProfessionalVisualizers: 'Create professional visualizers.',
+    presets: 'Presets',
+    style: 'Style',
+    text: 'Text',
+    effects: 'Effects',
+    fx: 'FX',
+    background: 'Background',
+    random: 'Random',
+    image: 'Image',
+    videoType: 'Video',
+    videoUpload: 'Upload',
+    pasteVideoUrl: 'Or paste video URL...',
+    videoLoaded: 'Video loaded',
+    dimming: 'Dimming',
+    colorPresets: 'Color Presets',
+    customColors: 'Custom Colors',
+    primary: 'Primary',
+    secondary: 'Secondary',
+    particles: 'Particles',
+    centerImage: 'Center Image',
+    resetToDefault: 'Reset to default',
+    addTextLayer: 'Add Text Layer',
+    newText: 'New Text',
+    textContent: 'Text content',
+    xPosition: 'X Position',
+    yPosition: 'Y Position',
+    layer: 'Layer',
+    bassShake: 'Bass Shake',
+    bassShakeDesc: 'Camera reacts to low freq',
+    digitalGlitch: 'Digital Glitch',
+    digitalGlitchDesc: 'Random artifacting',
+    vhsTape: 'VHS Tape',
+    vhsTapeDesc: 'Color bleeding & noise',
+    cctvMode: 'CCTV Mode',
+    cctvModeDesc: 'Night vision style',
+    scanlines: 'Scanlines',
+    scanlinesDesc: 'Old monitor effect',
+    aberration: 'Aberration',
+    aberrationDesc: 'RGB Split',
+    bloom: 'Bloom',
+    bloomDesc: 'Glow on bright areas',
+    filmGrain: 'Film Grain',
+    filmGrainDesc: 'Cinematic noise',
+    pixelate: 'Pixelate',
+    pixelateDesc: 'Retro pixel look',
+    strobe: 'Strobe',
+    strobeDesc: 'Flash on bass hits',
+    vignette: 'Vignette',
+    vignetteDesc: 'Dark edges',
+    hueShift: 'Hue Shift',
+    hueShiftDesc: 'Color rotation',
+    letterbox: 'Letterbox',
+    letterboxDesc: 'Cinematic bars',
+    loadingVideoEncoder: 'Loading video encoder...',
+    renderingFrames: 'Rendering frames',
+    encodingBePatient: 'Encoding (be patient)...',
+    encodingMP4: 'Encoding MP4',
+    renderVideoMP4: 'Render Video (MP4)',
+    encoderReady: 'Encoder ready',
+    offlineRendering: 'Offline rendering - faster than real-time.',
+    selectCenterImage: 'Select Center Image',
+    selectBackground: 'Select Background',
+    chooseImageForCenter: 'Choose an image for the center circle',
+    freeStockPhotos: 'Free stock photos & videos',
+    getFreeApiKey: 'Get free API key',
+    enterPexelsApiKey: 'Enter your Pexels API key...',
+    saveApiKey: 'Save',
+    apiKeyConfigured: 'API key configured',
+    setApiKey: 'Set API key',
+    photos: 'Photos',
+    videos: 'Videos',
+    searchForBackgrounds: 'Search for backgrounds...',
+    select: 'Select',
+    videoLabel: 'VIDEO',
+    noPhotosFound: 'No photos found. Try a different search term.',
+    noVideosFound: 'No videos found. Try a different search term.',
+    pexelsAttribution: 'Photos and videos provided by Pexels. Free for commercial use.',
+    exportVideo: 'Export Video',
+    capturing: 'Capturing',
+    encoding: 'Encoding',
+
     // Training Module
     loraTraining: 'LoRA Training',
-    trainingDescription: 'Build datasets from your audio files and train custom LoRA adapters',
+    trainingDescription: 'Build datasets from your audio files and train custom adapters',
+    adapterType: 'Adapter Type',
+    lokrSettings: 'LoKR Settings',
+    lokrTraining: 'LoKR Training',
+    lokrDescription: 'Low-Rank Kronecker Product - efficient adapter with Kronecker factorization',
+    linearDim: 'Linear Dim',
+    linearAlpha: 'Linear Alpha',
+    factor: 'Factor',
+    factorAuto: 'Auto',
+    decomposeBoth: 'Decompose Both',
+    useTucker: 'Use Tucker',
+    useScalar: 'Use Scalar',
+    weightDecompose: 'Weight Decompose (DoRA)',
+    rankDropout: 'Rank Dropout',
+    moduleDropout: 'Module Dropout',
     datasetBuilder: 'Dataset Builder',
     trainLora: 'Train LoRA',
     quickStart: 'Quick Start',
@@ -538,16 +727,27 @@ export const translations = {
     genreRatioHint: '0% = all Caption, 100% = all Genre',
     autoLabelWithAI: 'Auto-Label with AI',
     autoLabelDescription: 'Generate metadata for audio files: Caption, BPM, Key, Time Signature',
+    autoLabelChunkSize: 'Chunk Size',
+    autoLabelBatchSize: 'Batch Size',
     skipMetas: 'Skip BPM/Key/Time Signature',
     onlyUnlabeled: 'Only Unlabeled',
     autoLabelAll: 'Auto-Label All',
     filename: 'Filename',
     labeled: 'Labeled',
+    transcribeLyrics: 'Transcribe Lyrics',
+    transcribeLyricsDescription: 'Use ACE-Step Transcriber to automatically transcribe lyrics from vocal audio. Only non-instrumental samples will be transcribed.',
+    transcribeLyricsModelPath: 'Transcriber Model Path',
+    transcribeLyricsModelPathPlaceholder: 'ACE-Step/acestep-transcriber',
+    forceTranscribeAll: 'Force Transcribe All (auto-detect instrumental)',
+    returnInstrumentalLyrics: 'Return Instrumental Structure (keep raw lyrics for instrumental tracks)',
+    startTranscribe: 'Transcribe',
+    transcribeAllInstrumentalWarning: 'All samples are marked as instrumental. Uncheck "All Instrumental" or enable "Force Transcribe All".',
     saveDataset: 'Save Dataset',
     preprocessToTensors: 'Preprocess to Tensors',
     preprocessDescription: 'Converts dataset to pre-computed tensors for fast training (requires model loaded)',
     preprocess: 'Preprocess',
     preprocessedDataset: 'Preprocessed Dataset',
+    skipPreprocess: 'Skip existing tensors',
     loraSettings: 'LoRA Settings',
     loraRank: 'LoRA Rank',
     loraAlpha: 'LoRA Alpha',
@@ -558,9 +758,13 @@ export const translations = {
     gradientAccumulation: 'Gradient Accumulation',
     saveEvery: 'Save Every',
     epochs: 'epochs',
+    networkWeights: 'Resume from Previous Weights (Optional)',
+    networkWeightsPlaceholder: './lora_output/checkpoints/epoch_xxx/adapter_model.safetensors',
     outputDirectory: 'Output Directory',
     useFP8: 'Use FP8 Quantization',
     fp8Description: 'Reduces VRAM usage',
+    gradientCheckpointing: 'Gradient Checkpointing',
+    gradientCheckpointingDescription: 'Trade compute speed for lower VRAM usage',
     startTraining: 'Start Training',
     stopTraining: 'Stop Training',
     trainingProgress: 'Training Progress',
@@ -570,10 +774,12 @@ export const translations = {
     showTensorboard: 'Show TensorBoard',
     hideTensorboard: 'Hide TensorBoard',
     openInNewTab: 'Open in New Tab',
-    
+
     // Training Status Messages
     scanning: 'Scanning...',
     autoLabeling: 'Auto-labeling...',
+    autoLabelPreparing: 'Preparing...',
+    autoLabelLabelingStage: 'Labeling...',
     savingDataset: 'Saving...',
     preprocessing: 'Preprocessing...',
     loadingDataset: 'Loading...',
@@ -590,40 +796,6 @@ export const translations = {
     editableUsedForTraining: 'editable, used for training',
     useGlobalRatio: 'Use Global Ratio',
     thisSample: 'this sample',
-
-    // Model Descriptions
-    modelDescriptions: {
-      'acestep-v15-base': 'Base model, suitable for high-quality scenarios, requires more inference steps',
-      'acestep-v15-sft': 'Supervised fine-tuned model, optimized for specific tasks based on the base model',
-      'acestep-v15-turbo': 'Fast model, suitable for quick results, recommended 8 steps',
-      'acestep-v15-turbo-shift1': 'Fast model (shift 1), balanced between speed and quality',
-      'acestep-v15-turbo-shift3': 'Fast model (shift 3), default recommended fast model, balanced quality and speed',
-      'acestep-v15-turbo-continuous': 'Continuous fast model, suitable for smooth transition scenarios'
-    },
-
-    // Training Panel Additional Translations
-    yes: 'Yes',
-    no: 'No',
-    autoLabelingStatus: '🤖 Auto-labeling: {current}/{total} samples',
-    starting: 'Starting',
-    failedToLoadDataset: 'Failed to load dataset',
-    failedToLoadDatasetNoResponse: 'Failed to load dataset: No response from server',
-    failedToScanDirectory: 'Failed to scan directory',
-    failedToScanNoResponse: 'Failed to scan: No response from server',
-    failedToStartAutoLabeling: 'Failed to start auto-labeling',
-    failedToStartAutoLabelingNoResponse: 'Failed to start auto-labeling: No response from server',
-    failedToCheckLabelingStatus: 'Failed to check labeling status',
-    failedToSaveDataset: 'Failed to save dataset',
-    failedToSaveNoResponse: 'Failed to save: No response from server',
-    failedToStartPreprocessing: 'Failed to start preprocessing',
-    failedToStartPreprocessingNoResponse: 'Failed to start preprocessing: No response from server',
-    failedToCheckPreprocessingStatus: 'Failed to check preprocessing status',
-    failedToLoadDatasetInfo: 'Failed to load dataset info',
-    failedToLoadDatasetInfoNoResponse: 'Failed to load dataset info: No response from server',
-    failedToStartTraining: 'Failed to start training',
-    failedToStartTrainingNoResponse: 'Failed to start training: No response from server',
-    failedToStopTraining: 'Failed to stop training',
-    failedToStopTrainingNoResponse: 'Failed to stop training: No response from server'
   },
   zh: {
     // Navigation
@@ -631,16 +803,16 @@ export const translations = {
     library: '音乐库',
     search: '搜索',
     training: '训练',
-    
+
     // Theme
     lightMode: '浅色模式',
     darkMode: '深色模式',
-    
+
     // Auth
     signIn: '登录',
     signOut: '退出',
     settings: '设置',
-    
+
     // Username Modal
     welcomeTitle: '欢迎使用 ACE-Step UI',
     welcomeSubtitle: '输入您的名字开始创作 AI 音乐',
@@ -652,7 +824,7 @@ export const translations = {
     usernameMinLength: '用户名至少需要 2 个字符',
     usernameInvalidChars: '用户名只能包含字母、数字、下划线和破折号',
     failedToSetUsername: '设置用户名失败',
-    
+
     // Toasts
     songNotAvailable: '该歌曲已不可用。',
     unableToPlay: '无法播放该歌曲。',
@@ -664,26 +836,28 @@ export const translations = {
     failedToAddSong: '添加歌曲失败',
     songDeleted: '歌曲删除成功',
     failedToDeleteSong: '删除歌曲失败',
-    
+
     // Sidebar
     aceStepUI: 'ACE-Step UI',
-    
+
     // Common
     cancel: '取消',
+    default: '默认',
     save: '保存',
     delete: '删除',
     edit: '编辑',
     share: '分享',
     download: '下载',
+    collapse: '收起',
     play: '播放',
     pause: '暂停',
     normalSpeed: '正常',
     next: '下一首',
     previous: '上一首',
-    
+
     // Placeholders
     searchPlaceholder: '搜索...',
-    
+
     // Settings
     language: '语言',
     english: 'English',
@@ -707,15 +881,15 @@ export const translations = {
     done: '完成',
     light: '浅色',
     dark: '深色',
-    
+
     // Mobile
     createSong: '创作歌曲',
     viewList: '查看列表',
-    
+
     // CreatePanel - Modes
     simple: '简单',
     custom: '自定义',
-    
+
     // CreatePanel - Sections
     audio: '音频',
     lyrics: '歌词',
@@ -723,7 +897,7 @@ export const translations = {
     title: '标题',
     musicParameters: '音乐参数',
     advancedSettings: '高级设置',
-    
+
     // CreatePanel - LoRA
     loraPath: 'LoRA 路径',
     loraPathPlaceholder: '输入 LoRA 模型路径...',
@@ -734,13 +908,13 @@ export const translations = {
     loraUnload: '卸载',
     loraScale: 'LoRA 强度',
     loraScaleDescription: '调整 LoRA 模型的影响强度',
-    
+
     // CreatePanel - Audio
-    reference: '参考',
-    cover: '翻唱',
+    reference: '风格参考',
+    cover: '内容参考',
     fromLibrary: '从库中选择',
     upload: '上传',
-    
+
     // CreatePanel - Lyrics
     lyricsPlaceholder: '在此输入歌词...',
     leaveLyricsEmpty: '留空表示纯音乐，或使用下方开关',
@@ -798,15 +972,23 @@ export const translations = {
     vocalVietnamese: '越南语',
     vocalCantonese: '粤语',
     vocalChineseMandarin: '中文（普通话）',
-    
+
     // CreatePanel - Style
     stylePlaceholder: '例如：欢快流行摇滚、抒情民谣、90年代嘻哈',
     genreMoodInstruments: '曲风、情绪、乐器、氛围',
     refreshGenres: '刷新风格建议',
     mainGenre: '大类风格',
     subGenre: '小类风格',
+    searchGenre: '搜索风格...',
+    selectGenre: '选择风格...',
+    otherGenres: '其他风格',
+    majorGenres: '主要风格',
+    subGenres: '子风格',
+    clearSelection: '清除',
+    selectSubGenre: '选择子风格',
+    clearGenreSelection: '清除风格选择',
     nameSong: '为歌曲命名',
-    
+
     // CreatePanel - Parameters
     bpm: '曲速*(BPM)',
     auto: '自动',
@@ -814,7 +996,13 @@ export const translations = {
     seconds: '秒',
     keyScale: '调式',
     timeSignature: '拍号',
-    
+    autoOption: '自动',
+
+    // CreatePanel - Model Status
+    modelActive: '● 激活',
+    modelReady: '● 就绪',
+    backendNotStarted: 'ACE-Step 后端暂未启动，使用默认模型列表',
+
     // CreatePanel - Advanced
     randomSeed: '随机种子',
     thinking: '思考模式',
@@ -834,8 +1022,15 @@ export const translations = {
     taskType: '任务类型',
     textToMusic: '文本 → 音乐',
     audioCoverStrength: '音频翻唱强度',
+    coverNoiseStrength: '翻唱强度',
+    enableNormalization: '音频归一化',
+    normalizationDb: '归一化 dB',
+    latentShift: '潜变量偏移',
+    latentRescale: '潜变量缩放',
     repaintingStart: '重绘开始',
     repaintingEnd: '重绘结束',
+    repaintingRange: '重绘范围',
+    cfgInterval: 'CFG 区间',
     instruction: '指令',
     lmTemperature: 'LM 温度',
     higherMoreRandom: '值越高越随机（0-2）',
@@ -849,7 +1044,7 @@ export const translations = {
     useWhenCfgScaleGreater: '当 LM CFG 强度 > 1.0 时使用',
     lmTopK: 'LM Top-K',
     lmTopP: 'LM Top-P',
-    
+
     // Guidance section
     guidance: '引导控制(guidance)',
     advancedCfgScheduling: '高级 CFG 调度控制。',
@@ -869,6 +1064,7 @@ export const translations = {
     useCotCaption: '使用 CoT 字幕',
     useCotLanguage: '使用 CoT 语言',
     autogen: '自动生成',
+    autogenHint: '尽可能自动生成缺失的字段。',
     constrainedDecodingDebug: '约束解码调试',
     formatCaption: '格式化字幕',
     getScores: '获取分数',
@@ -892,20 +1088,40 @@ export const translations = {
     odeDeterministic: 'ODE（确定性）',
     sdeStochastic: 'SDE（随机性）',
     min: '分钟',
-    
+
+    // CreatePanel - Misc
+    instructionDefault: 'Fill the audio semantic mask based on the given conditions:',
+    untitled: '未命名',
+    pleaseSignInToUseLoRA: '请登录以使用 LoRA',
+    pleaseEnterLoRAPath: '请输入 LoRA 路径',
+    loraOperationFailed: 'LoRA 操作失败',
+    failedToUnloadLoRA: '卸载 LoRA 失败',
+    pleaseSignInToUploadAudio: '请登录以上传音频',
+    contentRefRequiredForTask: '该任务需要内容参考音频，请先上传。',
+    uploadFailed: '上传失败',
+    formatFailed: '格式化失败',
+    formatFailedLLMNotInitialized: '格式化失败。请确保 LLM 已初始化。',
+    formatFailedLLMNotAvailable: '格式化失败。LLM 可能不可用。',
+    maleVocals: '男声',
+    femaleVocals: '女声',
+    failedToFetchReferenceTracks: '获取参考曲目失败',
+    failedToTranscribe: '转录失败',
+    transcriptionFailed: '转录失败',
+    failedToDeleteTrack: '删除曲目失败',
+
     // CreatePanel - Drag & Drop
     dropToUseAudio: '拖放以使用音频',
     dropToUpload: '拖放以上传',
-    usingAsReference: '用作参考',
-    usingAsCover: '用作翻唱',
-    uploadingAsReference: '上传为参考',
-    uploadingAsCover: '上传为翻唱',
-    
+    usingAsReference: '用作风格参考',
+    usingAsCover: '用作内容参考',
+    uploadingAsReference: '上传为风格参考',
+    uploadingAsCover: '上传为内容参考',
+
     // CreatePanel - Vocal Gender
     vocalGender: '人声性别',
     male: '男声',
     female: '女声',
-    
+
     // CreatePanel - LM Backend & Model
     lmBackendLabel: 'LM 后端',
     lmBackendPt: 'PT（~1.6 GB 显存）',
@@ -916,18 +1132,32 @@ export const translations = {
     lmModel17B: '1.7B（均衡，~1.5 GB 显存）',
     lmModel4B: '4B（最佳质量，~4 GB 显存）',
     lmModelHint: '控制用于歌词/风格增强的 LLM。如不存在将自动下载。',
-    
+    audioCoverStrengthTooltip: '源音频塑造结果的程度。',
+    coverNoiseStrengthTooltip: '控制 Remix 模式下的旋律还原程度。推荐：使用 SFT 模型，值设为 0.1–0.25。（0=纯噪声/无翻唱，1=最接近原始音频）',
+    enableNormalizationTooltip: '对输出音频进行响度归一化处理。',
+    normalizationDbTooltip: '归一化目标响度（-10 到 0 dB）。默认：-1.0 dB。',
+    latentShiftTooltip: 'VAE 解码前对 DiT 潜变量施加的加性偏移。默认 0 = 无偏移。范围：-0.2 到 0.2。',
+    latentRescaleTooltip: 'VAE 解码前对 DiT 潜变量施加的乘性缩放。默认 1.0 = 无缩放。范围：0.5 到 1.5。',
+    repaintingStartTooltip: '重绘区域的起始时间（秒）。',
+    repaintingEndTooltip: '重绘区域的结束时间（秒）。',
+    instructionTooltip: '指导生成的附加指令。',
+    cfgIntervalStartTooltip: '开始应用引导的扩散过程比例。',
+    cfgIntervalEndTooltip: '停止应用引导的扩散过程比例。',
+    customTimestepsTooltip: '覆盖默认时间步调度（高级）。',
+    scoreScaleTooltip: '缩放基于分数的引导（高级）。',
+    lmBatchChunkSizeTooltip: '更大的分块可以更快但使用更多内存。',
+
     // CreatePanel - Transcription
     transcribing: '转录中...',
     transcribingWithWhisper: '正在使用 Whisper 转录…',
-    
+
     // CreatePanel - Library Tabs
     uploaded: '已上传',
     createdTab: '已创建',
-    useTrack: '使用',
+    useTrack: '选择',
     noCreatedSongsYet: '暂无已创建歌曲',
     generateSongsToReuse: '生成歌曲后可作为翻唱或参考使用',
-    
+
     // CreatePanel - Actions
     generate: '生成',
     generating: '生成中...',
@@ -935,25 +1165,25 @@ export const translations = {
     formatLyrics: '格式化歌词',
     formatting: '格式化中...',
     clearAll: '清空全部',
-    
+
     // Simple Mode
     describeYourSong: '描述你的歌曲',
     songDescriptionPlaceholder: '一首关于夏日和朋友冒险的快乐流行歌曲...',
     quickSettings: '快速设置',
     key: '调式',
     time: '拍号',
-    
+
     // CreatePanel - Errors
     loginToGenerate: '请登录以生成音乐',
-    uploadFailed: '上传失败',
-    formatFailed: '格式化失败',
-    formatFailedDetail: '格式化失败。请确保 LLM 已初始化。',
-    formatFailedLlmUnavailable: '格式化失败。LLM 可能不可用。',
     deleteSongConfirm: '确定要删除"{title}"吗？此操作无法撤销。',
+
+    // SongList - Selection
+    selectedCount: '已选择 {count} 个',
+    selectAll: '全选',
     profileUpdateFailed: '更新个人资料失败',
     ffmpegLoadFailed: '加载视频编码器失败。请刷新后重试。',
     videoRenderFailed: '视频渲染失败。请重试。',
-    
+
     // SongList / Filters
     searchYourSongs: '搜索你的歌曲...',
     filters: '筛选',
@@ -965,14 +1195,34 @@ export const translations = {
     selectSongToView: '选择一首歌曲查看详情',
     noSongsMatchFilters: '没有歌曲符合你的筛选条件。',
     clearFilters: '清除筛选',
-    
+    workspaces: '工作区',
+    myWorkspace: '我的工作区',
+    queuePosition: '队列 #',
+
     // RightSidebar - Song Details
     songDetails: '歌曲详情',
     created: '创建于',
     styleTags: '风格与标签',
     lyricsSection: '歌词',
     copyLyrics: '复制',
-    
+
+    // RightSidebar - Generation Metadata
+    generationParameters: '生成参数',
+    metaBpm: 'BPM',
+    metaKey: '调号',
+    metaTimeSignature: '拍号',
+    metaDuration: '时长',
+    metaInferenceSteps: '推理步数',
+    metaCfg: 'CFG',
+    metaSeed: '种子',
+    metaModel: '模型',
+    metaInferMethod: '推理方式',
+    metaAudioFormat: '格式',
+    metaShift: 'Shift',
+    metaLmModel: 'LM 模型',
+    metaGenres: '风格',
+    metaDefault: '默认',
+
     // Languages
     japanese: '日语',
     spanish: '西班牙语',
@@ -997,12 +1247,16 @@ export const translations = {
     swedish: '瑞典语',
     romanian: '罗马尼亚语',
     greek: '希腊语',
-    
+
     // Task Types
     audio2audio: '音频 → 音频',
     coverTask: '翻唱',
     repaintTask: '重绘',
-    
+    extractTask: '提取音轨',
+    legoTask: '乐高拼接',
+    completeTask: '自动补全',
+    requiresBaseModel: '需要 Base 模型',
+
     // Search Page
     searchSongsPlaceholder: '搜索歌曲、播放列表、创作者或风格',
     songsMatching: '匹配的歌曲',
@@ -1018,7 +1272,7 @@ export const translations = {
     noPlaylistsYet: '暂无公开播放列表。创建一个并分享你的最爱！',
     genres: '风格',
     songs: '首歌曲',
-    
+
     // Library View
     yourLibrary: '我的音乐库',
     newPlaylist: '新建播放列表',
@@ -1026,7 +1280,12 @@ export const translations = {
     playlists: '播放列表',
     playlist: '播放列表',
     byYou: '由你创建',
-    
+    allSongs: '全部歌曲',
+    uploads: '上传',
+    noSongsYet: '暂无歌曲。',
+    noUploadsYet: '暂无上传。',
+    deleteUpload: '删除上传',
+
     // User Profile
     back: '返回',
     loadingProfile: '加载中...',
@@ -1052,7 +1311,7 @@ export const translations = {
     uploadingBanner: '上传横幅中...',
     saving: '保存中...',
     saveChanges: '保存更改',
-    
+
     // Playlist Modals
     createPlaylist: '创建播放列表',
     playlistName: '名称',
@@ -1062,7 +1321,7 @@ export const translations = {
     addToPlaylist: '添加到播放列表',
     createNewPlaylist: '创建新播放列表',
     noExistingPlaylists: '暂无播放列表。',
-    
+
     // Edit Profile Modal (Settings)
     usernameLabel: '用户名',
     usernamePlaceholder: '用户名',
@@ -1070,16 +1329,26 @@ export const translations = {
     usernameTakenError: '用户名已被占用',
     usernameUpdateFailedError: '更新用户名失败',
     usernameRequirements: '仅允许字母、数字、下划线和短横线',
-    
+
     // Song Details (RightSidebar)
     more: '更多',
     copy: '复制',
     copied: '已复制！',
     copyAllTags: '复制所有标签',
-    
+    sources: '来源',
+    referenceAudio: '风格参考',
+    coverAudio: '内容参考',
+    instrumentalTrack: '纯音乐',
+    noLyricsGenerated: '未生成歌词',
+    video: '视频',
+    editor: '编辑器',
+    reuse: '重用',
+    stems: '音轨',
+
     // Song Dropdown Menu
     createVideo: '创建视频',
     editAudio: '编辑音频',
+    extractAudio: '提取音频',
     extractStems: '提取音轨',
     reusePrompt: '重用提示词',
     deleteSong: '删除歌曲',
@@ -1092,13 +1361,15 @@ export const translations = {
     songsDeletedPartial: '已删除 {succeeded}/{total} 首歌曲',
     deleteUploadConfirm: '确定要删除此上传文件吗？此操作无法撤销。',
     cannotBeUndone: '此操作无法撤销。',
-    
+
     // Player
     nowPlaying: '正在播放',
     downloadAudio: '下载音频',
+    like: '喜欢',
     openInEditor: '在编辑器中打开',
     anonymous: '匿名用户',
-    
+    selectSongToPlay: '选择一首歌曲播放',
+
     // PlaylistDetail
     loadingPlaylist: '加载播放列表中...',
     playlistNotFound: '播放列表未找到',
@@ -1106,13 +1377,13 @@ export const translations = {
     dateAdded: '添加日期',
     justNow: '刚刚',
     unknown: '未知',
-    
+
     // SongProfile
     loadingSong: '加载歌曲中...',
     songNotFound: '歌曲未找到',
     similar: '相似',
     by: '由',
-    
+
     // ShareModal
     shareSong: '分享歌曲',
     shareOnX: '分享到 X',
@@ -1125,12 +1396,12 @@ export const translations = {
     copyLink: '复制链接',
     emailSubject: '来听听这首AI歌曲',
     emailBody: '嘿！\n\n我创作了这首AI生成的歌曲，觉得你会喜欢：\n\n《{title}》- {creator}\n{style}\n\n点击收听：{url}\n\n使用 ACE-Step UI 制作 - 免费开源的本地AI音乐生成工具！',
-    
+
     // Reference Modal
-    referenceModalTitle: '参考音频',
-    coverModalTitle: '翻唱音频',
-    referenceModalDescription: '基于参考音轨创作歌曲',
-    coverModalDescription: '将现有音轨转换为新版本',
+    referenceModalTitle: '风格参考',
+    coverModalTitle: '内容参考',
+    referenceModalDescription: '上传风格参考音轨，用于音色/风格引导',
+    coverModalDescription: '上传内容音频，用于翻唱、重绘或变换',
     uploadAudio: '上传音频',
     uploadingAudio: '上传中...',
     audioFormats: 'MP3、WAV、FLAC',
@@ -1138,10 +1409,108 @@ export const translations = {
     loadingTracks: '加载中...',
     noTracksYet: '暂无音轨',
     uploadAudioFilesAsReferences: '上传音频文件作为参考',
-    
+
+    // Video Generator
+    videoGenerator: '视频生成器',
+    videoStudio: '视频工作室',
+    createProfessionalVisualizers: '创建专业的可视化效果。',
+    presets: '预设',
+    style: '样式',
+    text: '文字',
+    effects: '效果',
+    fx: '特效',
+    background: '背景',
+    random: '随机',
+    image: '图片',
+    videoType: '视频',
+    videoUpload: '上传',
+    pasteVideoUrl: '或粘贴视频URL...',
+    videoLoaded: '视频已加载',
+    dimming: '暗度',
+    colorPresets: '颜色预设',
+    customColors: '自定义颜色',
+    primary: '主色',
+    secondary: '副色',
+    particles: '粒子',
+    centerImage: '中心图片',
+    resetToDefault: '重置为默认',
+    addTextLayer: '添加文字图层',
+    newText: '新文字',
+    textContent: '文字内容',
+    xPosition: 'X位置',
+    yPosition: 'Y位置',
+    layer: '图层',
+    bassShake: '低音震动',
+    bassShakeDesc: '相机随低频反应',
+    digitalGlitch: '数字故障',
+    digitalGlitchDesc: '随机伪影效果',
+    vhsTape: 'VHS磁带',
+    vhsTapeDesc: '色彩溢出和噪点',
+    cctvMode: '监控模式',
+    cctvModeDesc: '夜视风格',
+    scanlines: '扫描线',
+    scanlinesDesc: '老式显示器效果',
+    aberration: '色差',
+    aberrationDesc: 'RGB分离',
+    bloom: '泛光',
+    bloomDesc: '明亮区域发光',
+    filmGrain: '胶片颗粒',
+    filmGrainDesc: '电影噪点',
+    pixelate: '像素化',
+    pixelateDesc: '复古像素风格',
+    strobe: '频闪',
+    strobeDesc: '低音节拍闪光',
+    vignette: '暗角',
+    vignetteDesc: '边缘变暗',
+    hueShift: '色相偏移',
+    hueShiftDesc: '色彩旋转',
+    letterbox: '宽银幕',
+    letterboxDesc: '电影黑边',
+    loadingVideoEncoder: '加载视频编码器...',
+    renderingFrames: '渲染帧',
+    encodingBePatient: '编码中（请耐心等候）...',
+    encodingMP4: '编码MP4',
+    renderVideoMP4: '渲染视频 (MP4)',
+    encoderReady: '编码器就绪',
+    offlineRendering: '离线渲染 - 比实时更快。',
+    selectCenterImage: '选择中心图片',
+    selectBackground: '选择背景',
+    chooseImageForCenter: '为中心圆圈选择图片',
+    freeStockPhotos: '免费库存照片和视频',
+    getFreeApiKey: '获取免费API密钥',
+    enterPexelsApiKey: '输入您的Pexels API密钥...',
+    saveApiKey: '保存',
+    apiKeyConfigured: 'API密钥已配置',
+    setApiKey: '设置API密钥',
+    photos: '照片',
+    videos: '视频',
+    searchForBackgrounds: '搜索背景...',
+    select: '选择',
+    videoLabel: '视频',
+    noPhotosFound: '未找到照片。尝试不同的搜索词。',
+    noVideosFound: '未找到视频。尝试不同的搜索词。',
+    pexelsAttribution: '照片和视频由Pexels提供。可免费商用。',
+    exportVideo: '导出视频',
+    capturing: '捕获中',
+    encoding: '编码中',
+
     // Training Module
     loraTraining: 'LoRA 训练',
-    trainingDescription: '从音频文件构建数据集并训练自定义 LoRA 适配器',
+    trainingDescription: '从音频文件构建数据集并训练自定义适配器',
+    adapterType: '适配器类型',
+    lokrSettings: 'LoKR 设置',
+    lokrTraining: 'LoKR 训练',
+    lokrDescription: '低秩克罗内克积 - 基于克罗内克分解的高效适配器',
+    linearDim: '线性维度',
+    linearAlpha: '线性 Alpha',
+    factor: '因子',
+    factorAuto: '自动',
+    decomposeBoth: '双矩阵分解',
+    useTucker: '使用 Tucker 分解',
+    useScalar: '使用标量校准',
+    weightDecompose: '权重分解 (DoRA)',
+    rankDropout: 'Rank Dropout',
+    moduleDropout: 'Module Dropout',
     datasetBuilder: '数据集构建器',
     trainLora: '训练 LoRA',
     quickStart: '快速开始',
@@ -1162,16 +1531,27 @@ export const translations = {
     genreRatioHint: '0% = 全部描述，100% = 全部风格',
     autoLabelWithAI: 'AI 自动标注',
     autoLabelDescription: '为音频文件生成元数据：描述、BPM、调式、拍号',
+    autoLabelChunkSize: '分块大小',
+    autoLabelBatchSize: '批大小',
     skipMetas: '跳过 BPM/调式/拍号',
     onlyUnlabeled: '仅未标注',
     autoLabelAll: '自动标注全部',
     filename: '文件名',
     labeled: '已标注',
+    transcribeLyrics: '歌词转录',
+    transcribeLyricsDescription: '使用 ACE-Step Transcriber 自动转录人声歌词。仅转录非纯音乐样本。',
+    transcribeLyricsModelPath: '转录模型路径',
+    transcribeLyricsModelPathPlaceholder: 'ACE-Step/acestep-transcriber',
+    forceTranscribeAll: '强制转录所有（自动检测纯音乐）',
+    returnInstrumentalLyrics: '纯音乐返回结构（保留纯音乐的原始歌词内容）',
+    startTranscribe: '转录',
+    transcribeAllInstrumentalWarning: '所有样本均标记为纯音乐。请取消勾选「全部纯音乐」或启用「强制转录所有」。',
     saveDataset: '保存数据集',
     preprocessToTensors: '预处理为张量',
     preprocessDescription: '将数据集转换为预计算张量以加速训练（需要加载模型）',
     preprocess: '预处理',
     preprocessedDataset: '预处理数据集',
+    skipPreprocess: '跳过现有张量',
     loraSettings: 'LoRA 设置',
     loraRank: 'LoRA Rank',
     loraAlpha: 'LoRA Alpha',
@@ -1182,9 +1562,13 @@ export const translations = {
     gradientAccumulation: '梯度累积',
     saveEvery: '保存间隔',
     epochs: '轮',
+    networkWeights: '读取之前训练的权重（可选）',
+    networkWeightsPlaceholder: './lora_output/checkpoints/epoch_xxx/adapter_model.safetensors',
     outputDirectory: '输出目录',
     useFP8: '使用 FP8 量化',
     fp8Description: '减少显存占用',
+    gradientCheckpointing: '梯度检查点',
+    gradientCheckpointingDescription: '用计算速度换取更低的显存占用',
     startTraining: '开始训练',
     stopTraining: '停止训练',
     trainingProgress: '训练进度',
@@ -1194,10 +1578,12 @@ export const translations = {
     showTensorboard: '显示 TensorBoard',
     hideTensorboard: '隐藏 TensorBoard',
     openInNewTab: '在新标签页打开',
-    
+
     // Training Status Messages
     scanning: '扫描中...',
     autoLabeling: '自动标注中...',
+    autoLabelPreparing: '准备中...',
+    autoLabelLabelingStage: '打标中...',
     savingDataset: '保存中...',
     preprocessing: '预处理中...',
     loadingDataset: '加载中...',
@@ -1214,40 +1600,6 @@ export const translations = {
     editableUsedForTraining: '可编辑，用于训练',
     useGlobalRatio: '使用全局比例',
     thisSample: '此样本',
-
-    // Model Descriptions
-    modelDescriptions: {
-      'acestep-v15-base': '基础模型，适合追求高质量的场景，需要较多推理步数',
-      'acestep-v15-sft': '监督微调模型，在基础模型基础上优化了特定任务',
-      'acestep-v15-turbo': '快速模型，适合需要快速出结果的场景，推荐使用8步',
-      'acestep-v15-turbo-shift1': '快速模型（偏移1），平衡速度和质量的折中方案',
-      'acestep-v15-turbo-shift3': '快速模型（偏移3），默认推荐的快速模型，平衡了质量和速度',
-      'acestep-v15-turbo-continuous': '连续快速模型，适合需要流畅过渡的场景'
-    },
-
-    // Training Panel Additional Translations
-    yes: '是',
-    no: '否',
-    autoLabelingStatus: '🤖 自动标注：{current}/{total} 个样本',
-    starting: '正在启动',
-    failedToLoadDataset: '加载数据集失败',
-    failedToLoadDatasetNoResponse: '加载数据集失败：服务器无响应',
-    failedToScanDirectory: '扫描目录失败',
-    failedToScanNoResponse: '扫描失败：服务器无响应',
-    failedToStartAutoLabeling: '启动自动标注失败',
-    failedToStartAutoLabelingNoResponse: '启动自动标注失败：服务器无响应',
-    failedToCheckLabelingStatus: '检查标注状态失败',
-    failedToSaveDataset: '保存数据集失败',
-    failedToSaveNoResponse: '保存失败：服务器无响应',
-    failedToStartPreprocessing: '启动预处理失败',
-    failedToStartPreprocessingNoResponse: '启动预处理失败：服务器无响应',
-    failedToCheckPreprocessingStatus: '检查预处理状态失败',
-    failedToLoadDatasetInfo: '加载数据集信息失败',
-    failedToLoadDatasetInfoNoResponse: '加载数据集信息失败：服务器无响应',
-    failedToStartTraining: '启动训练失败',
-    failedToStartTrainingNoResponse: '启动训练失败：服务器无响应',
-    failedToStopTraining: '停止训练失败',
-    failedToStopTrainingNoResponse: '停止训练失败：服务器无响应'
   },
   ja: {
     // Navigation
@@ -1255,16 +1607,16 @@ export const translations = {
     library: 'ライブラリ',
     search: '検索',
     training: 'トレーニング',
-    
+
     // Theme
     lightMode: 'ライトモード',
     darkMode: 'ダークモード',
-    
+
     // Auth
     signIn: 'サインイン',
     signOut: 'サインアウト',
     settings: '設定',
-    
+
     // Username Modal
     welcomeTitle: 'ACE-Step UIへようこそ',
     welcomeSubtitle: 'AI音楽作成を始めるために名前を入力してください',
@@ -1276,7 +1628,7 @@ export const translations = {
     usernameMinLength: 'ユーザー名は2文字以上である必要があります',
     usernameInvalidChars: 'ユーザー名は文字、数字、アンダースコア、ハイフンのみ使用できます',
     failedToSetUsername: 'ユーザー名の設定に失敗しました',
-    
+
     // Toasts
     songNotAvailable: 'この曲は利用できません。',
     unableToPlay: 'この曲を再生できません。',
@@ -1288,26 +1640,28 @@ export const translations = {
     failedToAddSong: '曲の追加に失敗しました',
     songDeleted: '曲を削除しました',
     failedToDeleteSong: '曲の削除に失敗しました',
-    
+
     // Sidebar
     aceStepUI: 'ACE-Step UI',
-    
+
     // Common
     cancel: 'キャンセル',
+    default: 'デフォルト',
     save: '保存',
     delete: '削除',
     edit: '編集',
     share: '共有',
     download: 'ダウンロード',
+    collapse: '折りたたむ',
     play: '再生',
     pause: '一時停止',
     normalSpeed: '通常',
     next: '次へ',
     previous: '前へ',
-    
+
     // Placeholders
     searchPlaceholder: '検索...',
-    
+
     // Settings
     language: '言語',
     english: 'English',
@@ -1331,15 +1685,15 @@ export const translations = {
     done: '完了',
     light: 'ライト',
     dark: 'ダーク',
-    
+
     // Mobile
     createSong: '曲を作成',
     viewList: 'リストを表示',
-    
+
     // CreatePanel - Modes
     simple: 'シンプル',
     custom: 'カスタム',
-    
+
     // CreatePanel - Sections
     audio: 'オーディオ',
     lyrics: '歌詞',
@@ -1347,7 +1701,7 @@ export const translations = {
     title: 'タイトル',
     musicParameters: '音楽パラメータ',
     advancedSettings: '詳細設定',
-    
+
     // CreatePanel - LoRA
     loraPath: 'LoRA パス',
     loraPathPlaceholder: 'LoRA モデルパスを入力...',
@@ -1358,13 +1712,13 @@ export const translations = {
     loraUnload: 'アンロード',
     loraScale: 'LoRA スケール',
     loraScaleDescription: 'LoRA モデルの影響強度を調整',
-    
+
     // CreatePanel - Audio
-    reference: '参照',
-    cover: 'カバー',
+    reference: 'スタイル参照',
+    cover: 'コンテンツ参照',
     fromLibrary: 'ライブラリから',
     upload: 'アップロード',
-    
+
     // CreatePanel - Lyrics
     lyricsPlaceholder: 'ここに歌詞を入力...',
     leaveLyricsEmpty: 'インストゥルメンタルの場合は空のままにするか、下のトグルを使用',
@@ -1422,15 +1776,23 @@ export const translations = {
     vocalVietnamese: 'ベトナム語',
     vocalCantonese: '広東語',
     vocalChineseMandarin: '中国語（標準語）',
-    
+
     // CreatePanel - Style
     stylePlaceholder: '例：アップビートなポップロック、エモーショナルなバラード、90年代ヒップホップ',
     genreMoodInstruments: 'ジャンル、ムード、楽器、雰囲気',
     refreshGenres: 'ジャンル提案を更新',
     mainGenre: 'メインジャンル',
     subGenre: 'サブジャンル',
+    searchGenre: 'ジャンルを検索...',
+    selectGenre: 'ジャンルを選択...',
+    otherGenres: 'その他のジャンル',
+    majorGenres: '主要ジャンル',
+    subGenres: 'サブジャンル',
+    clearSelection: 'クリア',
+    selectSubGenre: 'サブジャンルを選択',
+    clearGenreSelection: 'ジャンル選択をクリア',
     nameSong: '曲名を付ける',
-    
+
     // CreatePanel - Parameters
     bpm: 'BPM',
     auto: '自動',
@@ -1438,7 +1800,7 @@ export const translations = {
     seconds: '秒',
     keyScale: 'キーとスケール',
     timeSignature: '拍子',
-    
+
     // CreatePanel - Advanced
     randomSeed: 'ランダムシード',
     thinking: '思考',
@@ -1458,8 +1820,15 @@ export const translations = {
     taskType: 'タスクタイプ',
     textToMusic: 'テキスト → 音楽',
     audioCoverStrength: 'オーディオカバー強度',
+    coverNoiseStrength: 'カバー強度',
+    enableNormalization: '音声正規化',
+    normalizationDb: '正規化 dB',
+    latentShift: '潜在シフト',
+    latentRescale: '潜在リスケール',
     repaintingStart: 'リペイント開始',
     repaintingEnd: 'リペイント終了',
+    repaintingRange: 'リペイント範囲',
+    cfgInterval: 'CFG間隔',
     instruction: '指示',
     lmTemperature: 'LM温度',
     higherMoreRandom: '高いほどランダム（0-2）',
@@ -1473,7 +1842,7 @@ export const translations = {
     useWhenCfgScaleGreater: 'LM CFGスケール > 1.0の場合に使用',
     lmTopK: 'LM Top-K',
     lmTopP: 'LM Top-P',
-    
+
     // Guidance section
     guidance: 'ガイダンス',
     advancedCfgScheduling: '高度なCFGスケジューリング制御。',
@@ -1493,6 +1862,7 @@ export const translations = {
     useCotCaption: 'CoTキャプションを使用',
     useCotLanguage: 'CoT言語を使用',
     autogen: '自動生成',
+    autogenHint: '可能な場合は自動的に欠落しているフィールドを生成します。',
     constrainedDecodingDebug: '制約付きデコーディングデバッグ',
     formatCaption: 'キャプションをフォーマット',
     getScores: 'スコアを取得',
@@ -1516,20 +1886,40 @@ export const translations = {
     odeDeterministic: 'ODE（決定論的）',
     sdeStochastic: 'SDE（確率的）',
     min: '分',
-    
+
+    // CreatePanel - Misc
+    instructionDefault: 'Fill the audio semantic mask based on the given conditions:',
+    untitled: '無題',
+    pleaseSignInToUseLoRA: 'LoRAを使用するにはログインしてください',
+    pleaseEnterLoRAPath: 'LoRAパスを入力してください',
+    loraOperationFailed: 'LoRA操作に失敗しました',
+    failedToUnloadLoRA: 'LoRAのアンロードに失敗しました',
+    pleaseSignInToUploadAudio: '音声をアップロードするにはログインしてください',
+    contentRefRequiredForTask: 'このタスクにはコンテンツ参照オーディオが必要です。アップロードしてください。',
+    uploadFailed: 'アップロードに失敗しました',
+    formatFailed: 'フォーマットに失敗しました',
+    formatFailedLLMNotInitialized: 'フォーマットに失敗しました。LLMが初期化されていることを確認してください。',
+    formatFailedLLMNotAvailable: 'フォーマットに失敗しました。LLMが利用できない可能性があります。',
+    maleVocals: '男性ボーカル',
+    femaleVocals: '女性ボーカル',
+    failedToFetchReferenceTracks: '参照トラックの取得に失敗しました',
+    failedToTranscribe: '文字起こしに失敗しました',
+    transcriptionFailed: '文字起こしに失敗しました',
+    failedToDeleteTrack: 'トラックの削除に失敗しました',
+
     // CreatePanel - Drag & Drop
     dropToUseAudio: 'ドロップしてオーディオを使用',
     dropToUpload: 'ドロップしてアップロード',
-    usingAsReference: '参照として使用',
-    usingAsCover: 'カバーとして使用',
-    uploadingAsReference: '参照としてアップロード',
-    uploadingAsCover: 'カバーとしてアップロード',
-    
+    usingAsReference: 'スタイル参照として使用',
+    usingAsCover: 'コンテンツ参照として使用',
+    uploadingAsReference: 'スタイル参照としてアップロード',
+    uploadingAsCover: 'コンテンツ参照としてアップロード',
+
     // CreatePanel - Vocal Gender
     vocalGender: 'ボーカルの性別',
     male: '男性',
     female: '女性',
-    
+
     // CreatePanel - LM Backend & Model
     lmBackendLabel: 'LMバックエンド',
     lmBackendPt: 'PT（〜1.6 GB VRAM）',
@@ -1540,18 +1930,67 @@ export const translations = {
     lmModel17B: '1.7B（バランス、〜1.5 GB VRAM）',
     lmModel4B: '4B（最高品質、〜4 GB VRAM）',
     lmModelHint: '歌詞/スタイル強化に使用するLLMを制御。未インストールの場合自動ダウンロード。',
-    
+
+    // CreatePanel - Model Status
+    modelActive: '● アクティブ',
+    modelReady: '● 準備完了',
+    backendNotStarted: 'ACE-Step バックエンドが未起動です。デフォルトモデルリストを使用中',
+
+    // CreatePanel - Tooltips
+    aiFormatTooltip: 'AIフォーマット - スタイルを強化しパラメータを自動入力',
+    batchSizeTooltip: '単一実行で複数のバリエーションを作成。バリエーションが多いほど = 総時間が長くなります。',
+    inferenceStepsTooltip: 'ステップが多いほど品質が向上しますが、生成が遅くなります。',
+    guidanceScaleTooltip: 'モデルがプロンプトに従う程度。高い = 厳格、低い = 自由。',
+    shiftTooltip: '拡散スケジュールを調整。ベースモデルのみに影響します。',
+    lmTemperatureTooltip: '温度が高いほど = 単語の選択がよりランダムになります。',
+    lmGuidanceScaleTooltip: '歌詞モデルがプロンプトに従う程度。',
+    lmTopKTooltip: 'K個の最も可能性の高いトークンに選択を制限。0で無効化。',
+    lmTopPTooltip: '合計確率がPの最小セットからサンプリング。',
+    useAdgTooltip: '適応型デュアルガイダンス：品質のためにCFGを動的に調整。ベースモデルのみ；遅い。',
+    allowLmBatchTooltip: '速度のためにLMをより大きなバッチで実行できるようにします（より多くのVRAM）。',
+    useCotMetadataTooltip: 'LMにBPM、キー、長さなどのメタデータについて推論させます。',
+    useCotCaptionTooltip: 'LMにキャプション/スタイルテキストについて推論させます。',
+    useCotLanguageTooltip: 'LMに言語選択について推論させます。',
+    constrainedDecodingDebugTooltip: '制約付きデコーディングのデバッグ情報を含めます。',
+    formatCaptionTooltip: 'AIフォーマッタが生成したフォーマット済みキャプションを使用します。',
+    getScoresTooltip: '診断用にスコアラーの出力を返します。',
+    getLrcTooltip: '利用可能な場合、同期歌詞（LRC）出力を返します。',
+
+    // CreatePanel - More Tooltips
+    inferMethodTooltip: '決定論的はより再現性があり、確率的はランダム性を追加します。',
+    seedTooltip: 'シードを固定すると結果が再現可能になります。多様性にはランダムを推奨。',
+    thinkingTooltip: '歌詞モデルに構造とメタデータを推論させます。やや遅い。',
+    lmParametersTooltip: '5Hz歌詞/キャプションモデルのサンプリング動作を制御します。',
+    lmNegativePromptTooltip: '歌詞モデルを遠ざけるための単語やアイデア。',
+    transformTooltip: '出力が入力音声にどれだけ従うかを制御します。',
+    audioCodesTooltip: '高度：条件付け用の事前計算済みオーディオコード。',
+    taskTypeTooltip: 'テキストから音楽または音声ベースのモードを選択します。',
+    audioCoverStrengthTooltip: 'ソース音声が結果を形作る強さ。',
+    coverNoiseStrengthTooltip: 'Remixモードでのメロディ復元を制御。推奨：SFTモデル使用、値0.1〜0.25。（0=ノイズ/カバーなし、1=原曲に最も近い）',
+    enableNormalizationTooltip: '出力音声にラウドネス正規化を適用します。',
+    normalizationDbTooltip: '正規化の目標ラウドネス（-10〜0 dB）。デフォルト: -1.0 dB。',
+    latentShiftTooltip: 'VAEデコード前のDiT潜在変数への加算シフト。デフォルト 0 = シフトなし。範囲: -0.2〜0.2。',
+    latentRescaleTooltip: 'VAEデコード前のDiT潜在変数への乗算リスケール。デフォルト 1.0 = リスケールなし。範囲: 0.5〜1.5。',
+    repaintingStartTooltip: '再描画領域の開始時間（秒）。',
+    repaintingEndTooltip: '再描画領域の終了時間（秒）。',
+    instructionTooltip: '生成をガイドする追加の指示。',
+    cfgIntervalStartTooltip: 'ガイダンスを適用し始める拡散プロセスの割合。',
+    cfgIntervalEndTooltip: 'ガイダンスの適用を停止する拡散プロセスの割合。',
+    customTimestepsTooltip: 'デフォルトのタイムステップスケジュールを上書き（高度）。',
+    scoreScaleTooltip: 'スコアベースのガイダンスをスケーリング（高度）。',
+    lmBatchChunkSizeTooltip: '大きなチャンクは速くなりますが、より多くのメモリを使用します。',
+
     // CreatePanel - Transcription
     transcribing: '文字起こし中...',
     transcribingWithWhisper: 'Whisperで文字起こし中…',
-    
+
     // CreatePanel - Library Tabs
     uploaded: 'アップロード済み',
     createdTab: '作成済み',
-    useTrack: '使用',
+    useTrack: '選択',
     noCreatedSongsYet: '作成した曲がまだありません',
     generateSongsToReuse: '曲を生成してカバーや参照として再利用',
-    
+
     // CreatePanel - Actions
     generate: '生成',
     generating: '生成中...',
@@ -1559,25 +1998,25 @@ export const translations = {
     formatLyrics: '歌詞をフォーマット',
     formatting: 'フォーマット中...',
     clearAll: 'すべてクリア',
-    
+
     // Simple Mode
     describeYourSong: '曲を説明',
     songDescriptionPlaceholder: '友達との夏の冒険についての明るいポップソング...',
     quickSettings: 'クイック設定',
     key: 'キー',
     time: '拍子',
-    
+
     // CreatePanel - Errors
     loginToGenerate: '音楽を生成するにはログインしてください',
-    uploadFailed: 'アップロードに失敗しました',
-    formatFailed: 'フォーマットに失敗しました',
-    formatFailedDetail: 'フォーマットに失敗しました。LLMが初期化されていることを確認してください。',
-    formatFailedLlmUnavailable: 'フォーマットに失敗しました。LLMが利用できない可能性があります。',
     deleteSongConfirm: '「{title}」を削除しますか？この操作は元に戻せません。',
+
+    // SongList - Selection
+    selectedCount: '{count}件選択中',
+    selectAll: 'すべて選択',
     profileUpdateFailed: 'プロフィールの更新に失敗しました',
     ffmpegLoadFailed: 'ビデオエンコーダーの読み込みに失敗しました。更新してもう一度お試しください。',
     videoRenderFailed: 'ビデオレンダリングに失敗しました。もう一度お試しください。',
-    
+
     // SongList / Filters
     searchYourSongs: '曲を検索...',
     filters: 'フィルター',
@@ -1589,14 +2028,31 @@ export const translations = {
     selectSongToView: '詳細を表示する曲を選択',
     noSongsMatchFilters: 'フィルターに一致する曲がありません。',
     clearFilters: 'フィルターをクリア',
-    
+
     // RightSidebar - Song Details
     songDetails: '曲の詳細',
     created: '作成日',
     styleTags: 'スタイルとタグ',
     lyricsSection: '歌詞',
     copyLyrics: 'コピー',
-    
+
+    // RightSidebar - Generation Metadata
+    generationParameters: '生成パラメータ',
+    metaBpm: 'BPM',
+    metaKey: 'キー',
+    metaTimeSignature: '拍子',
+    metaDuration: '長さ',
+    metaInferenceSteps: 'ステップ数',
+    metaCfg: 'CFG',
+    metaSeed: 'シード',
+    metaModel: 'モデル',
+    metaInferMethod: '推論方法',
+    metaAudioFormat: 'フォーマット',
+    metaShift: 'シフト',
+    metaLmModel: 'LMモデル',
+    metaGenres: 'ジャンル',
+    metaDefault: 'デフォルト',
+
     // Languages
     japanese: '日本語',
     spanish: 'スペイン語',
@@ -1621,12 +2077,16 @@ export const translations = {
     swedish: 'スウェーデン語',
     romanian: 'ルーマニア語',
     greek: 'ギリシャ語',
-    
+
     // Task Types
     audio2audio: 'オーディオ → オーディオ',
     coverTask: 'カバー',
     repaintTask: 'リペイント',
-    
+    extractTask: '抽出',
+    legoTask: 'レゴ',
+    completeTask: '補完',
+    requiresBaseModel: 'Baseモデルが必要',
+
     // Search Page
     searchSongsPlaceholder: '曲、プレイリスト、クリエイター、スタイルを検索',
     songsMatching: '一致する曲',
@@ -1642,7 +2102,7 @@ export const translations = {
     noPlaylistsYet: '公開プレイリストがまだありません。作成してお気に入りを共有しましょう！',
     genres: 'ジャンル',
     songs: '曲',
-    
+
     // Library View
     yourLibrary: 'マイライブラリ',
     newPlaylist: '新しいプレイリスト',
@@ -1650,7 +2110,7 @@ export const translations = {
     playlists: 'プレイリスト',
     playlist: 'プレイリスト',
     byYou: 'あなたが作成',
-    
+
     // User Profile
     back: '戻る',
     loadingProfile: '読み込み中...',
@@ -1676,7 +2136,7 @@ export const translations = {
     uploadingBanner: 'バナーをアップロード中...',
     saving: '保存中...',
     saveChanges: '変更を保存',
-    
+
     // Playlist Modals
     createPlaylist: 'プレイリストを作成',
     playlistName: '名前',
@@ -1686,7 +2146,7 @@ export const translations = {
     addToPlaylist: 'プレイリストに追加',
     createNewPlaylist: '新しいプレイリストを作成',
     noExistingPlaylists: 'プレイリストがまだありません。',
-    
+
     // Edit Profile Modal (Settings)
     usernameLabel: 'ユーザー名',
     usernamePlaceholder: 'ユーザー名',
@@ -1694,16 +2154,17 @@ export const translations = {
     usernameTakenError: 'このユーザー名は既に使用されています',
     usernameUpdateFailedError: 'ユーザー名の更新に失敗しました',
     usernameRequirements: '文字、数字、アンダースコア、ハイフンのみ使用可能',
-    
+
     // Song Details (RightSidebar)
     more: 'もっと',
     copy: 'コピー',
     copied: 'コピーしました！',
     copyAllTags: 'すべてのタグをコピー',
-    
+
     // Song Dropdown Menu
     createVideo: 'ビデオを作成',
     editAudio: 'オーディオを編集',
+    extractAudio: 'オーディオを抽出',
     extractStems: 'ステムを抽出',
     reusePrompt: 'プロンプトを再利用',
     deleteSong: '曲を削除',
@@ -1716,13 +2177,14 @@ export const translations = {
     songsDeletedPartial: '{succeeded}/{total}曲を削除しました',
     deleteUploadConfirm: 'このアップロードを削除しますか？この操作は元に戻せません。',
     cannotBeUndone: 'この操作は元に戻せません。',
-    
+
     // Player
     nowPlaying: '再生中',
     downloadAudio: 'オーディオをダウンロード',
+    like: 'いいね',
     openInEditor: 'エディターで開く',
     anonymous: '匿名ユーザー',
-    
+
     // PlaylistDetail
     loadingPlaylist: 'プレイリストを読み込み中...',
     playlistNotFound: 'プレイリストが見つかりません',
@@ -1730,13 +2192,13 @@ export const translations = {
     dateAdded: '追加日',
     justNow: 'たった今',
     unknown: '不明',
-    
+
     // SongProfile
     loadingSong: '曲を読み込み中...',
     songNotFound: '曲が見つかりません',
     similar: '類似',
     by: '作成者',
-    
+
     // ShareModal
     shareSong: '曲を共有',
     shareOnX: 'Xで共有',
@@ -1749,12 +2211,12 @@ export const translations = {
     copyLink: 'リンクをコピー',
     emailSubject: 'このAI曲をチェックしてください',
     emailBody: 'こんにちは！\n\n私がこのAI生成の曲を作りました。気に入ってもらえると思います：\n\n「{title}」by {creator}\n{style}\n\nここで聴いてください：{url}\n\nACE-Step UIで作成 - 無料でオープンソースのローカルAI音楽生成！',
-    
+
     // Reference Modal
-    referenceModalTitle: 'リファレンス',
-    coverModalTitle: 'カバー',
-    referenceModalDescription: 'リファレンストラックに触発された曲を作成',
-    coverModalDescription: '既存のトラックを新しいバージョンに変換',
+    referenceModalTitle: 'スタイル参照',
+    coverModalTitle: 'コンテンツ参照',
+    referenceModalDescription: 'スタイル参照トラックをアップロード（音色/ジャンルガイド用）',
+    coverModalDescription: 'コンテンツ音声をアップロード（リミックス、リペイント、変換用）',
     uploadAudio: 'オーディオをアップロード',
     uploadingAudio: 'アップロード中...',
     audioFormats: 'MP3、WAV、FLAC',
@@ -1762,12 +2224,111 @@ export const translations = {
     loadingTracks: '読み込み中...',
     noTracksYet: 'トラックがまだありません',
     uploadAudioFilesAsReferences: 'リファレンスとして使用するオーディオファイルをアップロード',
-    
+
+    // Video Generator
+    videoGenerator: 'ビデオジェネレーター',
+    videoStudio: 'ビデオスタジオ',
+    createProfessionalVisualizers: 'プロフェッショナルなビジュアライザーを作成。',
+    presets: 'プリセット',
+    style: 'スタイル',
+    text: 'テキスト',
+    effects: 'エフェクト',
+    fx: 'FX',
+    background: '背景',
+    random: 'ランダム',
+    image: '画像',
+    videoType: 'ビデオ',
+    videoUpload: 'アップロード',
+    pasteVideoUrl: 'または動画URLを貼り付け...',
+    videoLoaded: '動画を読み込みました',
+    dimming: '暗度',
+    colorPresets: 'カラープリセット',
+    customColors: 'カスタムカラー',
+    primary: 'プライマリ',
+    secondary: 'セカンダリ',
+    particles: 'パーティクル',
+    centerImage: 'センター画像',
+    resetToDefault: 'デフォルトに戻す',
+    addTextLayer: 'テキストレイヤーを追加',
+    newText: '新しいテキスト',
+    textContent: 'テキスト内容',
+    xPosition: 'X位置',
+    yPosition: 'Y位置',
+    layer: 'レイヤー',
+    size: 'サイズ',
+    bassShake: '低音シェイク',
+    bassShakeDesc: '低周波に反応するカメラ',
+    digitalGlitch: 'デジタルグリッチ',
+    digitalGlitchDesc: 'ランダムなアーティファクト',
+    vhsTape: 'VHSテープ',
+    vhsTapeDesc: '色にじみとノイズ',
+    cctvMode: '監視カメラモード',
+    cctvModeDesc: '暗視スタイル',
+    scanlines: 'スキャンライン',
+    scanlinesDesc: '古いモニター効果',
+    aberration: '収差',
+    aberrationDesc: 'RGB分割',
+    bloom: 'ブルーム',
+    bloomDesc: '明るい部分の発光',
+    filmGrain: 'フィルムグレイン',
+    filmGrainDesc: '映画のノイズ',
+    pixelate: 'ピクセル化',
+    pixelateDesc: 'レトロピクセル風',
+    strobe: 'ストロボ',
+    strobeDesc: '低音ビートでフラッシュ',
+    vignette: 'ビネット',
+    vignetteDesc: '周辺暗角',
+    hueShift: '色相シフト',
+    hueShiftDesc: '色の回転',
+    letterbox: 'レターボックス',
+    letterboxDesc: 'シネマスコープ',
+    loadingVideoEncoder: 'ビデオエンコーダーを読み込み中...',
+    renderingFrames: 'フレームをレンダリング',
+    encodingBePatient: 'エンコード中（お待ちください）...',
+    encodingMP4: 'MP4をエンコード',
+    renderVideoMP4: 'ビデオをレンダリング (MP4)',
+    encoderReady: 'エンコーダー準備完了',
+    offlineRendering: 'オフライン rendering - リアルタイムより高速。',
+    selectCenterImage: 'センター画像を選択',
+    selectBackground: '背景を選択',
+    chooseImageForCenter: 'センターサークルの画像を選択',
+    freeStockPhotos: '無料のストック写真と動画',
+    getFreeApiKey: '無料APIキーを取得',
+    enterPexelsApiKey: 'Pexels APIキーを入力...',
+    saveApiKey: '保存',
+    apiKeyConfigured: 'APIキー設定済み',
+    setApiKey: 'APIキーを設定',
+    photos: '写真',
+    videos: '動画',
+    searchForBackgrounds: '背景を検索...',
+    select: '選択',
+    videoLabel: '動画',
+    noPhotosFound: '写真が見つかりません。別の検索語を試してください。',
+    noVideosFound: '動画が見つかりません。別の検索語を試してください。',
+    pexelsAttribution: '写真と動画はPexelsが提供しています。商用利用可能です。',
+    exportVideo: 'ビデオをエクスポート',
+    capturing: 'キャプチャ中',
+    encoding: 'エンコード中',
+
     // Training Module
-    loraTraining: 'LoRAトレーニング',
-    trainingDescription: 'オーディオファイルからデータセットを構築し、カスタムLoRAアダプターをトレーニング',
+    loraTraining: 'LoRA トレーニング',
+    trainingDescription: 'オーディオファイルからデータセットを構築し、カスタムアダプターをトレーニング',
+    adapterType: 'アダプタータイプ',
+    lokrSettings: 'LoKR 設定',
+    lokrTraining: 'LoKR トレーニング',
+    lokrDescription: '低ランククロネッカー積 - クロネッカー分解による効率的なアダプター',
+    linearDim: 'リニア次元',
+    linearAlpha: 'リニア Alpha',
+    factor: 'ファクター',
+    factorAuto: '自動',
+    decomposeBoth: '両方を分解',
+    useTucker: 'Tucker 分解を使用',
+    useScalar: 'スカラーキャリブレーション',
+    weightDecompose: '重み分解 (DoRA)',
+    rankDropout: 'ランクドロップアウト',
+    moduleDropout: 'モジュールドロップアウト',
     datasetBuilder: 'データセットビルダー',
-    trainLora: 'LoRAをトレーニング',
+    trainLora: 'LoRA をトレーニング',
     quickStart: 'クイックスタート',
     chooseOneOption: '選択：既存のデータセットを読み込む または 新しいディレクトリをスキャン',
     loadExistingDataset: '既存のデータセットを読み込む',
@@ -1784,51 +2345,69 @@ export const translations = {
     tagReplace: 'キャプションを置換',
     genreRatio: 'ジャンル比率',
     genreRatioHint: '0% = 全てキャプション、100% = 全てジャンル',
-    autoLabelWithAI: 'AIで自動ラベル付け',
+    autoLabelWithAI: 'AI で自動ラベル付け',
     autoLabelDescription: 'オーディオファイルのメタデータを生成：キャプション、BPM、キー、拍子',
+    autoLabelChunkSize: 'チャンクサイズ',
+    autoLabelBatchSize: 'バッチサイズ',
     skipMetas: 'BPM/キー/拍子をスキップ',
+    skipExisting: '既存をスキップ',
     onlyUnlabeled: 'ラベルなしのみ',
     autoLabelAll: '全て自動ラベル付け',
     filename: 'ファイル名',
     labeled: 'ラベル付き',
+    transcribeLyrics: '歌詞の文字起こし',
+    transcribeLyricsDescription: 'ACE-Step Transcriber を使用して音声から歌詞を自動的に文字起こしします。インストゥルメンタル以外のサンプルのみ対象です。',
+    transcribeLyricsModelPath: '文字起こしモデルパス',
+    transcribeLyricsModelPathPlaceholder: 'ACE-Step/acestep-transcriber',
+    forceTranscribeAll: 'すべて強制文字起こし（インストゥルメンタル自動検出）',
+    returnInstrumentalLyrics: 'インストゥルメンタル構造を返す（インストゥルメンタルの生歌詞を保持）',
+    startTranscribe: '文字起こし',
+    transcribeAllInstrumentalWarning: 'すべてのサンプルがインストゥルメンタルとしてマークされています。「すべてインストゥルメンタル」のチェックを外すか、「すべて強制文字起こし」を有効にしてください。',
     saveDataset: 'データセットを保存',
     preprocessToTensors: 'テンソルに前処理',
-    preprocessDescription: 'データセットを事前計算されたテンソルに変換して高速トレーニング（モデルのロードが必要）',
+    preprocessDescription: 'データセットを事前計算されたテンソルに変換して高速トレーニング（モデルロードが必要）',
     preprocess: '前処理',
     preprocessedDataset: '前処理済みデータセット',
-    loraSettings: 'LoRA設定',
-    loraRank: 'LoRAランク',
+    skipPreprocess: '既存のテンソルをスキップ',
+    loraSettings: 'LoRA 設定',
+    loraRank: 'LoRA ランク',
     loraAlpha: 'LoRA Alpha',
     dropout: 'ドロップアウト',
     trainingParameters: 'トレーニングパラメータ',
     learningRate: '学習率',
     maxEpochs: '最大エポック数',
-    gradientAccumulation: '勾配累積',
+    gradientAccumulation: 'グラデーション累積',
     saveEvery: '保存間隔',
     epochs: 'エポック',
+    networkWeights: '以前のトレーニング重みを読み込む（オプション）',
+    networkWeightsPlaceholder: './lora_output/checkpoints/epoch_xxx/adapter_model.safetensors',
     outputDirectory: '出力ディレクトリ',
-    useFP8: 'FP8量子化を使用',
-    fp8Description: 'VRAMを削減',
+    useFP8: 'FP8 量子化を使用',
+    fp8Description: 'VRAM を削減',
+    gradientCheckpointing: 'グラデーションチェックポイント',
+    gradientCheckpointingDescription: '計算速度を犠牲に VRAM 使用量を削減',
     startTraining: 'トレーニング開始',
     stopTraining: 'トレーニング停止',
     trainingProgress: 'トレーニング進行状況',
     trainingLog: 'トレーニングログ',
     trainingStatus: 'トレーニングステータス',
-    tensorboardView: 'TensorBoardビュー',
-    showTensorboard: 'TensorBoardを表示',
-    hideTensorboard: 'TensorBoardを非表示',
+    tensorboardView: 'TensorBoard ビュー',
+    showTensorboard: 'TensorBoard を表示',
+    hideTensorboard: 'TensorBoard を非表示',
     openInNewTab: '新しいタブで開く',
-    
+
     // Training Status Messages
     scanning: 'スキャン中...',
     autoLabeling: '自動ラベル付け中...',
+    autoLabelPreparing: '準備中...',
+    autoLabelLabelingStage: 'ラベリング中...',
     savingDataset: '保存中...',
     preprocessing: '前処理中...',
     loadingDataset: '読み込み中...',
     startingTraining: '開始中...',
     error: 'エラー',
-    datasetInfo: 'データセット: {name}、サンプル数: {samples}、ラベル付き: {labeled}',
-    trainingStep: 'ステップ {step} - 損失: {loss}',
+    datasetInfo: 'データセット：{name}、サンプル数：{samples}、ラベル付き：{labeled}',
+    trainingStep: 'ステップ {step} - 損失：{loss}',
     editSample: 'サンプルを編集',
     caption: 'キャプション',
     genre: 'ジャンル',
@@ -1845,16 +2424,16 @@ export const translations = {
     library: '라이브러리',
     search: '검색',
     training: '훈련',
-    
+
     // Theme
     lightMode: '라이트 모드',
     darkMode: '다크 모드',
-    
+
     // Auth
     signIn: '로그인',
     signOut: '로그아웃',
     settings: '설정',
-    
+
     // Username Modal
     welcomeTitle: 'ACE-Step UI에 오신 것을 환영합니다',
     welcomeSubtitle: 'AI 음악 제작을 시작하려면 이름을 입력하세요',
@@ -1866,7 +2445,7 @@ export const translations = {
     usernameMinLength: '사용자 이름은 최소 2자 이상이어야 합니다',
     usernameInvalidChars: '사용자 이름은 문자, 숫자, 밑줄, 하이픈만 사용할 수 있습니다',
     failedToSetUsername: '사용자 이름 설정에 실패했습니다',
-    
+
     // Toasts
     songNotAvailable: '이 곡은 더 이상 사용할 수 없습니다.',
     unableToPlay: '이 곡을 재생할 수 없습니다.',
@@ -1878,10 +2457,10 @@ export const translations = {
     failedToAddSong: '곡 추가에 실패했습니다',
     songDeleted: '곡이 삭제되었습니다',
     failedToDeleteSong: '곡 삭제에 실패했습니다',
-    
+
     // Sidebar
     aceStepUI: 'ACE-Step UI',
-    
+
     // Common
     cancel: '취소',
     save: '저장',
@@ -1889,15 +2468,16 @@ export const translations = {
     edit: '편집',
     share: '공유',
     download: '다운로드',
+    collapse: '접기',
     play: '재생',
     pause: '일시정지',
     normalSpeed: '보통',
     next: '다음',
     previous: '이전',
-    
+
     // Placeholders
     searchPlaceholder: '검색...',
-    
+
     // Settings
     language: '언어',
     english: 'English',
@@ -1921,15 +2501,15 @@ export const translations = {
     done: '완료',
     light: '라이트',
     dark: '다크',
-    
+
     // Mobile
     createSong: '곡 만들기',
     viewList: '목록 보기',
-    
+
     // CreatePanel - Modes
     simple: '간단',
     custom: '사용자 정의',
-    
+
     // CreatePanel - Sections
     audio: '오디오',
     lyrics: '가사',
@@ -1937,7 +2517,7 @@ export const translations = {
     title: '제목',
     musicParameters: '음악 매개변수',
     advancedSettings: '고급 설정',
-    
+
     // CreatePanel - LoRA
     loraPath: 'LoRA 경로',
     loraPathPlaceholder: 'LoRA 모델 경로 입력...',
@@ -1948,13 +2528,13 @@ export const translations = {
     loraUnload: '언로드',
     loraScale: 'LoRA 강도',
     loraScaleDescription: 'LoRA 모델의 영향 강도 조절',
-    
+
     // CreatePanel - Audio
-    reference: '참조',
-    cover: '커버',
+    reference: '스타일 참조',
+    cover: '콘텐츠 참조',
     fromLibrary: '라이브러리에서',
     upload: '업로드',
-    
+
     // CreatePanel - Lyrics
     lyricsPlaceholder: '여기에 가사를 입력하세요...',
     leaveLyricsEmpty: '연주곡의 경우 비워두거나 아래 토글 사용',
@@ -2012,15 +2592,23 @@ export const translations = {
     vocalVietnamese: '베트남어',
     vocalCantonese: '광둥어',
     vocalChineseMandarin: '중국어（표준어）',
-    
+
     // CreatePanel - Style
     stylePlaceholder: '예: 경쾌한 팝 록, 감성적인 발라드, 90년대 힙합',
     genreMoodInstruments: '장르, 분위기, 악기, 느낌',
     refreshGenres: '장르 제안 새로고침',
     mainGenre: '주요 장르',
     subGenre: '하위 장르',
+    searchGenre: '장르 검색...',
+    selectGenre: '장르 선택...',
+    otherGenres: '기타 장르',
+    majorGenres: '주요 장르',
+    subGenres: '하위 장르',
+    clearSelection: '지우기',
+    selectSubGenre: '하위 장르 선택',
+    clearGenreSelection: '장르 선택 초기화',
     nameSong: '곡 이름 짓기',
-    
+
     // CreatePanel - Parameters
     bpm: 'BPM',
     auto: '자동',
@@ -2028,7 +2616,7 @@ export const translations = {
     seconds: '초',
     keyScale: '키와 스케일',
     timeSignature: '박자',
-    
+
     // CreatePanel - Advanced
     randomSeed: '랜덤 시드',
     thinking: '생각',
@@ -2048,8 +2636,15 @@ export const translations = {
     taskType: '작업 유형',
     textToMusic: '텍스트 → 음악',
     audioCoverStrength: '오디오 커버 강도',
+    coverNoiseStrength: '커버 강도',
+    enableNormalization: '오디오 정규화',
+    normalizationDb: '정규화 dB',
+    latentShift: '잠재 시프트',
+    latentRescale: '잠재 리스케일',
     repaintingStart: '리페인팅 시작',
     repaintingEnd: '리페인팅 종료',
+    repaintingRange: '리페인팅 범위',
+    cfgInterval: 'CFG 간격',
     instruction: '지시',
     lmTemperature: 'LM 온도',
     higherMoreRandom: '높을수록 랜덤 (0-2)',
@@ -2063,7 +2658,7 @@ export const translations = {
     useWhenCfgScaleGreater: 'LM CFG 스케일 > 1.0일 때 사용',
     lmTopK: 'LM Top-K',
     lmTopP: 'LM Top-P',
-    
+
     // Guidance section
     guidance: '가이던스',
     advancedCfgScheduling: '고급 CFG 스케줄링 제어.',
@@ -2083,6 +2678,7 @@ export const translations = {
     useCotCaption: 'CoT 캡션 사용',
     useCotLanguage: 'CoT 언어 사용',
     autogen: '자동 생성',
+    autogenHint: '가능할 때 누락된 필드를 자동으로 생성합니다.',
     constrainedDecodingDebug: '제약 디코딩 디버그',
     formatCaption: '캡션 포맷',
     getScores: '점수 가져오기',
@@ -2106,20 +2702,40 @@ export const translations = {
     odeDeterministic: 'ODE (결정론적)',
     sdeStochastic: 'SDE (확률적)',
     min: '분',
-    
+
+    // CreatePanel - Misc
+    instructionDefault: 'Fill the audio semantic mask based on the given conditions:',
+    untitled: '무제',
+    pleaseSignInToUseLoRA: 'LoRA를 사용하려면 로그인하세요',
+    pleaseEnterLoRAPath: 'LoRA 경로를 입력하세요',
+    loraOperationFailed: 'LoRA 작업 실패',
+    failedToUnloadLoRA: 'LoRA 언로드 실패',
+    pleaseSignInToUploadAudio: '오디오를 업로드하려면 로그인하세요',
+    contentRefRequiredForTask: '이 작업에는 콘텐츠 참조 오디오가 필요합니다. 업로드해 주세요.',
+    uploadFailed: '업로드 실패',
+    formatFailed: '포맷 실패',
+    formatFailedLLMNotInitialized: '포맷 실패. LLM이 초기화되었는지 확인하세요.',
+    formatFailedLLMNotAvailable: '포맷 실패. LLM을 사용할 수 없을 수 있습니다.',
+    maleVocals: '남성 보컬',
+    femaleVocals: '여성 보컬',
+    failedToFetchReferenceTracks: '참조 트랙 가져오기 실패',
+    failedToTranscribe: '전사 실패',
+    transcriptionFailed: '전사 실패',
+    failedToDeleteTrack: '트랙 삭제 실패',
+
     // CreatePanel - Drag & Drop
     dropToUseAudio: '드롭하여 오디오 사용',
     dropToUpload: '드롭하여 업로드',
-    usingAsReference: '참조로 사용',
-    usingAsCover: '커버로 사용',
-    uploadingAsReference: '참조로 업로드',
-    uploadingAsCover: '커버로 업로드',
-    
+    usingAsReference: '스타일 참조로 사용',
+    usingAsCover: '콘텐츠 참조로 사용',
+    uploadingAsReference: '스타일 참조로 업로드',
+    uploadingAsCover: '콘텐츠 참조로 업로드',
+
     // CreatePanel - Vocal Gender
     vocalGender: '보컬 성별',
     male: '남성',
     female: '여성',
-    
+
     // CreatePanel - LM Backend & Model
     lmBackendLabel: 'LM 백엔드',
     lmBackendPt: 'PT (~1.6 GB VRAM)',
@@ -2130,18 +2746,67 @@ export const translations = {
     lmModel17B: '1.7B (균형, ~1.5 GB VRAM)',
     lmModel4B: '4B (최고 품질, ~4 GB VRAM)',
     lmModelHint: '가사/스타일 향상에 사용되는 LLM을 제어. 없으면 자동 다운로드.',
-    
+
+    // CreatePanel - Model Status
+    modelActive: '● 활성',
+    modelReady: '● 준비됨',
+    backendNotStarted: 'ACE-Step 백엔드가 아직 시작되지 않았습니다. 기본 모델 목록 사용 중',
+
+    // CreatePanel - Tooltips
+    aiFormatTooltip: 'AI 포맷 - 스타일 강화 및 자동 매개변수 채우기',
+    batchSizeTooltip: '단일 실행으로 여러 변형을 생성합니다. 변형이 많을수록 = 총 시간이 더 깁니다.',
+    inferenceStepsTooltip: '더 많은 단계는 일반적으로 품질을 향상시키지만 생성 속도가 느려집니다.',
+    guidanceScaleTooltip: '모델이 프롬프트를 따르는 정도. 높음 = 더 엄격함, 낮음 = 더 자유로움.',
+    shiftTooltip: '확산 일정을 조정합니다. 기본 모델에만 영향을 줍니다.',
+    lmTemperatureTooltip: '더 높은 온도 = 더 무작위한 단어 선택.',
+    lmGuidanceScaleTooltip: '가사 모델이 프롬프트를 따르는 정도.',
+    lmTopKTooltip: 'K개의 가장 가능성 있는 토큰으로 선택을 제한합니다. 0은 비활성화.',
+    lmTopPTooltip: '총 확률이 P인 가장 작은 세트에서 샘플링합니다.',
+    useAdgTooltip: '적응형 이중 가이던스: 품질을 위해 CFG를 동적으로 조정합니다. 기본 모델 전용; 느림.',
+    allowLmBatchTooltip: '속도를 위해 LM을 더 큰 배치로 실행하도록 허용합니다(더 많은 VRAM).',
+    useCotMetadataTooltip: 'LM이 BPM, 키, 길이와 같은 메타데이터를 추론하도록 합니다.',
+    useCotCaptionTooltip: 'LM이 캡션/스타일 텍스트를 추론하도록 합니다.',
+    useCotLanguageTooltip: 'LM이 언어 선택을 추론하도록 합니다.',
+    constrainedDecodingDebugTooltip: '제약 디코딩에 대한 디버그 정보를 포함합니다.',
+    formatCaptionTooltip: 'AI 포맷터가 생성한 포맷된 캡션을 사용합니다.',
+    getScoresTooltip: '진단을 위해 스코어 출력을 반환합니다.',
+    getLrcTooltip: '사용 가능할 때 동기화된 가사(LRC) 출력을 반환합니다.',
+
+    // CreatePanel - More Tooltips
+    inferMethodTooltip: '결정론적은 더 반복 가능하고, 확률적은 무작위성을 추가합니다.',
+    seedTooltip: '시드를 고정하면 결과가 반복 가능해집니다. 다양성을 위해 무작위를 권장합니다.',
+    thinkingTooltip: '가사 모델이 구조와 메타데이터를 추론하도록 합니다. 약간 느립니다.',
+    lmParametersTooltip: '5Hz 가사/캡션 모델 샘플링 동작을 제어합니다.',
+    lmNegativePromptTooltip: '가사 모델을 멀리하도록 유도하는 단어나 아이디어.',
+    transformTooltip: '출력이 입력 오디오를 얼마나 따르는지 제어합니다.',
+    audioCodesTooltip: '고급: 조건화를 위한 사전 계산된 오디오 코드.',
+    taskTypeTooltip: '텍스트를 음악으로 또는 오디오 기반 모드를 선택하세요.',
+    audioCoverStrengthTooltip: '소스 오디오가 결과를 형성하는 강도.',
+    coverNoiseStrengthTooltip: 'Remix 모드에서 멜로디 복원을 제어합니다. 권장: SFT 모델 사용, 값 0.1-0.25. (0=순수 노이즈/커버 없음, 1=원본에 가장 가까움)',
+    enableNormalizationTooltip: '출력 오디오에 라우드니스 정규화를 적용합니다.',
+    normalizationDbTooltip: '정규화 목표 라우드니스 (-10~0 dB). 기본값: -1.0 dB.',
+    latentShiftTooltip: 'VAE 디코딩 전 DiT 잠재 변수에 대한 가산 시프트. 기본값 0 = 시프트 없음. 범위: -0.2~0.2.',
+    latentRescaleTooltip: 'VAE 디코딩 전 DiT 잠재 변수에 대한 승산 리스케일. 기본값 1.0 = 리스케일 없음. 범위: 0.5~1.5.',
+    repaintingStartTooltip: '다시 칠할 영역의 시작 시간(초).',
+    repaintingEndTooltip: '다시 칠할 영역의 종료 시간(초).',
+    instructionTooltip: '생성을 안내하는 추가 지침.',
+    cfgIntervalStartTooltip: '가이던스를 적용하기 시작하는 확산 프로세스의 비율.',
+    cfgIntervalEndTooltip: '가이던스 적용을 중지하는 확산 프로세스의 비율.',
+    customTimestepsTooltip: '기본 타임스텝 스케줄을 재정의합니다(고급).',
+    scoreScaleTooltip: '점수 기반 가이던스를 스케일링합니다(고급).',
+    lmBatchChunkSizeTooltip: '더 큰 청크는 더 빠를 수 있지만 더 많은 메모리를 사용합니다.',
+
     // CreatePanel - Transcription
     transcribing: '전사 중...',
     transcribingWithWhisper: 'Whisper로 전사 중…',
-    
+
     // CreatePanel - Library Tabs
     uploaded: '업로드됨',
     createdTab: '생성됨',
-    useTrack: '사용',
+    useTrack: '선택',
     noCreatedSongsYet: '생성된 곡이 아직 없습니다',
     generateSongsToReuse: '곡을 생성하여 커버나 참조로 재사용',
-    
+
     // CreatePanel - Actions
     generate: '생성',
     generating: '생성 중...',
@@ -2149,25 +2814,25 @@ export const translations = {
     formatLyrics: '가사 포맷',
     formatting: '포맷 중...',
     clearAll: '모두 지우기',
-    
+
     // Simple Mode
     describeYourSong: '곡 설명',
     songDescriptionPlaceholder: '친구들과 여름 모험에 대한 밝은 팝송...',
     quickSettings: '빠른 설정',
     key: '키',
     time: '박자',
-    
+
     // CreatePanel - Errors
     loginToGenerate: '음악을 생성하려면 로그인하세요',
-    uploadFailed: '업로드 실패',
-    formatFailed: '포맷 실패',
-    formatFailedDetail: '포맷 실패. LLM이 초기화되었는지 확인하세요.',
-    formatFailedLlmUnavailable: '포맷 실패. LLM을 사용할 수 없을 수 있습니다.',
     deleteSongConfirm: '「{title}」을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+
+    // SongList - Selection
+    selectedCount: '{count}개 선택됨',
+    selectAll: '모두 선택',
     profileUpdateFailed: '프로필 업데이트에 실패했습니다',
     ffmpegLoadFailed: '비디오 인코더 로드에 실패했습니다. 새로고침 후 다시 시도하세요.',
     videoRenderFailed: '비디오 렌더링에 실패했습니다. 다시 시도하세요.',
-    
+
     // SongList / Filters
     searchYourSongs: '곡 검색...',
     filters: '필터',
@@ -2179,14 +2844,31 @@ export const translations = {
     selectSongToView: '세부 정보를 볼 곡 선택',
     noSongsMatchFilters: '필터와 일치하는 곡이 없습니다.',
     clearFilters: '필터 지우기',
-    
+
     // RightSidebar - Song Details
     songDetails: '곡 상세정보',
     created: '생성일',
     styleTags: '스타일 및 태그',
     lyricsSection: '가사',
     copyLyrics: '복사',
-    
+
+    // RightSidebar - Generation Metadata
+    generationParameters: '생성 매개변수',
+    metaBpm: 'BPM',
+    metaKey: '키',
+    metaTimeSignature: '박자',
+    metaDuration: '길이',
+    metaInferenceSteps: '추론 단계',
+    metaCfg: 'CFG',
+    metaSeed: '시드',
+    metaModel: '모델',
+    metaInferMethod: '추론 방법',
+    metaAudioFormat: '포맷',
+    metaShift: '시프트',
+    metaLmModel: 'LM 모델',
+    metaGenres: '장르',
+    metaDefault: '기본값',
+
     // Languages
     japanese: '일본어',
     spanish: '스페인어',
@@ -2211,12 +2893,16 @@ export const translations = {
     swedish: '스웨덴어',
     romanian: '루마니아어',
     greek: '그리스어',
-    
+
     // Task Types
     audio2audio: '오디오 → 오디오',
     coverTask: '커버',
     repaintTask: '리페인트',
-    
+    extractTask: '추출',
+    legoTask: '레고',
+    completeTask: '완성',
+    requiresBaseModel: 'Base 모델 필요',
+
     // Search Page
     searchSongsPlaceholder: '곡, 재생목록, 제작자 또는 스타일 검색',
     songsMatching: '일치하는 곡',
@@ -2232,7 +2918,7 @@ export const translations = {
     noPlaylistsYet: '공개 재생목록이 아직 없습니다. 만들고 즐겨찾기를 공유하세요!',
     genres: '장르',
     songs: '곡',
-    
+
     // Library View
     yourLibrary: '내 라이브러리',
     newPlaylist: '새 재생목록',
@@ -2240,7 +2926,7 @@ export const translations = {
     playlists: '재생목록',
     playlist: '재생목록',
     byYou: '내가 만든',
-    
+
     // User Profile
     back: '뒤로',
     loadingProfile: '로딩 중...',
@@ -2266,7 +2952,7 @@ export const translations = {
     uploadingBanner: '배너 업로드 중...',
     saving: '저장 중...',
     saveChanges: '변경 사항 저장',
-    
+
     // Playlist Modals
     createPlaylist: '재생목록 만들기',
     playlistName: '이름',
@@ -2276,7 +2962,7 @@ export const translations = {
     addToPlaylist: '재생목록에 추가',
     createNewPlaylist: '새 재생목록 만들기',
     noExistingPlaylists: '재생목록이 아직 없습니다.',
-    
+
     // Edit Profile Modal (Settings)
     usernameLabel: '사용자 이름',
     usernamePlaceholder: '사용자 이름',
@@ -2284,16 +2970,17 @@ export const translations = {
     usernameTakenError: '이 사용자 이름은 이미 사용 중입니다',
     usernameUpdateFailedError: '사용자 이름 업데이트에 실패했습니다',
     usernameRequirements: '문자, 숫자, 밑줄, 하이픈만 허용됨',
-    
+
     // Song Details (RightSidebar)
     more: '더보기',
     copy: '복사',
     copied: '복사됨!',
     copyAllTags: '모든 태그 복사',
-    
+
     // Song Dropdown Menu
     createVideo: '비디오 만들기',
     editAudio: '오디오 편집',
+    extractAudio: '오디오 추출',
     extractStems: '스템 추출',
     reusePrompt: '프롬프트 재사용',
     deleteSong: '곡 삭제',
@@ -2306,13 +2993,14 @@ export const translations = {
     songsDeletedPartial: '{succeeded}/{total}곡 삭제됨',
     deleteUploadConfirm: '이 업로드를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
     cannotBeUndone: '이 작업은 되돌릴 수 없습니다.',
-    
+
     // Player
     nowPlaying: '재생 중',
     downloadAudio: '오디오 다운로드',
+    like: '좋아요',
     openInEditor: '편집기에서 열기',
     anonymous: '익명 사용자',
-    
+
     // PlaylistDetail
     loadingPlaylist: '재생목록 로딩 중...',
     playlistNotFound: '재생목록을 찾을 수 없습니다',
@@ -2320,13 +3008,13 @@ export const translations = {
     dateAdded: '추가일',
     justNow: '방금',
     unknown: '알 수 없음',
-    
+
     // SongProfile
     loadingSong: '곡 로딩 중...',
     songNotFound: '곡을 찾을 수 없습니다',
     similar: '유사',
     by: '제작자',
-    
+
     // ShareModal
     shareSong: '곡 공유',
     shareOnX: 'X에서 공유',
@@ -2339,12 +3027,12 @@ export const translations = {
     copyLink: '링크 복사',
     emailSubject: '이 AI 곡을 들어보세요',
     emailBody: '안녕하세요!\n\n제가 만든 이 AI 생성 곡을 들어보세요. 마음에 드실 거예요:\n\n"{title}" - {creator}\n{style}\n\n여기서 들으세요: {url}\n\nACE-Step UI로 제작 - 무료 오픈 소스 로컬 AI 음악 생성!',
-    
+
     // Reference Modal
-    referenceModalTitle: '참조 음악',
-    coverModalTitle: '커버 음악',
-    referenceModalDescription: '참조 트랙에서 영감을 받은 곡 만들기',
-    coverModalDescription: '기존 트랙을 새로운 버전으로 변환',
+    referenceModalTitle: '스타일 참조',
+    coverModalTitle: '콘텐츠 참조',
+    referenceModalDescription: '스타일 참조 트랙 업로드 (음색/장르 가이드용)',
+    coverModalDescription: '콘텐츠 오디오 업로드 (리믹스, 리페인트, 변환용)',
     uploadAudio: '오디오 업로드',
     uploadingAudio: '업로드 중...',
     audioFormats: 'MP3, WAV, FLAC',
@@ -2352,10 +3040,109 @@ export const translations = {
     loadingTracks: '로딩 중...',
     noTracksYet: '트랙이 없습니다',
     uploadAudioFilesAsReferences: '참조로 사용할 오디오 파일 업로드',
-    
+
+    // Video Generator
+    videoGenerator: '비디오 생성기',
+    videoStudio: '비디오 스튜디오',
+    createProfessionalVisualizers: '전문적인 비주얼라이저를 만드세요.',
+    presets: '프리셋',
+    style: '스타일',
+    text: '텍스트',
+    effects: '효과',
+    fx: 'FX',
+    background: '배경',
+    random: '랜덤',
+    image: '이미지',
+    videoType: '비디오',
+    videoUpload: '업로드',
+    pasteVideoUrl: '또는 비디오 URL 붙여넣기...',
+    videoLoaded: '비디오 로드됨',
+    dimming: '어둡게',
+    colorPresets: '색상 프리셋',
+    customColors: '커스텀 색상',
+    primary: '기본색',
+    secondary: '보조색',
+    particles: '입자',
+    centerImage: '중앙 이미지',
+    resetToDefault: '기본값으로 재설정',
+    addTextLayer: '텍스트 레이어 추가',
+    newText: '새 텍스트',
+    textContent: '텍스트 내용',
+    xPosition: 'X 위치',
+    yPosition: 'Y 위치',
+    layer: '레이어',
+    size: '크기',
+    bassShake: '저음 흔들림',
+    bassShakeDesc: '저주파에 반응하는 칩처럼',
+    digitalGlitch: '디지털 글리치',
+    digitalGlitchDesc: '무작위 아티팩트',
+    vhsTape: 'VHS 테이프',
+    vhsTapeDesc: '색상 번짐 및 노이즈',
+    cctvMode: 'CCTV 모드',
+    cctvModeDesc: '야간 투시 스타일',
+    scanlines: '스캔라인',
+    scanlinesDesc: '오래된 모니터 효과',
+    aberration: '수차',
+    aberrationDesc: 'RGB 분할',
+    bloom: '블룸',
+    bloomDesc: '밝은 영역 발광',
+    filmGrain: '필름 그레인',
+    filmGrainDesc: '영화 노이즈',
+    pixelate: '픽셀화',
+    pixelateDesc: '레트로 픽셀 룩',
+    strobe: '스트로브',
+    strobeDesc: '저음 비트에서 플래시',
+    vignette: '비네트',
+    vignetteDesc: '어두운 가장자리',
+    hueShift: '색조 이동',
+    hueShiftDesc: '색상 회전',
+    letterbox: '레터박스',
+    letterboxDesc: '시네마스코프',
+    loadingVideoEncoder: '비디오 인코더 로딩 중...',
+    renderingFrames: '프레임 렌더링',
+    encodingBePatient: '인코딩 중 (잠시만 기다려주세요)...',
+    encodingMP4: 'MP4 인코딩',
+    renderVideoMP4: '비디오 렌더링 (MP4)',
+    encoderReady: '인코더 준비됨',
+    offlineRendering: '오프라인 렌더링 - 실시간보다 빠릅니다.',
+    selectCenterImage: '중앙 이미지 선택',
+    selectBackground: '배경 선택',
+    chooseImageForCenter: '중앙 원에 사용할 이미지 선택',
+    freeStockPhotos: '묵료 스톡 사진 및 비디오',
+    getFreeApiKey: '묵료 API 키 받기',
+    enterPexelsApiKey: 'Pexels API 키 입력...',
+    saveApiKey: '저장',
+    apiKeyConfigured: 'API 키 구성됨',
+    setApiKey: 'API 키 설정',
+    photos: '사진',
+    videos: '비디오',
+    searchForBackgrounds: '배경 검색...',
+    select: '선택',
+    videoLabel: '비디오',
+    noPhotosFound: '사진을 찾을 수 없습니다. 다른 검색어를 시도하세요.',
+    noVideosFound: '비디오를 찾을 수 없습니다. 다른 검색어를 시도하세요.',
+    pexelsAttribution: '사진 및 비디오는 Pexels에서 제공합니다. 상업용으로 묵료 사용 가능.',
+    exportVideo: '비디오 낳내기',
+    capturing: '캡처 중',
+    encoding: '인코딩 중',
+
     // Training Module
     loraTraining: 'LoRA 훈련',
-    trainingDescription: '오디오 파일에서 데이터셋을 구축하고 커스텀 LoRA 어댑터를 훈련',
+    trainingDescription: '오디오 파일에서 데이터셋을 구축하고 커스텀 어댑터를 훈련',
+    adapterType: '어댑터 유형',
+    lokrSettings: 'LoKR 설정',
+    lokrTraining: 'LoKR 훈련',
+    lokrDescription: '저랭크 크로네커 곱 - 크로네커 분해를 사용하는 효율적인 어댑터',
+    linearDim: '리니어 차원',
+    linearAlpha: '리니어 Alpha',
+    factor: '팩터',
+    factorAuto: '자동',
+    decomposeBoth: '양쪽 분해',
+    useTucker: 'Tucker 분해 사용',
+    useScalar: '스칼라 캘리브레이션',
+    weightDecompose: '가중치 분해 (DoRA)',
+    rankDropout: '랭크 드롭아웃',
+    moduleDropout: '모듈 드롭아웃',
     datasetBuilder: '데이터셋 빌더',
     trainLora: 'LoRA 훈련',
     quickStart: '빠른 시작',
@@ -2376,16 +3163,27 @@ export const translations = {
     genreRatioHint: '0% = 모두 캡션, 100% = 모두 장르',
     autoLabelWithAI: 'AI로 자동 라벨링',
     autoLabelDescription: '오디오 파일의 메타데이터 생성: 캡션, BPM, 키, 박자',
+    autoLabelChunkSize: '청크 크기',
+    autoLabelBatchSize: '배치 크기',
     skipMetas: 'BPM/키/박자 건너뛰기',
     onlyUnlabeled: '라벨 없는 것만',
     autoLabelAll: '모두 자동 라벨링',
     filename: '파일명',
     labeled: '라벨됨',
+    transcribeLyrics: '가사 전사',
+    transcribeLyricsDescription: 'ACE-Step Transcriber를 사용하여 보컬 오디오에서 가사를 자동으로 전사합니다. 비연주곡 샘플만 전사됩니다.',
+    transcribeLyricsModelPath: '전사 모델 경로',
+    transcribeLyricsModelPathPlaceholder: 'ACE-Step/acestep-transcriber',
+    forceTranscribeAll: '모두 강제 전사 (연주곡 자동 감지)',
+    returnInstrumentalLyrics: '연주곡 구조 반환 (연주곡의 원본 가사 유지)',
+    startTranscribe: '전사',
+    transcribeAllInstrumentalWarning: '모든 샘플이 연주곡으로 표시되어 있습니다. "모두 연주곡"을 해제하거나 "모두 강제 전사"를 활성화하세요.',
     saveDataset: '데이터셋 저장',
     preprocessToTensors: '텐서로 전처리',
     preprocessDescription: '빠른 훈련을 위해 데이터셋을 사전 계산된 텐서로 변환 (모델 로드 필요)',
     preprocess: '전처리',
     preprocessedDataset: '전처리된 데이터셋',
+    skipPreprocess: '기존 텐서 건너뛰기',
     loraSettings: 'LoRA 설정',
     loraRank: 'LoRA 랭크',
     loraAlpha: 'LoRA Alpha',
@@ -2396,17 +3194,23 @@ export const translations = {
     gradientAccumulation: '그래디언트 누적',
     saveEvery: '저장 간격',
     epochs: '에포크',
+    networkWeights: '이전 훈련 가중치 불러오기 (선택사항)',
+    networkWeightsPlaceholder: './lora_output/checkpoints/epoch_xxx/adapter_model.safetensors',
     outputDirectory: '출력 디렉토리',
     useFP8: 'FP8 양자화 사용',
     fp8Description: 'VRAM 사용량 감소',
+    gradientCheckpointing: '그래디언트 체크포인팅',
+    gradientCheckpointingDescription: '계산 속도를 희생하여 VRAM 사용량 감소',
     startTraining: '훈련 시작',
     stopTraining: '훈련 중지',
     trainingProgress: '훈련 진행',
     trainingLog: '훈련 로그',
-    
+
     // Training Status Messages
     scanning: '스캔 중...',
     autoLabeling: '자동 라벨링 중...',
+    autoLabelPreparing: '준비 중...',
+    autoLabelLabelingStage: '라벨링 중...',
     savingDataset: '저장 중...',
     preprocessing: '전처리 중...',
     loadingDataset: '로드 중...',
