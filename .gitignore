@@ -1,3 +1,32 @@
+# ============================================
+# Git管理范围说明
+# ============================================
+# Git只管理：
+# - .claude/ (AI技能配置)
+# - .githooks/ (Git钩子)
+# - .github/ (GitHub配置)
+# - docs/ (文档)
+# - .gitignore (本文件)
+# - .gitmodules (Git子模块)
+# - dev/ 中的纯净整合包 (EXE文件和app/文件夹)
+#
+# Git不管理：
+# - dev/app/.cache/ (缓存)
+# - dev/app/.venv/ (虚拟环境)
+# - dev/app/checkpoints/ (模型)
+# - dev/app/models/ (模型)
+# - dev/app/output/ (输出)
+# - dev/app/temp/ (临时文件)
+# - dev/app/gradio_outputs/ (Gradio输出)
+# - dev/app/huggingface/ (Huggingface缓存)
+# - dev/app/logs/ (日志)
+# - dev/app/nodejs/ (Node.js)
+# - dev/app/tools/ (工具)
+# - build/ (版本历史)
+# - pack/ (本地发布包)
+# - BAK/ (备份目录)
+# ============================================
+
 #Exclude potential (c) training data
 *_lyrics.txt
 *.mp3
@@ -38,7 +67,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
 develop-eggs/
 downloads/
 eggs/
@@ -55,13 +83,32 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# dist目录用于存放构建的EXE文件，不提交到Git
-dist/
+# dev目录 - Git管理纯净整合包，忽略开发临时文件
+dev/app/.cache/
+dev/app/.venv/
+dev/app/checkpoints/
+dev/app/models/
+dev/app/output/
+dev/app/temp/
+dev/app/gradio_outputs/
+dev/app/huggingface/
+dev/app/logs/
+dev/app/nodejs/
+dev/app/tools/
 
-# version目录用于存放精选的稳定版本（手动管理）
-# version/
+# build目录 - 版本历史，不提交到Git
+build/
 
-# tools目录用于存放下载的工具（Git便携版、Python便携版等）
+# pack目录 - 本地发布包，不提交到Git
+pack/
+
+# versions目录 - 旧版本目录，不提交到Git
+versions/
+
+# version目录 - 旧版本目录，不提交到Git
+version/
+
+# tools目录 - 存放下载的工具，不提交到Git
 tools/
 
 # PyInstaller

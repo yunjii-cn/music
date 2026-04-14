@@ -1,0 +1,15 @@
+{
+  "system": "Windows",
+  "system_version": "10.0.26100",
+  "python_version": "3.13.5",
+  "cpu_count": 16,
+  "memory_total": 127,
+  "memory_available": 28,
+  "git_available": true,
+  "git_version": "git version 2.52.0.windows.1",
+  "initialized": true,
+  "init_time": "2026-03-29T04:24:11.292502",
+  "version": "1.0.0",
+  "git_path": "git",
+  "python_version_ok": false
+}
