@@ -8,9 +8,11 @@
 # - docs/ (文档)
 # - .gitignore (本文件)
 # - .gitmodules (Git子模块)
-# - dev/ 中的纯净整合包 (EXE文件和app/文件夹)
+# - dev/app/ (纯净整合包文件夹)
+# - dev/ver/ (稳定版本EXE列表)
 #
 # Git不管理：
+# - dev/*.exe (开发测试用的临时EXE)
 # - dev/app/.cache/ (缓存)
 # - dev/app/.venv/ (虚拟环境)
 # - dev/app/checkpoints/ (模型)
@@ -84,6 +86,9 @@ share/python-wheels/
 MANIFEST
 
 # dev目录 - Git管理纯净整合包，忽略开发临时文件
+# 忽略 dev/ 下的临时EXE，但是不忽略 dev/ver/ 下的稳定版本EXE
+dev/*.exe
+!dev/ver/*.exe
 dev/app/.cache/
 dev/app/.venv/
 dev/app/checkpoints/

@@ -277,10 +277,11 @@ class HybridVersionManagerDialog(QDialog):
             return None
     
     def _get_available_exe_versions(self):
-        """获取可用EXE版本列表（检查version文件夹）"""
+        """获取可用EXE版本列表（检查ver文件夹）"""
         try:
-            version_dir = Path(self.base_dir) / "version"
-            dist_dir = Path(self.base_dir) / "dist"
+            version_dir = Path(self.base_dir) / "ver"
+            dev_dir = Path(self.base_dir).parent
+            ver_dir = dev_dir / "ver" if dev_dir.exists() else None
             
             # 从版本历史中获取所有版本
             all_versions = []
@@ -297,9 +298,9 @@ class HybridVersionManagerDialog(QDialog):
                         'date': None
                     })
             
-            # 检查version文件夹中哪些版本可用
-            if version_dir.exists():
-                for exe_file in version_dir.glob("*.exe"):
+            # 检查ver文件夹中哪些版本可用
+            if ver_dir and ver_dir.exists():
+                for exe_file in ver_dir.glob("*.exe"):
                     match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                     if match:
                         version = match.group(1)
@@ -316,9 +317,9 @@ class HybridVersionManagerDialog(QDialog):
                                 v['name'] = exe_file.name
                                 break
             
-            # 如果version文件夹没有，检查dist文件夹（兼容开发模式）
-            if dist_dir.exists():
-                for exe_file in dist_dir.glob("*.exe"):
+            # 检查当前目录的exe（兼容开发模式）
+            if Path(self.base_dir).exists():
+                for exe_file in Path(self.base_dir).glob("*.exe"):
                     match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                     if match:
                         version = match.group(1)
