@@ -2319,6 +2319,34 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self._log(f"[警告] 安装 {dep} 失败: {e}", "#FF9800")
     
+    def _quick_check_dependencies(self, venv_python):
+        """快速检查关键依赖是否已安装 - 返回True表示所有依赖都OK"""
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        
+        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio"]
+        all_ok = True
+        
+        for dep in deps_to_check:
+            try:
+                process = subprocess.Popen(
+                    [venv_python, "-c", f"import {dep}"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    startupinfo=startupinfo
+                )
+                stdout, stderr = process.communicate(timeout=10)
+                if process.returncode != 0:
+                    all_ok = False
+                    break
+            except Exception:
+                all_ok = False
+                break
+        
+        return all_ok
+    
     def _verify_dependencies(self, venv_python):
         """验证关键依赖是否安装"""
         self._log("[信息] 验证关键依赖...")
@@ -2352,6 +2380,94 @@ class MainWindow(QMainWindow):
             self._log("✓ 关键依赖验证通过")
         else:
             self._log("[警告] 部分关键依赖缺失", "#FF9800")
+    
+    def _quick_verify_environment(self):
+        """快速验证环境 - 只做检查不做安装"""
+        self._log("========================================")
+        self._log("开始快速环境验证...")
+        self._log("=======================================")
+        
+        try:
+            # 1. 检查 PowerShell
+            self._log("1. 检查 PowerShell...")
+            try:
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                process = subprocess.Popen(
+                    ["powershell.exe", "-Version"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    startupinfo=startupinfo
+                )
+                stdout, stderr = process.communicate(timeout=5)
+                if process.returncode == 0:
+                    version = stdout.strip() if stdout.strip() else "PowerShell"
+                    self._log(f"✓ PowerShell 已安装: {version}")
+            except:
+                pass
+            
+            # 2. 检查 Node.js
+            self._log("2. 检查 Node.js...")
+            try:
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                process = subprocess.Popen(
+                    ["node.exe", "--version"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    startupinfo=startupinfo
+                )
+                stdout, stderr = process.communicate(timeout=5)
+                if process.returncode == 0 and stdout.strip():
+                    self._log(f"✓ Node.js 已安装: {stdout.strip()}")
+            except:
+                pass
+            
+            # 3. 检查 uv
+            self._log("3. 检查 uv...")
+            uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+            if os.path.exists(uv_path):
+                self._log("✓ uv 已安装")
+            
+            # 4. 检查虚拟环境
+            self._log("4. 检查虚拟环境...")
+            scripts_dir = os.path.join(self.base_dir, "scripts")
+            venv_path = os.path.join(scripts_dir, ".venv")
+            if os.path.exists(venv_path):
+                self._log("✓ 虚拟环境已存在")
+            
+            # 5. 验证关键依赖
+            self._log("5. 验证关键依赖...")
+            venv_python = os.path.join(scripts_dir, ".venv", "Scripts", "python.exe")
+            self._verify_dependencies(venv_python)
+            
+            # 6. 检查 git 子模块
+            self._log("6. 检查 git 子模块...")
+            ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
+            if os.path.exists(ace_step_ui_path):
+                git_dir = os.path.join(ace_step_ui_path, ".git")
+                if os.path.exists(git_dir):
+                    self._log("✓ ace-step-ui git 子模块已初始化")
+                else:
+                    node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+                    if os.path.exists(node_modules_path):
+                        self._log("✓ ace-step-ui node_modules 已存在")
+            
+            # 7. 检查前端依赖
+            self._log("7. 检查前端依赖...")
+            ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
+            package_json_path = os.path.join(ace_step_ui_path, "package.json")
+            if os.path.exists(package_json_path):
+                node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+                if os.path.exists(node_modules_path):
+                    self._log("✓ 前端依赖已安装")
+            
+            self._log("✓ 快速环境验证完成")
+            
+        except Exception as e:
+            self._log(f"[警告] 快速验证过程中出错: {e}", "#FF9800")
     
     def _smart_fix_environment(self):
         """智能修复环境 - 自动检测并修复所有环境问题"""
@@ -2627,13 +2743,21 @@ class MainWindow(QMainWindow):
                 self._log("✓ 虚拟环境已存在")
             
             # 5. 安装项目依赖
-            self._log("5. 安装项目依赖...")
+            self._log("5. 检查项目依赖...")
             try:
                 venv_python = os.path.join(scripts_dir, ".venv", "Scripts", "python.exe")
                 pyproject_toml_path = os.path.join(scripts_dir, "pyproject.toml")
                 install_env_ps1 = os.path.join(scripts_dir, "install-env.ps1")
                 
-                if os.path.exists(pyproject_toml_path):
+                # 先快速验证关键依赖是否已安装
+                all_deps_ok = self._quick_check_dependencies(venv_python)
+                
+                if all_deps_ok:
+                    self._log("✓ 关键依赖已完整安装，跳过依赖安装步骤")
+                elif os.path.exists(pyproject_toml_path):
+                    # 关键依赖缺失，需要安装
+                    self._log("[信息] 检测到依赖缺失，开始安装...")
+                    
                     # 方案1: 尝试使用 uv sync
                     self._log("[信息] 方案1: 使用 uv sync 安装完整依赖...")
                     self._log("[信息] 这可能需要较长时间，请耐心等待...")
@@ -3416,9 +3540,14 @@ try {
                     self._log("[建议] 请确保 scripts/install-env.ps1 脚本存在", "#FF9800")
                     return
             
-            # 无论环境是否已安装，都执行智能修复（安装前端依赖等）
-            self._log("5. 执行智能修复（安装前端依赖等）...")
-            self._smart_fix_environment()
+            # 如果环境已完全安装，跳过智能修复的依赖安装步骤，只做快速检查
+            if environment_installed:
+                self._log("5. 环境已完全安装，执行快速验证...")
+                self._quick_verify_environment()
+            else:
+                # 环境未完全安装，执行完整智能修复
+                self._log("5. 执行智能修复（安装前端依赖等）...")
+                self._smart_fix_environment()
             
             # 6. 最终检查
             self._log("6. 最终检查...")
