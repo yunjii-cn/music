@@ -515,19 +515,36 @@ class ModelVerifyThread(QThread):
                 valid_components = 0
                 total_components = 0
                 
+                # 安全检查details是否是字典
+                if not isinstance(details, dict):
+                    self.log_received.emit("[模型验证] ⚠️ 验证结果格式异常")
+                    self.log_received.emit(f"[模型验证] {message}")
+                    self.verify_finished.emit(success, self.model_name)
+                    return
+                
                 for component, comp_details in details.items():
                     if component in ["model_name", "files_found", "files_missing", "size_ok", "total_size", "expected_size"]:
                         continue
                     
+                    # 安全检查comp_details
+                    if not isinstance(comp_details, dict):
+                        continue
+                    
                     total_components += 1
-                    comp_success = "✓" if comp_details.get("size_ok", True) and len(comp_details.get("files_missing", [])) == 0 else "✗"
+                    
+                    # 安全获取属性
+                    comp_details_safe = comp_details if isinstance(comp_details, dict) else {}
+                    size_ok = comp_details_safe.get("size_ok", True)
+                    files_missing_list = comp_details_safe.get("files_missing", [])
+                    comp_success = "✓" if size_ok and len(files_missing_list) == 0 else "✗"
+                    
                     if comp_success == "✓":
                         valid_components += 1
                     
-                    comp_size = comp_details.get("total_size", 0) / 1e6
-                    expected_size = comp_details.get("expected_size", 0) / 1e6
-                    files_found = len(comp_details.get("files_found", []))
-                    files_missing = len(comp_details.get("files_missing", []))
+                    comp_size = comp_details_safe.get("total_size", 0) / 1e6
+                    expected_size = comp_details_safe.get("expected_size", 0) / 1e6
+                    files_found = len(comp_details_safe.get("files_found", []))
+                    files_missing = len(files_missing_list)
                     
                     self.log_received.emit(f"[模型验证]   {comp_success} {component}:")
                     self.log_received.emit(f"[模型验证]     状态: {'验证通过' if comp_success == '✓' else '验证失败'}")
@@ -538,13 +555,15 @@ class ModelVerifyThread(QThread):
                     
                     # 显示找到的文件清单
                     if files_found > 0:
-                        found_files = comp_details.get("files_found", [])
-                        self.log_received.emit(f"[模型验证]     找到文件: {', '.join(found_files)}")
+                        found_files = comp_details_safe.get("files_found", [])
+                        if found_files:
+                            self.log_received.emit(f"[模型验证]     找到文件: {', '.join(found_files)}")
                     
                     if files_missing > 0:
-                        missing_files = comp_details.get("files_missing", [])
-                        self.log_received.emit(f"[模型验证]     缺失文件: {', '.join(missing_files)}")
-                    total_size += comp_details.get("total_size", 0)
+                        missing_files = files_missing_list
+                        if missing_files:
+                            self.log_received.emit(f"[模型验证]     缺失文件: {', '.join(missing_files)}")
+                    total_size += comp_details_safe.get("total_size", 0)
                 
                 self.log_received.emit("[模型验证] 验证总结：")
                 self.log_received.emit(f"[模型验证]   总组件数: {total_components}")
@@ -553,6 +572,10 @@ class ModelVerifyThread(QThread):
                 self.log_received.emit(f"[模型验证]   总大小: {total_size/1e6:.2f}MB")
             else:
                 # 单个模型验证报告
+                # 安全检查details是否是字典
+                if not isinstance(details, dict):
+                    details = {}
+                
                 files_found = len(details.get('files_found', []))
                 files_missing = len(details.get('files_missing', []))
                 
@@ -565,11 +588,13 @@ class ModelVerifyThread(QThread):
                 # 显示找到的文件清单
                 if files_found > 0:
                     found_files = details.get('files_found', [])
-                    self.log_received.emit(f"[模型验证]   找到文件: {', '.join(found_files)}")
+                    if found_files:
+                        self.log_received.emit(f"[模型验证]   找到文件: {', '.join(found_files)}")
                 
                 if files_missing > 0:
                     missing_files = details.get('files_missing', [])
-                    self.log_received.emit(f"[模型验证]   缺失文件: {', '.join(missing_files)}")
+                    if missing_files:
+                        self.log_received.emit(f"[模型验证]   缺失文件: {', '.join(missing_files)}")
             
             self.log_received.emit(f"[模型验证] {message}")
             self.verify_finished.emit(success, self.model_name)
@@ -579,7 +604,11 @@ class ModelVerifyThread(QThread):
             error_detail = traceback.format_exc()
             self.log_received.emit(f"❌ 验证模型时出错: {str(e)}")
             self.log_received.emit(f"错误详情: {error_detail}")
-            self.verify_finished.emit(False, str(e))
+            # 确保即使出错也发送完成信号
+            try:
+                self.verify_finished.emit(False, str(e))
+            except:
+                pass
 
 
 class CollapsiblePanel(QWidget):
@@ -1195,24 +1224,21 @@ class MainWindow(QMainWindow):
         nav_bar_layout.setSpacing(15)
         nav_bar_layout.setContentsMargins(15, 12, 15, 12)
         
-        # 菜单栏按钮样式 - 蓝色未激活，红色激活，圆角边框
+        # 菜单栏按钮样式 - 蓝色未激活，红色激活，更简约的设计
         menu_button_style = """
             QPushButton {
                 background-color: #1565C0;
                 color: white;
-                border: 2px solid #1976D2;
-                border-radius: 8px;
-                padding: 14px 28px;
-                font-size: 14px;
+                border: 1px solid #1976D2;
+                border-radius: 4px;
+                padding: 10px 20px;
+                font-size: 13px;
                 font-weight: bold;
                 font-family: 'Microsoft YaHei', sans-serif;
-                transition: all 0.3s ease;
             }
             QPushButton:hover {
                 background-color: #1976D2;
                 border-color: #1976D2;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
             }
             QPushButton:pressed {
                 background-color: #0D47A1;
@@ -1226,7 +1252,6 @@ class MainWindow(QMainWindow):
             QPushButton:checked:hover {
                 background-color: #B71C1C;
                 border-color: #B71C1C;
-                box-shadow: 0 4px 8px rgba(198, 40, 40, 0.3);
             }
         """
         
@@ -1240,23 +1265,23 @@ class MainWindow(QMainWindow):
         self.btn_home.clicked.connect(lambda: self._switch_page(0))
         nav_bar_layout.addWidget(self.btn_home)
         
-        # 模型管理按钮
-        self.btn_model_nav = QPushButton("📦 模型管理")
-        self.btn_model_nav.setCheckable(True)
-        self.btn_model_nav.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_model_nav.setStyleSheet(menu_button_style)
-        self.btn_model_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_model_nav.clicked.connect(lambda: self._switch_page(1))
-        nav_bar_layout.addWidget(self.btn_model_nav)
-        
         # 软件更新按钮
         self.btn_version_nav = QPushButton("🔄 软件更新")
         self.btn_version_nav.setCheckable(True)
         self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_version_nav.setStyleSheet(menu_button_style)
         self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
+        self.btn_version_nav.clicked.connect(lambda: self._switch_page(1))
         nav_bar_layout.addWidget(self.btn_version_nav)
+        
+        # 模型管理按钮
+        self.btn_model_nav = QPushButton("📦 模型管理")
+        self.btn_model_nav.setCheckable(True)
+        self.btn_model_nav.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_model_nav.setStyleSheet(menu_button_style)
+        self.btn_model_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_model_nav.clicked.connect(lambda: self._switch_page(2))
+        nav_bar_layout.addWidget(self.btn_model_nav)
         
         main_layout.addWidget(nav_bar)
         
@@ -3881,8 +3906,8 @@ try {
             "display_name": "Main Model",
             "repo": "ACE-Step/Ace-Step1.5",
             "category": "main",
-            "description": "包含：VAE、Qwen3-Embedding-0.6B、acestep-v15-turbo、acestep-5Hz-lm-1.7B",
-            "info": "完整的基础模型包，包含所有必需组件，适合初次使用",
+            "description": "完整基础模型包",
+            "info": "包含VAE、Qwen3-Embedding-0.6B、acestep-v15-turbo、acestep-5Hz-lm-1.7B等核心组件。适合初次使用的用户，提供一站式完整解决方案。",
             "exists": self._check_main_model_exists()
         })
         
@@ -3891,12 +3916,12 @@ try {
             "acestep-5Hz-lm-0.6B": {
                 "repo": "ACE-Step/acestep-5Hz-lm-0.6B",
                 "description": "轻量级语言模型",
-                "info": "0.6B参数，速度快，适合资源有限的环境"
+                "info": "0.6B参数的语言模型，速度极快，资源占用低，适合快速原型开发和资源有限的环境。"
             },
             "acestep-5Hz-lm-4B": {
                 "repo": "ACE-Step/acestep-5Hz-lm-4B",
                 "description": "大型语言模型",
-                "info": "4B参数，质量更高，生成效果更好"
+                "info": "4B参数的语言模型，生成质量更高，能理解更复杂的音乐结构和风格，适合专业音乐创作。"
             }
         }
         
@@ -3916,27 +3941,27 @@ try {
             "acestep-v15-base": {
                 "repo": "ACE-Step/acestep-v15-base",
                 "description": "基础DiT模型",
-                "info": "v1.5版本的基础模型，平衡质量和速度"
+                "info": "v1.5版本的基础模型，适合从零开始创作，能生成风格多样的音乐，是最灵活的选择。"
             },
             "acestep-v15-sft": {
                 "repo": "ACE-Step/acestep-v15-sft",
                 "description": "监督微调模型",
-                "info": "经过监督微调，生成更加稳定可控"
+                "info": "经过监督微调的模型，更适合风格延续和参考创作，旋律还原度较高，生成更加稳定可控。"
             },
             "acestep-v15-turbo-shift1": {
                 "repo": "ACE-Step/acestep-v15-turbo-shift1",
                 "description": "Turbo加速模型 (Shift 1)",
-                "info": "Turbo系列，Shift 1采样，生成速度快"
+                "info": "Turbo系列，Shift 1采样，生成速度快，质量也不错，适合快速迭代和测试想法。"
             },
             "acestep-v15-turbo-shift3": {
                 "repo": "ACE-Step/acestep-v15-turbo-shift3",
                 "description": "Turbo加速模型 (Shift 3)",
-                "info": "Turbo系列，Shift 3采样，平衡质量和速度"
+                "info": "Turbo系列，Shift 3采样，平衡质量和速度，质量更好的快速模型，推荐用于正式创作。"
             },
             "acestep-v15-turbo-continuous": {
                 "repo": "ACE-Step/acestep-v15-turbo-continuous",
                 "description": "Turbo连续生成模型",
-                "info": "支持连续生成，适合长音频创作"
+                "info": "支持连续生成，适合长音频创作，稳定性极佳，能生成连贯的完整音乐作品。"
             }
         }
         

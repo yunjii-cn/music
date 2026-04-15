@@ -283,22 +283,24 @@ class HybridVersionManagerDialog(QDialog):
             dev_dir = Path(self.base_dir).parent
             ver_dir = dev_dir / "ver" if dev_dir.exists() else None
             
-            # 从版本历史中获取所有版本
-            all_versions = []
+            # 使用字典来存储所有版本，避免重复
+            version_dict = {}
+            
+            # 首先从版本历史中获取所有版本
             for version_name in self.version_history:
                 match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', version_name)
                 if match:
                     version = match.group(1)
-                    all_versions.append({
+                    version_dict[version] = {
                         'version': version,
                         'name': version_name,
                         'available': False,
                         'path': None,
                         'size': None,
                         'date': None
-                    })
+                    }
             
-            # 检查ver文件夹中哪些版本可用
+            # 检查ver文件夹中哪些版本可用，并添加所有找到的exe
             if ver_dir and ver_dir.exists():
                 for exe_file in ver_dir.glob("*.exe"):
                     match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
@@ -307,15 +309,23 @@ class HybridVersionManagerDialog(QDialog):
                         file_size = exe_file.stat().st_size / (1024 * 1024)
                         mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
                         
-                        # 更新版本信息
-                        for v in all_versions:
-                            if v['version'] == version:
-                                v['available'] = True
-                                v['path'] = str(exe_file)
-                                v['size'] = f"{file_size:.2f} MB"
-                                v['date'] = mtime.strftime("%Y-%m-%d %H:%M")
-                                v['name'] = exe_file.name
-                                break
+                        # 更新或添加版本信息
+                        if version in version_dict:
+                            version_dict[version]['available'] = True
+                            version_dict[version]['path'] = str(exe_file)
+                            version_dict[version]['size'] = f"{file_size:.2f} MB"
+                            version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
+                            version_dict[version]['name'] = exe_file.name
+                        else:
+                            # 如果不在版本历史中，添加新条目
+                            version_dict[version] = {
+                                'version': version,
+                                'name': exe_file.name,
+                                'available': True,
+                                'path': str(exe_file),
+                                'size': f"{file_size:.2f} MB",
+                                'date': mtime.strftime("%Y-%m-%d %H:%M")
+                            }
             
             # 检查当前目录的exe（兼容开发模式）
             if Path(self.base_dir).exists():
@@ -327,20 +337,31 @@ class HybridVersionManagerDialog(QDialog):
                         mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
                         
                         # 更新版本信息（如果还没有）
-                        for v in all_versions:
-                            if v['version'] == version and not v['available']:
-                                v['available'] = True
-                                v['path'] = str(exe_file)
-                                v['size'] = f"{file_size:.2f} MB"
-                                v['date'] = mtime.strftime("%Y-%m-%d %H:%M")
-                                v['name'] = exe_file.name
-                                break
+                        if version in version_dict and not version_dict[version]['available']:
+                            version_dict[version]['available'] = True
+                            version_dict[version]['path'] = str(exe_file)
+                            version_dict[version]['size'] = f"{file_size:.2f} MB"
+                            version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
+                            version_dict[version]['name'] = exe_file.name
+                        elif version not in version_dict:
+                            # 如果不在版本历史中，添加新条目
+                            version_dict[version] = {
+                                'version': version,
+                                'name': exe_file.name,
+                                'available': True,
+                                'path': str(exe_file),
+                                'size': f"{file_size:.2f} MB",
+                                'date': mtime.strftime("%Y-%m-%d %H:%M")
+                            }
             
-            # 按版本号排序
+            # 转换为列表并按版本号排序
+            all_versions = list(version_dict.values())
             all_versions.sort(key=lambda x: x['version'], reverse=True)
             return all_versions
         except Exception as e:
             print(f"获取EXE版本列表失败：{e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def _get_current_git_version(self):
@@ -1049,14 +1070,14 @@ class ModelManagerDialog(QDialog):
     def _setup_ui(self):
         """设置UI"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(8)
+        layout.setContentsMargins(12, 12, 12, 12)
         
         # 顶部标题栏
         top_bar = QHBoxLayout()
         
         title_label = QLabel("模型管理器")
-        title_label.setFont(QFont("Microsoft YaHei", 16, QFont.Weight.Bold))
+        title_label.setFont(QFont("Microsoft YaHei", 14, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #FFFFFF;")
         top_bar.addWidget(title_label)
         
@@ -1235,42 +1256,40 @@ class ModelManagerDialog(QDialog):
             if not cat_info["models"]:
                 continue
             
-            # 分类标题
+            # 分类标题 - 更简约的设计
             cat_header = QFrame()
             cat_header.setStyleSheet("""
                 QFrame {
-                    background-color: #2A2A2A;
-                    border-radius: 4px;
-                    border: 1px solid #444444;
-                    padding: 6px 10px;
+                    background-color: #252525;
+                    border: none;
+                    border-radius: 3px;
+                    padding: 5px 8px;
                 }
             """)
             cat_layout = QHBoxLayout(cat_header)
-            cat_layout.setContentsMargins(8, 5, 8, 5)
+            cat_layout.setContentsMargins(6, 4, 6, 4)
             
             cat_label = QLabel(cat_info["name"])
-            cat_label.setStyleSheet("font-weight: bold; color: #E53935; font-size: 13px;")
+            cat_label.setStyleSheet("font-weight: bold; color: #E53935; font-size: 12px;")
             cat_layout.addWidget(cat_label)
             cat_layout.addStretch()
             
             self.models_layout.addWidget(cat_header)
             
-            # 模型表格
+            # 模型表格 - 更简约的设计
             for idx, model in enumerate(cat_info["models"]):
                 model_item = QFrame()
                 is_last = idx == len(cat_info["models"]) - 1
-                if is_last:
-                    border_style = "border-radius: 0 0 4px 4px;"
-                else:
-                    border_style = "border-radius: 0px;"
-                model_item.setStyleSheet(f"""
-                    QFrame {{
+                model_item.setStyleSheet("""
+                    QFrame {
                         background-color: #1E1E1E;
-                        {border_style}
-                        border: 1px solid #333333;
-                        border-top: none;
-                        padding: 8px 10px;
-                    }}
+                        border: none;
+                        border-bottom: 1px solid #2A2A2A;
+                        padding: 6px 8px;
+                    }
+                    QFrame:last {
+                        border-bottom: none;
+                    }
                 """)
                 
                 model_item_layout = QVBoxLayout(model_item)
