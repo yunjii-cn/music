@@ -100,6 +100,9 @@ dev/app/huggingface/
 dev/app/logs/
 dev/app/nodejs/
 dev/app/tools/
+dev/app/build/
+dev/app/dist/
+dev/app/*.spec
 
 # build目录 - 版本历史，不提交到Git
 build/

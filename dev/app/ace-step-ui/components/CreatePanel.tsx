@@ -232,9 +232,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
-    if (fetchedModels.length > 0) {
-      return fetchedModels.map(m => ({ id: m.name, name: m.name }));
-    }
+    // 总是显示所有模型，不依赖后端返回
     return [
       { id: 'acestep-v15-base', name: 'acestep-v15-base' },
       { id: 'acestep-v15-sft', name: 'acestep-v15-sft' },
@@ -243,7 +241,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       { id: 'acestep-v15-turbo-shift3', name: 'acestep-v15-turbo-shift3' },
       { id: 'acestep-v15-turbo-continuous', name: 'acestep-v15-turbo-continuous' },
     ];
-  }, [fetchedModels]);
+  }, []);
 
   // Map model ID to short display name
   const getModelDisplayName = (modelId: string): string => {
@@ -1133,7 +1131,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <div className="max-h-96 overflow-y-auto custom-scrollbar">
                     {availableModels.map(model => {
                       const fetchedModel = fetchedModels.find(m => m.name === model.id);
-                      const isAvailable = fetchedModel?.is_preloaded ?? false;
+                      const isAvailable = fetchedModel?.is_installed ?? false;
                       
                       const descriptions: Record<string, string> = {
                         'acestep-v15-base': '基础模型，适合从零开始创作，生成风格多样的音乐。',

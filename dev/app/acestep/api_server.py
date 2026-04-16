@@ -3229,16 +3229,25 @@ def create_app() -> FastAPI:
             if model3_name in installed:
                 preloaded.add(model3_name)
 
-        models = []
-        # Only include models that are actually installed
-        candidate_names = {name for name in installed if name}
+        # All possible models (even if not installed)
+        all_model_names = [
+            "acestep-v15-base",
+            "acestep-v15-sft", 
+            "acestep-v15-turbo",
+            "acestep-v15-turbo-shift1",
+            "acestep-v15-turbo-shift3",
+            "acestep-v15-turbo-continuous"
+        ]
 
-        for name in sorted(candidate_names):
+        models = []
+        for name in all_model_names:
+            is_installed = name in installed
             is_active = name == current_model
             models.append({
                 "name": name,
                 "is_active": is_active,
                 "is_preloaded": name in preloaded or is_active,
+                "is_installed": is_installed,
                 # Backward-compatible alias for older clients.
                 "is_default": is_active,
             })

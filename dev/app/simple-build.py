@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-简化的EXE构建脚本 - 直接在dev/app目录下构建
+简化的EXE构建脚本 - 直接输出到dev目录
 支持自动Git提交和推送
 """
 import os
@@ -20,7 +20,7 @@ if sys.platform == "win32":
 
 VERSION = datetime.now().strftime("%Y.%m.%d.%H%M")
 ROOT_DIR = Path(__file__).resolve().parent
-DIST_DIR = ROOT_DIR / "dist"
+DEV_DIR = ROOT_DIR.parent
 PROJECT_ROOT = ROOT_DIR.parent.parent
 VERSION_HISTORY_FILE = ROOT_DIR / "version_history.json"
 
@@ -109,23 +109,12 @@ def git_commit_and_push(commit_message):
         return False
 
 
-def clean_build():
-    """清理构建目录"""
-    print("清理构建目录...")
-    build_dirs = [ROOT_DIR / "build", ROOT_DIR / "dist"]
-    for dir_path in build_dirs:
-        if dir_path.exists():
-            try:
-                shutil.rmtree(dir_path)
-                print(f"  已删除：{dir_path.name}")
-            except Exception as e:
-                print(f"  跳过 {dir_path.name}：{e}")
-
-
 def build_exe():
-    """构建EXE"""
+    """构建EXE - 直接输出到dev目录"""
     print(f"构建 EXE (v{VERSION})...")
     os.chdir(ROOT_DIR)
+    
+    exe_name = f"云集智能音乐创意台-v{VERSION}.exe"
     
     # 构建PyInstaller参数
     pyinstaller_args = [
@@ -133,6 +122,8 @@ def build_exe():
         "--name", f"云集智能音乐创意台-v{VERSION}",
         "--onefile", "--windowed",
         "--clean", "--noconfirm",
+        "--distpath", str(DEV_DIR),
+        "--workpath", str(ROOT_DIR / "build"),
         "--hidden-import", "PyQt6",
         "--hidden-import", "PyQt6.QtCore",
         "--hidden-import", "PyQt6.QtGui",
@@ -164,6 +155,8 @@ def build_exe():
     
     print("  运行 PyInstaller...")
     subprocess.run(pyinstaller_args, check=True)
+    
+    return DEV_DIR / exe_name
 
 
 def main():
@@ -206,16 +199,9 @@ def main():
         print()
     
     try:
-        # 1. 清理构建目录
-        clean_build()
+        # 1. 构建EXE（直接输出到dev目录）
+        exe_path = build_exe()
         print()
-        
-        # 2. 构建EXE
-        build_exe()
-        print()
-        
-        exe_name = f"云集智能音乐创意台-v{VERSION}.exe"
-        exe_path = DIST_DIR / exe_name
         
         if not exe_path.exists():
             print("未找到生成的EXE文件")
@@ -229,26 +215,19 @@ def main():
         print("=" * 60)
         print()
         
-        # 3. 移动EXE到dev目录
-        dev_dir = ROOT_DIR.parent
-        dev_exe_path = dev_dir / exe_name
-        ver_dir = dev_dir / "ver"
-        ver_exe_path = ver_dir / exe_name
-        
-        print("复制EXE到dev目录...")
-        shutil.copy2(exe_path, dev_exe_path)
-        print(f"  ✓ 已复制到：{dev_exe_path}")
-        
-        print("复制EXE到ver目录...")
+        # 2. 复制一份到ver目录（作为稳定版本备份）
+        ver_dir = DEV_DIR / "ver"
+        ver_exe_path = ver_dir / exe_path.name
+        print(f"复制到ver目录作为稳定版本...")
         ver_dir.mkdir(exist_ok=True)
         shutil.copy2(exe_path, ver_exe_path)
         print(f"  ✓ 已复制到：{ver_exe_path}")
         print()
         
-        # 4. 更新version_history.json
+        # 3. 更新version_history.json
         print("更新版本历史...")
         version_history = load_version_history()
-        version_name = f"云集智能音乐创意台-v{VERSION}"
+        version_name = exe_path.stem
         version_history[version_name] = {
             "version": version_name,
             "changes": changes,
@@ -259,13 +238,14 @@ def main():
         print("  ✓ 版本历史已更新")
         print()
         
-        # 5. Git提交和推送
+        # 4. Git提交和推送
         commit_message = f"feat: 发布版本 v{VERSION}\n\n" + "\n".join([f"- {change}" for change in changes])
         git_commit_and_push(commit_message)
         print()
         
         print("=" * 60)
         print("  全部完成！")
+        print("  提示：临时构建文件在 dev/app/build/，可手动清理")
         print("=" * 60)
         
     except subprocess.CalledProcessError as e:
