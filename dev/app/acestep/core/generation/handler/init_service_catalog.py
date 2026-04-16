@@ -35,18 +35,20 @@ class InitServiceCatalogMixin:
         # Try multiple possible checkpoint directory locations
         possible_checkpoint_dirs = []
         
-        # Get project root directory
-        def _get_project_root() -> str:
+        # Get app directory (not project root)
+        def _get_app_dir() -> str:
             # Get the directory of the current file
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            # Go up 5 levels to reach the project root
-            project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..', '..', '..'))
-            return project_root
+            # Go up 4 levels to reach the app directory
+            app_dir = os.path.abspath(os.path.join(current_dir, '..', '..', '..', '..'))
+            return app_dir
         
-        project_root = _get_project_root()
+        app_dir = _get_app_dir()
         
-        # Add possible checkpoint directory locations
-        possible_checkpoint_dirs.append(os.path.join(project_root, "checkpoints"))
+        # Add possible checkpoint directory locations (models directory first, then checkpoints)
+        possible_checkpoint_dirs.append(os.path.join(app_dir, "models"))
+        possible_checkpoint_dirs.append(os.path.join(os.getcwd(), "models"))
+        possible_checkpoint_dirs.append(os.path.join(app_dir, "checkpoints"))
         possible_checkpoint_dirs.append(os.path.join(os.getcwd(), "checkpoints"))
         
         print(f"[DEBUG] Possible checkpoint directories: {possible_checkpoint_dirs}")

@@ -404,8 +404,15 @@ def get_checkpoints_dir(custom_dir: Optional[str] = None) -> Path:
         from shared.config_manager import config_manager
         return Path(config_manager.get_checkpoints_dir())
     except ImportError:
-        # Fallback to local calculation
-        return Path(__file__).resolve().parent.parent / "checkpoints"
+        # Fallback to local calculation, try models first, then checkpoints
+        project_root = Path(__file__).resolve().parent.parent
+        models_dir = project_root / "models"
+        checkpoints_dir = project_root / "checkpoints"
+        
+        # Prefer models directory if it exists
+        if models_dir.exists():
+            return models_dir
+        return checkpoints_dir
 
 
 def check_main_model_exists(checkpoints_dir: Optional[Path] = None) -> bool:

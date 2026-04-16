@@ -1147,6 +1147,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                         <button
                           key={model.id}
                           onClick={() => {
+                            if (!isAvailable) return;
                             setSelectedModel(model.id);
                             localStorage.setItem('ace-model', model.id);
                             // Auto-adjust parameters for non-turbo models
@@ -1156,8 +1157,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                             }
                             setShowModelMenu(false);
                           }}
-                          className={`w-full px-4 py-3 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-b-0 ${
+                          className={`w-full px-4 py-3 text-left transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-b-0 ${
                             selectedModel === model.id ? 'bg-zinc-50 dark:bg-zinc-800/50' : ''
+                          } ${
+                            isAvailable 
+                              ? 'hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer' 
+                              : 'opacity-50 cursor-not-allowed'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
