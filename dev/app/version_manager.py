@@ -57,6 +57,7 @@ class HybridVersionManagerDialog(QDialog):
         possible_paths = [
             Path(self.base_dir) / 'version_history.json',
             Path(self.base_dir) / 'dist' / 'version_history.json',
+            Path(self.base_dir).parent / 'app' / 'version_history.json',
         ]
         
         for history_path in possible_paths:
@@ -282,6 +283,7 @@ class HybridVersionManagerDialog(QDialog):
             version_dir = Path(self.base_dir) / "ver"
             dev_dir = Path(self.base_dir).parent
             ver_dir = dev_dir / "ver" if dev_dir.exists() else None
+            app_ver_dir = Path(self.base_dir) / "ver"  # app目录下的ver
             
             # 使用字典来存储所有版本，避免重复
             version_dict = {}
@@ -300,32 +302,33 @@ class HybridVersionManagerDialog(QDialog):
                         'date': None
                     }
             
-            # 检查ver文件夹中哪些版本可用，并添加所有找到的exe
-            if ver_dir and ver_dir.exists():
-                for exe_file in ver_dir.glob("*.exe"):
-                    match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
-                    if match:
-                        version = match.group(1)
-                        file_size = exe_file.stat().st_size / (1024 * 1024)
-                        mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
-                        
-                        # 更新或添加版本信息
-                        if version in version_dict:
-                            version_dict[version]['available'] = True
-                            version_dict[version]['path'] = str(exe_file)
-                            version_dict[version]['size'] = f"{file_size:.2f} MB"
-                            version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
-                            version_dict[version]['name'] = exe_file.name
-                        else:
-                            # 如果不在版本历史中，添加新条目
-                            version_dict[version] = {
-                                'version': version,
-                                'name': exe_file.name,
-                                'available': True,
-                                'path': str(exe_file),
-                                'size': f"{file_size:.2f} MB",
-                                'date': mtime.strftime("%Y-%m-%d %H:%M")
-                            }
+            # 检查多个可能的ver文件夹
+            for ver_folder in [ver_dir, app_ver_dir, version_dir]:
+                if ver_folder and ver_folder.exists():
+                    for exe_file in ver_folder.glob("*.exe"):
+                        match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
+                        if match:
+                            version = match.group(1)
+                            file_size = exe_file.stat().st_size / (1024 * 1024)
+                            mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
+                            
+                            # 更新或添加版本信息
+                            if version in version_dict:
+                                version_dict[version]['available'] = True
+                                version_dict[version]['path'] = str(exe_file)
+                                version_dict[version]['size'] = f"{file_size:.2f} MB"
+                                version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
+                                version_dict[version]['name'] = exe_file.name
+                            else:
+                                # 如果不在版本历史中，添加新条目
+                                version_dict[version] = {
+                                    'version': version,
+                                    'name': exe_file.name,
+                                    'available': True,
+                                    'path': str(exe_file),
+                                    'size': f"{file_size:.2f} MB",
+                                    'date': mtime.strftime("%Y-%m-%d %H:%M")
+                                }
             
             # 检查当前目录的exe（兼容开发模式）
             if Path(self.base_dir).exists():

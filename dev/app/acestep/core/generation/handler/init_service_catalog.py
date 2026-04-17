@@ -26,17 +26,42 @@ class InitServiceCatalogMixin:
             return [str(checkpoint_dir)]
         return []
 
-    def get_available_acestep_v15_models(self) -> List[str]:
+    def get_available_acestep_v15_models(self) -&gt; List[str]:
         """Scan and return all model directory names that are valid ACE-Step DiT models."""
         import sys
         from pathlib import Path
         
-        # 统一使用model_downloader.py的逻辑
+        # 直接计算模型目录 - 最可靠的方法
         try:
-            from acestep.model_downloader import get_checkpoints_dir, check_model_exists
-            
-            checkpoints_dir = get_checkpoints_dir()
-            logger.info(f"[ModelScan] Using checkpoints_dir: {checkpoints_dir}")
+            # 方法1: 使用model_downloader.py
+            try:
+                from acestep.model_downloader import get_checkpoints_dir, check_model_exists
+                
+                checkpoints_dir = get_checkpoints_dir()
+                logger.info(f"[ModelScan] Method 1 - Using checkpoints_dir: {checkpoints_dir}")
+            except Exception as e1:
+                logger.warning(f"[ModelScan] Method 1 failed: {e1}")
+                # 方法2: 直接从__file__计算
+                current_file = Path(__file__).resolve()
+                # acestep/core/generation/handler/init_service_catalog.py
+                # 向上4级到app目录
+                app_dir = current_file.parent.parent.parent.parent
+                checkpoints_dir = app_dir / "models"
+                if not checkpoints_dir.exists():
+                    checkpoints_dir = app_dir / "checkpoints"
+                logger.info(f"[ModelScan] Method 2 - Using checkpoints_dir: {checkpoints_dir}")
+                
+                # 简化版的check_model_exists
+                def simple_check_model_exists(mname, cdir):
+                    mpath = cdir / mname
+                    if not mpath.exists() or not mpath.is_dir():
+                        return False
+                    try:
+                        return len(list(mpath.iterdir())) &gt; 0
+                    except:
+                        return False
+                
+                check_model_exists = simple_check_model_exists
             
             # 列出所有可用模型，但只返回DiT模型
             exclude_models = ["Qwen3-Embedding-0.6B", "acestep-5Hz-lm-0.6B", "acestep-5Hz-lm-1.7B", "acestep-5Hz-lm-4B", "vae"]

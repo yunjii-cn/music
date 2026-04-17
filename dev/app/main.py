@@ -4237,31 +4237,53 @@ try {
             self._set_model_buttons_enabled(True)
     
     def _verify_all_models(self):
-        """一键验证所有模型安装"""
-        if self.is_deleting or self.is_downloading or self.is_verifying:
-            self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
-            return
-        
-        self.is_verifying = True
-        
-        # 禁用验证按钮
-        self.btn_verify_all.setEnabled(False)
-        
-        # 启动验证线程
-        self.model_verify_thread = ModelVerifyThread(
-            "main",
-            self.base_dir
-        )
-        
-        # 连接信号
-        self.model_verify_thread.log_received.connect(self._log)
-        self.model_verify_thread.verify_finished.connect(self._on_verify_all_finished)
-        
-        # 禁用所有模型按钮
-        self._set_model_buttons_enabled(False)
-        
-        # 启动验证线程
-        self.model_verify_thread.start()
+        """一键验证所有模型安装 - 最简版，不使用线程避免闪退"""
+        try:
+            if self.is_deleting or self.is_downloading or self.is_verifying:
+                self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
+                return
+            
+            self.is_verifying = True
+            
+            # 禁用验证按钮
+            if hasattr(self, 'btn_verify_all'):
+                self.btn_verify_all.setEnabled(False)
+            
+            # 禁用所有模型按钮
+            self._set_model_buttons_enabled(False)
+            
+            self._log("🔍 开始验证模型...", "#2196F3")
+            
+            # 直接重新加载模型列表（会自动检查所有模型状态）
+            self.model_list = []
+            self._load_model_list()
+            
+            # 更新UI
+            self._update_model_management_ui()
+            
+            self._log("✅ 验证完成！模型状态已更新", "#4CAF50")
+            
+            # 重置状态
+            self.is_verifying = False
+            if hasattr(self, 'btn_verify_all'):
+                self.btn_verify_all.setEnabled(True)
+            self._set_model_buttons_enabled(True)
+            
+        except Exception as e:
+            import traceback
+            try:
+                self._log(f"❌ 验证出错: {str(e)}", "#F44336")
+                self._log(f"错误详情: {traceback.format_exc()}", "#F44336")
+            except:
+                pass
+            # 即使出错也要确保状态重置
+            self.is_verifying = False
+            try:
+                if hasattr(self, 'btn_verify_all'):
+                    self.btn_verify_all.setEnabled(True)
+                self._set_model_buttons_enabled(True)
+            except:
+                pass
     
     def _on_verify_all_finished(self, success: bool, model_name: str):
         """验证完成回调 - 增强版，更新模型状态"""
