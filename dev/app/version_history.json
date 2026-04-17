@@ -179,5 +179,16 @@
     ],
     "build_time": "2026-04-18T06:28:25.082352",
     "version_number": "2026.04.18.0627"
+  },
+  "云集智能音乐创意台-v2026.04.18.0641": {
+    "version": "云集智能音乐创意台-v2026.04.18.0641",
+    "changes": [
+      "修复版本列表不显示问题",
+      "1.修复datetime.fromtimestamp错误，改为datetime.datetime.fromtimestamp",
+      "2.修复构建脚本，让build和spec文件在项目根目录",
+      "3.清理app目录下不该有的文件夹"
+    ],
+    "build_time": "2026-04-18T06:42:53.610336",
+    "version_number": "2026.04.18.0641"
   }
 }

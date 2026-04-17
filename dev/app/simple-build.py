@@ -123,7 +123,8 @@ def build_exe():
         "--onefile", "--windowed",
         "--clean", "--noconfirm",
         "--distpath", str(DEV_DIR),
-        "--workpath", str(ROOT_DIR / "build"),
+        "--workpath", str(PROJECT_ROOT / "build"),
+        "--specpath", str(PROJECT_ROOT),
         "--hidden-import", "PyQt6",
         "--hidden-import", "PyQt6.QtCore",
         "--hidden-import", "PyQt6.QtGui",
@@ -145,10 +146,10 @@ def build_exe():
     icon_path = ROOT_DIR / "icon.ico"
     if icon_path.exists():
         pyinstaller_args.append("--icon")
-        pyinstaller_args.append("icon.ico")
+        pyinstaller_args.append(str(icon_path))
         pyinstaller_args.append("--add-data")
-        pyinstaller_args.append("icon.ico;.")
-        print(f"  已添加图标: icon.ico")
+        pyinstaller_args.append(f"{str(icon_path)};.")
+        print(f"  已添加图标: {icon_path}")
     
     # 最后添加main.py
     pyinstaller_args.append("main.py")
@@ -245,7 +246,7 @@ def main():
         
         print("=" * 60)
         print("  全部完成！")
-        print("  提示：临时构建文件在 dev/app/build/，可手动清理")
+        print("  提示：临时构建文件在 项目根目录/build/，可手动清理")
         print("=" * 60)
         
     except subprocess.CalledProcessError as e:

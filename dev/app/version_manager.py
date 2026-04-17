@@ -347,7 +347,7 @@ class HybridVersionManagerDialog(QDialog):
                         if match:
                             version = match.group(1)
                             file_size = exe_file.stat().st_size / (1024 * 1024)
-                            mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
+                            mtime = datetime.datetime.fromtimestamp(exe_file.stat().st_mtime)
                             
                             # 更新版本信息
                             for v in all_versions:
