@@ -499,6 +499,13 @@ class HybridVersionManagerDialog(QDialog):
         versions = self._get_available_exe_versions()
         print(f"[DEBUG] 找到 {len(versions)} 个可用版本")
         
+        # 测试：先添加一个简单的标签
+        test_label = QLabel("✅ 测试标签：_load_exe_versions 正常执行")
+        test_label.setStyleSheet("color: #4CAF50; font-size: 14px; font-weight: bold; padding: 10px;")
+        test_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.versions_layout.addWidget(test_label)
+        print(f"[DEBUG] 测试标签已添加，versions_layout.count(): {self.versions_layout.count()}")
+        
         if not versions:
             print("[DEBUG] 没有找到版本，显示无版本提示")
             no_version_label = QLabel("未找到EXE版本文件")

@@ -1698,9 +1698,13 @@ class MainWindow(QMainWindow):
         if index == 1 and hasattr(self, 'model_manager_widget'):
             self.model_manager_widget._update_ui()
         
-        # 如果切换到软件更新页面，刷新版本列表
+        # 如果切换到软件更新页面，刷新版本列表并强制更新UI
         if index == 2 and hasattr(self, 'version_manager_widget'):
+            print("[DEBUG] 切换到软件更新页面，调用_load_versions")
             self.version_manager_widget._load_versions()
+            # 强制更新UI
+            self.version_manager_widget.update()
+            self.version_manager_widget.repaint()
     
     def _setup_monitor(self):
         """设置监控"""
