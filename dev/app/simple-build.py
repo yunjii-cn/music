@@ -124,7 +124,7 @@ def build_exe():
         "--clean", "--noconfirm",
         "--distpath", str(DEV_DIR),
         "--workpath", str(PROJECT_ROOT / "build"),
-        "--specpath", str(PROJECT_ROOT),
+        "--specpath", str(PROJECT_ROOT / "build"),
         "--hidden-import", "PyQt6",
         "--hidden-import", "PyQt6.QtCore",
         "--hidden-import", "PyQt6.QtGui",

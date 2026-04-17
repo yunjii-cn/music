@@ -7,7 +7,7 @@ import subprocess
 import sys
 import os
 import re
-import datetime
+from datetime import datetime
 import json
 from pathlib import Path
 from PyQt6.QtWidgets import (
@@ -53,42 +53,21 @@ class HybridVersionManagerDialog(QDialog):
         """加载版本历史"""
         self.version_history = {}
         
-        print(f"[DEBUG] _load_version_history - base_dir: {self.base_dir}")
-        print(f"[DEBUG] is_exe_mode: {self.is_exe_mode}")
-        
-        # 计算正确的dev目录
-        base_path = Path(self.base_dir)
-        dev_dir = base_path.parent if base_path.name == "app" else base_path
-        
         # 尝试从多个位置加载版本历史
         possible_paths = [
-            dev_dir / 'app' / 'version_history.json',
-            dev_dir / 'version_history.json',
-            base_path / 'version_history.json',
-            base_path / 'dist' / 'version_history.json',
+            Path(self.base_dir) / 'version_history.json',
+            Path(self.base_dir) / 'dist' / 'version_history.json',
         ]
-        
-        # 如果是EXE模式，额外检查EXE所在目录和父目录
-        if self.is_exe_mode and hasattr(sys, 'frozen'):
-            exe_dir = Path(sys.executable).parent
-            possible_paths.insert(0, exe_dir / 'version_history.json')
-            possible_paths.insert(1, exe_dir / 'app' / 'version_history.json')
-            if exe_dir.parent:
-                possible_paths.insert(2, exe_dir.parent / 'app' / 'version_history.json')
-        
-        print(f"[DEBUG] 可能的version_history.json路径: {possible_paths}")
         
         for history_path in possible_paths:
             if history_path.exists():
                 try:
                     with open(history_path, 'r', encoding='utf-8') as f:
                         self.version_history = json.load(f)
-                    print(f"[DEBUG] 加载版本历史：{history_path}")
-                    print(f"[DEBUG] 版本历史包含 {len(self.version_history)} 个版本")
+                    print(f"加载版本历史：{history_path}")
                     break
                 except Exception as e:
-                    print(f"[DEBUG] 加载版本历史失败：{e}")
-                    continue
+                    print(f"加载版本历史失败：{e}")
     
     def _get_version_changes(self, version_name):
         """获取版本的修改内容"""
@@ -299,69 +278,58 @@ class HybridVersionManagerDialog(QDialog):
     
     def _get_available_exe_versions(self):
         """获取可用EXE版本列表（检查ver文件夹）"""
-        print(f"[DEBUG] _get_available_exe_versions - base_dir: {self.base_dir}")
-        print(f"[DEBUG] is_exe_mode: {self.is_exe_mode}")
         try:
-            # 计算正确的dev目录和ver目录
-            base_path = Path(self.base_dir)
-            dev_dir = base_path.parent if base_path.name == "app" else base_path
-            version_dir = dev_dir / "ver"
-            print(f"[DEBUG] 计算的路径: base_path={base_path}, dev_dir={dev_dir}, version_dir={version_dir}")
+            version_dir = Path(self.base_dir) / "ver"
+            dev_dir = Path(self.base_dir).parent
+            ver_dir = dev_dir / "ver" if dev_dir.exists() else None
             
-            # 如果是EXE模式，额外检查EXE所在目录的ver文件夹
-            exe_ver_dir = None
-            if self.is_exe_mode and hasattr(sys, 'frozen'):
-                exe_dir = Path(sys.executable).parent
-                exe_ver_dir = exe_dir / "ver"
-                if exe_ver_dir.exists():
-                    version_dir = exe_ver_dir
-                    print(f"[DEBUG] 使用EXE所在的ver目录: {version_dir}")
-                elif exe_dir.parent and (exe_dir.parent / "ver").exists():
-                    version_dir = exe_dir.parent / "ver"
-                    print(f"[DEBUG] 使用EXE父目录的ver目录: {version_dir}")
+            # 使用字典来存储所有版本，避免重复
+            version_dict = {}
             
-            # 从版本历史中获取所有版本
-            all_versions = []
+            # 首先从版本历史中获取所有版本
             for version_name in self.version_history:
                 match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', version_name)
                 if match:
                     version = match.group(1)
-                    all_versions.append({
+                    version_dict[version] = {
                         'version': version,
                         'name': version_name,
                         'available': False,
                         'path': None,
                         'size': None,
                         'date': None
-                    })
+                    }
             
-            print(f"[DEBUG] 从version_history获取了 {len(all_versions)} 个版本")
+            # 检查ver文件夹中哪些版本可用，并添加所有找到的exe
+            if ver_dir and ver_dir.exists():
+                for exe_file in ver_dir.glob("*.exe"):
+                    match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
+                    if match:
+                        version = match.group(1)
+                        file_size = exe_file.stat().st_size / (1024 * 1024)
+                        mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
+                        
+                        # 更新或添加版本信息
+                        if version in version_dict:
+                            version_dict[version]['available'] = True
+                            version_dict[version]['path'] = str(exe_file)
+                            version_dict[version]['size'] = f"{file_size:.2f} MB"
+                            version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
+                            version_dict[version]['name'] = exe_file.name
+                        else:
+                            # 如果不在版本历史中，添加新条目
+                            version_dict[version] = {
+                                'version': version,
+                                'name': exe_file.name,
+                                'available': True,
+                                'path': str(exe_file),
+                                'size': f"{file_size:.2f} MB",
+                                'date': mtime.strftime("%Y-%m-%d %H:%M")
+                            }
             
-            # 检查多个可能的ver文件夹中哪些版本可用
-            for check_ver_dir in [version_dir, exe_ver_dir]:
-                if check_ver_dir and check_ver_dir.exists():
-                    print(f"[DEBUG] 检查目录: {check_ver_dir}")
-                    for exe_file in check_ver_dir.glob("*.exe"):
-                        print(f"[DEBUG] 找到EXE文件: {exe_file}")
-                        match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
-                        if match:
-                            version = match.group(1)
-                            file_size = exe_file.stat().st_size / (1024 * 1024)
-                            mtime = datetime.datetime.fromtimestamp(exe_file.stat().st_mtime)
-                            
-                            # 更新版本信息
-                            for v in all_versions:
-                                if v['version'] == version:
-                                    v['available'] = True
-                                    v['path'] = str(exe_file)
-                                    v['size'] = f"{file_size:.2f} MB"
-                                    v['date'] = mtime.strftime("%Y-%m-%d %H:%M")
-                                    v['name'] = exe_file.name
-                                    break
-            
-            # 检查dev目录的exe（兼容开发模式）
-            if dev_dir.exists():
-                for exe_file in dev_dir.glob("*.exe"):
+            # 检查当前目录的exe（兼容开发模式）
+            if Path(self.base_dir).exists():
+                for exe_file in Path(self.base_dir).glob("*.exe"):
                     match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                     if match:
                         version = match.group(1)
@@ -369,23 +337,29 @@ class HybridVersionManagerDialog(QDialog):
                         mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
                         
                         # 更新版本信息（如果还没有）
-                        for v in all_versions:
-                            if v['version'] == version and not v['available']:
-                                v['available'] = True
-                                v['path'] = str(exe_file)
-                                v['size'] = f"{file_size:.2f} MB"
-                                v['date'] = mtime.strftime("%Y-%m-%d %H:%M")
-                                v['name'] = exe_file.name
-                                break
+                        if version in version_dict and not version_dict[version]['available']:
+                            version_dict[version]['available'] = True
+                            version_dict[version]['path'] = str(exe_file)
+                            version_dict[version]['size'] = f"{file_size:.2f} MB"
+                            version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
+                            version_dict[version]['name'] = exe_file.name
+                        elif version not in version_dict:
+                            # 如果不在版本历史中，添加新条目
+                            version_dict[version] = {
+                                'version': version,
+                                'name': exe_file.name,
+                                'available': True,
+                                'path': str(exe_file),
+                                'size': f"{file_size:.2f} MB",
+                                'date': mtime.strftime("%Y-%m-%d %H:%M")
+                            }
             
-            # 按版本号排序
+            # 转换为列表并按版本号排序
+            all_versions = list(version_dict.values())
             all_versions.sort(key=lambda x: x['version'], reverse=True)
-            print(f"[DEBUG] 最终版本列表: {len(all_versions)} 个版本")
-            for v in all_versions:
-                print(f"  [DEBUG] v{v['version']} - {v['name']} - available: {v['available']}")
             return all_versions
         except Exception as e:
-            print(f"[DEBUG] 获取EXE版本列表失败：{e}")
+            print(f"获取EXE版本列表失败：{e}")
             import traceback
             traceback.print_exc()
             return []
@@ -491,23 +465,19 @@ class HybridVersionManagerDialog(QDialog):
     
     def _load_exe_versions(self):
         """加载EXE版本列表"""
-        print("[DEBUG] _load_exe_versions 被调用")
         self.current_mode_label.setText("EXE 模式")
         
         current = self._get_current_exe_version()
-        print(f"[DEBUG] 当前EXE版本: {current}")
         if current:
             self.current_info_label.setText(
                 f"版本: v{current['version']} | 文件: {current['name']} | 大小: {current['size']}"
             )
         else:
-            self.current_info_label.setText("ℹ️ 开发模式 - 请运行打包后的EXE查看当前版本")
+            self.current_info_label.setText("⚠️ 无法获取当前版本信息")
         
         versions = self._get_available_exe_versions()
-        print(f"[DEBUG] 找到 {len(versions)} 个可用版本")
         
         if not versions:
-            print("[DEBUG] 没有找到版本，显示无版本提示")
             no_version_label = QLabel("未找到EXE版本文件")
             no_version_label.setStyleSheet("color: #666666; padding: 20px;")
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -516,12 +486,9 @@ class HybridVersionManagerDialog(QDialog):
         
         current_version = current['version'] if current else None
         
-        print(f"[DEBUG] 开始创建版本项，当前版本: {current_version}")
         for version in versions:
-            print(f"[DEBUG] 创建版本项: v{version['version']}")
             is_current = version['version'] == current_version
             self._create_exe_version_item(version, is_current)
-        print(f"[DEBUG] 版本项创建完成，versions_layout.count(): {self.versions_layout.count()}")
     
     def _create_exe_version_item(self, version, is_current):
         """创建EXE版本项"""
@@ -1088,8 +1055,6 @@ class ModelManagerDialog(QDialog):
         self.setWindowTitle("模型管理器")
         self.setMinimumSize(1000, 700)
         self.resize(1200, 800)
-        self.last_verify_time = None  # 最后验证时间
-        self.last_verify_result = None  # 最后验证结果
         
         if not as_widget:
             self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -1152,14 +1117,12 @@ class ModelManagerDialog(QDialog):
         for source_key, source_name in download_sources.items():
             self.download_source_combo.addItem(source_name, source_key)
         
-        # 设置当前选中的下载源 - 先断开信号避免触发
-        self.download_source_combo.blockSignals(True)
+        # 设置当前选中的下载源
         if hasattr(self.main_window, 'selected_download_source'):
             for i in range(self.download_source_combo.count()):
                 if self.download_source_combo.itemData(i) == self.main_window.selected_download_source:
                     self.download_source_combo.setCurrentIndex(i)
                     break
-        self.download_source_combo.blockSignals(False)
         
         self.download_source_combo.currentIndexChanged.connect(self._on_download_source_changed)
         top_bar.addWidget(self.download_source_combo)
@@ -1189,6 +1152,26 @@ class ModelManagerDialog(QDialog):
         self.btn_verify_all.clicked.connect(self._verify_all_models)
         top_bar.addWidget(self.btn_verify_all)
         
+        # 刷新按钮
+        refresh_btn = QPushButton("🔄 刷新")
+        refresh_btn.clicked.connect(self._update_ui)
+        refresh_btn.setMinimumWidth(80)
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2D2D2D;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                padding: 10px 20px;
+                font-size: 13px;
+                color: #F0F0F0;
+            }
+            QPushButton:hover {
+                background-color: #424242;
+                border-color: #E53935;
+            }
+        """)
+        top_bar.addWidget(refresh_btn)
+        
         if not self.as_widget:
             close_btn = QPushButton("✕ 关闭")
             close_btn.clicked.connect(self.accept)
@@ -1211,31 +1194,6 @@ class ModelManagerDialog(QDialog):
         
         layout.addLayout(top_bar)
         
-        # 验证结果显示区域
-        self.verify_info_frame = QFrame()
-        self.verify_info_frame.setStyleSheet("""
-            QFrame {
-                background-color: #1A1A1A;
-                border: 1px solid #333333;
-                border-radius: 4px;
-                padding: 8px;
-            }
-        """)
-        verify_info_layout = QHBoxLayout(self.verify_info_frame)
-        verify_info_layout.setContentsMargins(8, 4, 8, 4)
-        
-        self.verify_time_label = QLabel("⏱ 上次验证: 暂未验证")
-        self.verify_time_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
-        verify_info_layout.addWidget(self.verify_time_label)
-        
-        verify_info_layout.addStretch()
-        
-        self.verify_result_label = QLabel("")
-        self.verify_result_label.setStyleSheet("font-size: 11px;")
-        verify_info_layout.addWidget(self.verify_result_label)
-        
-        layout.addWidget(self.verify_info_frame)
-        
         # 模型列表滚动区域
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -1257,15 +1215,11 @@ class ModelManagerDialog(QDialog):
     
     def _on_download_source_changed(self, index):
         """下载源改变"""
-        try:
-            if self.main_window:
-                source_key = self.download_source_combo.itemData(index)
-                if source_key:
-                    self.main_window.selected_download_source = source_key
-                    if hasattr(self.main_window, 'config'):
-                        self.main_window.config.set("download.source", source_key)
-        except Exception as e:
-            pass
+        if self.main_window:
+            source_key = self.download_source_combo.itemData(index)
+            self.main_window.selected_download_source = source_key
+            if hasattr(self.main_window, '_on_download_source_changed'):
+                self.main_window._on_download_source_changed(index)
     
     def _verify_all_models(self):
         """验证所有模型"""
