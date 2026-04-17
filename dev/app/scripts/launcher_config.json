@@ -35,6 +35,6 @@
     "custom_path": ""
   },
   "download": {
-    "source": "huggingface-cn"
+    "source": "modelscope"
   }
 }

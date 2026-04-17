@@ -53,6 +53,9 @@ class HybridVersionManagerDialog(QDialog):
         """加载版本历史"""
         self.version_history = {}
         
+        print(f"[DEBUG] _load_version_history - base_dir: {self.base_dir}")
+        print(f"[DEBUG] is_exe_mode: {self.is_exe_mode}")
+        
         # 尝试从多个位置加载版本历史
         possible_paths = [
             Path(self.base_dir) / 'version_history.json',
@@ -60,15 +63,27 @@ class HybridVersionManagerDialog(QDialog):
             Path(self.base_dir).parent / 'app' / 'version_history.json',
         ]
         
+        # 如果是EXE模式，额外检查EXE所在目录和父目录
+        if self.is_exe_mode and hasattr(sys, 'frozen'):
+            exe_dir = Path(sys.executable).parent
+            possible_paths.insert(0, exe_dir / 'version_history.json')
+            possible_paths.insert(1, exe_dir / 'app' / 'version_history.json')
+            if exe_dir.parent:
+                possible_paths.insert(2, exe_dir.parent / 'app' / 'version_history.json')
+        
+        print(f"[DEBUG] 可能的version_history.json路径: {possible_paths}")
+        
         for history_path in possible_paths:
             if history_path.exists():
                 try:
                     with open(history_path, 'r', encoding='utf-8') as f:
                         self.version_history = json.load(f)
-                    print(f"加载版本历史：{history_path}")
+                    print(f"[DEBUG] 加载版本历史：{history_path}")
+                    print(f"[DEBUG] 版本历史包含 {len(self.version_history)} 个版本")
                     break
                 except Exception as e:
-                    print(f"加载版本历史失败：{e}")
+                    print(f"[DEBUG] 加载版本历史失败：{e}")
+                    continue
     
     def _get_version_changes(self, version_name):
         """获取版本的修改内容"""
@@ -279,11 +294,24 @@ class HybridVersionManagerDialog(QDialog):
     
     def _get_available_exe_versions(self):
         """获取可用EXE版本列表（检查ver文件夹）"""
+        print(f"[DEBUG] _get_available_exe_versions - base_dir: {self.base_dir}")
+        print(f"[DEBUG] is_exe_mode: {self.is_exe_mode}")
         try:
             version_dir = Path(self.base_dir) / "ver"
             dev_dir = Path(self.base_dir).parent
             ver_dir = dev_dir / "ver" if dev_dir.exists() else None
             app_ver_dir = Path(self.base_dir) / "ver"
+            
+            # 如果是EXE模式，额外检查EXE所在目录的ver文件夹
+            if self.is_exe_mode and hasattr(sys, 'frozen'):
+                exe_dir = Path(sys.executable).parent
+                exe_ver_dir = exe_dir / "ver"
+                if exe_ver_dir.exists():
+                    ver_dir = exe_ver_dir
+                elif exe_dir.parent and (exe_dir.parent / "ver").exists():
+                    ver_dir = exe_dir.parent / "ver"
+            
+            print(f"[DEBUG] 检查ver目录: ver_dir={ver_dir}, app_ver_dir={app_ver_dir}, version_dir={version_dir}")
             
             # 从版本历史中获取所有版本
             all_versions = []
@@ -300,10 +328,14 @@ class HybridVersionManagerDialog(QDialog):
                         'date': None
                     })
             
+            print(f"[DEBUG] 从version_history获取了 {len(all_versions)} 个版本")
+            
             # 检查多个可能的ver文件夹中哪些版本可用
             for check_ver_dir in [ver_dir, app_ver_dir, version_dir]:
                 if check_ver_dir and check_ver_dir.exists():
+                    print(f"[DEBUG] 检查目录: {check_ver_dir}")
                     for exe_file in check_ver_dir.glob("*.exe"):
+                        print(f"[DEBUG] 找到EXE文件: {exe_file}")
                         match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                         if match:
                             version = match.group(1)
@@ -341,9 +373,12 @@ class HybridVersionManagerDialog(QDialog):
             
             # 按版本号排序
             all_versions.sort(key=lambda x: x['version'], reverse=True)
+            print(f"[DEBUG] 最终版本列表: {len(all_versions)} 个版本")
+            for v in all_versions:
+                print(f"  [DEBUG] v{v['version']} - {v['name']} - available: {v['available']}")
             return all_versions
         except Exception as e:
-            print(f"获取EXE版本列表失败：{e}")
+            print(f"[DEBUG] 获取EXE版本列表失败：{e}")
             import traceback
             traceback.print_exc()
             return []

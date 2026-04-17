@@ -139,5 +139,15 @@
     ],
     "build_time": "2026-04-18T05:10:05.984364",
     "version_number": "2026.04.18.0509"
+  },
+  "云集智能音乐创意台-v2026.04.18.0523": {
+    "version": "云集智能音乐创意台-v2026.04.18.0523",
+    "changes": [
+      "添加EXE模式调试",
+      "1.在_load_version_history中添加EXE模式路径支持和调试打印",
+      "2.在_get_available_exe_versions中添加EXE模式路径支持和调试打印"
+    ],
+    "build_time": "2026-04-18T05:24:52.209991",
+    "version_number": "2026.04.18.0523"
   }
 }
