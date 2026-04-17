@@ -56,11 +56,16 @@ class HybridVersionManagerDialog(QDialog):
         print(f"[DEBUG] _load_version_history - base_dir: {self.base_dir}")
         print(f"[DEBUG] is_exe_mode: {self.is_exe_mode}")
         
+        # 计算正确的dev目录
+        base_path = Path(self.base_dir)
+        dev_dir = base_path.parent if base_path.name == "app" else base_path
+        
         # 尝试从多个位置加载版本历史
         possible_paths = [
-            Path(self.base_dir) / 'version_history.json',
-            Path(self.base_dir) / 'dist' / 'version_history.json',
-            Path(self.base_dir).parent / 'app' / 'version_history.json',
+            dev_dir / 'app' / 'version_history.json',
+            dev_dir / 'version_history.json',
+            base_path / 'version_history.json',
+            base_path / 'dist' / 'version_history.json',
         ]
         
         # 如果是EXE模式，额外检查EXE所在目录和父目录
@@ -297,21 +302,23 @@ class HybridVersionManagerDialog(QDialog):
         print(f"[DEBUG] _get_available_exe_versions - base_dir: {self.base_dir}")
         print(f"[DEBUG] is_exe_mode: {self.is_exe_mode}")
         try:
-            version_dir = Path(self.base_dir) / "ver"
-            dev_dir = Path(self.base_dir).parent
-            ver_dir = dev_dir / "ver" if dev_dir.exists() else None
-            app_ver_dir = Path(self.base_dir) / "ver"
+            # 计算正确的dev目录和ver目录
+            base_path = Path(self.base_dir)
+            dev_dir = base_path.parent if base_path.name == "app" else base_path
+            version_dir = dev_dir / "ver"
+            print(f"[DEBUG] 计算的路径: base_path={base_path}, dev_dir={dev_dir}, version_dir={version_dir}")
             
             # 如果是EXE模式，额外检查EXE所在目录的ver文件夹
+            exe_ver_dir = None
             if self.is_exe_mode and hasattr(sys, 'frozen'):
                 exe_dir = Path(sys.executable).parent
                 exe_ver_dir = exe_dir / "ver"
                 if exe_ver_dir.exists():
-                    ver_dir = exe_ver_dir
+                    version_dir = exe_ver_dir
+                    print(f"[DEBUG] 使用EXE所在的ver目录: {version_dir}")
                 elif exe_dir.parent and (exe_dir.parent / "ver").exists():
-                    ver_dir = exe_dir.parent / "ver"
-            
-            print(f"[DEBUG] 检查ver目录: ver_dir={ver_dir}, app_ver_dir={app_ver_dir}, version_dir={version_dir}")
+                    version_dir = exe_dir.parent / "ver"
+                    print(f"[DEBUG] 使用EXE父目录的ver目录: {version_dir}")
             
             # 从版本历史中获取所有版本
             all_versions = []
@@ -331,7 +338,7 @@ class HybridVersionManagerDialog(QDialog):
             print(f"[DEBUG] 从version_history获取了 {len(all_versions)} 个版本")
             
             # 检查多个可能的ver文件夹中哪些版本可用
-            for check_ver_dir in [ver_dir, app_ver_dir, version_dir]:
+            for check_ver_dir in [version_dir, exe_ver_dir]:
                 if check_ver_dir and check_ver_dir.exists():
                     print(f"[DEBUG] 检查目录: {check_ver_dir}")
                     for exe_file in check_ver_dir.glob("*.exe"):
@@ -352,9 +359,9 @@ class HybridVersionManagerDialog(QDialog):
                                     v['name'] = exe_file.name
                                     break
             
-            # 检查当前目录的exe（兼容开发模式）
-            if Path(self.base_dir).exists():
-                for exe_file in Path(self.base_dir).glob("*.exe"):
+            # 检查dev目录的exe（兼容开发模式）
+            if dev_dir.exists():
+                for exe_file in dev_dir.glob("*.exe"):
                     match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                     if match:
                         version = match.group(1)
@@ -498,54 +505,6 @@ class HybridVersionManagerDialog(QDialog):
         
         versions = self._get_available_exe_versions()
         print(f"[DEBUG] 找到 {len(versions)} 个可用版本")
-        
-        # 显示调试信息在UI上
-        debug_text = f"""
-📊 调试信息：
-• 版本历史数量: {len(self.version_history)}
-• 找到的版本数量: {len(versions)}
-• 当前目录: {self.base_dir}
-• is_exe_mode: {self.is_exe_mode}
-        """.strip()
-        debug_label = QLabel(debug_text)
-        debug_label.setStyleSheet("""
-            QLabel {
-                background-color: #2D2D2D;
-                color: #F0F0F0;
-                padding: 12px;
-                border-radius: 6px;
-                font-family: Consolas, monospace;
-                font-size: 11px;
-            }
-        """)
-        debug_label.setWordWrap(True)
-        self.versions_layout.addWidget(debug_label)
-        
-        # 测试：先添加一个简单的标签
-        test_label = QLabel("✅ 测试标签：_load_exe_versions 正常执行")
-        test_label.setStyleSheet("color: #4CAF50; font-size: 14px; font-weight: bold; padding: 10px;")
-        test_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.versions_layout.addWidget(test_label)
-        print(f"[DEBUG] 测试标签已添加，versions_layout.count(): {self.versions_layout.count()}")
-        
-        # 显示前5个版本的详情
-        if versions:
-            version_preview = "📦 前3个版本详情：\n"
-            for v in versions[:3]:
-                version_preview += f"  • v{v['version']} - {v['name']} - available={v['available']}\n"
-            preview_label = QLabel(version_preview)
-            preview_label.setStyleSheet("""
-                QLabel {
-                    background-color: #1A1A1A;
-                    color: #AAAAAA;
-                    padding: 10px;
-                    border-radius: 4px;
-                    font-family: Consolas, monospace;
-                    font-size: 10px;
-                }
-            """)
-            preview_label.setWordWrap(True)
-            self.versions_layout.addWidget(preview_label)
         
         if not versions:
             print("[DEBUG] 没有找到版本，显示无版本提示")
