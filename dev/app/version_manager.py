@@ -283,52 +283,42 @@ class HybridVersionManagerDialog(QDialog):
             version_dir = Path(self.base_dir) / "ver"
             dev_dir = Path(self.base_dir).parent
             ver_dir = dev_dir / "ver" if dev_dir.exists() else None
-            app_ver_dir = Path(self.base_dir) / "ver"  # app目录下的ver
+            app_ver_dir = Path(self.base_dir) / "ver"
             
-            # 使用字典来存储所有版本，避免重复
-            version_dict = {}
-            
-            # 首先从版本历史中获取所有版本
+            # 从版本历史中获取所有版本
+            all_versions = []
             for version_name in self.version_history:
                 match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', version_name)
                 if match:
                     version = match.group(1)
-                    version_dict[version] = {
+                    all_versions.append({
                         'version': version,
                         'name': version_name,
                         'available': False,
                         'path': None,
                         'size': None,
                         'date': None
-                    }
+                    })
             
-            # 检查多个可能的ver文件夹
-            for ver_folder in [ver_dir, app_ver_dir, version_dir]:
-                if ver_folder and ver_folder.exists():
-                    for exe_file in ver_folder.glob("*.exe"):
+            # 检查多个可能的ver文件夹中哪些版本可用
+            for check_ver_dir in [ver_dir, app_ver_dir, version_dir]:
+                if check_ver_dir and check_ver_dir.exists():
+                    for exe_file in check_ver_dir.glob("*.exe"):
                         match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                         if match:
                             version = match.group(1)
                             file_size = exe_file.stat().st_size / (1024 * 1024)
                             mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
                             
-                            # 更新或添加版本信息
-                            if version in version_dict:
-                                version_dict[version]['available'] = True
-                                version_dict[version]['path'] = str(exe_file)
-                                version_dict[version]['size'] = f"{file_size:.2f} MB"
-                                version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
-                                version_dict[version]['name'] = exe_file.name
-                            else:
-                                # 如果不在版本历史中，添加新条目
-                                version_dict[version] = {
-                                    'version': version,
-                                    'name': exe_file.name,
-                                    'available': True,
-                                    'path': str(exe_file),
-                                    'size': f"{file_size:.2f} MB",
-                                    'date': mtime.strftime("%Y-%m-%d %H:%M")
-                                }
+                            # 更新版本信息
+                            for v in all_versions:
+                                if v['version'] == version:
+                                    v['available'] = True
+                                    v['path'] = str(exe_file)
+                                    v['size'] = f"{file_size:.2f} MB"
+                                    v['date'] = mtime.strftime("%Y-%m-%d %H:%M")
+                                    v['name'] = exe_file.name
+                                    break
             
             # 检查当前目录的exe（兼容开发模式）
             if Path(self.base_dir).exists():
@@ -340,25 +330,16 @@ class HybridVersionManagerDialog(QDialog):
                         mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
                         
                         # 更新版本信息（如果还没有）
-                        if version in version_dict and not version_dict[version]['available']:
-                            version_dict[version]['available'] = True
-                            version_dict[version]['path'] = str(exe_file)
-                            version_dict[version]['size'] = f"{file_size:.2f} MB"
-                            version_dict[version]['date'] = mtime.strftime("%Y-%m-%d %H:%M")
-                            version_dict[version]['name'] = exe_file.name
-                        elif version not in version_dict:
-                            # 如果不在版本历史中，添加新条目
-                            version_dict[version] = {
-                                'version': version,
-                                'name': exe_file.name,
-                                'available': True,
-                                'path': str(exe_file),
-                                'size': f"{file_size:.2f} MB",
-                                'date': mtime.strftime("%Y-%m-%d %H:%M")
-                            }
+                        for v in all_versions:
+                            if v['version'] == version and not v['available']:
+                                v['available'] = True
+                                v['path'] = str(exe_file)
+                                v['size'] = f"{file_size:.2f} MB"
+                                v['date'] = mtime.strftime("%Y-%m-%d %H:%M")
+                                v['name'] = exe_file.name
+                                break
             
-            # 转换为列表并按版本号排序
-            all_versions = list(version_dict.values())
+            # 按版本号排序
             all_versions.sort(key=lambda x: x['version'], reverse=True)
             return all_versions
         except Exception as e:
