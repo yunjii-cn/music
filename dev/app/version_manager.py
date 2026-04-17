@@ -499,12 +499,53 @@ class HybridVersionManagerDialog(QDialog):
         versions = self._get_available_exe_versions()
         print(f"[DEBUG] 找到 {len(versions)} 个可用版本")
         
+        # 显示调试信息在UI上
+        debug_text = f"""
+📊 调试信息：
+• 版本历史数量: {len(self.version_history)}
+• 找到的版本数量: {len(versions)}
+• 当前目录: {self.base_dir}
+• is_exe_mode: {self.is_exe_mode}
+        """.strip()
+        debug_label = QLabel(debug_text)
+        debug_label.setStyleSheet("""
+            QLabel {
+                background-color: #2D2D2D;
+                color: #F0F0F0;
+                padding: 12px;
+                border-radius: 6px;
+                font-family: Consolas, monospace;
+                font-size: 11px;
+            }
+        """)
+        debug_label.setWordWrap(True)
+        self.versions_layout.addWidget(debug_label)
+        
         # 测试：先添加一个简单的标签
         test_label = QLabel("✅ 测试标签：_load_exe_versions 正常执行")
         test_label.setStyleSheet("color: #4CAF50; font-size: 14px; font-weight: bold; padding: 10px;")
         test_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.versions_layout.addWidget(test_label)
         print(f"[DEBUG] 测试标签已添加，versions_layout.count(): {self.versions_layout.count()}")
+        
+        # 显示前5个版本的详情
+        if versions:
+            version_preview = "📦 前3个版本详情：\n"
+            for v in versions[:3]:
+                version_preview += f"  • v{v['version']} - {v['name']} - available={v['available']}\n"
+            preview_label = QLabel(version_preview)
+            preview_label.setStyleSheet("""
+                QLabel {
+                    background-color: #1A1A1A;
+                    color: #AAAAAA;
+                    padding: 10px;
+                    border-radius: 4px;
+                    font-family: Consolas, monospace;
+                    font-size: 10px;
+                }
+            """)
+            preview_label.setWordWrap(True)
+            self.versions_layout.addWidget(preview_label)
         
         if not versions:
             print("[DEBUG] 没有找到版本，显示无版本提示")
