@@ -476,7 +476,7 @@ class HybridVersionManagerDialog(QDialog):
                 f"版本: v{current['version']} | 文件: {current['name']} | 大小: {current['size']}"
             )
         else:
-            self.current_info_label.setText("⚠️ 无法获取当前版本信息")
+            self.current_info_label.setText("ℹ️ 开发模式 - 请运行打包后的EXE查看当前版本")
         
         versions = self._get_available_exe_versions()
         
@@ -1220,11 +1220,15 @@ class ModelManagerDialog(QDialog):
     
     def _on_download_source_changed(self, index):
         """下载源改变"""
-        if self.main_window:
-            source_key = self.download_source_combo.itemData(index)
-            self.main_window.selected_download_source = source_key
-            if hasattr(self.main_window, '_on_download_source_changed'):
-                self.main_window._on_download_source_changed(index)
+        try:
+            if self.main_window:
+                source_key = self.download_source_combo.itemData(index)
+                if source_key:
+                    self.main_window.selected_download_source = source_key
+                    if hasattr(self.main_window, 'config'):
+                        self.main_window.config.set("download.source", source_key)
+        except Exception as e:
+            pass
     
     def _verify_all_models(self):
         """验证所有模型"""
