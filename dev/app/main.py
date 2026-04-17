@@ -483,7 +483,7 @@ class ModelDeleteThread(QThread):
 
 
 class ModelVerifyThread(QThread):
-    """模型验证线程"""
+    """模型验证线程 - 增加更强健的异常处理"""
     log_received = pyqtSignal(str)
     verify_finished = pyqtSignal(bool, str)
     
@@ -493,54 +493,92 @@ class ModelVerifyThread(QThread):
         self.base_dir = base_dir
     
     def run(self):
-        """执行模型验证"""
+        """执行模型验证 - 增强异常处理"""
         try:
             self.log_received.emit(f"开始验证模型: {self.model_name}")
             
             # 直接调用verify_model函数获取详细结果
             import sys
             sys.path.insert(0, os.path.join(self.base_dir))
-            from acestep.model_downloader import verify_model, get_checkpoints_dir
             
-            checkpoints_dir = get_checkpoints_dir()
-            success, message, details = verify_model(self.model_name, checkpoints_dir)
+            try:
+                from acestep.model_downloader import verify_model, get_checkpoints_dir
+            except Exception as e:
+                self.log_received.emit(f"[模型验证] 导入模块失败: {e}")
+                self.verify_finished.emit(False, self.model_name)
+                return
             
-            # 生成详细的验证报告
-            self.log_received.emit(f"[模型验证] Verifying model: {self.model_name}")
-            self.log_received.emit("[模型验证] 详细分析报告：")
+            try:
+                checkpoints_dir = get_checkpoints_dir()
+                success, message, details = verify_model(self.model_name, checkpoints_dir)
+            except Exception as e:
+                self.log_received.emit(f"[模型验证] 执行验证失败: {e}")
+                import traceback
+                self.log_received.emit(f"错误详情: {traceback.format_exc()}")
+                self.verify_finished.emit(False, self.model_name)
+                return
             
-            if self.model_name == "main":
-                # 主模型验证报告
-                total_size = 0
-                valid_components = 0
-                total_components = 0
+            # 生成详细的验证报告 - 增强异常处理
+            try:
+                self.log_received.emit(f"[模型验证] Verifying model: {self.model_name}")
+                self.log_received.emit("[模型验证] 详细分析报告：")
                 
-                # 安全检查details是否是字典
-                if not isinstance(details, dict):
-                    self.log_received.emit("[模型验证] ⚠️ 验证结果格式异常")
-                    self.log_received.emit(f"[模型验证] {message}")
-                    self.verify_finished.emit(success, self.model_name)
-                    return
+                if self.model_name == "main":
+                    self._report_main_model(details)
+                else:
+                    self._report_single_model(details, success)
                 
-                for component, comp_details in details.items():
-                    if component in ["model_name", "files_found", "files_missing", "size_ok", "total_size", "expected_size"]:
-                        continue
-                    
-                    # 安全检查comp_details
-                    if not isinstance(comp_details, dict):
-                        continue
-                    
-                    total_components += 1
-                    
-                    # 安全获取属性
-                    comp_details_safe = comp_details if isinstance(comp_details, dict) else {}
-                    size_ok = comp_details_safe.get("size_ok", True)
-                    files_missing_list = comp_details_safe.get("files_missing", [])
-                    comp_success = "✓" if size_ok and len(files_missing_list) == 0 else "✗"
-                    
-                    if comp_success == "✓":
-                        valid_components += 1
-                    
+                self.log_received.emit(f"[模型验证] {message}")
+            except Exception as e:
+                self.log_received.emit(f"[模型验证] 生成报告时出错: {e}")
+                import traceback
+                self.log_received.emit(f"错误详情: {traceback.format_exc()}")
+                self.log_received.emit(f"[模型验证] 验证结果: {'成功' if success else '失败'}")
+            
+            self.verify_finished.emit(success, self.model_name)
+            
+        except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
+            try:
+                self.log_received.emit(f"❌ 验证模型时出错: {str(e)}")
+                self.log_received.emit(f"错误详情: {error_detail}")
+            except:
+                pass
+            try:
+                self.verify_finished.emit(False, str(e))
+            except:
+                pass
+    
+    def _report_main_model(self, details):
+        """主模型验证报告 - 增强异常处理"""
+        try:
+            total_size = 0
+            valid_components = 0
+            total_components = 0
+            
+            if not isinstance(details, dict):
+                self.log_received.emit("[模型验证] ⚠️ 验证结果格式异常")
+                return
+            
+            for component, comp_details in details.items():
+                if component in ["model_name", "files_found", "files_missing", "size_ok", "total_size", "expected_size"]:
+                    continue
+                
+                if not isinstance(comp_details, dict):
+                    continue
+                
+                total_components += 1
+                
+                comp_details_safe = comp_details if isinstance(comp_details, dict) else {}
+                size_ok = comp_details_safe.get("size_ok", True)
+                files_missing_list = comp_details_safe.get("files_missing", [])
+                comp_success = "✓" if size_ok and len(files_missing_list) == 0 else "✗"
+                
+                if comp_success == "✓":
+                    valid_components += 1
+                
+                try:
                     comp_size = comp_details_safe.get("total_size", 0) / 1e6
                     expected_size = comp_details_safe.get("expected_size", 0) / 1e6
                     files_found = len(comp_details_safe.get("files_found", []))
@@ -552,63 +590,41 @@ class ModelVerifyThread(QThread):
                     self.log_received.emit(f"[模型验证]     大小: {comp_size:.2f}MB")
                     if expected_size > 0:
                         self.log_received.emit(f"[模型验证]     期望: {expected_size:.2f}MB")
-                    
-                    # 显示找到的文件清单
-                    if files_found > 0:
-                        found_files = comp_details_safe.get("files_found", [])
-                        if found_files:
-                            self.log_received.emit(f"[模型验证]     找到文件: {', '.join(found_files)}")
-                    
-                    if files_missing > 0:
-                        missing_files = files_missing_list
-                        if missing_files:
-                            self.log_received.emit(f"[模型验证]     缺失文件: {', '.join(missing_files)}")
-                    total_size += comp_details_safe.get("total_size", 0)
+                except Exception as e:
+                    self.log_received.emit(f"[模型验证]   {comp_success} {component}: 报告生成错误 {e}")
                 
-                self.log_received.emit("[模型验证] 验证总结：")
-                self.log_received.emit(f"[模型验证]   总组件数: {total_components}")
-                self.log_received.emit(f"[模型验证]   验证通过: {valid_components}")
-                self.log_received.emit(f"[模型验证]   验证失败: {total_components - valid_components}")
+                total_size += comp_details_safe.get("total_size", 0)
+            
+            self.log_received.emit("[模型验证] 验证总结：")
+            self.log_received.emit(f"[模型验证]   总组件数: {total_components}")
+            self.log_received.emit(f"[模型验证]   验证通过: {valid_components}")
+            self.log_received.emit(f"[模型验证]   验证失败: {total_components - valid_components}")
+            try:
                 self.log_received.emit(f"[模型验证]   总大小: {total_size/1e6:.2f}MB")
-            else:
-                # 单个模型验证报告
-                # 安全检查details是否是字典
-                if not isinstance(details, dict):
-                    details = {}
-                
-                files_found = len(details.get('files_found', []))
-                files_missing = len(details.get('files_missing', []))
-                
-                self.log_received.emit(f"[模型验证]   状态: {'验证通过' if success else '验证失败'}")
-                self.log_received.emit(f"[模型验证]   文件: {files_found} 个找到, {files_missing} 个缺失")
+            except:
+                pass
+        except Exception as e:
+            self.log_received.emit(f"[模型验证] 生成主模型报告出错: {e}")
+    
+    def _report_single_model(self, details, success):
+        """单个模型验证报告 - 增强异常处理"""
+        try:
+            if not isinstance(details, dict):
+                details = {}
+            
+            files_found = len(details.get('files_found', []))
+            files_missing = len(details.get('files_missing', []))
+            
+            self.log_received.emit(f"[模型验证]   状态: {'验证通过' if success else '验证失败'}")
+            self.log_received.emit(f"[模型验证]   文件: {files_found} 个找到, {files_missing} 个缺失")
+            try:
                 self.log_received.emit(f"[模型验证]   大小: {details.get('total_size', 0)/1e6:.2f}MB")
                 if details.get('expected_size', 0) > 0:
                     self.log_received.emit(f"[模型验证]   期望: {details.get('expected_size', 0)/1e6:.2f}MB")
-                
-                # 显示找到的文件清单
-                if files_found > 0:
-                    found_files = details.get('files_found', [])
-                    if found_files:
-                        self.log_received.emit(f"[模型验证]   找到文件: {', '.join(found_files)}")
-                
-                if files_missing > 0:
-                    missing_files = details.get('files_missing', [])
-                    if missing_files:
-                        self.log_received.emit(f"[模型验证]   缺失文件: {', '.join(missing_files)}")
-            
-            self.log_received.emit(f"[模型验证] {message}")
-            self.verify_finished.emit(success, self.model_name)
-            
-        except Exception as e:
-            import traceback
-            error_detail = traceback.format_exc()
-            self.log_received.emit(f"❌ 验证模型时出错: {str(e)}")
-            self.log_received.emit(f"错误详情: {error_detail}")
-            # 确保即使出错也发送完成信号
-            try:
-                self.verify_finished.emit(False, str(e))
             except:
                 pass
+        except Exception as e:
+            self.log_received.emit(f"[模型验证] 生成单个模型报告出错: {e}")
 
 
 class CollapsiblePanel(QWidget):
@@ -4106,28 +4122,54 @@ try {
             })
     
     def _check_main_model_exists(self):
-        """检查主模型是否存在"""
-        checkpoints_dir = os.path.join(self.base_dir, "models")
-        components = ["acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B", "acestep-5Hz-lm-1.7B"]
-        for component in components:
-            component_path = os.path.join(checkpoints_dir, component)
-            if not os.path.exists(component_path):
+        """检查主模型是否存在 - 使用与model_downloader.py相同的逻辑"""
+        try:
+            import sys
+            sys.path.insert(0, self.base_dir)
+            from acestep.model_downloader import check_main_model_exists, get_checkpoints_dir
+            return check_main_model_exists(get_checkpoints_dir())
+        except Exception as e:
+            print(f"[check_main_model_exists] Error: {e}")
+            # Fallback: 简单检查
+            try:
+                checkpoints_dir = os.path.join(self.base_dir, "models")
+                if not os.path.exists(checkpoints_dir):
+                    checkpoints_dir = os.path.join(self.base_dir, "checkpoints")
+                components = ["acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B", "acestep-5Hz-lm-1.7B"]
+                for component in components:
+                    component_path = os.path.join(checkpoints_dir, component)
+                    if not os.path.exists(component_path):
+                        return False
+                    # 检查目录是否有文件
+                    if not os.listdir(component_path):
+                        return False
+                return True
+            except Exception:
                 return False
-            # 检查目录是否有文件
-            if not os.listdir(component_path):
-                return False
-        return True
     
     def _check_model_exists(self, model_name):
-        """检查模型是否存在"""
-        checkpoints_dir = os.path.join(self.base_dir, "models")
-        model_path = os.path.join(checkpoints_dir, model_name)
-        if not os.path.exists(model_path):
-            return False
-        # 检查目录是否有文件
-        if not os.listdir(model_path):
-            return False
-        return True
+        """检查模型是否存在 - 使用与model_downloader.py相同的逻辑"""
+        try:
+            import sys
+            sys.path.insert(0, self.base_dir)
+            from acestep.model_downloader import check_model_exists, get_checkpoints_dir
+            return check_model_exists(model_name, get_checkpoints_dir())
+        except Exception as e:
+            print(f"[check_model_exists] Error: {e}")
+            # Fallback: 简单检查
+            try:
+                checkpoints_dir = os.path.join(self.base_dir, "models")
+                if not os.path.exists(checkpoints_dir):
+                    checkpoints_dir = os.path.join(self.base_dir, "checkpoints")
+                model_path = os.path.join(checkpoints_dir, model_name)
+                if not os.path.exists(model_path):
+                    return False
+                # 检查目录是否有文件
+                if not os.listdir(model_path):
+                    return False
+                return True
+            except Exception:
+                return False
     
     def _download_model(self, model_name):
         """下载模型 - 使用异步线程避免UI阻塞"""

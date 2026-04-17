@@ -228,7 +228,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const previousModelRef = useRef<string>(selectedModel);
   
   // Available models fetched from backend
-  const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
+  const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean; is_installed: boolean }[]>([]);
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
@@ -508,7 +508,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       const modelsRes = await fetch('/api/generate/models');
       if (modelsRes.ok) {
         const data = await modelsRes.json();
+        console.log('[CreatePanel] API response:', data);
         const models = data.models || [];
+        console.log('[CreatePanel] models:', models);
         if (models.length > 0) {
           setFetchedModels(models);
           // Always sync to the backend's active model
@@ -519,8 +521,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           }
         }
       }
-    } catch {
-      // ignore - will use fallback model list
+    } catch (err) {
+      console.error('[CreatePanel] Error fetching models:', err);
     }
   }, []);
 
@@ -1132,6 +1134,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     {availableModels.map(model => {
                       const fetchedModel = fetchedModels.find(m => m.name === model.id);
                       const isAvailable = fetchedModel?.is_installed ?? false;
+                      console.log(`[CreatePanel] Model ${model.id}:`, { fetchedModel, isAvailable });
                       
                       const descriptions: Record<string, string> = {
                         'acestep-v15-base': '基础模型，适合从零开始创作，生成风格多样的音乐。',

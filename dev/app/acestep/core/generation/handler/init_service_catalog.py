@@ -28,80 +28,63 @@ class InitServiceCatalogMixin:
 
     def get_available_acestep_v15_models(self) -> List[str]:
         """Scan and return all model directory names that are valid ACE-Step DiT models."""
-        # Use root-level checkpoints directory for shared models
-        import os
         import sys
+        from pathlib import Path
         
-        # Try multiple possible checkpoint directory locations
-        possible_checkpoint_dirs = []
-        
-        # Get app directory (not project root)
-        def _get_app_dir() -> str:
-            # Get the directory of the current file
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # Go up 4 levels to reach the app directory
-            app_dir = os.path.abspath(os.path.join(current_dir, '..', '..', '..', '..'))
-            return app_dir
-        
-        app_dir = _get_app_dir()
-        
-        # Add possible checkpoint directory locations (models directory first, then checkpoints)
-        possible_checkpoint_dirs.append(os.path.join(app_dir, "models"))
-        possible_checkpoint_dirs.append(os.path.join(os.getcwd(), "models"))
-        possible_checkpoint_dirs.append(os.path.join(app_dir, "checkpoints"))
-        possible_checkpoint_dirs.append(os.path.join(os.getcwd(), "checkpoints"))
-        
-        print(f"[DEBUG] Possible checkpoint directories: {possible_checkpoint_dirs}")
-
-        models = []
-        checked_dirs = set()
-        
-        # Exclude non-DiT models
-        exclude_models = ["Qwen3-Embedding-0.6B", "acestep-5Hz-lm-0.6B", "acestep-5Hz-lm-1.7B", "acestep-5Hz-lm-4B", "vae"]
-        
-        for checkpoint_dir in possible_checkpoint_dirs:
-            if checkpoint_dir in checked_dirs:
-                continue
-            checked_dirs.add(checkpoint_dir)
+        # 统一使用model_downloader.py的逻辑
+        try:
+            from acestep.model_downloader import list_available_models, get_checkpoints_dir, check_model_exists
             
-            print(f"[DEBUG] Scanning for models in: {checkpoint_dir}")
+            checkpoints_dir = get_checkpoints_dir()
+            logger.info(f"[ModelScan] Using checkpoints_dir: {checkpoints_dir}")
             
-            if os.path.exists(checkpoint_dir):
-                print(f"[DEBUG] Checkpoint directory exists")
-                items = os.listdir(checkpoint_dir)
-                print(f"[DEBUG] Found items: {items}")
-                for item in items:
-                    # Skip excluded models
-                    if item in exclude_models:
-                        print(f"[DEBUG] Skipping excluded model: {item}")
-                        continue
+            # 列出所有可用模型，但只返回DiT模型
+            exclude_models = ["Qwen3-Embedding-0.6B", "acestep-5Hz-lm-0.6B", "acestep-5Hz-lm-1.7B", "acestep-5Hz-lm-4B", "vae"]
+            
+            models = []
+            
+            # 扫描checkpoints目录
+            if checkpoints_dir.exists():
+                logger.info(f"[ModelScan] Scanning: {checkpoints_dir}")
+                for item in checkpoints_dir.iterdir():
+                    if item.is_dir():
+                        model_name = item.name
+                        if model_name in exclude_models:
+                            logger.info(f"[ModelScan] Skipping excluded: {model_name}")
+                            continue
                         
-                    item_path = os.path.join(checkpoint_dir, item)
-                    if os.path.isdir(item_path):
-                        try:
-                            has_files = os.listdir(item_path)
-                            print(f"[DEBUG] Item {item} is a directory with files: {has_files}")
-                            if has_files:
-                                # Accept models with various naming patterns
-                                has_config = os.path.exists(os.path.join(item_path, "config.json"))
-                                print(f"[DEBUG] Item {item} has config.json: {has_config}")
-                                # Only accept DiT models (not LM models)
-                                if not item.endswith("-lm-0.6B") and not item.endswith("-lm-1.7B") and not item.endswith("-lm-4B"):
-                                    if (item.startswith("acestep-") or 
-                                        item.startswith("qinglong-") or 
-                                        has_config):
-                                        models.append(item)
-                                        print(f"[DEBUG] Added model: {item}")
-                        except Exception as e:
-                            print(f"[DEBUG] Error checking item {item}: {e}")
-            else:
-                print(f"[DEBUG] Checkpoint directory does not exist")
-
-        # Remove duplicates
-        models = list(set(models))
-        print(f"[DEBUG] Final models list: {models}")
-        models.sort()
-        return models
+                        # 检查是否是有效的模型目录（使用check_model_exists验证）
+                        if check_model_exists(model_name, checkpoints_dir):
+                            # 只添加DiT模型（排除LM模型）
+                            if not model_name.endswith("-lm-0.6B") and not model_name.endswith("-lm-1.7B") and not model_name.endswith("-lm-4B"):
+                                models.append(model_name)
+                                logger.info(f"[ModelScan] ✅ Added model: {model_name}")
+            
+            # 也尝试检查models目录（如果存在）
+            project_root = Path(__file__).resolve().parent.parent.parent
+            models_dir = project_root / "models"
+            if models_dir.exists() and models_dir != checkpoints_dir:
+                logger.info(f"[ModelScan] Also scanning models_dir: {models_dir}")
+                for item in models_dir.iterdir():
+                    if item.is_dir():
+                        model_name = item.name
+                        if model_name in exclude_models:
+                            continue
+                        if check_model_exists(model_name, models_dir):
+                            if not model_name.endswith("-lm-0.6B") and not model_name.endswith("-lm-1.7B") and not model_name.endswith("-lm-4B"):
+                                if model_name not in models:
+                                    models.append(model_name)
+                                    logger.info(f"[ModelScan] ✅ Added model from models_dir: {model_name}")
+            
+            models.sort()
+            logger.info(f"[ModelScan] Final models list: {models}")
+            return models
+            
+        except Exception as e:
+            logger.error(f"[ModelScan] Error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
 
     def is_flash_attention_available(self, device: Optional[str] = None) -> bool:
         """Check whether flash attention can be used on the target device."""
