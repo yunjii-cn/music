@@ -33,7 +33,7 @@ class InitServiceCatalogMixin:
         
         # 统一使用model_downloader.py的逻辑
         try:
-            from acestep.model_downloader import list_available_models, get_checkpoints_dir, check_model_exists
+            from acestep.model_downloader import get_checkpoints_dir, check_model_exists
             
             checkpoints_dir = get_checkpoints_dir()
             logger.info(f"[ModelScan] Using checkpoints_dir: {checkpoints_dir}")
@@ -49,32 +49,18 @@ class InitServiceCatalogMixin:
                 for item in checkpoints_dir.iterdir():
                     if item.is_dir():
                         model_name = item.name
-                        if model_name in exclude_models:
+                        if model_name in exclude_models or model_name.startswith('.'):
                             logger.info(f"[ModelScan] Skipping excluded: {model_name}")
                             continue
                         
-                        # 检查是否是有效的模型目录（使用check_model_exists验证）
-                        if check_model_exists(model_name, checkpoints_dir):
-                            # 只添加DiT模型（排除LM模型）
-                            if not model_name.endswith("-lm-0.6B") and not model_name.endswith("-lm-1.7B") and not model_name.endswith("-lm-4B"):
+                        # 只添加DiT模型（排除LM模型）
+                        if not model_name.endswith("-lm-0.6B") and not model_name.endswith("-lm-1.7B") and not model_name.endswith("-lm-4B"):
+                            # 检查是否是有效的模型目录
+                            if check_model_exists(model_name, checkpoints_dir):
                                 models.append(model_name)
                                 logger.info(f"[ModelScan] ✅ Added model: {model_name}")
-            
-            # 也尝试检查models目录（如果存在）
-            project_root = Path(__file__).resolve().parent.parent.parent
-            models_dir = project_root / "models"
-            if models_dir.exists() and models_dir != checkpoints_dir:
-                logger.info(f"[ModelScan] Also scanning models_dir: {models_dir}")
-                for item in models_dir.iterdir():
-                    if item.is_dir():
-                        model_name = item.name
-                        if model_name in exclude_models:
-                            continue
-                        if check_model_exists(model_name, models_dir):
-                            if not model_name.endswith("-lm-0.6B") and not model_name.endswith("-lm-1.7B") and not model_name.endswith("-lm-4B"):
-                                if model_name not in models:
-                                    models.append(model_name)
-                                    logger.info(f"[ModelScan] ✅ Added model from models_dir: {model_name}")
+                            else:
+                                logger.info(f"[ModelScan] Skipping invalid model: {model_name}")
             
             models.sort()
             logger.info(f"[ModelScan] Final models list: {models}")

@@ -483,7 +483,7 @@ class ModelDeleteThread(QThread):
 
 
 class ModelVerifyThread(QThread):
-    """简单安全的模型验证线程"""
+    """最简单安全的模型验证线程 - 最小化操作"""
     log_received = pyqtSignal(str)
     verify_finished = pyqtSignal(bool, str)
     
@@ -493,93 +493,60 @@ class ModelVerifyThread(QThread):
         self.base_dir = base_dir
     
     def run(self):
-        """简单安全的验证方法"""
+        """最简单的验证方法 - 只检查目录存在"""
         try:
-            self.log_received.emit(f"开始验证模型: {self.model_name}")
-            
-            # 获取模型目录
+            # 1. 获取模型目录
             import sys
             sys.path.insert(0, os.path.join(self.base_dir))
             
             try:
                 from acestep.model_downloader import get_checkpoints_dir
             except Exception as e:
-                self.log_received.emit(f"[验证] 模块导入失败: {e}")
                 self.verify_finished.emit(False, self.model_name)
                 return
             
             try:
                 checkpoints_dir = get_checkpoints_dir()
-                self.log_received.emit(f"[验证] 模型目录: {checkpoints_dir}")
             except Exception as e:
-                self.log_received.emit(f"[验证] 获取目录失败: {e}")
                 self.verify_finished.emit(False, self.model_name)
                 return
             
-            # 简单验证：检查目录是否存在
+            # 2. 简单验证
             success = True
             
             if self.model_name == "main":
-                # 验证主模型的所有组件
+                # 验证主模型
                 components = ["acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B", "acestep-5Hz-lm-1.7B"]
-                valid_count = 0
-                
-                self.log_received.emit("[验证] 开始检查主模型组件...")
-                
                 for comp in components:
                     comp_path = os.path.join(str(checkpoints_dir), comp)
-                    
-                    if os.path.exists(comp_path) and os.path.isdir(comp_path):
-                        try:
-                            files = os.listdir(comp_path)
-                            if len(files) > 0:
-                                self.log_received.emit(f"[验证] ✓ {comp}: 找到 {len(files)} 个文件")
-                                valid_count += 1
-                            else:
-                                self.log_received.emit(f"[验证] ✗ {comp}: 目录为空")
-                                success = False
-                        except Exception as e:
-                            self.log_received.emit(f"[验证] ✗ {comp}: 检查失败 - {e}")
-                            success = False
-                    else:
-                        self.log_received.emit(f"[验证] ✗ {comp}: 目录不存在")
+                    if not os.path.exists(comp_path) or not os.path.isdir(comp_path):
                         success = False
-                
-                self.log_received.emit(f"[验证] 主模型检查完成: {valid_count}/{len(components)} 个组件可用")
+                        break
+                    try:
+                        files = os.listdir(comp_path)
+                        if len(files) == 0:
+                            success = False
+                            break
+                    except:
+                        success = False
+                        break
             else:
                 # 验证单个模型
                 model_path = os.path.join(str(checkpoints_dir), self.model_name)
-                
-                if os.path.exists(model_path) and os.path.isdir(model_path):
+                if not os.path.exists(model_path) or not os.path.isdir(model_path):
+                    success = False
+                else:
                     try:
                         files = os.listdir(model_path)
-                        if len(files) > 0:
-                            self.log_received.emit(f"[验证] ✓ {self.model_name}: 找到 {len(files)} 个文件")
-                        else:
-                            self.log_received.emit(f"[验证] ✗ {self.model_name}: 目录为空")
+                        if len(files) == 0:
                             success = False
-                    except Exception as e:
-                        self.log_received.emit(f"[验证] ✗ {self.model_name}: 检查失败 - {e}")
+                    except:
                         success = False
-                else:
-                    self.log_received.emit(f"[验证] ✗ {self.model_name}: 目录不存在")
-                    success = False
             
-            if success:
-                self.log_received.emit(f"[验证] ✓ 验证通过")
-            else:
-                self.log_received.emit(f"[验证] ✗ 验证失败")
-            
+            # 3. 完成
             self.verify_finished.emit(success, self.model_name)
             
         except Exception as e:
-            import traceback
-            error_detail = traceback.format_exc()
-            try:
-                self.log_received.emit(f"❌ 验证出错: {str(e)}")
-                self.log_received.emit(f"错误详情: {error_detail}")
-            except:
-                pass
             try:
                 self.verify_finished.emit(False, str(e))
             except:
@@ -4297,14 +4264,39 @@ try {
         self.model_verify_thread.start()
     
     def _on_verify_all_finished(self, success: bool, model_name: str):
-        """验证完成回调"""
-        self.is_verifying = False
-        
-        # 重新启用验证按钮
-        self.btn_verify_all.setEnabled(True)
-        
-        # 重新启用所有按钮
-        self._set_model_buttons_enabled(True)
+        """验证完成回调 - 增强版，更新模型状态"""
+        try:
+            self.is_verifying = False
+            
+            # 重新加载模型列表（更新exists状态）
+            self.model_list = []
+            self._load_model_list()
+            
+            # 重新启用验证按钮
+            if hasattr(self, 'btn_verify_all'):
+                self.btn_verify_all.setEnabled(True)
+            
+            # 重新启用所有按钮
+            self._set_model_buttons_enabled(True)
+            
+            # 更新UI
+            self._update_model_management_ui()
+            
+        except Exception as e:
+            import traceback
+            try:
+                self._log(f"❌ 验证完成回调出错: {str(e)}", "#F44336")
+                self._log(f"错误详情: {traceback.format_exc()}", "#F44336")
+            except:
+                pass
+            # 即使出错也要确保状态重置
+            self.is_verifying = False
+            try:
+                if hasattr(self, 'btn_verify_all'):
+                    self.btn_verify_all.setEnabled(True)
+                self._set_model_buttons_enabled(True)
+            except:
+                pass
     
     def _redownload_model(self, model_name):
         """重新下载模型（先删除再下载）"""

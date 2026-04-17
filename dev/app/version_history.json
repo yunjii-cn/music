@@ -65,5 +65,16 @@
     ],
     "build_time": "2026-04-18T02:38:04.903592",
     "version_number": "2026.04.18.0237"
+  },
+  "云集智能音乐创意台-v2026.04.18.0348": {
+    "version": "云集智能音乐创意台-v2026.04.18.0348",
+    "changes": [
+      "修复模型检测和验证功能",
+      "修复init_service_catalog.py中误用list_available_models的问题",
+      "进一步简化验证线程，最小化操作避免闪退",
+      "增强_on_verify_all_finished，更新模型状态并刷新UI"
+    ],
+    "build_time": "2026-04-18T03:49:30.562950",
+    "version_number": "2026.04.18.0348"
   }
 }
