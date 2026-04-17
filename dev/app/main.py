@@ -483,7 +483,7 @@ class ModelDeleteThread(QThread):
 
 
 class ModelVerifyThread(QThread):
-    """模型验证线程 - 增加更强健的异常处理"""
+    """简单安全的模型验证线程"""
     log_received = pyqtSignal(str)
     verify_finished = pyqtSignal(bool, str)
     
@@ -493,47 +493,82 @@ class ModelVerifyThread(QThread):
         self.base_dir = base_dir
     
     def run(self):
-        """执行模型验证 - 增强异常处理"""
+        """简单安全的验证方法"""
         try:
             self.log_received.emit(f"开始验证模型: {self.model_name}")
             
-            # 直接调用verify_model函数获取详细结果
+            # 获取模型目录
             import sys
             sys.path.insert(0, os.path.join(self.base_dir))
             
             try:
-                from acestep.model_downloader import verify_model, get_checkpoints_dir
+                from acestep.model_downloader import get_checkpoints_dir
             except Exception as e:
-                self.log_received.emit(f"[模型验证] 导入模块失败: {e}")
+                self.log_received.emit(f"[验证] 模块导入失败: {e}")
                 self.verify_finished.emit(False, self.model_name)
                 return
             
             try:
                 checkpoints_dir = get_checkpoints_dir()
-                success, message, details = verify_model(self.model_name, checkpoints_dir)
+                self.log_received.emit(f"[验证] 模型目录: {checkpoints_dir}")
             except Exception as e:
-                self.log_received.emit(f"[模型验证] 执行验证失败: {e}")
-                import traceback
-                self.log_received.emit(f"错误详情: {traceback.format_exc()}")
+                self.log_received.emit(f"[验证] 获取目录失败: {e}")
                 self.verify_finished.emit(False, self.model_name)
                 return
             
-            # 生成详细的验证报告 - 增强异常处理
-            try:
-                self.log_received.emit(f"[模型验证] Verifying model: {self.model_name}")
-                self.log_received.emit("[模型验证] 详细分析报告：")
+            # 简单验证：检查目录是否存在
+            success = True
+            
+            if self.model_name == "main":
+                # 验证主模型的所有组件
+                components = ["acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B", "acestep-5Hz-lm-1.7B"]
+                valid_count = 0
                 
-                if self.model_name == "main":
-                    self._report_main_model(details)
+                self.log_received.emit("[验证] 开始检查主模型组件...")
+                
+                for comp in components:
+                    comp_path = os.path.join(str(checkpoints_dir), comp)
+                    
+                    if os.path.exists(comp_path) and os.path.isdir(comp_path):
+                        try:
+                            files = os.listdir(comp_path)
+                            if len(files) > 0:
+                                self.log_received.emit(f"[验证] ✓ {comp}: 找到 {len(files)} 个文件")
+                                valid_count += 1
+                            else:
+                                self.log_received.emit(f"[验证] ✗ {comp}: 目录为空")
+                                success = False
+                        except Exception as e:
+                            self.log_received.emit(f"[验证] ✗ {comp}: 检查失败 - {e}")
+                            success = False
+                    else:
+                        self.log_received.emit(f"[验证] ✗ {comp}: 目录不存在")
+                        success = False
+                
+                self.log_received.emit(f"[验证] 主模型检查完成: {valid_count}/{len(components)} 个组件可用")
+            else:
+                # 验证单个模型
+                model_path = os.path.join(str(checkpoints_dir), self.model_name)
+                
+                if os.path.exists(model_path) and os.path.isdir(model_path):
+                    try:
+                        files = os.listdir(model_path)
+                        if len(files) > 0:
+                            self.log_received.emit(f"[验证] ✓ {self.model_name}: 找到 {len(files)} 个文件")
+                        else:
+                            self.log_received.emit(f"[验证] ✗ {self.model_name}: 目录为空")
+                            success = False
+                    except Exception as e:
+                        self.log_received.emit(f"[验证] ✗ {self.model_name}: 检查失败 - {e}")
+                        success = False
                 else:
-                    self._report_single_model(details, success)
-                
-                self.log_received.emit(f"[模型验证] {message}")
-            except Exception as e:
-                self.log_received.emit(f"[模型验证] 生成报告时出错: {e}")
-                import traceback
-                self.log_received.emit(f"错误详情: {traceback.format_exc()}")
-                self.log_received.emit(f"[模型验证] 验证结果: {'成功' if success else '失败'}")
+                    self.log_received.emit(f"[验证] ✗ {self.model_name}: 目录不存在")
+                    success = False
+            
+            if success:
+                self.log_received.emit(f"[验证] ✓ 验证通过")
+            else:
+                self.log_received.emit(f"[验证] ✗ 验证失败")
             
             self.verify_finished.emit(success, self.model_name)
             
@@ -541,7 +576,7 @@ class ModelVerifyThread(QThread):
             import traceback
             error_detail = traceback.format_exc()
             try:
-                self.log_received.emit(f"❌ 验证模型时出错: {str(e)}")
+                self.log_received.emit(f"❌ 验证出错: {str(e)}")
                 self.log_received.emit(f"错误详情: {error_detail}")
             except:
                 pass
@@ -549,82 +584,6 @@ class ModelVerifyThread(QThread):
                 self.verify_finished.emit(False, str(e))
             except:
                 pass
-    
-    def _report_main_model(self, details):
-        """主模型验证报告 - 增强异常处理"""
-        try:
-            total_size = 0
-            valid_components = 0
-            total_components = 0
-            
-            if not isinstance(details, dict):
-                self.log_received.emit("[模型验证] ⚠️ 验证结果格式异常")
-                return
-            
-            for component, comp_details in details.items():
-                if component in ["model_name", "files_found", "files_missing", "size_ok", "total_size", "expected_size"]:
-                    continue
-                
-                if not isinstance(comp_details, dict):
-                    continue
-                
-                total_components += 1
-                
-                comp_details_safe = comp_details if isinstance(comp_details, dict) else {}
-                size_ok = comp_details_safe.get("size_ok", True)
-                files_missing_list = comp_details_safe.get("files_missing", [])
-                comp_success = "✓" if size_ok and len(files_missing_list) == 0 else "✗"
-                
-                if comp_success == "✓":
-                    valid_components += 1
-                
-                try:
-                    comp_size = comp_details_safe.get("total_size", 0) / 1e6
-                    expected_size = comp_details_safe.get("expected_size", 0) / 1e6
-                    files_found = len(comp_details_safe.get("files_found", []))
-                    files_missing = len(files_missing_list)
-                    
-                    self.log_received.emit(f"[模型验证]   {comp_success} {component}:")
-                    self.log_received.emit(f"[模型验证]     状态: {'验证通过' if comp_success == '✓' else '验证失败'}")
-                    self.log_received.emit(f"[模型验证]     文件: {files_found} 个找到, {files_missing} 个缺失")
-                    self.log_received.emit(f"[模型验证]     大小: {comp_size:.2f}MB")
-                    if expected_size > 0:
-                        self.log_received.emit(f"[模型验证]     期望: {expected_size:.2f}MB")
-                except Exception as e:
-                    self.log_received.emit(f"[模型验证]   {comp_success} {component}: 报告生成错误 {e}")
-                
-                total_size += comp_details_safe.get("total_size", 0)
-            
-            self.log_received.emit("[模型验证] 验证总结：")
-            self.log_received.emit(f"[模型验证]   总组件数: {total_components}")
-            self.log_received.emit(f"[模型验证]   验证通过: {valid_components}")
-            self.log_received.emit(f"[模型验证]   验证失败: {total_components - valid_components}")
-            try:
-                self.log_received.emit(f"[模型验证]   总大小: {total_size/1e6:.2f}MB")
-            except:
-                pass
-        except Exception as e:
-            self.log_received.emit(f"[模型验证] 生成主模型报告出错: {e}")
-    
-    def _report_single_model(self, details, success):
-        """单个模型验证报告 - 增强异常处理"""
-        try:
-            if not isinstance(details, dict):
-                details = {}
-            
-            files_found = len(details.get('files_found', []))
-            files_missing = len(details.get('files_missing', []))
-            
-            self.log_received.emit(f"[模型验证]   状态: {'验证通过' if success else '验证失败'}")
-            self.log_received.emit(f"[模型验证]   文件: {files_found} 个找到, {files_missing} 个缺失")
-            try:
-                self.log_received.emit(f"[模型验证]   大小: {details.get('total_size', 0)/1e6:.2f}MB")
-                if details.get('expected_size', 0) > 0:
-                    self.log_received.emit(f"[模型验证]   期望: {details.get('expected_size', 0)/1e6:.2f}MB")
-            except:
-                pass
-        except Exception as e:
-            self.log_received.emit(f"[模型验证] 生成单个模型报告出错: {e}")
 
 
 class CollapsiblePanel(QWidget):
@@ -1287,7 +1246,7 @@ class MainWindow(QMainWindow):
         self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_version_nav.setStyleSheet(menu_button_style)
         self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_version_nav.clicked.connect(lambda: self._switch_page(1))
+        self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
         nav_bar_layout.addWidget(self.btn_version_nav)
         
         # 模型管理按钮
@@ -1296,7 +1255,7 @@ class MainWindow(QMainWindow):
         self.btn_model_nav.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_model_nav.setStyleSheet(menu_button_style)
         self.btn_model_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_model_nav.clicked.connect(lambda: self._switch_page(2))
+        self.btn_model_nav.clicked.connect(lambda: self._switch_page(1))
         nav_bar_layout.addWidget(self.btn_model_nav)
         
         main_layout.addWidget(nav_bar)
