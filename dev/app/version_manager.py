@@ -1058,6 +1058,8 @@ class ModelManagerDialog(QDialog):
         self.setWindowTitle("模型管理器")
         self.setMinimumSize(1000, 700)
         self.resize(1200, 800)
+        self.last_verify_time = None  # 最后验证时间
+        self.last_verify_result = None  # 最后验证结果
         
         if not as_widget:
             self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -1198,6 +1200,31 @@ class ModelManagerDialog(QDialog):
             top_bar.addWidget(close_btn)
         
         layout.addLayout(top_bar)
+        
+        # 验证结果显示区域
+        self.verify_info_frame = QFrame()
+        self.verify_info_frame.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        verify_info_layout = QHBoxLayout(self.verify_info_frame)
+        verify_info_layout.setContentsMargins(8, 4, 8, 4)
+        
+        self.verify_time_label = QLabel("⏱ 上次验证: 暂未验证")
+        self.verify_time_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+        verify_info_layout.addWidget(self.verify_time_label)
+        
+        verify_info_layout.addStretch()
+        
+        self.verify_result_label = QLabel("")
+        self.verify_result_label.setStyleSheet("font-size: 11px;")
+        verify_info_layout.addWidget(self.verify_result_label)
+        
+        layout.addWidget(self.verify_info_frame)
         
         # 模型列表滚动区域
         scroll_area = QScrollArea()

@@ -1697,6 +1697,10 @@ class MainWindow(QMainWindow):
         # 如果切换到模型管理页面，更新UI
         if index == 1 and hasattr(self, 'model_manager_widget'):
             self.model_manager_widget._update_ui()
+        
+        # 如果切换到软件更新页面，刷新版本列表
+        if index == 2 and hasattr(self, 'version_manager_widget'):
+            self.version_manager_widget._load_versions()
     
     def _setup_monitor(self):
         """设置监控"""
@@ -4258,10 +4262,28 @@ try {
             self.model_list = []
             self._load_model_list()
             
+            # 计算验证结果
+            total_models = len(self.model_list)
+            installed_models = sum(1 for m in self.model_list if m.get('exists', False))
+            
+            # 更新验证时间和结果
+            from datetime import datetime
+            verify_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # 如果有模型管理器widget，更新它
+            if hasattr(self, 'model_manager_widget'):
+                self.model_manager_widget.last_verify_time = verify_time
+                self.model_manager_widget.last_verify_result = (total_models, installed_models)
+                # 更新标签
+                self.model_manager_widget.verify_time_label.setText(f"⏱ 上次验证: {verify_time}")
+                result_text = f"✅ {installed_models}/{total_models} 模型已安装"
+                self.model_manager_widget.verify_result_label.setText(result_text)
+                self.model_manager_widget.verify_result_label.setStyleSheet("color: #4CAF50; font-size: 11px; font-weight: bold;")
+            
             # 更新UI
             self._update_model_management_ui()
             
-            self._log("✅ 验证完成！模型状态已更新", "#4CAF50")
+            self._log(f"✅ 验证完成！{installed_models}/{total_models} 模型已安装", "#4CAF50")
             
             # 重置状态
             self.is_verifying = False
