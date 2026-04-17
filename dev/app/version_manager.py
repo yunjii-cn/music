@@ -1120,12 +1120,14 @@ class ModelManagerDialog(QDialog):
         for source_key, source_name in download_sources.items():
             self.download_source_combo.addItem(source_name, source_key)
         
-        # 设置当前选中的下载源
+        # 设置当前选中的下载源 - 先断开信号避免触发
+        self.download_source_combo.blockSignals(True)
         if hasattr(self.main_window, 'selected_download_source'):
             for i in range(self.download_source_combo.count()):
                 if self.download_source_combo.itemData(i) == self.main_window.selected_download_source:
                     self.download_source_combo.setCurrentIndex(i)
                     break
+        self.download_source_combo.blockSignals(False)
         
         self.download_source_combo.currentIndexChanged.connect(self._on_download_source_changed)
         top_bar.addWidget(self.download_source_combo)

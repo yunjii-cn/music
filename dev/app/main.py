@@ -1656,14 +1656,14 @@ class MainWindow(QMainWindow):
     
     def _create_version_page(self):
         """创建版本管理器页面"""
-        from version_manager import VersionManagerDialog
+        from version_manager import HybridVersionManagerDialog
         
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         
         # 创建版本管理器容器
-        self.version_manager_widget = VersionManagerDialog(self, self.base_dir, as_widget=True)
+        self.version_manager_widget = HybridVersionManagerDialog(self, self.base_dir, as_widget=True)
         
         layout.addWidget(self.version_manager_widget)
         
@@ -1688,14 +1688,14 @@ class MainWindow(QMainWindow):
         """切换页面"""
         # 更新导航按钮状态
         self.btn_home.setChecked(index == 0)
-        self.btn_version_nav.setChecked(index == 1)
-        self.btn_model_nav.setChecked(index == 2)
+        self.btn_model_nav.setChecked(index == 1)
+        self.btn_version_nav.setChecked(index == 2)
         
         # 切换到对应页面
         self.page_stack.setCurrentIndex(index)
         
         # 如果切换到模型管理页面，更新UI
-        if index == 2 and hasattr(self, 'model_manager_widget'):
+        if index == 1 and hasattr(self, 'model_manager_widget'):
             self.model_manager_widget._update_ui()
     
     def _setup_monitor(self):
