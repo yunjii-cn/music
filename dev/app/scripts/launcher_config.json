@@ -33,8 +33,5 @@
   "browser": {
     "default": "Chrome",
     "custom_path": ""
-  },
-  "download": {
-    "source": "huggingface-cn"
   }
 }

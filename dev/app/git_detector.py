@@ -14,6 +14,14 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
+# Windows隐藏窗口常量
+if sys.platform == 'win32':
+    CREATE_NO_WINDOW = 0x08000000
+    SW_HIDE = 0
+else:
+    CREATE_NO_WINDOW = 0
+    SW_HIDE = 0
+
 
 class GitDetector:
     """Git检测器"""
@@ -24,11 +32,19 @@ class GitDetector:
     def is_git_available():
         """检查Git是否可用"""
         try:
+            startupinfo = None
+            if sys.platform == 'win32':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = SW_HIDE
+            
             result = subprocess.run(
                 ['git', '--version'],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                startupinfo=startupinfo,
+                creationflags=CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
             return result.returncode == 0
         except Exception:
@@ -38,11 +54,19 @@ class GitDetector:
     def get_git_version():
         """获取Git版本"""
         try:
+            startupinfo = None
+            if sys.platform == 'win32':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = SW_HIDE
+            
             result = subprocess.run(
                 ['git', '--version'],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                startupinfo=startupinfo,
+                creationflags=CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
             if result.returncode == 0:
                 return result.stdout.strip()

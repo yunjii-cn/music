@@ -468,9 +468,11 @@ class HybridVersionManagerDialog(QDialog):
     
     def _load_exe_versions(self):
         """加载EXE版本列表"""
+        print("[DEBUG] _load_exe_versions 被调用")
         self.current_mode_label.setText("EXE 模式")
         
         current = self._get_current_exe_version()
+        print(f"[DEBUG] 当前EXE版本: {current}")
         if current:
             self.current_info_label.setText(
                 f"版本: v{current['version']} | 文件: {current['name']} | 大小: {current['size']}"
@@ -479,8 +481,10 @@ class HybridVersionManagerDialog(QDialog):
             self.current_info_label.setText("ℹ️ 开发模式 - 请运行打包后的EXE查看当前版本")
         
         versions = self._get_available_exe_versions()
+        print(f"[DEBUG] 找到 {len(versions)} 个可用版本")
         
         if not versions:
+            print("[DEBUG] 没有找到版本，显示无版本提示")
             no_version_label = QLabel("未找到EXE版本文件")
             no_version_label.setStyleSheet("color: #666666; padding: 20px;")
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -489,9 +493,12 @@ class HybridVersionManagerDialog(QDialog):
         
         current_version = current['version'] if current else None
         
+        print(f"[DEBUG] 开始创建版本项，当前版本: {current_version}")
         for version in versions:
+            print(f"[DEBUG] 创建版本项: v{version['version']}")
             is_current = version['version'] == current_version
             self._create_exe_version_item(version, is_current)
+        print(f"[DEBUG] 版本项创建完成，versions_layout.count(): {self.versions_layout.count()}")
     
     def _create_exe_version_item(self, version, is_current):
         """创建EXE版本项"""
@@ -1158,26 +1165,6 @@ class ModelManagerDialog(QDialog):
         """)
         self.btn_verify_all.clicked.connect(self._verify_all_models)
         top_bar.addWidget(self.btn_verify_all)
-        
-        # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新")
-        refresh_btn.clicked.connect(self._update_ui)
-        refresh_btn.setMinimumWidth(80)
-        refresh_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2D2D2D;
-                border: 1px solid #424242;
-                border-radius: 4px;
-                padding: 10px 20px;
-                font-size: 13px;
-                color: #F0F0F0;
-            }
-            QPushButton:hover {
-                background-color: #424242;
-                border-color: #E53935;
-            }
-        """)
-        top_bar.addWidget(refresh_btn)
         
         if not self.as_widget:
             close_btn = QPushButton("✕ 关闭")
