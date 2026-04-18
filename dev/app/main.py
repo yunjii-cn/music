@@ -850,19 +850,15 @@ class ServiceCard(QFrame):
         
         top_row_layout.addStretch()
         
-        # 状态指示（不可点击）
-        self.status_label = QLabel("○ 未启动")
+        # 状态指示灯 - 使用QLabel样式
+        self.status_label = QLabel()
+        self.status_label.setFixedSize(24, 24)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setFixedSize(95, 30)
         self.status_label.setStyleSheet("""
             QLabel {
                 background-color: #424242;
-                color: #BDBDBD;
-                border: 1px solid #616161;
-                border-radius: 15px;
-                font-size: 11px;
-                font-weight: bold;
-                padding: 0px;
+                border: 2px solid #616161;
+                border-radius: 12px;
             }
         """)
         top_row_layout.addWidget(self.status_label)
@@ -872,7 +868,7 @@ class ServiceCard(QFrame):
         # 第二行：操作按钮
         btn_layout = QHBoxLayout()
         
-        self.restart_btn = QPushButton("🔄 重启")
+        self.restart_btn = QPushButton("重启")
         self.restart_btn.setStyleSheet("""
             QPushButton {
                 background-color: #1565C0;
@@ -891,7 +887,7 @@ class ServiceCard(QFrame):
         self.restart_btn.clicked.connect(lambda: self.restart_clicked.emit(self.service_id))
         btn_layout.addWidget(self.restart_btn)
         
-        self.open_btn = QPushButton("🌐 打开")
+        self.open_btn = QPushButton("打开")
         self.open_btn.setStyleSheet("""
             QPushButton {
                 background-color: #E53935;
@@ -916,16 +912,11 @@ class ServiceCard(QFrame):
         """更新状态显示"""
         self.is_running = is_running
         if is_running:
-            self.status_label.setText("● 运行中")
             self.status_label.setStyleSheet("""
                 QLabel {
-                    background-color: #2E7D32;
-                    color: #FFFFFF;
-                    border: 1px solid #388E3C;
-                    border-radius: 15px;
-                    font-size: 11px;
-                    font-weight: bold;
-                    padding: 0px;
+                    background-color: #4CAF50;
+                    border: 2px solid #388E3C;
+                    border-radius: 12px;
                 }
             """)
             self.setStyleSheet(f"""
@@ -936,16 +927,11 @@ class ServiceCard(QFrame):
                 }}
             """)
         else:
-            self.status_label.setText("○ 未启动")
             self.status_label.setStyleSheet("""
                 QLabel {
                     background-color: #424242;
-                    color: #BDBDBD;
-                    border: 1px solid #616161;
-                    border-radius: 15px;
-                    font-size: 11px;
-                    font-weight: bold;
-                    padding: 0px;
+                    border: 2px solid #616161;
+                    border-radius: 12px;
                 }
             """)
             self.setStyleSheet(f"""
@@ -1432,7 +1418,7 @@ class MainWindow(QMainWindow):
             QComboBox {
                 background-color: #1E1E1E;
                 color: #FFFFFF;
-                border: 2px solid #424242;
+                border: 2px solid #333333;
                 border-radius: 8px;
                 padding: 10px 40px 10px 14px;
                 font-size: 13px;
@@ -1440,7 +1426,7 @@ class MainWindow(QMainWindow):
                 min-width: 200px;
             }
             QComboBox:hover {
-                border-color: #616161;
+                border-color: #424242;
                 background-color: #252525;
             }
             QComboBox:focus {
@@ -1457,17 +1443,17 @@ class MainWindow(QMainWindow):
                 image: none;
                 border-left: 7px solid transparent;
                 border-right: 7px solid transparent;
-                border-top: 7px solid #AAAAAA;
+                border-top: 7px solid #888888;
                 width: 0;
                 height: 0;
-                right: 12px;
+                right: 10px;
             }
             QComboBox:hover::down-arrow {
                 border-top-color: #FFFFFF;
             }
             QComboBox QAbstractItemView {
                 background-color: #1E1E1E;
-                border: 2px solid #424242;
+                border: 2px solid #333333;
                 border-radius: 8px;
                 outline: none;
                 padding: 4px;

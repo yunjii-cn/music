@@ -113,49 +113,90 @@ class HybridVersionManagerDialog(QDialog):
             top_bar.addWidget(mode_label)
             
             self.mode_combo = QComboBox()
-            self.mode_combo.addItem("📦 EXE 版本", "exe")
-            self.mode_combo.addItem("🔧 Git 源代码", "git")
+            self.mode_combo.addItem("EXE 版本", "exe")
+            self.mode_combo.addItem("Git 源代码", "git")
             self.mode_combo.setStyleSheet("""
                 QComboBox {
-                    background-color: #1A1A1A;
-                    color: #F0F0F0;
-                    border: 1px solid #333333;
-                    border-radius: 4px;
-                    padding: 6px 12px;
+                    background-color: #1E1E1E;
+                    color: #FFFFFF;
+                    border: 2px solid #333333;
+                    border-radius: 6px;
+                    padding: 8px 35px 8px 12px;
                     font-size: 12px;
-                    min-width: 120px;
+                    font-weight: 500;
+                    min-width: 130px;
                 }
                 QComboBox:hover {
-                    border-color: #444444;
+                    border-color: #424242;
+                    background-color: #252525;
+                }
+                QComboBox:focus {
+                    border-color: #1976D2;
+                    background-color: #1E1E1E;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                    width: 30px;
+                    subcontrol-origin: padding;
+                    subcontrol-position: right center;
+                }
+                QComboBox::down-arrow {
+                    image: none;
+                    border-left: 6px solid transparent;
+                    border-right: 6px solid transparent;
+                    border-top: 6px solid #888888;
+                    width: 0;
+                    height: 0;
+                    right: 8px;
+                }
+                QComboBox:hover::down-arrow {
+                    border-top-color: #FFFFFF;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #1E1E1E;
+                    border: 2px solid #333333;
+                    border-radius: 6px;
+                    outline: none;
+                    padding: 4px;
+                    selection-background-color: #1976D2;
+                    selection-color: #FFFFFF;
+                }
+                QComboBox QAbstractItemView::item {
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    margin: 2px;
+                }
+                QComboBox QAbstractItemView::item:hover {
+                    background-color: #2D2D2D;
+                }
+                QComboBox QAbstractItemView::item:selected {
+                    background-color: #1976D2;
                 }
             """)
+            self.mode_combo.blockSignals(True)
             self.mode_combo.setCurrentIndex(0 if self.current_mode == "exe" else 1)
+            self.mode_combo.blockSignals(False)
             self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
             top_bar.addWidget(self.mode_combo)
         
         top_bar.addStretch()
         
         # 全部展开/收起开关（只在Git模式时显示）
-        self.expand_all_btn = QPushButton("📖 全部展开")
+        self.expand_all_btn = QPushButton("全部收起")
         self.expand_all_btn.setCheckable(True)
         self.expand_all_btn.setChecked(True)
         self.expand_all_btn.clicked.connect(self._toggle_expand_all)
-        self.expand_all_btn.setMinimumWidth(90)
+        self.expand_all_btn.setMinimumWidth(80)
         self.expand_all_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2D2D2D;
-                border: 1px solid #424242;
-                border-radius: 4px;
+                background-color: transparent;
+                border: none;
                 padding: 8px 12px;
                 font-size: 11px;
-                color: #F0F0F0;
-            }
-            QPushButton:checked {
-                background-color: #1565C0;
-                border-color: #1976D2;
+                color: #AAAAAA;
             }
             QPushButton:hover {
-                border-color: #555555;
+                color: #FFFFFF;
             }
         """)
         top_bar.addWidget(self.expand_all_btn)
@@ -223,10 +264,7 @@ class HybridVersionManagerDialog(QDialog):
         self.current_mode_label = QLabel("")
         self.current_mode_label.setStyleSheet("""
             QLabel {
-                background-color: #1565C0;
-                color: white;
-                padding: 2px 8px;
-                border-radius: 3px;
+                color: #1565C0;
                 font-size: 11px;
                 font-weight: bold;
             }
@@ -277,8 +315,13 @@ class HybridVersionManagerDialog(QDialog):
     
     def _on_mode_changed(self, index):
         """模式切换"""
-        self.current_mode = self.mode_combo.itemData(index)
-        self._load_versions()
+        try:
+            new_mode = self.mode_combo.itemData(index)
+            if new_mode:
+                self.current_mode = new_mode
+                self._load_versions()
+        except Exception as e:
+            print(f"模式切换失败：{e}")
     
     def _get_current_exe_version(self):
         """获取当前EXE版本信息"""
@@ -536,6 +579,9 @@ class HybridVersionManagerDialog(QDialog):
         
         current_version = current['version'] if current else None
         
+        # 初始化列表
+        self.exe_version_items = []
+        
         for version in versions:
             is_current = version['version'] == current_version
             self._create_exe_version_item(version, is_current)
@@ -546,12 +592,19 @@ class HybridVersionManagerDialog(QDialog):
         changes = self._get_version_changes(version['name'])
         is_available = version.get('available', False)
         
+        # 默认展开状态
+        is_expanded = True
+        if hasattr(self, 'expand_all_btn'):
+            try:
+                is_expanded = self.expand_all_btn.isChecked()
+            except:
+                is_expanded = True
+        
         frame = QFrame()
         if is_current:
             frame.setStyleSheet("""
                 QFrame {
                     background-color: #1B5E20;
-                    border: 1px solid #4CAF50;
                     border-radius: 5px;
                     padding: 10px;
                 }
@@ -559,25 +612,14 @@ class HybridVersionManagerDialog(QDialog):
                     background-color: #2E7D32;
                 }
             """)
-        elif not is_available:
-            frame.setStyleSheet("""
-                QFrame {
-                    background-color: #1A1A1A;
-                    border: 1px solid #333333;
-                    border-radius: 5px;
-                    padding: 10px;
-                }
-            """)
         else:
             frame.setStyleSheet("""
                 QFrame {
                     background-color: #1A1A1A;
-                    border: 1px solid #333333;
                     border-radius: 5px;
                     padding: 10px;
                 }
                 QFrame:hover {
-                    border: 1px solid #555555;
                     background-color: #252525;
                 }
             """)
@@ -632,14 +674,7 @@ class HybridVersionManagerDialog(QDialog):
         elif not is_available:
             status_label = QLabel("未提供")
             status_label.setFont(QFont("Microsoft YaHei", 9, QFont.Weight.Bold))
-            status_label.setStyleSheet("""
-                QLabel {
-                    background-color: #424242;
-                    color: #9E9E9E;
-                    padding: 3px 8px;
-                    border-radius: 3px;
-                }
-            """)
+            status_label.setStyleSheet("color: #9E9E9E;")
             top_layout.addWidget(status_label)
         else:
             # 占位
@@ -651,16 +686,27 @@ class HybridVersionManagerDialog(QDialog):
         if is_current:
             current_tag = QLabel("当前")
             current_tag.setFont(QFont("Microsoft YaHei", 8, QFont.Weight.Bold))
-            current_tag.setStyleSheet("""
-                QLabel {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 3px 8px;
-                    border-radius: 3px;
-                }
-            """)
+            current_tag.setStyleSheet("color: #4CAF50;")
             top_layout.addWidget(current_tag)
         elif is_available:
+            # 展开/收起按钮
+            if changes:
+                toggle_btn = QPushButton("收起" if is_expanded else "展开")
+                toggle_btn.setMinimumWidth(55)
+                toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                        color: #AAAAAA;
+                        border: none;
+                        padding: 4px 8px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        color: #FFFFFF;
+                    }
+                """)
+                top_layout.addWidget(toggle_btn)
+            
             # 切换版本按钮
             switch_btn = QPushButton("切换版本")
             switch_btn.setMinimumWidth(75)
@@ -668,7 +714,7 @@ class HybridVersionManagerDialog(QDialog):
             switch_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
-                    border: 1px solid #4CAF50;
+                    border: none;
                     border-radius: 3px;
                     padding: 4px 12px;
                     font-size: 11px;
@@ -677,7 +723,6 @@ class HybridVersionManagerDialog(QDialog):
                 }
                 QPushButton:hover {
                     background-color: #43A047;
-                    border-color: #43A047;
                 }
             """)
             top_layout.addWidget(switch_btn)
@@ -685,12 +730,14 @@ class HybridVersionManagerDialog(QDialog):
         layout.addLayout(top_layout)
         
         # 底部：版本修改内容（所有版本都显示，如果有）
+        detail_widget = None
         if changes:
-            changes_layout = QVBoxLayout()
+            detail_widget = QWidget()
+            changes_layout = QVBoxLayout(detail_widget)
             changes_layout.setSpacing(4)
             changes_layout.setContentsMargins(10, 0, 0, 0)
             
-            changes_label = QLabel("📋 修改内容：")
+            changes_label = QLabel("修改内容：")
             changes_label.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
             changes_label.setStyleSheet("color: #FF9800;")
             changes_layout.addWidget(changes_label)
@@ -702,7 +749,26 @@ class HybridVersionManagerDialog(QDialog):
                 change_label.setWordWrap(True)
                 changes_layout.addWidget(change_label)
             
-            layout.addLayout(changes_layout)
+            detail_widget.setVisible(is_expanded)
+            layout.addWidget(detail_widget)
+            
+            # 连接展开/收起按钮
+            if is_available and changes:
+                def toggle_detail(checked=False):
+                    is_visible = not detail_widget.isVisible()
+                    detail_widget.setVisible(is_visible)
+                    toggle_btn.setText("收起" if is_visible else "展开")
+                toggle_btn.clicked.connect(toggle_detail)
+        
+        # 保存到列表用于全部展开/收起
+        if not hasattr(self, 'exe_version_items'):
+            self.exe_version_items = []
+        if changes:
+            self.exe_version_items.append({
+                'expanded': is_expanded,
+                'detail_widget': detail_widget,
+                'toggle_btn': toggle_btn if (is_available and changes) else None
+            })
         
         self.versions_layout.addWidget(frame)
     
@@ -768,7 +834,7 @@ class HybridVersionManagerDialog(QDialog):
         
         current_hash = current['hash'] if current else None
         
-        # 存储所有版本项，用于全部展开/收起
+        # 初始化列表
         self.git_version_items = []
         
         for version in versions:
@@ -777,11 +843,23 @@ class HybridVersionManagerDialog(QDialog):
     
     def _toggle_expand_all(self, checked):
         """全部展开/收起"""
+        # 更新按钮文字
+        self.expand_all_btn.setText("全部收起" if checked else "全部展开")
+        
+        # 处理Git版本项
         if hasattr(self, 'git_version_items'):
             for item in self.git_version_items:
                 item['expanded'] = checked
                 item['detail_widget'].setVisible(checked)
-                item['toggle_btn'].setText("📕 收起" if checked else "📖 展开")
+                item['toggle_btn'].setText("收起" if checked else "展开")
+        
+        # 处理EXE版本项
+        if hasattr(self, 'exe_version_items'):
+            for item in self.exe_version_items:
+                item['expanded'] = checked
+                item['detail_widget'].setVisible(checked)
+                if item['toggle_btn']:
+                    item['toggle_btn'].setText("收起" if checked else "展开")
     
     def _create_git_version_item(self, version, is_current):
         """创建Git版本项"""
@@ -802,12 +880,19 @@ class HybridVersionManagerDialog(QDialog):
         except Exception:
             pass
         
+        # 默认展开状态
+        is_expanded = True
+        if hasattr(self, 'expand_all_btn'):
+            try:
+                is_expanded = self.expand_all_btn.isChecked()
+            except:
+                is_expanded = True
+        
         frame = QFrame()
         if is_current:
             frame.setStyleSheet("""
                 QFrame {
                     background-color: #1B5E20;
-                    border: 1px solid #4CAF50;
                     border-radius: 5px;
                     padding: 10px;
                 }
@@ -819,12 +904,10 @@ class HybridVersionManagerDialog(QDialog):
             frame.setStyleSheet("""
                 QFrame {
                     background-color: #1A1A1A;
-                    border: 1px solid #333333;
                     border-radius: 5px;
                     padding: 10px;
                 }
                 QFrame:hover {
-                    border: 1px solid #555555;
                     background-color: #252525;
                 }
             """)
@@ -863,42 +946,26 @@ class HybridVersionManagerDialog(QDialog):
         if is_current:
             current_tag = QLabel("当前")
             current_tag.setFont(QFont("Microsoft YaHei", 8, QFont.Weight.Bold))
-            current_tag.setStyleSheet("""
-                QLabel {
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 3px 8px;
-                    border-radius: 3px;
-                }
-            """)
+            current_tag.setStyleSheet("color: #4CAF50;")
             top_layout.addWidget(current_tag)
         else:
-            # 展开/收起按钮 - 使用安全检查
-            is_expanded = True
-            if hasattr(self, 'expand_all_btn'):
-                try:
-                    is_expanded = self.expand_all_btn.isChecked()
-                except:
-                    is_expanded = True
-            
-            toggle_btn = QPushButton("📕 收起" if is_expanded else "📖 展开")
-            toggle_btn.setMinimumWidth(65)
-            toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: transparent;
-                    border: 1px solid #424242;
-                    border-radius: 3px;
-                    padding: 4px 10px;
-                    font-size: 11px;
-                    color: #AAAAAA;
-                }
-                QPushButton:hover {
-                    background-color: #1976D2;
-                    border-color: #1976D2;
-                    color: white;
-                }
-            """)
-            top_layout.addWidget(toggle_btn)
+            # 展开/收起按钮
+            if detail_content:
+                toggle_btn = QPushButton("收起" if is_expanded else "展开")
+                toggle_btn.setMinimumWidth(55)
+                toggle_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                        color: #AAAAAA;
+                        border: none;
+                        padding: 4px 8px;
+                        font-size: 11px;
+                    }
+                    QPushButton:hover {
+                        color: #FFFFFF;
+                    }
+                """)
+                top_layout.addWidget(toggle_btn)
             
             # 切换按钮
             switch_btn = QPushButton("切换")
@@ -907,7 +974,7 @@ class HybridVersionManagerDialog(QDialog):
             switch_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
-                    border: 1px solid #4CAF50;
+                    border: none;
                     border-radius: 3px;
                     padding: 4px 10px;
                     font-size: 11px;
@@ -916,7 +983,6 @@ class HybridVersionManagerDialog(QDialog):
                 }
                 QPushButton:hover {
                     background-color: #43A047;
-                    border-color: #43A047;
                 }
             """)
             top_layout.addWidget(switch_btn)
@@ -930,47 +996,34 @@ class HybridVersionManagerDialog(QDialog):
         detail_layout.setContentsMargins(10, 4, 0, 0)
         
         if detail_content:
-            changes_label = QLabel("📋 提交详情：")
+            changes_label = QLabel("提交详情：")
             changes_label.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
             changes_label.setStyleSheet("color: #FF9800;")
             detail_layout.addWidget(changes_label)
             
-            detail_text = QTextEdit()
-            detail_text.setReadOnly(True)
-            detail_text.setMaximumHeight(150)
-            detail_text.setStyleSheet("""
-                QTextEdit {
-                    background-color: #121212;
-                    border: 1px solid #333333;
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-family: 'Consolas', monospace;
-                    font-size: 11px;
-                    color: #F0F0F0;
-                }
-            """)
-            detail_text.setPlainText(detail_content)
+            detail_text = QLabel(detail_content)
+            detail_text.setFont(QFont("Microsoft YaHei", 9))
+            detail_text.setStyleSheet("color: #AAAAAA;")
+            detail_text.setWordWrap(True)
             detail_layout.addWidget(detail_text)
         
-        detail_widget.setVisible(is_expanded)
+        detail_widget.setVisible(is_expanded and bool(detail_content))
         main_layout.addWidget(detail_widget)
         
-        # 保存引用，用于全部展开/收起
-        if not is_current:
-            item_ref = {
-                'toggle_btn': toggle_btn,
-                'detail_widget': detail_widget,
-                'expanded': is_expanded
-            }
-            self.git_version_items.append(item_ref)
-            
-            # 点击展开/收起按钮的事件
-            def toggle_this(checked, item=item_ref):
-                item['expanded'] = not item['expanded']
-                item['detail_widget'].setVisible(item['expanded'])
-                item['toggle_btn'].setText("📕 收起" if item['expanded'] else "📖 展开")
-            
-            toggle_btn.clicked.connect(toggle_this)
+        # 连接展开/收起按钮
+        if not is_current and detail_content:
+            def toggle_detail(checked=False):
+                is_visible = not detail_widget.isVisible()
+                detail_widget.setVisible(is_visible)
+                toggle_btn.setText("收起" if is_visible else "展开")
+            toggle_btn.clicked.connect(toggle_detail)
+        
+        # 保存到列表
+        self.git_version_items.append({
+            'expanded': is_expanded and bool(detail_content),
+            'detail_widget': detail_widget,
+            'toggle_btn': toggle_btn if (not is_current and detail_content) else None
+        })
         
         self.versions_layout.addWidget(frame)
     
@@ -1202,6 +1255,10 @@ class ModelManagerDialog(QDialog):
             }
         """)
         
+        # 初始化验证相关的属性
+        self.last_verify_time = ""
+        self.last_verify_result = None
+        
         self._setup_ui()
         self._update_ui()
     
@@ -1221,27 +1278,78 @@ class ModelManagerDialog(QDialog):
         
         top_bar.addStretch()
         
+        # 验证结果标签
+        self.verify_result_label = QLabel("")
+        self.verify_result_label.setStyleSheet("font-size: 11px; color: #AAAAAA;")
+        top_bar.addWidget(self.verify_result_label)
+        
+        # 验证时间标签
+        self.verify_time_label = QLabel("")
+        self.verify_time_label.setStyleSheet("font-size: 11px; color: #666666; margin-left: 10px;")
+        top_bar.addWidget(self.verify_time_label)
+        
         # 下载源设置
         download_source_label = QLabel("下载源:")
-        download_source_label.setStyleSheet("font-size: 12px; color: #AAAAAA;")
+        download_source_label.setStyleSheet("font-size: 12px; color: #AAAAAA; margin-left: 15px;")
         top_bar.addWidget(download_source_label)
         
         self.download_source_combo = QComboBox()
         self.download_source_combo.setStyleSheet("""
             QComboBox {
                 background-color: #1E1E1E;
-                color: #F0F0F0;
-                border: 1px solid #333333;
-                border-radius: 3px;
-                padding: 4px 8px;
+                color: #FFFFFF;
+                border: 2px solid #333333;
+                border-radius: 6px;
+                padding: 8px 35px 8px 12px;
                 font-size: 12px;
-                min-width: 120px;
+                font-weight: 500;
+                min-width: 130px;
             }
             QComboBox:hover {
-                border-color: #444444;
+                border-color: #424242;
+                background-color: #252525;
+            }
+            QComboBox:focus {
+                border-color: #1976D2;
+                background-color: #1E1E1E;
             }
             QComboBox::drop-down {
                 border: none;
+                width: 30px;
+                subcontrol-origin: padding;
+                subcontrol-position: right center;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 6px solid #888888;
+                width: 0;
+                height: 0;
+                right: 8px;
+            }
+            QComboBox:hover::down-arrow {
+                border-top-color: #FFFFFF;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1E1E1E;
+                border: 2px solid #333333;
+                border-radius: 6px;
+                outline: none;
+                padding: 4px;
+                selection-background-color: #1976D2;
+                selection-color: #FFFFFF;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 6px 12px;
+                border-radius: 4px;
+                margin: 2px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #2D2D2D;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #1976D2;
             }
         """)
         
@@ -1271,61 +1379,38 @@ class ModelManagerDialog(QDialog):
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
-                border: 2px solid #4CAF50;
-                border-radius: 5px;
-                padding: 4px 12px;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #45a049;
-                border-color: #45a049;
             }
             QPushButton:disabled {
                 background-color: #333333;
-                border-color: #333333;
                 color: #666666;
             }
         """)
         self.btn_verify_all.clicked.connect(self._verify_all_models)
         top_bar.addWidget(self.btn_verify_all)
         
-        # 刷新按钮
-        refresh_btn = QPushButton("🔄 刷新")
-        refresh_btn.clicked.connect(self._update_ui)
-        refresh_btn.setMinimumWidth(80)
-        refresh_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2D2D2D;
-                border: 1px solid #424242;
-                border-radius: 4px;
-                padding: 10px 20px;
-                font-size: 13px;
-                color: #F0F0F0;
-            }
-            QPushButton:hover {
-                background-color: #424242;
-                border-color: #E53935;
-            }
-        """)
-        top_bar.addWidget(refresh_btn)
-        
         if not self.as_widget:
-            close_btn = QPushButton("✕ 关闭")
+            close_btn = QPushButton("关闭")
             close_btn.clicked.connect(self.accept)
             close_btn.setMinimumWidth(80)
             close_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #2D2D2D;
-                    border: 1px solid #424242;
-                    border-radius: 4px;
-                    padding: 10px 20px;
-                    font-size: 13px;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    font-size: 12px;
                     color: #F0F0F0;
                 }
                 QPushButton:hover {
                     background-color: #424242;
-                    border-color: #E53935;
                 }
             """)
             top_bar.addWidget(close_btn)
@@ -1367,7 +1452,7 @@ class ModelManagerDialog(QDialog):
             QTimer.singleShot(100, self._update_ui)
     
     def _update_ui(self):
-        """更新UI - 调用main_window的更新方法"""
+        """更新UI - 表格样式"""
         if not self.main_window:
             return
         
@@ -1394,61 +1479,80 @@ class ModelManagerDialog(QDialog):
             if not cat_info["models"]:
                 continue
             
-            # 分类标题 - 更简约的设计
-            cat_header = QFrame()
-            cat_header.setStyleSheet("""
+            # 分类标题 - 简约设计（无边框）
+            cat_label = QLabel(cat_info["name"])
+            cat_label.setStyleSheet("font-weight: bold; color: #E53935; font-size: 13px; padding: 8px 0;")
+            self.models_layout.addWidget(cat_label)
+            
+            # 表格标题行
+            header_frame = QFrame()
+            header_frame.setStyleSheet("""
                 QFrame {
-                    background-color: #252525;
+                    background-color: #1A1A1A;
                     border: none;
-                    border-radius: 3px;
-                    padding: 5px 8px;
+                    padding: 8px;
                 }
             """)
-            cat_layout = QHBoxLayout(cat_header)
-            cat_layout.setContentsMargins(6, 4, 6, 4)
+            header_layout = QHBoxLayout(header_frame)
+            header_layout.setContentsMargins(8, 4, 8, 4)
+            header_layout.setSpacing(10)
             
-            cat_label = QLabel(cat_info["name"])
-            cat_label.setStyleSheet("font-weight: bold; color: #E53935; font-size: 12px;")
-            cat_layout.addWidget(cat_label)
-            cat_layout.addStretch()
+            # 名称列
+            name_header = QLabel("模型名称")
+            name_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; min-width: 200px;")
+            header_layout.addWidget(name_header)
             
-            self.models_layout.addWidget(cat_header)
+            # 状态列
+            status_header = QLabel("状态")
+            status_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; min-width: 80px;")
+            header_layout.addWidget(status_header)
             
-            # 模型表格 - 更简约的设计
+            # 描述列
+            desc_header = QLabel("描述")
+            desc_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px;")
+            header_layout.addWidget(desc_header, 1)
+            
+            # 操作列
+            action_header = QLabel("操作")
+            action_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; min-width: 100px;")
+            header_layout.addWidget(action_header)
+            
+            self.models_layout.addWidget(header_frame)
+            
+            # 模型行
             for idx, model in enumerate(cat_info["models"]):
                 model_item = QFrame()
-                is_last = idx == len(cat_info["models"]) - 1
                 model_item.setStyleSheet("""
                     QFrame {
                         background-color: #1E1E1E;
                         border: none;
-                        border-bottom: 1px solid #2A2A2A;
-                        padding: 6px 8px;
+                        padding: 8px;
                     }
-                    QFrame:last {
-                        border-bottom: none;
+                    QFrame:hover {
+                        background-color: #252525;
                     }
                 """)
                 
-                model_item_layout = QVBoxLayout(model_item)
-                model_item_layout.setSpacing(4)
+                model_item_layout = QHBoxLayout(model_item)
                 model_item_layout.setContentsMargins(8, 6, 8, 6)
+                model_item_layout.setSpacing(10)
                 
-                # 第一行：名称 + 状态 + 按钮
-                row1 = QHBoxLayout()
-                
+                # 名称列
                 name_label = QLabel(model["display_name"])
-                name_label.setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px;")
-                row1.addWidget(name_label)
+                name_label.setStyleSheet("color: #FFFFFF; font-size: 12px; min-width: 200px;")
+                model_item_layout.addWidget(name_label)
                 
-                row1.addStretch()
-                
-                # 状态
+                # 状态列
                 status_label = QLabel("✓ 已安装" if model["exists"] else "✗ 未安装")
-                status_label.setStyleSheet(f"font-size: 11px; color: {'#4CAF50' if model['exists'] else '#F44336'};")
-                row1.addWidget(status_label)
+                status_label.setStyleSheet(f"color: {'#4CAF50' if model['exists'] else '#F44336'}; font-size: 11px; min-width: 80px;")
+                model_item_layout.addWidget(status_label)
                 
-                # 按钮区域
+                # 描述列
+                desc_label = QLabel(model["description"])
+                desc_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+                model_item_layout.addWidget(desc_label, 1)
+                
+                # 操作按钮
                 btn_layout = QHBoxLayout()
                 btn_layout.setSpacing(4)
                 
@@ -1463,40 +1567,30 @@ class ModelManagerDialog(QDialog):
                             background-color: #FF8F00;
                             color: white;
                             border: none;
-                            border-radius: 3px;
-                            padding: 3px 8px;
+                            border-radius: 4px;
+                            padding: 4px 12px;
                             font-size: 11px;
-                            font-weight: normal;
                         }
                         QPushButton:hover {
                             background-color: #FF6F00;
-                        }
-                        QPushButton:disabled {
-                            background-color: #333333;
-                            color: #666666;
                         }
                     """)
                     pause_btn.clicked.connect(self.main_window._pause_download)
                     btn_layout.addWidget(pause_btn)
                 elif model["exists"]:
-                    # 已安装的模型：只保留删除按钮
+                    # 已安装的模型：删除按钮
                     delete_btn = QPushButton("删除")
                     delete_btn.setStyleSheet("""
                         QPushButton {
                             background-color: #C62828;
                             color: white;
                             border: none;
-                            border-radius: 3px;
-                            padding: 3px 8px;
+                            border-radius: 4px;
+                            padding: 4px 12px;
                             font-size: 11px;
-                            font-weight: normal;
                         }
                         QPushButton:hover {
                             background-color: #B71C1C;
-                        }
-                        QPushButton:disabled {
-                            background-color: #333333;
-                            color: #666666;
                         }
                     """)
                     delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
@@ -1509,44 +1603,24 @@ class ModelManagerDialog(QDialog):
                             background-color: #1565C0;
                             color: white;
                             border: none;
-                            border-radius: 3px;
-                            padding: 3px 10px;
+                            border-radius: 4px;
+                            padding: 4px 12px;
                             font-size: 11px;
-                            font-weight: normal;
                         }
                         QPushButton:hover {
                             background-color: #1976D2;
-                        }
-                        QPushButton:disabled {
-                            background-color: #333333;
-                            color: #666666;
                         }
                     """)
                     download_btn.clicked.connect(lambda checked, m=model["name"]: self._download_model(m))
                     btn_layout.addWidget(download_btn)
                 
-                row1.addLayout(btn_layout)
-                
-                model_item_layout.addLayout(row1)
-                
-                # 第二行：描述
-                desc_label = QLabel(model["description"])
-                desc_label.setStyleSheet("font-size: 11px; color: #AAAAAA;")
-                model_item_layout.addWidget(desc_label)
-                
-                # 第三行：详细介绍
-                if "info" in model:
-                    info_label = QLabel(model["info"])
-                    info_label.setStyleSheet("font-size: 10px; color: #888888;")
-                    info_label.setWordWrap(True)
-                    model_item_layout.addWidget(info_label)
-                
+                model_item_layout.addLayout(btn_layout)
                 self.models_layout.addWidget(model_item)
             
             # 分类间距
             if cat_id != list(categories.keys())[-1]:
                 spacer = QWidget()
-                spacer.setMinimumHeight(8)
+                spacer.setMinimumHeight(10)
                 self.models_layout.addWidget(spacer)
     
     def _download_model(self, model_name):
