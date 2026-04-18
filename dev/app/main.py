@@ -879,38 +879,39 @@ class ServiceCard(QFrame):
         # 第二行：操作按钮
         btn_layout = QHBoxLayout()
         
-        self.restart_btn = QPushButton("🔄 重启")
+        self.restart_btn = QPushButton("重启")
         self.restart_btn.setStyleSheet("""
             QPushButton {
-                background-color: #1565C0;
-                color: #E0E0E0;
-                border: 1px solid #1976D2;
+                background-color: #2D2D2D;
+                color: #FFFFFF;
+                border: 1px solid #424242;
                 border-radius: 6px;
                 padding: 6px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1976D2;
+                background-color: #3D3D3D;
+                border-color: #525252;
             }
         """)
         self.restart_btn.clicked.connect(lambda: self.restart_clicked.emit(self.service_id))
         btn_layout.addWidget(self.restart_btn)
         
-        self.open_btn = QPushButton("🌐 打开")
+        self.open_btn = QPushButton("打开")
         self.open_btn.setStyleSheet("""
             QPushButton {
-                background-color: #E53935;
-                color: white;
-                border: none;
+                background-color: #2D2D2D;
+                color: #FFFFFF;
+                border: 1px solid #424242;
                 border-radius: 6px;
                 padding: 6px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #C62828;
+                background-color: #3D3D3D;
+                border-color: #525252;
             }
         """)
         self.open_btn.clicked.connect(lambda: self.open_clicked.emit(self.service_id))

@@ -26,7 +26,7 @@ class InitServiceCatalogMixin:
             return [str(checkpoint_dir)]
         return []
 
-    def get_available_acestep_v15_models(self) -&gt; List[str]:
+    def get_available_acestep_v15_models(self) -> List[str]:
         """Scan and return all model directory names that are valid ACE-Step DiT models."""
         import sys
         from pathlib import Path
