@@ -873,8 +873,14 @@ class HybridVersionManagerDialog(QDialog):
             """)
             top_layout.addWidget(current_tag)
         else:
-            # 展开/收起按钮
-            is_expanded = self.expand_all_btn.isChecked()
+            # 展开/收起按钮 - 使用安全检查
+            is_expanded = True
+            if hasattr(self, 'expand_all_btn'):
+                try:
+                    is_expanded = self.expand_all_btn.isChecked()
+                except:
+                    is_expanded = True
+            
             toggle_btn = QPushButton("📕 收起" if is_expanded else "📖 展开")
             toggle_btn.setMinimumWidth(65)
             toggle_btn.setStyleSheet("""

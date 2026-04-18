@@ -133,6 +133,9 @@ def build_exe():
     os.chdir(ROOT_DIR)
     
     exe_name = f"云集智能音乐创意台-v{VERSION}.exe"
+    build_dir_name = f"云集智能音乐创意台-v{VERSION}"
+    build_dir = PROJECT_ROOT / "build" / build_dir_name
+    build_dir.mkdir(parents=True, exist_ok=True)
     
     # 构建PyInstaller参数
     pyinstaller_args = [
@@ -141,8 +144,8 @@ def build_exe():
         "--onefile", "--windowed",
         "--clean", "--noconfirm",
         "--distpath", str(DEV_DIR),
-        "--workpath", str(PROJECT_ROOT / "build"),
-        "--specpath", str(PROJECT_ROOT / "build"),
+        "--workpath", str(build_dir),
+        "--specpath", str(build_dir),
         "--hidden-import", "PyQt6",
         "--hidden-import", "PyQt6.QtCore",
         "--hidden-import", "PyQt6.QtGui",
