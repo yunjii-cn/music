@@ -117,60 +117,43 @@ class HybridVersionManagerDialog(QDialog):
             self.mode_combo.addItem("Git 源代码", "git")
             self.mode_combo.setStyleSheet("""
                 QComboBox {
-                    background-color: #1E1E1E;
+                    background-color: #252525;
                     color: #FFFFFF;
-                    border: 2px solid #333333;
-                    border-radius: 6px;
-                    padding: 8px 35px 8px 12px;
+                    border: 1px solid #333333;
+                    border-radius: 4px;
+                    padding: 6px 30px 6px 10px;
                     font-size: 12px;
-                    font-weight: 500;
                     min-width: 130px;
                 }
                 QComboBox:hover {
-                    border-color: #424242;
-                    background-color: #252525;
+                    border-color: #444444;
                 }
                 QComboBox:focus {
                     border-color: #1976D2;
-                    background-color: #1E1E1E;
                 }
                 QComboBox::drop-down {
                     border: none;
-                    width: 30px;
-                    subcontrol-origin: padding;
-                    subcontrol-position: right center;
+                    width: 25px;
                 }
                 QComboBox::down-arrow {
                     image: none;
-                    border-left: 6px solid transparent;
-                    border-right: 6px solid transparent;
-                    border-top: 6px solid #888888;
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-top: 5px solid #888888;
                     width: 0;
                     height: 0;
                     right: 8px;
                 }
-                QComboBox:hover::down-arrow {
-                    border-top-color: #FFFFFF;
-                }
                 QComboBox QAbstractItemView {
-                    background-color: #1E1E1E;
-                    border: 2px solid #333333;
-                    border-radius: 6px;
+                    background-color: #252525;
+                    border: 1px solid #333333;
+                    border-radius: 4px;
                     outline: none;
-                    padding: 4px;
                     selection-background-color: #1976D2;
                     selection-color: #FFFFFF;
                 }
                 QComboBox QAbstractItemView::item {
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    margin: 2px;
-                }
-                QComboBox QAbstractItemView::item:hover {
-                    background-color: #2D2D2D;
-                }
-                QComboBox QAbstractItemView::item:selected {
-                    background-color: #1976D2;
+                    padding: 6px 10px;
                 }
             """)
             self.mode_combo.blockSignals(True)
@@ -862,38 +845,13 @@ class HybridVersionManagerDialog(QDialog):
                     item['toggle_btn'].setText("收起" if checked else "展开")
     
     def _create_git_version_item(self, version, is_current):
-        """创建Git版本项"""
-        # 获取版本详情（提前获取，用于默认展开）
-        detail_content = ""
-        try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = SW_HIDE
-            result = subprocess.run(
-                ['git', 'show', '-s', '--pretty=format:%B', version['hash']],
-                capture_output=True, text=True,
-                cwd=self.base_dir, timeout=5,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW
-            )
-            detail_content = result.stdout.strip() if result.stdout else ""
-        except Exception:
-            pass
-        
-        # 默认展开状态
-        is_expanded = True
-        if hasattr(self, 'expand_all_btn'):
-            try:
-                is_expanded = self.expand_all_btn.isChecked()
-            except:
-                is_expanded = True
-        
+        """创建Git版本项 - 简化版"""
         frame = QFrame()
         if is_current:
             frame.setStyleSheet("""
                 QFrame {
                     background-color: #1B5E20;
-                    border-radius: 5px;
+                    border-radius: 4px;
                     padding: 10px;
                 }
                 QFrame:hover {
@@ -904,7 +862,7 @@ class HybridVersionManagerDialog(QDialog):
             frame.setStyleSheet("""
                 QFrame {
                     background-color: #1A1A1A;
-                    border-radius: 5px;
+                    border-radius: 4px;
                     padding: 10px;
                 }
                 QFrame:hover {
@@ -913,12 +871,12 @@ class HybridVersionManagerDialog(QDialog):
             """)
         
         main_layout = QVBoxLayout(frame)
-        main_layout.setSpacing(8)
+        main_layout.setSpacing(6)
         main_layout.setContentsMargins(10, 8, 10, 8)
         
         # 顶部：版本信息行
         top_layout = QHBoxLayout()
-        top_layout.setSpacing(12)
+        top_layout.setSpacing(10)
         
         # 提交哈希
         hash_label = QLabel(version['hash'])
@@ -949,24 +907,6 @@ class HybridVersionManagerDialog(QDialog):
             current_tag.setStyleSheet("color: #4CAF50;")
             top_layout.addWidget(current_tag)
         else:
-            # 展开/收起按钮
-            if detail_content:
-                toggle_btn = QPushButton("收起" if is_expanded else "展开")
-                toggle_btn.setMinimumWidth(55)
-                toggle_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: #AAAAAA;
-                        border: none;
-                        padding: 4px 8px;
-                        font-size: 11px;
-                    }
-                    QPushButton:hover {
-                        color: #FFFFFF;
-                    }
-                """)
-                top_layout.addWidget(toggle_btn)
-            
             # 切换按钮
             switch_btn = QPushButton("切换")
             switch_btn.setMinimumWidth(55)
@@ -988,43 +928,6 @@ class HybridVersionManagerDialog(QDialog):
             top_layout.addWidget(switch_btn)
         
         main_layout.addLayout(top_layout)
-        
-        # 详情区域（默认展开）
-        detail_widget = QWidget()
-        detail_layout = QVBoxLayout(detail_widget)
-        detail_layout.setSpacing(4)
-        detail_layout.setContentsMargins(10, 4, 0, 0)
-        
-        if detail_content:
-            changes_label = QLabel("提交详情：")
-            changes_label.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
-            changes_label.setStyleSheet("color: #FF9800;")
-            detail_layout.addWidget(changes_label)
-            
-            detail_text = QLabel(detail_content)
-            detail_text.setFont(QFont("Microsoft YaHei", 9))
-            detail_text.setStyleSheet("color: #AAAAAA;")
-            detail_text.setWordWrap(True)
-            detail_layout.addWidget(detail_text)
-        
-        detail_widget.setVisible(is_expanded and bool(detail_content))
-        main_layout.addWidget(detail_widget)
-        
-        # 连接展开/收起按钮
-        if not is_current and detail_content:
-            def toggle_detail(checked=False):
-                is_visible = not detail_widget.isVisible()
-                detail_widget.setVisible(is_visible)
-                toggle_btn.setText("收起" if is_visible else "展开")
-            toggle_btn.clicked.connect(toggle_detail)
-        
-        # 保存到列表
-        self.git_version_items.append({
-            'expanded': is_expanded and bool(detail_content),
-            'detail_widget': detail_widget,
-            'toggle_btn': toggle_btn if (not is_current and detail_content) else None
-        })
-        
         self.versions_layout.addWidget(frame)
     
     def _preview_git_version(self, version):
@@ -1296,60 +1199,43 @@ class ModelManagerDialog(QDialog):
         self.download_source_combo = QComboBox()
         self.download_source_combo.setStyleSheet("""
             QComboBox {
-                background-color: #1E1E1E;
+                background-color: #252525;
                 color: #FFFFFF;
-                border: 2px solid #333333;
-                border-radius: 6px;
-                padding: 8px 35px 8px 12px;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                padding: 6px 30px 6px 10px;
                 font-size: 12px;
-                font-weight: 500;
                 min-width: 130px;
             }
             QComboBox:hover {
-                border-color: #424242;
-                background-color: #252525;
+                border-color: #444444;
             }
             QComboBox:focus {
                 border-color: #1976D2;
-                background-color: #1E1E1E;
             }
             QComboBox::drop-down {
                 border: none;
-                width: 30px;
-                subcontrol-origin: padding;
-                subcontrol-position: right center;
+                width: 25px;
             }
             QComboBox::down-arrow {
                 image: none;
-                border-left: 6px solid transparent;
-                border-right: 6px solid transparent;
-                border-top: 6px solid #888888;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #888888;
                 width: 0;
                 height: 0;
                 right: 8px;
             }
-            QComboBox:hover::down-arrow {
-                border-top-color: #FFFFFF;
-            }
             QComboBox QAbstractItemView {
-                background-color: #1E1E1E;
-                border: 2px solid #333333;
-                border-radius: 6px;
+                background-color: #252525;
+                border: 1px solid #333333;
+                border-radius: 4px;
                 outline: none;
-                padding: 4px;
                 selection-background-color: #1976D2;
                 selection-color: #FFFFFF;
             }
             QComboBox QAbstractItemView::item {
-                padding: 6px 12px;
-                border-radius: 4px;
-                margin: 2px;
-            }
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #2D2D2D;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #1976D2;
+                padding: 6px 10px;
             }
         """)
         

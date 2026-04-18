@@ -850,18 +850,26 @@ class ServiceCard(QFrame):
         
         top_row_layout.addStretch()
         
-        # 状态指示灯 - 使用QLabel样式
+        # 状态指示灯+文字
+        status_container = QHBoxLayout()
+        status_container.setSpacing(6)
+        
         self.status_label = QLabel()
-        self.status_label.setFixedSize(24, 24)
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setFixedSize(16, 16)
         self.status_label.setStyleSheet("""
             QLabel {
                 background-color: #424242;
                 border: 2px solid #616161;
-                border-radius: 12px;
+                border-radius: 8px;
             }
         """)
-        top_row_layout.addWidget(self.status_label)
+        status_container.addWidget(self.status_label)
+        
+        self.status_text_label = QLabel("未启动")
+        self.status_text_label.setStyleSheet("font-size: 12px; color: #AAAAAA;")
+        status_container.addWidget(self.status_text_label)
+        
+        top_row_layout.addLayout(status_container)
         
         layout.addLayout(top_row_layout)
         
@@ -916,9 +924,11 @@ class ServiceCard(QFrame):
                 QLabel {
                     background-color: #4CAF50;
                     border: 2px solid #388E3C;
-                    border-radius: 12px;
+                    border-radius: 8px;
                 }
             """)
+            self.status_text_label.setText("运行中")
+            self.status_text_label.setStyleSheet("font-size: 12px; color: #4CAF50; font-weight: bold;")
             self.setStyleSheet(f"""
                 ServiceCard {{
                     background-color: #1E1E1E;
@@ -931,9 +941,11 @@ class ServiceCard(QFrame):
                 QLabel {
                     background-color: #424242;
                     border: 2px solid #616161;
-                    border-radius: 12px;
+                    border-radius: 8px;
                 }
             """)
+            self.status_text_label.setText("未启动")
+            self.status_text_label.setStyleSheet("font-size: 12px; color: #AAAAAA;")
             self.setStyleSheet(f"""
                 ServiceCard {{
                     background-color: #1E1E1E;
@@ -1182,34 +1194,29 @@ class MainWindow(QMainWindow):
         nav_bar_layout.setSpacing(15)
         nav_bar_layout.setContentsMargins(15, 12, 15, 12)
         
-        # 菜单栏按钮样式 - 蓝色未激活，红色激活，更简约的设计
+        # 菜单栏按钮样式 - 更简约的设计
         menu_button_style = """
             QPushButton {
-                background-color: #1565C0;
-                color: white;
-                border: 1px solid #1976D2;
+                background-color: #252525;
+                color: #FFFFFF;
+                border: 1px solid #333333;
                 border-radius: 4px;
-                padding: 10px 20px;
-                font-size: 13px;
-                font-weight: bold;
-                font-family: 'Microsoft YaHei', sans-serif;
+                padding: 10px 16px;
+                font-size: 12px;
+                font-weight: normal;
             }
             QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1976D2;
-            }
-            QPushButton:pressed {
-                background-color: #0D47A1;
-                border-color: #0D47A1;
+                background-color: #333333;
+                border-color: #444444;
             }
             QPushButton:checked {
-                background-color: #C62828;
-                border-color: #C62828;
-                color: white;
+                background-color: #1565C0;
+                border-color: #1976D2;
+                color: #FFFFFF;
             }
             QPushButton:checked:hover {
-                background-color: #B71C1C;
-                border-color: #B71C1C;
+                background-color: #1976D2;
+                border-color: #1976D2;
             }
         """
         
@@ -1416,60 +1423,43 @@ class MainWindow(QMainWindow):
         self.browser_combo = QComboBox()
         self.browser_combo.setStyleSheet("""
             QComboBox {
-                background-color: #1E1E1E;
+                background-color: #252525;
                 color: #FFFFFF;
-                border: 2px solid #333333;
-                border-radius: 8px;
-                padding: 10px 40px 10px 14px;
-                font-size: 13px;
-                font-weight: 500;
-                min-width: 200px;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                padding: 6px 30px 6px 10px;
+                font-size: 12px;
+                min-width: 180px;
             }
             QComboBox:hover {
-                border-color: #424242;
-                background-color: #252525;
+                border-color: #444444;
             }
             QComboBox:focus {
                 border-color: #1976D2;
-                background-color: #1E1E1E;
             }
             QComboBox::drop-down {
                 border: none;
-                width: 35px;
-                subcontrol-origin: padding;
-                subcontrol-position: right center;
+                width: 25px;
             }
             QComboBox::down-arrow {
                 image: none;
-                border-left: 7px solid transparent;
-                border-right: 7px solid transparent;
-                border-top: 7px solid #888888;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #888888;
                 width: 0;
                 height: 0;
-                right: 10px;
-            }
-            QComboBox:hover::down-arrow {
-                border-top-color: #FFFFFF;
+                right: 8px;
             }
             QComboBox QAbstractItemView {
-                background-color: #1E1E1E;
-                border: 2px solid #333333;
-                border-radius: 8px;
+                background-color: #252525;
+                border: 1px solid #333333;
+                border-radius: 4px;
                 outline: none;
-                padding: 4px;
                 selection-background-color: #1976D2;
                 selection-color: #FFFFFF;
             }
             QComboBox QAbstractItemView::item {
-                padding: 8px 12px;
-                border-radius: 4px;
-                margin: 2px;
-            }
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #2D2D2D;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #1976D2;
+                padding: 6px 10px;
             }
         """)
         
