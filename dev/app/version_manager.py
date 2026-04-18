@@ -258,22 +258,45 @@ class HybridVersionManagerDialog(QDialog):
     def _get_current_exe_version(self):
         """获取当前EXE版本信息"""
         try:
+            # 首先检查是否是打包的EXE模式
             if hasattr(sys, 'frozen'):
                 exe_path = sys.executable
                 exe_name = os.path.basename(exe_path)
+            else:
+                # 如果不是打包模式（开发模式），尝试从文件名或其他方式获取
+                # 尝试从version_history.json获取最新版本
+                if self.version_history:
+                    latest_version = sorted(self.version_history.keys(), reverse=True)[0]
+                    match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', latest_version)
+                    if match:
+                        version = match.group(1)
+                        return {
+                            'version': version,
+                            'name': latest_version,
+                            'size': "开发模式",
+                            'path': os.path.abspath(__file__)
+                        }
+                return None
+            
+            # 从文件名中提取版本号，支持多种格式
+            match = re.search(r'v(\d{4}\.\d{2}\.\d{2}\.\d{4})', exe_name)
+            if not match:
                 match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_name)
-                if match:
-                    version = match.group(1)
-                    file_size = os.path.getsize(exe_path) / (1024 * 1024)
-                    return {
-                        'version': version,
-                        'name': exe_name,
-                        'size': f"{file_size:.2f} MB",
-                        'path': exe_path
-                    }
+            
+            if match:
+                version = match.group(1)
+                file_size = os.path.getsize(exe_path) / (1024 * 1024)
+                return {
+                    'version': version,
+                    'name': exe_name,
+                    'size': f"{file_size:.2f} MB",
+                    'path': exe_path
+                }
             return None
         except Exception as e:
             print(f"获取当前EXE版本失败：{e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _get_available_exe_versions(self):
@@ -433,35 +456,37 @@ class HybridVersionManagerDialog(QDialog):
         # 检查Git是否可用
         git_available = GitDetector.is_git_available()
         
-        if not git_available and self.current_mode == "git":
-            # Git模式但没有Git，引导安装
-            reply = QMessageBox.question(
-                self,
-                "需要Git",
-                "Git模式需要安装Git才能使用。\n\n"
-                "是否打开Git安装引导？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                dialog = GitInstallDialog(self)
-                if dialog.exec() == QDialog.DialogCode.Accepted:
-                    # 用户安装了Git，重新加载
-                    self.has_git_repo = self._check_git_repo()
-                    self._load_versions()
-                    return
-            # 切换回EXE模式
-            self.current_mode = "exe"
-            if hasattr(self, 'mode_combo'):
-                self.mode_combo.setCurrentIndex(0)
-        
-        # 如果没有Git仓库或Git不可用，使用EXE模式
-        if not self.has_git_repo or not git_available:
-            self._load_exe_versions()
-        elif self.current_mode == "exe":
+        # 根据当前模式直接加载，不强制切换
+        if self.current_mode == "exe":
             self._load_exe_versions()
         else:
-            self._load_git_versions()
+            # 检查Git仓库和Git是否可用
+            if not self.has_git_repo or not git_available:
+                # Git模式但没有Git，引导安装
+                reply = QMessageBox.question(
+                    self,
+                    "需要Git",
+                    "Git模式需要安装Git才能使用。\n\n"
+                    "是否打开Git安装引导？",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    dialog = GitInstallDialog(self)
+                    if dialog.exec() == QDialog.DialogCode.Accepted:
+                        # 用户安装了Git，重新加载
+                        self.has_git_repo = self._check_git_repo()
+                        self._load_versions()
+                        return
+                # 切换回EXE模式
+                self.current_mode = "exe"
+                if hasattr(self, 'mode_combo'):
+                    self.mode_combo.blockSignals(True)
+                    self.mode_combo.setCurrentIndex(0)
+                    self.mode_combo.blockSignals(False)
+                self._load_exe_versions()
+            else:
+                self._load_git_versions()
     
     def _load_exe_versions(self):
         """加载EXE版本列表"""

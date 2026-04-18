@@ -204,6 +204,10 @@ def build_exe(version_dir):
         else:
             print(f"  警告: 文件不存在: {script_name}")
     
+    # 指定.spec文件输出到版本目录下的build文件夹
+    spec_output_dir = version_dir / "build"
+    spec_output_dir.mkdir(exist_ok=True)
+    
     # 构建PyInstaller参数（只打包核心文件和脚本）
     pyinstaller_args = [
         sys.executable, "-m", "PyInstaller",
@@ -211,6 +215,7 @@ def build_exe(version_dir):
         "--onefile", "--windowed",
         "--icon", "icon.ico",
         "--clean", "--noconfirm",
+        "--specpath", str(spec_output_dir),
         "--hidden-import", "PyQt6",
         "--hidden-import", "PyQt6.QtCore",
         "--hidden-import", "PyQt6.QtGui",
@@ -383,6 +388,7 @@ def cleanup_version_build(version_dir, keep_dist=False):
             except Exception:
                 pass
     
+    # 从版本目录根目录删除.spec文件
     spec_files_to_remove = list(version_dir.glob("*.spec"))
     for spec_file in spec_files_to_remove:
         if spec_file.name != "launcher.spec":

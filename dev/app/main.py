@@ -844,16 +844,23 @@ class ServiceCard(QFrame):
         title_layout.addStretch()
         layout.addLayout(title_layout)
         
+        # 端口和状态在一行显示
+        status_port_layout = QHBoxLayout()
+        
         self.status_label = QLabel("○ 未启动")
         self.status_label.setStyleSheet("""
             font-size: 12px;
             color: #1976D2;
         """)
-        layout.addWidget(self.status_label)
+        status_port_layout.addWidget(self.status_label)
+        
+        status_port_layout.addStretch()
         
         self.port_label = QLabel(f"端口: {self.service_info['port']}")
         self.port_label.setStyleSheet("font-size: 11px; color: #FFFFFF;")
-        layout.addWidget(self.port_label)
+        status_port_layout.addWidget(self.port_label)
+        
+        layout.addLayout(status_port_layout)
         
         btn_layout = QHBoxLayout()
         
@@ -1379,89 +1386,117 @@ class MainWindow(QMainWindow):
         # 加载系统信息或显示初始化流程
         self._check_and_load_system_info()
         
-        # 1. 浏览器设置面板
-        browser_panel = CollapsiblePanel("🌐 浏览器设置")
-        browser_content = QWidget()
-        browser_content_layout = QVBoxLayout(browser_content)
-        browser_content_layout.setSpacing(10)
-        browser_content_layout.setContentsMargins(0, 0, 0, 0)
+        # 1. 浏览器设置面板 - 一排横向布局
+        browser_panel = QFrame()
+        browser_panel.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        browser_layout = QHBoxLayout(browser_panel)
+        browser_layout.setSpacing(12)
+        browser_layout.setContentsMargins(12, 10, 12, 10)
         
-        browser_header_layout = QHBoxLayout()
-        browser_label = QLabel("启动后打开的浏览器:")
-        browser_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        browser_header_layout.addWidget(browser_label)
-        browser_header_layout.addStretch()
+        browser_label = QLabel("🌐 浏览器:")
+        browser_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #FFFFFF;")
+        browser_layout.addWidget(browser_label)
         
         self.browser_combo = QComboBox()
         self.browser_combo.setStyleSheet("""
             QComboBox {
-                background-color: #1A1A1A;
+                background-color: #121212;
                 color: #F0F0F0;
                 border: 1px solid #333333;
-                border-radius: 5px;
-                padding: 8px;
-                font-size: 12px;
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-size: 13px;
+                min-width: 180px;
             }
             QComboBox:hover {
                 border-color: #1976D2;
             }
             QComboBox::drop-down {
                 border: none;
+                width: 30px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 6px solid #888888;
             }
         """)
         
-        # 添加浏览器选项
+        # 添加浏览器选项，包括自定义选项
         for browser_name, browser_path in self.browsers.items():
             self.browser_combo.addItem(browser_name, browser_path)
         
+        # 添加自定义浏览器选项
+        self.browser_combo.addItem("📁 自定义浏览器...", "custom")
+        
         # 设置当前选中的浏览器
-        for i in range(self.browser_combo.count()):
-            if self.browser_combo.itemText(i) == self.selected_browser:
-                self.browser_combo.setCurrentIndex(i)
-                break
+        is_custom = self.selected_browser == "自定义浏览器" or self.selected_browser == "custom"
+        if is_custom and self.custom_browser_path:
+            # 如果是自定义模式，检查是否在列表中
+            found = False
+            for i in range(self.browser_combo.count()):
+                if self.browser_combo.itemText(i) == self.selected_browser:
+                    self.browser_combo.setCurrentIndex(i)
+                    found = True
+                    break
+            if not found:
+                # 选择自定义选项
+                for i in range(self.browser_combo.count()):
+                    if self.browser_combo.itemData(i) == "custom":
+                        self.browser_combo.setCurrentIndex(i)
+                        break
+        else:
+            # 选择系统浏览器
+            for i in range(self.browser_combo.count()):
+                if self.browser_combo.itemText(i) == self.selected_browser:
+                    self.browser_combo.setCurrentIndex(i)
+                    break
         
         # 保存浏览器选择
         self.browser_combo.currentIndexChanged.connect(self._on_browser_changed)
         
-        browser_header_layout.addWidget(self.browser_combo)
-        browser_content_layout.addLayout(browser_header_layout)
+        browser_layout.addWidget(self.browser_combo)
         
-        # 添加手动选择浏览器按钮
-        browser_custom_layout = QHBoxLayout()
-        self.browser_custom_label = QLabel("自定义浏览器:")
-        self.browser_custom_label.setStyleSheet("font-size: 12px; color: #AAAAAA;")
-        browser_custom_layout.addWidget(self.browser_custom_label)
-        
+        # 自定义浏览器路径（默认隐藏）
         self.browser_path_edit = QLineEdit()
-        self.browser_path_edit.setReadOnly(True)
-        self.browser_path_edit.setPlaceholderText("点击右侧按钮选择浏览器...")
+        self.browser_path_edit.setReadOnly(False)
+        self.browser_path_edit.setPlaceholderText("粘贴或输入浏览器路径...")
         self.browser_path_edit.setStyleSheet("""
             QLineEdit {
-                background-color: #1A1A1A;
+                background-color: #121212;
                 color: #F0F0F0;
                 border: 1px solid #333333;
-                border-radius: 5px;
-                padding: 8px;
+                border-radius: 6px;
+                padding: 8px 10px;
                 font-size: 12px;
             }
-            QLineEdit:hover {
+            QLineEdit:hover, QLineEdit:focus {
                 border-color: #1976D2;
             }
         """)
         self.browser_path_edit.setText(self.custom_browser_path)
-        browser_custom_layout.addWidget(self.browser_path_edit, 1)
+        self.browser_path_edit.setVisible(is_custom)
+        self.browser_path_edit.textChanged.connect(self._on_custom_browser_path_changed)
+        browser_layout.addWidget(self.browser_path_edit, 1)
         
-        self.btn_select_browser = QPushButton("📁 选择...")
+        self.btn_select_browser = QPushButton("📂 选择")
         self.btn_select_browser.setStyleSheet("""
             QPushButton {
                 background-color: #1565C0;
                 color: #E0E0E0;
-                border: 2px solid #1976D2;
-                border-radius: 5px;
-                padding: 8px 12px;
+                border: 1px solid #1976D2;
+                border-radius: 6px;
+                padding: 8px 16px;
                 font-size: 12px;
                 font-weight: bold;
-                transition: all 0.2s ease;
             }
             QPushButton:hover {
                 background-color: #1976D2;
@@ -1469,10 +1504,9 @@ class MainWindow(QMainWindow):
             }
         """)
         self.btn_select_browser.clicked.connect(self._select_custom_browser)
-        browser_custom_layout.addWidget(self.btn_select_browser)
+        self.btn_select_browser.setVisible(is_custom)
+        browser_layout.addWidget(self.btn_select_browser)
         
-        browser_content_layout.addLayout(browser_custom_layout)
-        browser_panel.set_content(browser_content)
         settings_layout.addWidget(browser_panel)
         
         self.services_layout.addWidget(settings_container)
@@ -3891,32 +3925,66 @@ try {
     def _on_browser_changed(self, index):
         """处理浏览器选择变化"""
         selected_browser = self.browser_combo.itemText(index)
-        self.selected_browser = selected_browser
-        self.config.set("browser.default", selected_browser)
-        self._log(f"已设置默认浏览器为: {selected_browser}")
+        selected_data = self.browser_combo.itemData(index)
+        
+        # 检查是否选择了自定义浏览器
+        is_custom = selected_data == "custom" or selected_browser == "自定义浏览器"
+        
+        # 显示/隐藏自定义设置
+        self.browser_path_edit.setVisible(is_custom)
+        self.btn_select_browser.setVisible(is_custom)
+        
+        if is_custom:
+            # 自定义浏览器模式
+            self.selected_browser = "custom"
+            self.config.set("browser.default", "custom")
+            if self.custom_browser_path and os.path.exists(self.custom_browser_path):
+                self._log(f"已启用自定义浏览器")
+            else:
+                self._log(f"请选择或输入自定义浏览器路径")
+        else:
+            # 系统浏览器模式
+            self.selected_browser = selected_browser
+            self.config.set("browser.default", selected_browser)
+            self._log(f"已设置默认浏览器为: {selected_browser}")
+    
+    def _on_custom_browser_path_changed(self, path):
+        """处理自定义浏览器路径变化"""
+        self.custom_browser_path = path
+        self.config.set("browser.custom_path", path)
+        if path and os.path.exists(path):
+            self.selected_browser = "custom"
+            self.config.set("browser.default", "custom")
+            self._log(f"已设置自定义浏览器: {path}")
     
     def _open_url_in_browser(self, url: str):
         """使用选择的浏览器打开URL"""
-        selected_browser = self.selected_browser
-        
-        if selected_browser == "系统默认":
-            import webbrowser
-            webbrowser.open(url)
-        else:
-            browser_path = self.browsers.get(selected_browser)
-            if browser_path:
-                try:
-                    subprocess.Popen([browser_path, url])
-                    self._log(f"使用 {selected_browser} 打开: {url}")
-                except Exception as e:
-                    self._log(f"打开浏览器失败: {e}", "#F44336")
-                    # 回退到系统默认
-                    import webbrowser
-                    webbrowser.open(url)
-            else:
-                # 浏览器路径不存在，回退到系统默认
+        if (self.selected_browser == "custom" or self.selected_browser == "自定义浏览器") and self.custom_browser_path and os.path.exists(self.custom_browser_path):
+            try:
+                subprocess.Popen([self.custom_browser_path, url])
+                self._log(f"使用自定义浏览器打开: {url}")
+            except Exception as e:
+                self._log(f"打开自定义浏览器失败: {e}", "#F44336")
                 import webbrowser
                 webbrowser.open(url)
+        else:
+            selected_browser = self.selected_browser
+            if selected_browser == "系统默认" or selected_browser == "custom" or selected_browser == "自定义浏览器":
+                import webbrowser
+                webbrowser.open(url)
+            else:
+                browser_path = self.browsers.get(selected_browser)
+                if browser_path:
+                    try:
+                        subprocess.Popen([browser_path, url])
+                        self._log(f"使用 {selected_browser} 打开: {url}")
+                    except Exception as e:
+                        self._log(f"打开浏览器失败: {e}", "#F44336")
+                        import webbrowser
+                        webbrowser.open(url)
+                else:
+                    import webbrowser
+                    webbrowser.open(url)
     
     def _select_custom_browser(self):
         """手动选择浏览器"""
@@ -3931,21 +3999,8 @@ try {
                 self.custom_browser_path = browser_path
                 self.config.set("browser.custom_path", browser_path)
                 
-                # 更新浏览器列表
-                if "自定义浏览器" in self.browsers:
-                    del self.browsers["自定义浏览器"]
-                self.browsers["自定义浏览器"] = browser_path
-                
-                # 更新下拉框
-                self.browser_combo.clear()
-                for browser_name, browser_path in self.browsers.items():
-                    self.browser_combo.addItem(browser_name, browser_path)
-                
-                # 选择自定义浏览器
-                for i in range(self.browser_combo.count()):
-                    if self.browser_combo.itemText(i) == "自定义浏览器":
-                        self.browser_combo.setCurrentIndex(i)
-                        break
+                self.selected_browser = "custom"
+                self.config.set("browser.default", "custom")
                 
                 self._log(f"已选择自定义浏览器: {browser_path}")
     
