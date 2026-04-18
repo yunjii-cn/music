@@ -90,22 +90,40 @@ def git_commit_and_push(commit_message):
         
         # 推送
         print("  推送到远程仓库...")
-        result = subprocess.run(
-            ['git', 'push'],
-            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=60
-        )
-        if result.returncode == 0:
-            print("  ✓ 推送成功")
-            return True
-        else:
-            print(f"  警告：推送失败：{result.stderr}")
-            return False
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                result = subprocess.run(
+                    ['git', 'push'],
+                    cwd=PROJECT_ROOT, capture_output=True, text=True,
+                    timeout=180  # 3分钟超时
+                )
+                if result.returncode == 0:
+                    print("  ✓ 推送成功")
+                    return True
+                else:
+                    print(f"  警告：推送失败（第{attempt + 1}次尝试）：{result.stderr}")
+                    if attempt < max_attempts - 1:
+                        print("  重试中...")
+                        import time
+                        time.sleep(3)
+            except subprocess.TimeoutExpired:
+                print(f"  警告：推送超时（第{attempt + 1}次尝试）")
+                if attempt < max_attempts - 1:
+                    print("  重试中...")
+                    import time
+                    time.sleep(3)
+        
+        print("  ✗ 推送失败，请稍后手动推送")
+        return False
             
     except subprocess.CalledProcessError as e:
         print(f"  Git操作失败：{e}")
         return False
     except Exception as e:
         print(f"  Git操作异常：{e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -241,12 +259,14 @@ def main():
         
         # 4. Git提交和推送
         commit_message = f"feat: 发布版本 v{VERSION}\n\n" + "\n".join([f"- {change}" for change in changes])
-        git_commit_and_push(commit_message)
+        push_success = git_commit_and_push(commit_message)
         print()
         
         print("=" * 60)
         print("  全部完成！")
         print("  提示：临时构建文件在 项目根目录/build/，可手动清理")
+        if not push_success:
+            print("  ⚠️  注意：Git推送失败，请稍后手动执行 git push")
         print("=" * 60)
         
     except subprocess.CalledProcessError as e:

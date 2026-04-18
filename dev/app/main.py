@@ -826,54 +826,69 @@ class ServiceCard(QFrame):
         """)
         
         layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        layout.setSpacing(12)
         layout.setContentsMargins(15, 15, 15, 15)
         
-        title_layout = QHBoxLayout()
+        # 第一行：图标、名称、端口、状态都在同一排
+        top_row_layout = QHBoxLayout()
+        
         self.icon_label = QLabel(self.service_info["icon"])
         self.icon_label.setStyleSheet("font-size: 24px;")
-        title_layout.addWidget(self.icon_label)
+        top_row_layout.addWidget(self.icon_label)
         
         self.name_label = QLabel(self.service_info["name"])
-        self.name_label.setStyleSheet(f"""
+        self.name_label.setStyleSheet("""
             font-size: 14px;
             font-weight: bold;
             color: #FFFFFF;
         """)
-        title_layout.addWidget(self.name_label)
-        title_layout.addStretch()
-        layout.addLayout(title_layout)
+        top_row_layout.addWidget(self.name_label)
         
-        # 端口和状态在一行显示
-        status_port_layout = QHBoxLayout()
+        self.port_label = QLabel(f"端口:{self.service_info['port']}")
+        self.port_label.setStyleSheet("font-size: 12px; color: #AAAAAA;")
+        top_row_layout.addWidget(self.port_label)
         
-        self.status_label = QLabel("○ 未启动")
-        self.status_label.setStyleSheet("""
-            font-size: 12px;
-            color: #1976D2;
+        top_row_layout.addStretch()
+        
+        # 状态按钮
+        self.status_btn = QPushButton("○ 未启动")
+        self.status_btn.setCheckable(True)
+        self.status_btn.setChecked(False)
+        self.status_btn.setFixedSize(95, 30)
+        self.status_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                color: #BDBDBD;
+                border: 1px solid #616161;
+                border-radius: 15px;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 0px;
+            }
+            QPushButton:checked {
+                background-color: #2E7D32;
+                color: #FFFFFF;
+                border: 1px solid #388E3C;
+            }
         """)
-        status_port_layout.addWidget(self.status_label)
+        self.status_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        top_row_layout.addWidget(self.status_btn)
         
-        status_port_layout.addStretch()
+        layout.addLayout(top_row_layout)
         
-        self.port_label = QLabel(f"端口: {self.service_info['port']}")
-        self.port_label.setStyleSheet("font-size: 11px; color: #FFFFFF;")
-        status_port_layout.addWidget(self.port_label)
-        
-        layout.addLayout(status_port_layout)
-        
+        # 第二行：操作按钮
         btn_layout = QHBoxLayout()
         
-        self.restart_btn = QPushButton("重启")
+        self.restart_btn = QPushButton("🔄 重启")
         self.restart_btn.setStyleSheet("""
             QPushButton {
                 background-color: #1565C0;
                 color: #E0E0E0;
                 border: 1px solid #1976D2;
-                border-radius: 5px;
-                padding: 5px 10px;
-                font-size: 11px;
-                transition: all 0.2s ease;
+                border-radius: 6px;
+                padding: 6px 16px;
+                font-size: 12px;
+                font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #1976D2;
@@ -883,15 +898,16 @@ class ServiceCard(QFrame):
         self.restart_btn.clicked.connect(lambda: self.restart_clicked.emit(self.service_id))
         btn_layout.addWidget(self.restart_btn)
         
-        self.open_btn = QPushButton("打开")
+        self.open_btn = QPushButton("🌐 打开")
         self.open_btn.setStyleSheet("""
             QPushButton {
                 background-color: #E53935;
                 color: white;
                 border: none;
-                border-radius: 5px;
-                padding: 5px 10px;
-                font-size: 11px;
+                border-radius: 6px;
+                padding: 6px 16px;
+                font-size: 12px;
+                font-weight: bold;
             }
             QPushButton:hover {
                 background-color: #C62828;
@@ -906,12 +922,8 @@ class ServiceCard(QFrame):
         """更新状态显示"""
         self.is_running = is_running
         if is_running:
-            self.status_label.setText("● 运行中")
-            self.status_label.setStyleSheet("""
-                font-size: 12px;
-                color: #E53935;
-                font-weight: bold;
-            """)
+            self.status_btn.setText("● 运行中")
+            self.status_btn.setChecked(True)
             self.setStyleSheet(f"""
                 ServiceCard {{
                     background-color: #1E1E1E;
@@ -920,11 +932,8 @@ class ServiceCard(QFrame):
                 }}
             """)
         else:
-            self.status_label.setText("○ 未启动")
-            self.status_label.setStyleSheet("""
-                font-size: 12px;
-                color: #1976D2;
-            """)
+            self.status_btn.setText("○ 未启动")
+            self.status_btn.setChecked(False)
             self.setStyleSheet(f"""
                 ServiceCard {{
                     background-color: #1E1E1E;
@@ -1204,8 +1213,8 @@ class MainWindow(QMainWindow):
             }
         """
         
-        # 启动服务按钮
-        self.btn_home = QPushButton("🚀 启动服务")
+        # 运行服务按钮
+        self.btn_home = QPushButton("🚀 运行服务")
         self.btn_home.setCheckable(True)
         self.btn_home.setChecked(True)
         self.btn_home.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1411,7 +1420,7 @@ class MainWindow(QMainWindow):
                 color: #F0F0F0;
                 border: 1px solid #333333;
                 border-radius: 6px;
-                padding: 8px 12px;
+                padding: 8px 35px 8px 12px;
                 font-size: 13px;
                 min-width: 180px;
             }
@@ -1421,12 +1430,17 @@ class MainWindow(QMainWindow):
             QComboBox::drop-down {
                 border: none;
                 width: 30px;
+                subcontrol-origin: padding;
+                subcontrol-position: right center;
             }
             QComboBox::down-arrow {
                 image: none;
                 border-left: 6px solid transparent;
                 border-right: 6px solid transparent;
                 border-top: 6px solid #888888;
+                width: 0;
+                height: 0;
+                right: 10px;
             }
         """)
         
