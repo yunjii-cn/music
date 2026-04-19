@@ -3210,25 +3210,13 @@ def create_app() -> FastAPI:
     @app.get("/api/generate/models")
     async def list_models_public():
         """List available DiT models (public endpoint for frontend)."""
+        from acestep.model_downloader import get_checkpoints_dir, check_model_exists
+        
         current_model = _get_model_name(app.state._config_path) if getattr(app.state, "_initialized", False) else None
 
-        # Scan checkpoints directory for installed models
-        installed = set()
-        h: AceStepHandler = app.state.handler
-        if h:
-            installed = set(h.get_available_acestep_v15_models())
-
-        # Pre-loaded secondary handlers
-        preloaded = set()
-        if getattr(app.state, "_initialized2", False) and app.state._config_path2:
-            model2_name = _get_model_name(app.state._config_path2)
-            if model2_name in installed:
-                preloaded.add(model2_name)
-        if getattr(app.state, "_initialized3", False) and app.state._config_path3:
-            model3_name = _get_model_name(app.state._config_path3)
-            if model3_name in installed:
-                preloaded.add(model3_name)
-
+        # Use official model validation logic directly for reliability
+        checkpoints_dir = get_checkpoints_dir()
+        
         # All possible models (even if not installed)
         all_model_names = [
             "acestep-v15-base",
@@ -3239,9 +3227,21 @@ def create_app() -> FastAPI:
             "acestep-v15-turbo-continuous"
         ]
 
+        # Pre-loaded secondary handlers
+        preloaded = set()
+        if getattr(app.state, "_initialized2", False) and app.state._config_path2:
+            model2_name = _get_model_name(app.state._config_path2)
+            if model2_name:
+                preloaded.add(model2_name)
+        if getattr(app.state, "_initialized3", False) and app.state._config_path3:
+            model3_name = _get_model_name(app.state._config_path3)
+            if model3_name:
+                preloaded.add(model3_name)
+
         models = []
         for name in all_model_names:
-            is_installed = name in installed
+            # Use official check_model_exists function
+            is_installed = check_model_exists(name, checkpoints_dir)
             is_active = name == current_model
             models.append({
                 "name": name,
@@ -3251,10 +3251,6 @@ def create_app() -> FastAPI:
                 # Backward-compatible alias for older clients.
                 "is_default": is_active,
             })
-
-        # Update active_model to None if it's not installed
-        if current_model and current_model not in installed:
-            current_model = None
 
         return _wrap_response({
             "models": models,
