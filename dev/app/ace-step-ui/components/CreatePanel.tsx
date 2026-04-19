@@ -509,7 +509,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       if (modelsRes.ok) {
         const data = await modelsRes.json();
         console.log('[CreatePanel] API response:', data);
-        const models = data.models || [];
+        const models = data.data?.models || data.models || [];
         console.log('[CreatePanel] models:', models);
         if (models.length > 0) {
           setFetchedModels(models);
