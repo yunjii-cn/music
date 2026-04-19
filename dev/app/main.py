@@ -1765,13 +1765,19 @@ class MainWindow(QMainWindow):
         if index == 1 and hasattr(self, 'model_manager_widget'):
             self.model_manager_widget._update_ui()
         
-        # 如果切换到软件更新页面，刷新版本列表并强制更新UI
+        # 如果切换到软件更新页面，延迟刷新版本列表（避免卡顿和窗口）
         if index == 2 and hasattr(self, 'version_manager_widget'):
-            print("[DEBUG] 切换到软件更新页面，调用_load_versions")
+            print("[DEBUG] 切换到软件更新页面，延迟调用_load_versions")
+            # 使用QTimer延迟加载，避免UI卡顿
+            QTimer.singleShot(100, self._delayed_load_versions)
+    
+    def _delayed_load_versions(self):
+        """延迟加载版本列表"""
+        if hasattr(self, 'version_manager_widget'):
             self.version_manager_widget._load_versions()
-            # 强制更新UI
-            self.version_manager_widget.update()
-            self.version_manager_widget.repaint()
+            # 避免强制更新UI带来的问题
+            # self.version_manager_widget.update()
+            # self.version_manager_widget.repaint()
     
     def _setup_monitor(self):
         """设置监控"""

@@ -829,20 +829,17 @@ class HybridVersionManagerDialog(QDialog):
         # 更新按钮文字
         self.expand_all_btn.setText("全部收起" if checked else "全部展开")
         
-        # 处理Git版本项
-        if hasattr(self, 'git_version_items'):
-            for item in self.git_version_items:
-                item['expanded'] = checked
-                item['detail_widget'].setVisible(checked)
-                item['toggle_btn'].setText("收起" if checked else "展开")
-        
-        # 处理EXE版本项
+        # 处理EXE版本项（Git版本项已简化，无展开/收起功能）
         if hasattr(self, 'exe_version_items'):
             for item in self.exe_version_items:
-                item['expanded'] = checked
-                item['detail_widget'].setVisible(checked)
-                if item['toggle_btn']:
-                    item['toggle_btn'].setText("收起" if checked else "展开")
+                try:
+                    item['expanded'] = checked
+                    if hasattr(item, 'detail_widget') and item['detail_widget']:
+                        item['detail_widget'].setVisible(checked)
+                    if hasattr(item, 'toggle_btn') and item['toggle_btn']:
+                        item['toggle_btn'].setText("收起" if checked else "展开")
+                except Exception as e:
+                    print(f"更新EXE版本项状态失败: {e}")
     
     def _create_git_version_item(self, version, is_current):
         """创建Git版本项 - 简化版"""
