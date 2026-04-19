@@ -128,29 +128,61 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   }, []);
 
   // Mode
-  const [customMode, setCustomMode] = useState(true);
+  const [customMode, setCustomMode] = useState(() => {
+    const stored = localStorage.getItem('ace-customMode');
+    return stored !== null ? stored === 'true' : true;
+  });
 
   // Simple Mode
-  const [songDescription, setSongDescription] = useState('');
+  const [songDescription, setSongDescription] = useState(() => {
+    return localStorage.getItem('ace-songDescription') || '';
+  });
 
   // Custom Mode
-  const [lyrics, setLyrics] = useState('');
-  const [style, setStyle] = useState('');
-  const [title, setTitle] = useState('');
+  const [lyrics, setLyrics] = useState(() => {
+    return localStorage.getItem('ace-lyrics') || '';
+  });
+  const [style, setStyle] = useState(() => {
+    return localStorage.getItem('ace-style') || '';
+  });
+  const [title, setTitle] = useState(() => {
+    return localStorage.getItem('ace-title') || '';
+  });
 
   // Common
-  const [instrumental, setInstrumental] = useState(false);
-  const [vocalLanguage, setVocalLanguage] = useState('en');
-  const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>('');
+  const [instrumental, setInstrumental] = useState(() => {
+    const stored = localStorage.getItem('ace-instrumental');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [vocalLanguage, setVocalLanguage] = useState(() => {
+    return localStorage.getItem('ace-vocalLanguage') || 'en';
+  });
+  const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>(() => {
+    const stored = localStorage.getItem('ace-vocalGender');
+    return stored as 'male' | 'female' | '' || '';
+  });
 
   // Music Parameters
-  const [bpm, setBpm] = useState(0);
-  const [keyScale, setKeyScale] = useState('');
-  const [timeSignature, setTimeSignature] = useState('');
+  const [bpm, setBpm] = useState(() => {
+    const stored = localStorage.getItem('ace-bpm');
+    return stored ? Number(stored) : 0;
+  });
+  const [keyScale, setKeyScale] = useState(() => {
+    return localStorage.getItem('ace-keyScale') || '';
+  });
+  const [timeSignature, setTimeSignature] = useState(() => {
+    return localStorage.getItem('ace-timeSignature') || '';
+  });
 
   // Advanced Settings
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [duration, setDuration] = useState(-1);
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    const stored = localStorage.getItem('ace-showAdvanced');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [duration, setDuration] = useState(() => {
+    const stored = localStorage.getItem('ace-duration');
+    return stored ? Number(stored) : -1;
+  });
   const [batchSize, setBatchSize] = useState(() => {
     const stored = localStorage.getItem('ace-batchSize');
     return stored ? Number(stored) : 1;
@@ -159,26 +191,70 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     const stored = localStorage.getItem('ace-bulkCount');
     return stored ? Number(stored) : 1;
   });
-  const [guidanceScale, setGuidanceScale] = useState(9.0);
-  const [randomSeed, setRandomSeed] = useState(true);
-  const [seed, setSeed] = useState(-1);
-  const [thinking, setThinking] = useState(false); // Default false for GPU compatibility
-  const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>('mp3');
-  const [inferenceSteps, setInferenceSteps] = useState(12);
-  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
-  const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
+  const [guidanceScale, setGuidanceScale] = useState(() => {
+    const stored = localStorage.getItem('ace-guidanceScale');
+    return stored ? Number(stored) : 9.0;
+  });
+  const [randomSeed, setRandomSeed] = useState(() => {
+    const stored = localStorage.getItem('ace-randomSeed');
+    return stored !== null ? stored === 'true' : true;
+  });
+  const [seed, setSeed] = useState(() => {
+    const stored = localStorage.getItem('ace-seed');
+    return stored ? Number(stored) : -1;
+  });
+  const [thinking, setThinking] = useState(() => {
+    const stored = localStorage.getItem('ace-thinking');
+    return stored !== null ? stored === 'true' : false; // Default false for GPU compatibility
+  });
+  const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>(() => {
+    const stored = localStorage.getItem('ace-audioFormat');
+    return (stored as 'mp3' | 'flac') || 'mp3';
+  });
+  const [inferenceSteps, setInferenceSteps] = useState(() => {
+    const stored = localStorage.getItem('ace-inferenceSteps');
+    return stored ? Number(stored) : 12;
+  });
+  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(() => {
+    const stored = localStorage.getItem('ace-inferMethod');
+    return (stored as 'ode' | 'sde') || 'ode';
+  });
+  const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>(() => {
+    const stored = localStorage.getItem('ace-lmBackend');
+    return (stored as 'pt' | 'vllm') || 'pt';
+  });
   const [lmModel, setLmModel] = useState(() => {
     return localStorage.getItem('ace-lmModel') || 'acestep-5Hz-lm-0.6B';
   });
-  const [shift, setShift] = useState(3.0);
+  const [shift, setShift] = useState(() => {
+    const stored = localStorage.getItem('ace-shift');
+    return stored ? Number(stored) : 3.0;
+  });
 
   // LM Parameters (under Expert)
-  const [showLmParams, setShowLmParams] = useState(false);
-  const [lmTemperature, setLmTemperature] = useState(0.8);
-  const [lmCfgScale, setLmCfgScale] = useState(2.2);
-  const [lmTopK, setLmTopK] = useState(0);
-  const [lmTopP, setLmTopP] = useState(0.92);
-  const [lmNegativePrompt, setLmNegativePrompt] = useState('NO USER INPUT');
+  const [showLmParams, setShowLmParams] = useState(() => {
+    const stored = localStorage.getItem('ace-showLmParams');
+    return stored !== null ? stored === 'true' : false;
+  });
+  const [lmTemperature, setLmTemperature] = useState(() => {
+    const stored = localStorage.getItem('ace-lmTemperature');
+    return stored ? Number(stored) : 0.8;
+  });
+  const [lmCfgScale, setLmCfgScale] = useState(() => {
+    const stored = localStorage.getItem('ace-lmCfgScale');
+    return stored ? Number(stored) : 2.2;
+  });
+  const [lmTopK, setLmTopK] = useState(() => {
+    const stored = localStorage.getItem('ace-lmTopK');
+    return stored ? Number(stored) : 0;
+  });
+  const [lmTopP, setLmTopP] = useState(() => {
+    const stored = localStorage.getItem('ace-lmTopP');
+    return stored ? Number(stored) : 0.92;
+  });
+  const [lmNegativePrompt, setLmNegativePrompt] = useState(() => {
+    return localStorage.getItem('ace-lmNegativePrompt') || 'NO USER INPUT';
+  });
 
   // Expert Parameters (now in Advanced section)
   const [referenceAudioUrl, setReferenceAudioUrl] = useState('');
@@ -1103,13 +1179,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             {/* Mode Toggle */}
             <div className="flex items-center bg-zinc-200 dark:bg-black/40 rounded-lg p-1 border border-zinc-300 dark:border-white/5">
               <button
-                onClick={() => setCustomMode(false)}
+                onClick={() => { setCustomMode(false); localStorage.setItem('ace-customMode', 'false'); }}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${!customMode ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
               >
                 {t('simple')}
               </button>
               <button
-                onClick={() => setCustomMode(true)}
+                onClick={() => { setCustomMode(true); localStorage.setItem('ace-customMode', 'true'); }}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${customMode ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
               >
                 {t('custom')}
@@ -1215,7 +1291,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               </div>
               <textarea
                 value={songDescription}
-                onChange={(e) => setSongDescription(e.target.value)}
+                onChange={(e) => { setSongDescription(e.target.value); localStorage.setItem('ace-songDescription', e.target.value); }}
                 placeholder={t('songDescriptionPlaceholder')}
                 className="w-full h-32 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
@@ -1229,7 +1305,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <div className="flex flex-wrap items-center gap-2 p-3">
                 <select
                   value={vocalLanguage}
-                  onChange={(e) => setVocalLanguage(e.target.value)}
+                  onChange={(e) => { setVocalLanguage(e.target.value); localStorage.setItem('ace-vocalLanguage', e.target.value); }}
                   className="flex-1 min-w-[180px] bg-transparent text-sm text-zinc-900 dark:text-white focus:outline-none"
                 >
                   {VOCAL_LANGUAGE_KEYS.map(lang => (
@@ -1239,14 +1315,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setVocalGender(vocalGender === 'male' ? '' : 'male')}
+                    onClick={() => { const newVal = vocalGender === 'male' ? '' : 'male'; setVocalGender(newVal); localStorage.setItem('ace-vocalGender', newVal); }}
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('male')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setVocalGender(vocalGender === 'female' ? '' : 'female')}
+                    onClick={() => { const newVal = vocalGender === 'female' ? '' : 'female'; setVocalGender(newVal); localStorage.setItem('ace-vocalGender', newVal); }}
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('female')}
@@ -1269,7 +1345,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 min={-1}
                 max={600}
                 step={5}
-                onChange={setDuration}
+                onChange={(val) => { setDuration(val); localStorage.setItem('ace-duration', val.toString()); }}
                 formatDisplay={(val) => val === -1 ? t('auto') : `${val}${t('seconds')}`}
                 title={''}
                 autoLabel={t('auto')}
@@ -1282,7 +1358,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 min={0}
                 max={300}
                 step={5}
-                onChange={setBpm}
+                onChange={(val) => { setBpm(val); localStorage.setItem('ace-bpm', val.toString()); }}
                 formatDisplay={(val) => val === 0 ? t('auto') : val.toString()}
                 autoLabel={t('auto')}
               />
@@ -1293,7 +1369,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('key')}</label>
                   <select
                     value={keyScale}
-                    onChange={setKeyScale}
+                    onChange={(val) => { setKeyScale(val); localStorage.setItem('ace-keyScale', val); }}
                     className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                   >
                     <option value="">{t('auto')}</option>
@@ -1306,7 +1382,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('time')}</label>
                   <select
                     value={timeSignature}
-                    onChange={setTimeSignature}
+                    onChange={(val) => { setTimeSignature(val); localStorage.setItem('ace-timeSignature', val); }}
                     className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                   >
                     <option value="">{t('auto')}</option>
@@ -1324,7 +1400,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 min={1}
                 max={8}
                 step={1}
-                onChange={setBatchSize}
+                onChange={(val) => { setBatchSize(val); localStorage.setItem('ace-batchSize', val.toString()); }}
               />
               <div style={{display: 'none'}}>
                 <input
@@ -1333,7 +1409,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   max="8"
                   step="1"
                   value={batchSize}
-                  onChange={setBatchSize}
+                  onChange={(val) => { setBatchSize(val); localStorage.setItem('ace-batchSize', val.toString()); }}
                   className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
                 />
                 <p className="text-[10px] text-zinc-500">{t('numberOfVariations')}</p>
@@ -1532,7 +1608,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setInstrumental(!instrumental)}
+                    onClick={() => { setInstrumental(!instrumental); localStorage.setItem('ace-instrumental', (!instrumental).toString()); }}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
                       instrumental
                         ? 'bg-pink-600 text-white border-pink-500'
@@ -1560,7 +1636,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <textarea
                 disabled={instrumental}
                 value={lyrics}
-                onChange={(e) => setLyrics(e.target.value)}
+                onChange={(e) => { setLyrics(e.target.value); localStorage.setItem('ace-lyrics', e.target.value); }}
                 placeholder={instrumental ? t('instrumental') + ' mode' : t('lyricsPlaceholder')}
                 className={`w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none font-mono leading-relaxed ${instrumental ? 'opacity-30 cursor-not-allowed' : ''}`}
                 style={{ height: `${lyricsHeight}px` }}
@@ -1607,7 +1683,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               </div>
               <textarea
                 value={style}
-                onChange={(e) => setStyle(e.target.value)}
+                onChange={(e) => { setStyle(e.target.value); localStorage.setItem('ace-style', e.target.value); }}
                 placeholder={t('stylePlaceholder')}
                 className="w-full h-20 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
@@ -1699,7 +1775,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); localStorage.setItem('ace-title', e.target.value); }}
                 placeholder={t('nameSong')}
                 className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
               />
@@ -1717,7 +1793,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('instrumental')}</span>
               </div>
               <button
-                onClick={() => setInstrumental(!instrumental)}
+                onClick={() => { setInstrumental(!instrumental); localStorage.setItem('ace-instrumental', (!instrumental).toString()); }}
                 className={`w-11 h-6 rounded-full flex items-center transition-colors duration-200 px-1 border border-zinc-200 dark:border-white/5 ${instrumental ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-black/40'}`}
               >
                 <div className={`w-4 h-4 rounded-full bg-white transform transition-transform duration-200 shadow-sm ${instrumental ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -1734,7 +1810,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </label>
                 <select
                   value={vocalLanguage}
-                  onChange={(e) => setVocalLanguage(e.target.value)}
+                  onChange={(e) => { setVocalLanguage(e.target.value); localStorage.setItem('ace-vocalLanguage', e.target.value); }}
                   className="w-full bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/5 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   {VOCAL_LANGUAGE_KEYS.map(lang => (
@@ -1749,14 +1825,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setVocalGender(vocalGender === 'male' ? '' : 'male')}
+                    onClick={() => { const newVal = vocalGender === 'male' ? '' : 'male'; setVocalGender(newVal); localStorage.setItem('ace-vocalGender', newVal); }}
                     className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('male')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setVocalGender(vocalGender === 'female' ? '' : 'female')}
+                    onClick={() => { const newVal = vocalGender === 'female' ? '' : 'female'; setVocalGender(newVal); localStorage.setItem('ace-vocalGender', newVal); }}
                     className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('female')}
@@ -1870,7 +1946,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Key</label>
               <select
                 value={keyScale}
-                onChange={(e) => setKeyScale(e.target.value)}
+                onChange={(e) => { setKeyScale(e.target.value); localStorage.setItem('ace-keyScale', e.target.value); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
               >
                 <option value="">{t('auto')}</option>
@@ -1883,7 +1959,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Time</label>
               <select
                 value={timeSignature}
-                onChange={(e) => setTimeSignature(e.target.value)}
+                onChange={(e) => { setTimeSignature(e.target.value); localStorage.setItem('ace-timeSignature', e.target.value); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
               >
                 <option value="">{t('auto')}</option>
@@ -1897,7 +1973,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
         {/* ADVANCED SETTINGS */}
         <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
+          onClick={() => { setShowAdvanced(!showAdvanced); localStorage.setItem('ace-showAdvanced', (!showAdvanced).toString()); }}
           className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
         >
           <div className="flex items-center gap-2">
@@ -1968,7 +2044,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               min={4}
               max={200}
               step={1}
-              onChange={setInferenceSteps}
+              onChange={(val) => { setInferenceSteps(val); localStorage.setItem('ace-inferenceSteps', val.toString()); }}
               helpText={t('moreStepsBetterQuality')}
               title="More steps usually improves quality but slows generation."
             />
@@ -1980,7 +2056,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               min={1}
               max={15}
               step={0.5}
-              onChange={setGuidanceScale}
+              onChange={(val) => { setGuidanceScale(val); localStorage.setItem('ace-guidanceScale', val.toString()); }}
               formatDisplay={(val) => val.toFixed(1)}
               helpText={t('howCloselyFollowPrompt')}
               title="How strongly the model follows the prompt. Higher = stricter, lower = freer."
@@ -1992,7 +2068,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('audioFormat')}</label>
                 <select
                   value={audioFormat}
-                  onChange={(e) => setAudioFormat(e.target.value as 'mp3' | 'flac')}
+                  onChange={(e) => { setAudioFormat(e.target.value as 'mp3' | 'flac'); localStorage.setItem('ace-audioFormat', e.target.value); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   <option value="mp3">{t('mp3Smaller')}</option>
@@ -2003,7 +2079,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Deterministic is more repeatable; stochastic adds randomness.">{t('inferMethod')}</label>
                 <select
                   value={inferMethod}
-                  onChange={(e) => setInferMethod(e.target.value as 'ode' | 'sde')}
+                  onChange={(e) => { setInferMethod(e.target.value as 'ode' | 'sde'); localStorage.setItem('ace-inferMethod', e.target.value); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   <option value="ode">{t('odeDeterministic')}</option>
@@ -2017,7 +2093,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('lmBackendLabel')}</label>
               <select
                 value={lmBackend}
-                onChange={(e) => setLmBackend(e.target.value as 'pt' | 'vllm')}
+                onChange={(e) => { setLmBackend(e.target.value as 'pt' | 'vllm'); localStorage.setItem('ace-lmBackend', e.target.value); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
               >
                 <option value="pt">{t('lmBackendPt')}</option>
@@ -2056,7 +2132,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Fixing the seed makes results repeatable. Random is recommended for variety.">{t('seed')}</span>
                 </div>
                 <button
-                  onClick={() => setRandomSeed(!randomSeed)}
+                  onClick={() => { setRandomSeed(!randomSeed); localStorage.setItem('ace-randomSeed', (!randomSeed).toString()); }}
                   className={`w-10 h-5 rounded-full flex items-center transition-colors duration-200 px-0.5 border border-zinc-200 dark:border-white/5 ${randomSeed ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-black/40'}`}
                 >
                   <div className={`w-4 h-4 rounded-full bg-white transform transition-transform duration-200 shadow-sm ${randomSeed ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -2080,7 +2156,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             <div className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5">
               <span className={`text-xs font-medium ${loraLoaded ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-600 dark:text-zinc-400'}`} title="Lets the lyric model reason about structure and metadata. Slightly slower.">{t('thinkingCot')}</span>
               <button
-                onClick={() => !loraLoaded && setThinking(!thinking)}
+                onClick={() => { if (loraLoaded) return; const newVal = !thinking; setThinking(newVal); localStorage.setItem('ace-thinking', newVal.toString()); }}
                 disabled={loraLoaded}
                 className={`w-10 h-5 rounded-full flex items-center transition-colors duration-200 px-0.5 border border-zinc-200 dark:border-white/5 ${thinking ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-black/40'} ${loraLoaded ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
@@ -2095,7 +2171,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               min={1}
               max={5}
               step={0.1}
-              onChange={setShift}
+              onChange={(val) => { setShift(val); localStorage.setItem('ace-shift', val.toString()); }}
               formatDisplay={(val) => val.toFixed(1)}
               helpText={t('timestepShiftForBase')}
               title="Adjusts the diffusion schedule. Only affects base model."
@@ -2112,7 +2188,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
             {/* LM Parameters */}
             <button
-              onClick={() => setShowLmParams(!showLmParams)}
+              onClick={() => { setShowLmParams(!showLmParams); localStorage.setItem('ace-showLmParams', (!showLmParams).toString()); }}
               className="w-full flex items-center justify-between px-4 py-3 bg-white/60 dark:bg-black/20 rounded-xl border border-zinc-200/70 dark:border-white/10 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
             >
               <div className="flex items-center gap-2">
@@ -2134,7 +2210,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   min={0}
                   max={2}
                   step={0.05}
-                  onChange={(e) => setLmTemperature(Number(e.target.value))}
+                  onChange={(val) => { setLmTemperature(val); localStorage.setItem('ace-lmTemperature', val.toString()); }}
                   formatDisplay={(val) => val.toFixed(2)}
                   helpText={t('higherMoreRandom')}
                   title="Higher temperature = more random word choices."
@@ -2147,7 +2223,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   min={1}
                   max={3}
                   step={0.1}
-                  onChange={setLmCfgScale}
+                  onChange={(val) => { setLmCfgScale(val); localStorage.setItem('ace-lmCfgScale', val.toString()); }}
                   formatDisplay={(val) => val.toFixed(1)}
                   helpText={t('noCfgScale')}
                   title="How strongly the lyric model follows the prompt."
@@ -2161,7 +2237,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     min={0}
                     max={100}
                     step={1}
-                    onChange={setLmTopK}
+                    onChange={(val) => { setLmTopK(val); localStorage.setItem('ace-lmTopK', val.toString()); }}
                     title="Restricts choices to the K most likely tokens. 0 disables."
                   />
                   <EditableSlider
@@ -2170,7 +2246,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     min={0}
                     max={1}
                     step={0.01}
-                    onChange={setLmTopP}
+                    onChange={(val) => { setLmTopP(val); localStorage.setItem('ace-lmTopP', val.toString()); }}
                     formatDisplay={(val) => val.toFixed(2)}
                     title="Samples from the smallest set whose total probability is P."
                   />
@@ -2181,7 +2257,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Words or ideas to steer the lyric model away from.">{t('lmNegativePrompt')}</label>
                   <textarea
                     value={lmNegativePrompt}
-                    onChange={(e) => setLmNegativePrompt(e.target.value)}
+                    onChange={(e) => { setLmNegativePrompt(e.target.value); localStorage.setItem('ace-lmNegativePrompt', e.target.value); }}
                     placeholder={t('thingsToAvoid')}
                     className="w-full h-16 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg p-2 text-xs text-zinc-900 dark:text-white focus:outline-none resize-none"
                   />
