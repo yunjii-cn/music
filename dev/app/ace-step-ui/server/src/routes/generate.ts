@@ -943,7 +943,7 @@ router.get('/history', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
 router.get('/models', async (_req, res: Response) => {
   try {
-    const modelsResponse = await fetch(`${config.acestep.apiUrl}/v1/models`, {
+    const modelsResponse = await fetch(`${config.acestep.apiUrl}/api/generate/models`, {
       headers: {
         'x-api-key': process.env.ACESTEP_API_KEY || '',
       },
