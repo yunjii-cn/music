@@ -2694,57 +2694,7 @@ class MainWindow(QMainWindow):
                         continue
                 
                 if not node_available:
-                    self._log("[信息] Node.js 未安装，尝试使用 winget 自动安装...", "#FF9800")
-                    
-                    winget_available = False
-                    try:
-                        process = subprocess.Popen(
-                            ["winget", "--version"],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo
-                        )
-                        stdout, stderr = process.communicate(timeout=10)
-                        if process.returncode == 0:
-                            winget_available = True
-                            self._log(f"✓ winget 可用: {stdout.strip()}")
-                    except:
-                        pass
-                    
-                    if winget_available:
-                        self._log("正在使用 winget 安装 Node.js 22...")
-                        self._log("这可能需要几分钟，请稍候...")
-                        
-                        try:
-                            process = subprocess.Popen(
-                                ["winget", "install", "--id", "OpenJS.NodeJS.LTS.22", "--silent", "--accept-package-agreements", "--accept-source-agreements"],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                text=True,
-                                startupinfo=startupinfo
-                            )
-                            
-                            while process.poll() is None:
-                                line = process.stdout.readline()
-                                if line:
-                                    self._log(f"[Node.js 安装] {line.strip()}")
-                                line_err = process.stderr.readline()
-                                if line_err:
-                                    self._log(f"[Node.js 安装错误] {line_err.strip()}", "#F44336")
-                            
-                            if process.returncode == 0:
-                                self._log("✓ Node.js 22 安装成功！", "#4CAF50")
-                                self._log("[信息] 请重新运行部署维护以完成后续步骤", "#FF9800")
-                                return
-                            else:
-                                self._log(f"[错误] Node.js 安装失败，返回码: {process.returncode}", "#F44336")
-                        except Exception as e:
-                            self._log(f"[错误] Node.js 安装失败: {e}", "#F44336")
-                    else:
-                        self._log("[错误] winget 不可用", "#F44336")
-                        self._log("[建议] 请手动安装 Node.js 22+ 或使用 winget", "#FF9800")
-                        return
+                    self._log("[信息] Node.js 未安装，请运行部署维护自动安装便携版", "#FF9800")
             except Exception as e:
                 self._log(f"[错误] 检查 Node.js 失败: {e}", "#F44336")
                 return
@@ -3518,15 +3468,14 @@ try {
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
-                # 检查常见的 Node.js 安装位置
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
                 portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
+                    os.path.join(portable_node24_dir, "node.exe"),
+                    os.path.join(portable_node22_dir, "node.exe"),
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
-                    os.path.join(portable_node22_dir, "node.exe"),
-                    os.path.join(portable_node24_dir, "node.exe")
                 ]
                 
                 for node_exe in node_paths:
@@ -3548,58 +3497,129 @@ try {
                         continue
                 
                 if not node_available:
-                    self._log("[信息] Node.js 未安装，尝试使用 winget 自动安装...", "#FF9800")
+                    self._log("[信息] Node.js 未安装，正在下载便携版 Node.js 24...", "#FF9800")
                     
-                    # 检查 winget 是否可用
-                    winget_available = False
-                    try:
-                        process = subprocess.Popen(
-                            ["winget", "--version"],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo
-                        )
-                        stdout, stderr = process.communicate(timeout=10)
-                        if process.returncode == 0:
-                            winget_available = True
-                            self._log(f"✓ winget 可用: {stdout.strip()}")
-                    except:
-                        pass
+                    tools_dir = os.path.join(self.base_dir, "tools")
+                    os.makedirs(tools_dir, exist_ok=True)
+                    node24_zip = os.path.join(tools_dir, "node-v24.14.1-win-x64.zip")
+                    node24_url = "https://nodejs.org/dist/v24.14.1/node-v24.14.1-win-x64.zip"
                     
-                    if winget_available:
-                        self._log("正在使用 winget 安装 Node.js 22...")
-                        self._log("这可能需要几分钟，请稍候...")
+                    downloaded = False
+                    if os.path.exists(portable_node24_dir) and os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
+                        self._log("✓ 便携版 Node.js 24 已存在", "#4CAF50")
+                        node_available = True
+                        node_path = os.path.join(portable_node24_dir, "node.exe")
+                    else:
+                        try:
+                            import urllib.request
+                            self._log(f"[信息] 下载 Node.js 24 便携版...")
+                            self._log(f"[信息] 下载地址: {node24_url}")
+                            
+                            def _download_progress(block_num, block_size, total_size):
+                                downloaded_bytes = block_num * block_size
+                                percent = min(downloaded_bytes * 100 / total_size, 100) if total_size > 0 else 0
+                                if block_num % 500 == 0:
+                                    self._log(f"[下载] Node.js 24: {percent:.1f}%")
+                            
+                            urllib.request.urlretrieve(node24_url, node24_zip, _download_progress)
+                            self._log("✓ Node.js 24 下载完成", "#4CAF50")
+                            downloaded = True
+                        except Exception as e:
+                            self._log(f"[警告] Node.js 24 下载失败: {e}", "#FF9800")
+                            self._log("[信息] 尝试下载 Node.js 22 便携版作为备选...", "#FF9800")
+                            
+                            try:
+                                node22_url = "https://nodejs.org/dist/v22.22.2/node-v22.22.2-win-x64.zip"
+                                node22_zip = os.path.join(tools_dir, "node-v22.22.2-win-x64.zip")
+                                urllib.request.urlretrieve(node22_url, node22_zip)
+                                downloaded = True
+                                node24_zip = node22_zip
+                                portable_node24_dir = portable_node22_dir
+                                self._log("✓ Node.js 22 下载完成", "#4CAF50")
+                            except Exception as e2:
+                                self._log(f"[错误] Node.js 22 下载也失败: {e2}", "#F44336")
                         
+                        if downloaded:
+                            self._log("[信息] 正在解压 Node.js 便携版...")
+                            try:
+                                import zipfile
+                                with zipfile.ZipFile(node24_zip, 'r') as zf:
+                                    zf.extractall(tools_dir)
+                                self._log("✓ Node.js 便携版解压完成", "#4CAF50")
+                                
+                                try:
+                                    os.remove(node24_zip)
+                                except:
+                                    pass
+                                
+                                if os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
+                                    node_available = True
+                                    node_path = os.path.join(portable_node24_dir, "node.exe")
+                                    ver_process = subprocess.Popen(
+                                        [node_path, "--version"],
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        text=True,
+                                        startupinfo=startupinfo
+                                    )
+                                    v_stdout, _ = ver_process.communicate(timeout=5)
+                                    self._log(f"✓ Node.js 便携版安装成功: {v_stdout.strip()}", "#4CAF50")
+                                else:
+                                    self._log("[错误] 解压后未找到 node.exe", "#F44336")
+                            except Exception as e:
+                                self._log(f"[错误] 解压失败: {e}", "#F44336")
+                    
+                    if not node_available:
+                        self._log("[信息] 尝试使用 winget 安装 Node.js...", "#FF9800")
+                        winget_available = False
                         try:
                             process = subprocess.Popen(
-                                ["winget", "install", "--id", "OpenJS.NodeJS.LTS.22", "--silent", "--accept-package-agreements", "--accept-source-agreements"],
+                                ["winget", "--version"],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 text=True,
                                 startupinfo=startupinfo
                             )
-                            
-                            while process.poll() is None:
-                                line = process.stdout.readline()
-                                if line:
-                                    self._log(f"[Node.js 安装] {line.strip()}")
-                                line_err = process.stderr.readline()
-                                if line_err:
-                                    self._log(f"[Node.js 安装错误] {line_err.strip()}", "#F44336")
-                            
+                            stdout, stderr = process.communicate(timeout=10)
                             if process.returncode == 0:
-                                self._log("✓ Node.js 22 安装成功！", "#4CAF50")
-                                self._log("[信息] 请重新运行部署维护以完成后续步骤", "#FF9800")
-                                return
-                            else:
-                                self._log(f"[错误] Node.js 安装失败，返回码: {process.returncode}", "#F44336")
-                        except Exception as e:
-                            self._log(f"[错误] Node.js 安装失败: {e}", "#F44336")
-                    else:
-                        self._log("[错误] winget 不可用", "#F44336")
-                        self._log("[建议] 请手动安装 Node.js 22+ 或使用 winget", "#FF9800")
-                        return
+                                winget_available = True
+                                self._log(f"✓ winget 可用: {stdout.strip()}")
+                        except:
+                            pass
+                        
+                        if winget_available:
+                            self._log("正在使用 winget 安装 Node.js 22...")
+                            self._log("这可能需要几分钟，请稍候...")
+                            
+                            try:
+                                process = subprocess.Popen(
+                                    ["winget", "install", "--id", "OpenJS.NodeJS.LTS.22", "--silent", "--accept-package-agreements", "--accept-source-agreements"],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    text=True,
+                                    startupinfo=startupinfo
+                                )
+                                
+                                while process.poll() is None:
+                                    line = process.stdout.readline()
+                                    if line:
+                                        self._log(f"[Node.js 安装] {line.strip()}")
+                                    line_err = process.stderr.readline()
+                                    if line_err:
+                                        self._log(f"[Node.js 安装错误] {line_err.strip()}", "#F44336")
+                                
+                                if process.returncode == 0:
+                                    self._log("✓ Node.js 22 安装成功！", "#4CAF50")
+                                    self._log("[信息] 请重新运行部署维护以完成后续步骤", "#FF9800")
+                                    return
+                                else:
+                                    self._log(f"[错误] Node.js 安装失败，返回码: {process.returncode}", "#F44336")
+                            except Exception as e:
+                                self._log(f"[错误] Node.js 安装失败: {e}", "#F44336")
+                        else:
+                            self._log("[错误] winget 不可用", "#F44336")
+                            self._log("[建议] 请手动安装 Node.js 22+ 或使用 winget", "#FF9800")
+                            return
             except Exception as e:
                 self._log(f"[错误] 检查 Node.js 失败: {e}", "#F44336")
                 return

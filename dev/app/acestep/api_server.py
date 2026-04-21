@@ -248,11 +248,44 @@ def _get_project_root() -> str:
 # =============================================================================
 
 RESULT_KEY_PREFIX = "ace_step_v1.5_"
-RESULT_EXPIRE_SECONDS = 7 * 24 * 60 * 60  # 7 days
-TASK_TIMEOUT_SECONDS = 3600  # 1 hour
-JOB_STORE_CLEANUP_INTERVAL = 300  # 5 minutes - interval for cleaning up old jobs
-JOB_STORE_MAX_AGE_SECONDS = 86400  # 24 hours - completed jobs older than this will be cleaned
+RESULT_EXPIRE_SECONDS = 7 * 24 * 60 * 60
+TASK_TIMEOUT_SECONDS = 3600
+JOB_STORE_CLEANUP_INTERVAL = 300
+JOB_STORE_MAX_AGE_SECONDS = 86400
 STATUS_MAP = {"queued": 0, "running": 0, "succeeded": 1, "failed": 2}
+LORA_STATE_FILE = os.path.join(_get_project_root(), "lora_state.json")
+
+
+def _save_lora_state(lora_path: str, scale: float = 1.0, adapter_name: str | None = None):
+    try:
+        state = {
+            "lora_path": lora_path,
+            "scale": scale,
+            "adapter_name": adapter_name,
+            "loaded_at": time.time(),
+        }
+        with open(LORA_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _clear_lora_state():
+    try:
+        if os.path.exists(LORA_STATE_FILE):
+            os.remove(LORA_STATE_FILE)
+    except Exception:
+        pass
+
+
+def _load_lora_state() -> dict | None:
+    try:
+        if os.path.exists(LORA_STATE_FILE):
+            with open(LORA_STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
 
 LM_DEFAULT_TEMPERATURE = 0.85
 LM_DEFAULT_CFG_SCALE = 2.5
@@ -1653,6 +1686,7 @@ def create_app() -> FastAPI:
         app.state.executor = executor
         app.state.job_store = store
         app.state._python_executable = sys.executable
+        app.state.project_root = _get_project_root()
         initialize_training_state(app)
 
         # Shared output directory for saving generated audio files
@@ -1822,6 +1856,33 @@ def create_app() -> FastAPI:
                             print(f"[API Server] Warning: LLM initialization failed: {e}")
 
                     print("[API Server] Lazy initialization complete.")
+
+                    saved_lora = _load_lora_state()
+                    if saved_lora and saved_lora.get("lora_path"):
+                        lora_path_r = saved_lora["lora_path"]
+                        lora_scale_r = saved_lora.get("scale", 1.0)
+                        adapter_name_r = saved_lora.get("adapter_name")
+                        print(f"[API Server] Restoring LoRA: {lora_path_r} (scale={lora_scale_r})")
+                        try:
+                            if adapter_name_r:
+                                result_r = handler.add_lora(lora_path_r, adapter_name=adapter_name_r)
+                            else:
+                                result_r = handler.load_lora(lora_path_r)
+                            if result_r.startswith("✅"):
+                                try:
+                                    if adapter_name_r:
+                                        handler.set_lora_scale(adapter_name_r, lora_scale_r)
+                                    else:
+                                        handler.set_lora_scale(lora_scale_r)
+                                except Exception:
+                                    pass
+                                print(f"[API Server] LoRA restored successfully: {lora_path_r}")
+                            else:
+                                print(f"[API Server] Warning: LoRA restore failed: {result_r}")
+                                _clear_lora_state()
+                        except Exception as e:
+                            print(f"[API Server] Warning: LoRA restore failed: {e}")
+                            _clear_lora_state()
 
                 except RuntimeError:
                     raise
@@ -2959,6 +3020,33 @@ def create_app() -> FastAPI:
 
             print("[API Server] All models initialized successfully!")
 
+            saved_lora = _load_lora_state()
+            if saved_lora and saved_lora.get("lora_path"):
+                lora_path = saved_lora["lora_path"]
+                lora_scale = saved_lora.get("scale", 1.0)
+                adapter_name = saved_lora.get("adapter_name")
+                print(f"[API Server] Restoring LoRA: {lora_path} (scale={lora_scale})")
+                try:
+                    if adapter_name:
+                        result = handler.add_lora(lora_path, adapter_name=adapter_name)
+                    else:
+                        result = handler.load_lora(lora_path)
+                    if result.startswith("✅"):
+                        try:
+                            if adapter_name:
+                                handler.set_lora_scale(adapter_name, lora_scale)
+                            else:
+                                handler.set_lora_scale(lora_scale)
+                        except Exception:
+                            pass
+                        print(f"[API Server] LoRA restored successfully: {lora_path}")
+                    else:
+                        print(f"[API Server] Warning: LoRA restore failed: {result}")
+                        _clear_lora_state()
+                except Exception as e:
+                    print(f"[API Server] Warning: LoRA restore failed: {e}")
+                    _clear_lora_state()
+
         try:
             yield
         finally:
@@ -3652,6 +3740,7 @@ def create_app() -> FastAPI:
         """Load LoRA adapter into the primary model.
         
         Automatically lazy-initializes the model if not yet loaded (e.g. --no-init mode).
+        Supports both absolute paths and relative paths (resolved from project root).
         """
         handler: AceStepHandler = app.state.handler
 
@@ -3665,14 +3754,22 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=500, detail="Model not initialized after lazy load attempt")
 
         try:
+            lora_path = request.lora_path.strip()
+            if lora_path and not os.path.isabs(lora_path):
+                project_root = getattr(app.state, "project_root", os.getcwd())
+                resolved_path = os.path.join(project_root, lora_path)
+                if os.path.exists(resolved_path) and not os.path.exists(lora_path):
+                    lora_path = resolved_path.replace("\\", "/")
+
             adapter_name = request.adapter_name.strip() if isinstance(request.adapter_name, str) else None
             if adapter_name:
-                result = handler.add_lora(request.lora_path, adapter_name=adapter_name)
+                result = handler.add_lora(lora_path, adapter_name=adapter_name)
             else:
-                result = handler.load_lora(request.lora_path)
+                result = handler.load_lora(lora_path)
 
             if result.startswith("✅"):
-                response_data = {"message": result, "lora_path": request.lora_path}
+                _save_lora_state(lora_path, 1.0, adapter_name)
+                response_data = {"message": result, "lora_path": lora_path}
                 if adapter_name:
                     response_data["adapter_name"] = adapter_name
                 return _wrap_response(response_data)
@@ -3693,6 +3790,7 @@ def create_app() -> FastAPI:
 
         try:
             result = handler.unload_lora()
+            _clear_lora_state()
 
             if result.startswith("✅") or result.startswith("⚠️"):
                 return _wrap_response({"message": result})
@@ -3737,6 +3835,9 @@ def create_app() -> FastAPI:
                 result = handler.set_lora_scale(request.scale)
 
             if result.startswith("✅") or result.startswith("⚠️"):
+                saved = _load_lora_state()
+                if saved:
+                    _save_lora_state(saved.get("lora_path", ""), request.scale, saved.get("adapter_name"))
                 response_data = {"message": result, "scale": request.scale}
                 if adapter_name:
                     response_data["adapter_name"] = adapter_name
@@ -3798,6 +3899,147 @@ def create_app() -> FastAPI:
             "active_adapter": status.get("active_adapter"),
             "adapters": status.get("adapters", []),
             "synthetic_default_mode": bool(status.get("synthetic_default_mode", False)),
+        })
+
+    def _read_safetensors_metadata(sf_path: str) -> dict:
+        try:
+            from safetensors import safe_open
+            with safe_open(sf_path, framework="pt", device="cpu") as sf:
+                raw = sf.metadata() or {}
+            result = {}
+            for key, value in raw.items():
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, dict):
+                        result[key] = parsed
+                    else:
+                        result[key] = value
+                except (json.JSONDecodeError, TypeError):
+                    result[key] = value
+            return result
+        except Exception:
+            return {}
+
+    def _read_adapter_config(dir_path: str) -> dict:
+        config_path = os.path.join(dir_path, "adapter_config.json")
+        if not os.path.isfile(config_path):
+            return {}
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    @app.get("/api/lora/discover")
+    async def discover_lora_paths():
+        """Discover available LoRA/LoKr adapter paths in the project directory."""
+        project_root = getattr(app.state, "project_root", os.getcwd())
+        
+        search_dirs = [
+            ("lora_output", "LoRA"),
+            ("lokr_output", "LoKr"),
+        ]
+        
+        discovered = []
+        
+        for dir_name, adapter_type in search_dirs:
+            base_dir = os.path.join(project_root, dir_name)
+            if not os.path.isdir(base_dir):
+                continue
+            
+            final_root = os.path.join(base_dir, "final")
+            if os.path.isdir(final_root):
+                adapter_config = _read_adapter_config(final_root)
+                lokr_path = os.path.join(final_root, "lokr_weights.safetensors")
+                adapter_model_path = os.path.join(final_root, "adapter_model.safetensors")
+                
+                if os.path.isfile(lokr_path):
+                    rel_path = os.path.relpath(lokr_path, project_root).replace("\\", "/")
+                    meta = _read_safetensors_metadata(lokr_path)
+                    discovered.append({
+                        "path": rel_path,
+                        "type": "LoKr",
+                        "format": "lycoris",
+                        "display_name": "final",
+                        "is_final": True,
+                        "priority": 0,
+                        "metadata": meta,
+                        "adapter_config": adapter_config or None,
+                    })
+                elif os.path.isfile(adapter_model_path) or os.path.isfile(os.path.join(final_root, "adapter_config.json")):
+                    rel_path = os.path.relpath(final_root, project_root).replace("\\", "/")
+                    meta = _read_safetensors_metadata(adapter_model_path) if os.path.isfile(adapter_model_path) else {}
+                    discovered.append({
+                        "path": rel_path,
+                        "type": adapter_type,
+                        "format": "peft",
+                        "display_name": "final",
+                        "is_final": True,
+                        "priority": 0,
+                        "metadata": meta,
+                        "adapter_config": adapter_config or None,
+                    })
+                else:
+                    for f in os.listdir(final_root):
+                        fpath = os.path.join(final_root, f)
+                        if f.lower().endswith(".safetensors"):
+                            rel_path = os.path.relpath(fpath, project_root).replace("\\", "/")
+                            meta = _read_safetensors_metadata(fpath)
+                            adapter_fmt = "lycoris" if meta.get("lokr_config") else "peft"
+                            discovered.append({
+                                "path": rel_path,
+                                "type": adapter_type,
+                                "format": adapter_fmt,
+                                "display_name": f"final/{f}",
+                                "is_final": True,
+                                "priority": 0,
+                                "metadata": meta,
+                                "adapter_config": adapter_config or None,
+                            })
+            
+            checkpoints_dir = os.path.join(base_dir, "checkpoints")
+            if os.path.isdir(checkpoints_dir):
+                for epoch_dir in sorted(os.listdir(checkpoints_dir)):
+                    epoch_path = os.path.join(checkpoints_dir, epoch_dir)
+                    if not os.path.isdir(epoch_path):
+                        continue
+                    
+                    adapter_config = _read_adapter_config(epoch_path)
+                    lokr_path = os.path.join(epoch_path, "lokr_weights.safetensors")
+                    adapter_model_path = os.path.join(epoch_path, "adapter_model.safetensors")
+                    
+                    if os.path.isfile(lokr_path):
+                        rel_path = os.path.relpath(lokr_path, project_root).replace("\\", "/")
+                        meta = _read_safetensors_metadata(lokr_path)
+                        discovered.append({
+                            "path": rel_path,
+                            "type": "LoKr",
+                            "format": "lycoris",
+                            "display_name": epoch_dir,
+                            "is_final": False,
+                            "priority": 1,
+                            "metadata": meta,
+                            "adapter_config": adapter_config or None,
+                        })
+                    elif os.path.isfile(adapter_model_path) or os.path.isfile(os.path.join(epoch_path, "adapter_config.json")):
+                        rel_path = os.path.relpath(epoch_path, project_root).replace("\\", "/")
+                        meta = _read_safetensors_metadata(adapter_model_path) if os.path.isfile(adapter_model_path) else {}
+                        discovered.append({
+                            "path": rel_path,
+                            "type": adapter_type,
+                            "format": "peft",
+                            "display_name": epoch_dir,
+                            "is_final": False,
+                            "priority": 1,
+                            "metadata": meta,
+                            "adapter_config": adapter_config or None,
+                        })
+        
+        discovered.sort(key=lambda x: (x.get("priority", 99), x.get("display_name", "")))
+        
+        return _wrap_response({
+            "paths": discovered,
+            "project_root": project_root,
         })
 
     @app.post("/v1/reinitialize")

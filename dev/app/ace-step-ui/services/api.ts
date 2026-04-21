@@ -423,6 +423,16 @@ export const generateApi = {
     lora_scale: number;
     adapter_type: string | null;
   }> => api('/api/lora/status', { token }),
+
+  discoverLoraPaths: (): Promise<{
+    paths: Array<{
+      path: string;
+      type: string;
+      format: string;
+      display_name: string;
+    }>;
+    project_root: string;
+  }> => api('/api/lora/discover', { method: 'GET' }),
 };
 
 // Users API

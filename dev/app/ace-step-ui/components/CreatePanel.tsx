@@ -289,11 +289,30 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // LoRA Parameters
   const [showLoraPanel, setShowLoraPanel] = useState(false);
-  const [loraPath, setLoraPath] = useState('./lora_output/final/adapter');
+  const [loraPath, setLoraPath] = useState(() => {
+    return localStorage.getItem('ace-loraPath') || '';
+  });
   const [loraLoaded, setLoraLoaded] = useState(false);
-  const [loraScale, setLoraScale] = useState(1.0);
+  const [loraScale, setLoraScale] = useState(() => {
+    const saved = localStorage.getItem('ace-loraScale');
+    return saved ? parseFloat(saved) : 1.0;
+  });
   const [loraError, setLoraError] = useState<string | null>(null);
   const [isLoraLoading, setIsLoraLoading] = useState(false);
+  const [availableLoraPaths, setAvailableLoraPaths] = useState<Array<{
+    path: string;
+    type: string;
+    format: string;
+    display_name: string;
+    is_final?: boolean;
+    priority?: number;
+    metadata?: Record<string, any>;
+    adapter_config?: Record<string, any> | null;
+  }>>([]);
+  const [showLoraMenu, setShowLoraMenu] = useState(false);
+  const [showCustomLoraInput, setShowCustomLoraInput] = useState(false);
+  const [showAllLoraPaths, setShowAllLoraPaths] = useState(false);
+  const loraMenuRef = useRef<HTMLDivElement>(null);
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
@@ -445,6 +464,71 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showModelMenu]);
+
+  useEffect(() => {
+    if (showLoraMenu) {
+      const handleClickOutside = (e: MouseEvent) => {
+        if (loraMenuRef.current && !loraMenuRef.current.contains(e.target as Node)) {
+          setShowLoraMenu(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showLoraMenu]);
+
+  useEffect(() => {
+    const fetchLoraPaths = async () => {
+      try {
+        const result = await generateApi.discoverLoraPaths();
+        if (result?.paths) {
+          setAvailableLoraPaths(result.paths);
+          if (!loraPath && result.paths.length > 0) {
+            const finalPath = result.paths.find((p: any) => p.is_final);
+            setLoraPath(finalPath ? finalPath.path : result.paths[0].path);
+          }
+        }
+      } catch {}
+    };
+    fetchLoraPaths();
+    const interval = setInterval(fetchLoraPaths, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (loraPath) {
+      localStorage.setItem('ace-loraPath', loraPath);
+    }
+  }, [loraPath]);
+
+  useEffect(() => {
+    localStorage.setItem('ace-loraScale', loraScale.toString());
+  }, [loraScale]);
+
+  useEffect(() => {
+    let failCount = 0;
+    let timerId: ReturnType<typeof setTimeout>;
+    const syncLoraStatus = async () => {
+      try {
+        const status = await generateApi.getLoraStatus(token || '');
+        failCount = 0;
+        if (status?.lora_loaded) {
+          setLoraLoaded(true);
+          if (status.lora_scale !== undefined) {
+            setLoraScale(status.lora_scale);
+          }
+        } else {
+          setLoraLoaded(false);
+        }
+      } catch {
+        failCount++;
+      }
+      const delay = failCount > 3 ? 60000 : 10000;
+      timerId = setTimeout(syncLoraStatus, delay);
+    };
+    syncLoraStatus();
+    return () => clearTimeout(timerId);
+  }, [token]);
 
   // Auto-unload LoRA when model changes
   useEffect(() => {
@@ -1883,16 +1967,129 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
             {showLoraPanel && (
               <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
-                {/* LoRA Path Input */}
+                {/* LoRA Selector */}
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('loraPath')}</label>
-                  <input
-                    type="text"
-                    value={loraPath}
-                    onChange={(e) => setLoraPath(e.target.value)}
-                    placeholder={t('loraPathPlaceholder')}
-                    className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors"
-                  />
+                  <div className="relative" ref={loraMenuRef}>
+                    <button
+                      onClick={() => setShowLoraMenu(!showLoraMenu)}
+                      className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-black/30 transition-colors flex items-center justify-between"
+                    >
+                      <span className="truncate">
+                        {loraPath || t('selectLora') || '选择 LoRA'}
+                      </span>
+                      <ChevronDown size={14} className={`text-zinc-500 transition-transform flex-shrink-0 ml-2 ${showLoraMenu ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {showLoraMenu && (
+                      <div className="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-white/10 rounded-lg shadow-2xl max-h-80 overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowLoraMenu(false);
+                            setShowCustomLoraInput(true);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs border-b border-zinc-100 dark:border-white/5 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5"
+                        >
+                          ✏️ {t('customPath') || '自定义路径'}
+                        </button>
+                        
+                        {(() => {
+                          const visiblePaths = showAllLoraPaths
+                            ? availableLoraPaths
+                            : availableLoraPaths.filter(p => p.is_final);
+                          const hasNonFinal = availableLoraPaths.some(p => !p.is_final);
+                          
+                          return (
+                            <>
+                              {visiblePaths.length > 0 ? (
+                                visiblePaths.map((item, index) => {
+                                  const adapterCfg = item.adapter_config || {};
+                                  const metaKeys = item.metadata ? Object.keys(item.metadata) : [];
+                                  const loraRank = adapterCfg.r || adapterCfg.rank;
+                                  const loraAlpha = adapterCfg.lora_alpha || adapterCfg.alpha;
+                                  const targetModules = adapterCfg.target_modules;
+                                  const modulesStr = Array.isArray(targetModules)
+                                    ? targetModules.join(', ')
+                                    : typeof targetModules === 'string' ? targetModules : '';
+                                  
+                                  return (
+                                    <button
+                                      key={index}
+                                      type="button"
+                                      onClick={() => {
+                                        setLoraPath(item.path);
+                                        setShowLoraMenu(false);
+                                        setShowCustomLoraInput(false);
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-xs border-b border-zinc-100 dark:border-white/5 last:border-0 ${
+                                        loraPath === item.path
+                                          ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300'
+                                          : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="truncate font-medium">
+                                          {item.is_final && <span className="text-green-500 mr-1">✓</span>}
+                                          {item.display_name}
+                                        </span>
+                                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 ml-2 flex-shrink-0">
+                                          {item.type}
+                                          {item.is_final ? ' · final' : ''}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate mt-0.5">{item.path}</div>
+                                      {(loraRank || loraAlpha || modulesStr || metaKeys.length > 0) && (
+                                        <div className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 flex flex-wrap gap-x-2">
+                                          {loraRank && <span>r={loraRank}</span>}
+                                          {loraAlpha && <span>α={loraAlpha}</span>}
+                                          {modulesStr && <span className="truncate max-w-[120px]">{modulesStr}</span>}
+                                          {metaKeys.length > 0 && <span>{metaKeys.length} meta</span>}
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <div className="px-3 py-3 text-xs text-zinc-500 dark:text-zinc-400">
+                                  {t('noLoraFound') || '未发现 LoRA 适配器'}
+                                </div>
+                              )}
+                              {hasNonFinal && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAllLoraPaths(!showAllLoraPaths)}
+                                  className="w-full text-left px-3 py-2 text-[10px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 border-t border-zinc-100 dark:border-white/5"
+                                >
+                                  {showAllLoraPaths
+                                    ? (t('showFinalOnly') || '仅显示训练完成的')
+                                    : (t('showAllPaths') || `显示全部 (${availableLoraPaths.filter(p => !p.is_final).length} 个中间检查点)`)}
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {showCustomLoraInput && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={loraPath}
+                        onChange={(e) => setLoraPath(e.target.value)}
+                        placeholder={t('loraPathPlaceholder') || 'LoRA 路径'}
+                        className="flex-1 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors"
+                      />
+                      <button
+                        onClick={() => setShowCustomLoraInput(false)}
+                        className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* LoRA Load/Unload Toggle */}
