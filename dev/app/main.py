@@ -1930,6 +1930,39 @@ class MainWindow(QMainWindow):
                         self._log("[信息] 尝试继续启动，依赖可能已安装...", "#FF9800")
                     else:
                         self._log("✓ 虚拟环境依赖检查通过")
+                    
+                    try:
+                        process = subprocess.Popen(
+                            [python_exe, "-c", "import transformers; v=transformers.__version__; major=int(v.split('.')[0]); print(v); exit(0 if major<5 else 1)"],
+                            cwd=self.base_dir,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            startupinfo=startupinfo
+                        )
+                        stdout, stderr = process.communicate(timeout=10)
+                        if process.returncode != 0:
+                            installed_ver = stdout.strip() if stdout.strip() else "unknown"
+                            self._log(f"[错误] transformers 版本不兼容: {installed_ver} (需要 <5.0)", "#F44336")
+                            self._log("[信息] 正在自动修复: 降级 transformers 到兼容版本...", "#FF9800")
+                            fix_process = subprocess.Popen(
+                                [python_exe, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"],
+                                cwd=self.base_dir,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                startupinfo=startupinfo
+                            )
+                            fix_stdout, fix_stderr = fix_process.communicate(timeout=120)
+                            if fix_process.returncode == 0:
+                                self._log("✓ transformers 已降级到兼容版本", "#4CAF50")
+                            else:
+                                self._log(f"[错误] 自动修复失败: {fix_stderr.strip()}", "#F44336")
+                                self._log("[建议] 请手动运行: pip install \"transformers>=4.51.0,<4.58.0\"", "#FF9800")
+                        else:
+                            self._log(f"✓ transformers 版本兼容: {stdout.strip()}")
+                    except Exception as e:
+                        self._log(f"[警告] 检查 transformers 版本失败: {e}", "#FF9800")
                 except Exception as e:
                     self._log(f"[警告] 检查虚拟环境依赖失败: {e}，尝试继续启动...", "#FF9800")
                 
@@ -1982,9 +2015,9 @@ class MainWindow(QMainWindow):
                         
                         threading.Thread(target=read_api_output, daemon=True).start()
                         
-                        self._log("等待核心 API 服务就绪...")
+                        self._log("等待核心 API 服务就绪（模型加载可能需要较长时间）...")
                         api_ready = False
-                        max_wait = 60
+                        max_wait = 300
                         waited = 0
                         while waited < max_wait and not api_ready:
                             if self.monitor._check_port(api_port):
@@ -1992,6 +2025,8 @@ class MainWindow(QMainWindow):
                             else:
                                 time.sleep(2)
                                 waited += 2
+                                if waited % 30 == 0 and waited > 0:
+                                    self._log(f"[信息] 仍在等待 API 服务就绪... (已等待 {waited} 秒)", "#FF9800")
                         if not api_ready:
                             self._log("[错误] 核心 API 服务启动超时", "#F44336")
                             self.is_starting = False
@@ -2027,7 +2062,7 @@ class MainWindow(QMainWindow):
                     # 等待后端就绪
                     self._log(f"等待 {backend_service['name']} 就绪...")
                     backend_ready = False
-                    max_wait = 60
+                    max_wait = 120
                     waited = 0
                     while waited < max_wait and not backend_ready:
                         if self.monitor._check_port(backend_service["port"]):
@@ -2413,6 +2448,25 @@ class MainWindow(QMainWindow):
                 self._log(f"✗ 检查 {dep} 失败: {e}", "#FF9800")
                 all_ok = False
         
+        try:
+            process = subprocess.Popen(
+                [venv_python, "-c", "import transformers; v=transformers.__version__; major=int(v.split('.')[0]); print(v); exit(0 if major<5 else 1)"],
+                cwd=self.base_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                startupinfo=startupinfo
+            )
+            stdout, stderr = process.communicate(timeout=10)
+            if process.returncode != 0:
+                installed_ver = stdout.strip() if stdout.strip() else "unknown"
+                self._log(f"✗ transformers 版本不兼容: {installed_ver} (需要 <5.0，5.x 会导致模型加载失败)", "#F44336")
+                all_ok = False
+            else:
+                self._log(f"✓ transformers 版本兼容: {stdout.strip()}")
+        except Exception as e:
+            self._log(f"⚠ 检查 transformers 版本失败: {e}", "#FF9800")
+        
         self._log("[信息] 验证可选加速项...")
         for dep, desc in optional_deps:
             try:
@@ -2469,16 +2523,28 @@ class MainWindow(QMainWindow):
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                process = subprocess.Popen(
-                    ["node.exe", "--version"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    startupinfo=startupinfo
-                )
-                stdout, stderr = process.communicate(timeout=5)
-                if process.returncode == 0 and stdout.strip():
-                    self._log(f"✓ Node.js 已安装: {stdout.strip()}")
+                portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+                portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+                node_paths = [
+                    os.path.join(portable_node24_dir, "node.exe"),
+                    os.path.join(portable_node22_dir, "node.exe"),
+                    "node.exe",
+                ]
+                for node_exe in node_paths:
+                    try:
+                        process = subprocess.Popen(
+                            [node_exe, "--version"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            startupinfo=startupinfo
+                        )
+                        stdout, stderr = process.communicate(timeout=5)
+                        if process.returncode == 0 and stdout.strip():
+                            self._log(f"✓ Node.js 已安装: {stdout.strip()}")
+                            break
+                    except:
+                        continue
             except:
                 pass
             
@@ -2603,11 +2669,11 @@ class MainWindow(QMainWindow):
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
                 portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
+                    os.path.join(portable_node24_dir, "node.exe"),
+                    os.path.join(portable_node22_dir, "node.exe"),
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
-                    os.path.join(portable_node22_dir, "node.exe"),
-                    os.path.join(portable_node24_dir, "node.exe")
                 ]
                 
                 for node_exe in node_paths:
@@ -3751,11 +3817,11 @@ try {
         
         self._log(f"✓ {service_name} 进程已启动")
         
-        max_wait = 60
+        max_wait = 120
         waited = 0
         start_time = time.time()
         while waited < max_wait:
-            time.sleep(10)
+            time.sleep(5)
             waited = int(time.time() - start_time)
             
             if self.monitor._check_port(SERVICES[service_id]["port"]):
