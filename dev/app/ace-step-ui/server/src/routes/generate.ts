@@ -969,6 +969,43 @@ router.get('/models', async (_req, res: Response) => {
   }
 });
 
+router.get('/models/verify', async (req, res: Response) => {
+  try {
+    const modelName = req.query.model_name as string;
+    if (!modelName) {
+      res.status(400).json({ error: 'model_name parameter is required' });
+      return;
+    }
+
+    const verifyResponse = await fetch(
+      `${config.acestep.apiUrl}/api/generate/models/verify?model_name=${encodeURIComponent(modelName)}`,
+      {
+        headers: {
+          'x-api-key': process.env.ACESTEP_API_KEY || '',
+        },
+      }
+    );
+
+    if (!verifyResponse.ok) {
+      res.status(verifyResponse.status).json({ error: 'Failed to verify model' });
+      return;
+    }
+
+    const result = await verifyResponse.json();
+    res.json(result.data || result);
+  } catch (error: any) {
+    const isConnRefused = error?.cause?.code === 'ECONNREFUSED' ||
+      error?.code === 'ECONNREFUSED';
+    if (isConnRefused) {
+      console.warn('Model verify proxy: ACE-Step backend not reachable yet');
+      res.status(503).json({ error: 'ACE-Step 后端暂未启动', backend_unavailable: true });
+    } else {
+      console.error('Model verify proxy error:', error);
+      res.status(500).json({ error: 'Failed to verify model from backend' });
+    }
+  }
+});
+
 router.get('/endpoints', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const endpoints = await discoverEndpoints();

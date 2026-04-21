@@ -3209,8 +3209,14 @@ def create_app() -> FastAPI:
 
     @app.get("/api/generate/models")
     async def list_models_public():
-        """List available DiT models (public endpoint for frontend)."""
-        from acestep.model_downloader import get_checkpoints_dir, check_model_exists
+        """List available DiT models (public endpoint for frontend).
+        
+        Returns model list with strict integrity validation:
+        - is_installed: True only if model passes full validation (files + size)
+        - integrity_status: "complete" | "incomplete" | "missing"
+        - integrity_details: detailed validation info for incomplete models
+        """
+        from acestep.model_downloader import get_checkpoints_dir, check_model_exists, verify_model
         
         current_model = _get_model_name(app.state._config_path) if getattr(app.state, "_initialized", False) else None
 
@@ -3240,14 +3246,37 @@ def create_app() -> FastAPI:
 
         models = []
         for name in all_model_names:
-            # Use official check_model_exists function
+            # Use official check_model_exists function (strict: files + size)
             is_installed = check_model_exists(name, checkpoints_dir)
             is_active = name == current_model
+            
+            # Determine integrity status for UI feedback
+            integrity_status = "missing"
+            integrity_details = None
+            if is_installed:
+                integrity_status = "complete"
+            else:
+                # Model directory may exist but be incomplete - get details
+                model_path = checkpoints_dir / name if hasattr(checkpoints_dir, '__truediv__') else None
+                if model_path and model_path.exists():
+                    # Directory exists but failed strict validation - get detailed info
+                    _, _, details = verify_model(name, checkpoints_dir)
+                    integrity_status = "incomplete"
+                    integrity_details = {
+                        "files_found": details.get("files_found", []),
+                        "files_missing": details.get("files_missing", []),
+                        "total_size_mb": round(details.get("total_size", 0) / 1e6, 2),
+                        "expected_size_mb": round(details.get("expected_size", 0) / 1e6, 2),
+                        "size_ok": details.get("size_ok", False),
+                    }
+            
             models.append({
                 "name": name,
                 "is_active": is_active,
                 "is_preloaded": name in preloaded or is_active,
                 "is_installed": is_installed,
+                "integrity_status": integrity_status,
+                "integrity_details": integrity_details,
                 # Backward-compatible alias for older clients.
                 "is_default": is_active,
             })
@@ -3255,6 +3284,49 @@ def create_app() -> FastAPI:
         return _wrap_response({
             "models": models,
             "active_model": current_model,
+        })
+
+    @app.get("/api/generate/models/verify")
+    async def verify_model_endpoint(model_name: str):
+        """Verify a model's integrity (public endpoint for frontend).
+        
+        Returns detailed validation results including:
+        - Whether the model passes strict validation
+        - Which files are missing
+        - Size comparison (actual vs expected)
+        - Suggestion for the user when validation fails
+        """
+        from acestep.model_downloader import verify_model as do_verify
+        
+        success, message, details = do_verify(model_name)
+        
+        suggestion = None
+        if not success:
+            if not details.get("files_found") and not details.get("files_missing"):
+                # Model directory doesn't exist at all
+                suggestion = "模型未安装，请先下载模型。"
+            elif details.get("files_missing"):
+                missing = ", ".join(details["files_missing"])
+                suggestion = f"模型文件不完整，缺少: {missing}。建议重新下载模型。"
+            elif not details.get("size_ok", True):
+                actual = round(details.get("total_size", 0) / 1e6, 2)
+                expected = round(details.get("expected_size", 0) / 1e6, 2)
+                suggestion = f"模型大小不足({actual}MB < {expected}MB)，可能下载不完整。建议重新下载模型。"
+            else:
+                suggestion = "模型验证未通过，建议重新下载。"
+        
+        return _wrap_response({
+            "model_name": model_name,
+            "is_valid": success,
+            "message": message,
+            "details": {
+                "files_found": details.get("files_found", []),
+                "files_missing": details.get("files_missing", []),
+                "total_size_mb": round(details.get("total_size", 0) / 1e6, 2),
+                "expected_size_mb": round(details.get("expected_size", 0) / 1e6, 2),
+                "size_ok": details.get("size_ok", False),
+            },
+            "suggestion": suggestion,
         })
 
     @app.get("/v1/models")

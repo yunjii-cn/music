@@ -483,9 +483,10 @@ class ModelDeleteThread(QThread):
 
 
 class ModelVerifyThread(QThread):
-    """最简单安全的模型验证线程 - 最小化操作"""
+    """严格模型验证线程 - 使用与前端API相同的 verify_model 逻辑"""
     log_received = pyqtSignal(str)
     verify_finished = pyqtSignal(bool, str)
+    verify_details = pyqtSignal(dict)  # 发送详细验证结果
     
     def __init__(self, model_name: str, base_dir: str, parent=None):
         super().__init__(parent)
@@ -493,61 +494,59 @@ class ModelVerifyThread(QThread):
         self.base_dir = base_dir
     
     def run(self):
-        """最简单的验证方法 - 只检查目录存在"""
+        """使用官方严格验证逻辑 - 与 API 端点 /api/generate/models/verify 一致"""
         try:
-            # 1. 获取模型目录
             import sys
             sys.path.insert(0, os.path.join(self.base_dir))
             
             try:
-                from acestep.model_downloader import get_checkpoints_dir
+                from acestep.model_downloader import verify_model, get_checkpoints_dir
             except Exception as e:
+                self.log_received.emit(f"[错误] 无法加载验证模块: {e}")
                 self.verify_finished.emit(False, self.model_name)
                 return
             
             try:
                 checkpoints_dir = get_checkpoints_dir()
+                self.log_received.emit(f"[验证] 检查目录: {checkpoints_dir}")
             except Exception as e:
+                self.log_received.emit(f"[错误] 无法获取模型目录: {e}")
                 self.verify_finished.emit(False, self.model_name)
                 return
             
-            # 2. 简单验证
-            success = True
+            # 使用官方 verify_model 进行严格验证
+            success, message, details = verify_model(self.model_name, checkpoints_dir)
             
-            if self.model_name == "main":
-                # 验证主模型
-                components = ["acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B", "acestep-5Hz-lm-1.7B"]
-                for comp in components:
-                    comp_path = os.path.join(str(checkpoints_dir), comp)
-                    if not os.path.exists(comp_path) or not os.path.isdir(comp_path):
-                        success = False
-                        break
-                    try:
-                        files = os.listdir(comp_path)
-                        if len(files) == 0:
-                            success = False
-                            break
-                    except:
-                        success = False
-                        break
+            # 输出详细日志
+            if success:
+                self.log_received.emit(f"[验证通过] {message}")
             else:
-                # 验证单个模型
-                model_path = os.path.join(str(checkpoints_dir), self.model_name)
-                if not os.path.exists(model_path) or not os.path.isdir(model_path):
-                    success = False
-                else:
-                    try:
-                        files = os.listdir(model_path)
-                        if len(files) == 0:
-                            success = False
-                    except:
-                        success = False
+                self.log_received.emit(f"[验证失败] {message}")
+                if details.get("files_missing"):
+                    self.log_received.emit(f"  缺少文件: {', '.join(details['files_missing'])}")
+                if not details.get("size_ok", True):
+                    actual = round(details.get("total_size", 0) / 1e6, 2)
+                    expected = round(details.get("expected_size", 0) / 1e6, 2)
+                    self.log_received.emit(f"  大小不足: {actual}MB < 预期 {expected}MB")
+                self.log_received.emit(f"  建议: 请重新下载模型以修复不完整的文件")
             
-            # 3. 完成
+            # 发送详细结果
+            self.verify_details.emit({
+                "model_name": self.model_name,
+                "is_valid": success,
+                "message": message,
+                "files_found": details.get("files_found", []),
+                "files_missing": details.get("files_missing", []),
+                "total_size_mb": round(details.get("total_size", 0) / 1e6, 2),
+                "expected_size_mb": round(details.get("expected_size", 0) / 1e6, 2),
+                "size_ok": details.get("size_ok", False),
+            })
+            
             self.verify_finished.emit(success, self.model_name)
             
         except Exception as e:
             try:
+                self.log_received.emit(f"[错误] 验证异常: {e}")
                 self.verify_finished.emit(False, str(e))
             except:
                 pass
@@ -4313,6 +4312,7 @@ try {
         # 连接信号
         self.model_verify_thread.log_received.connect(self._log)
         self.model_verify_thread.verify_finished.connect(self._on_verify_finished)
+        self.model_verify_thread.verify_details.connect(self._on_verify_details)
         
         # 禁用所有模型按钮
         self._set_model_buttons_enabled(False)
@@ -4327,6 +4327,21 @@ try {
         
         # 重新启用所有按钮
         self._set_model_buttons_enabled(True)
+    
+    def _on_verify_details(self, details: dict):
+        """验证详情回调 - 显示详细的完整性信息"""
+        if not details.get("is_valid", False):
+            msg = f"[验证详情] 模型 {details.get('model_name', '')} 不完整"
+            if details.get("files_missing"):
+                msg += f"\n  缺少文件: {', '.join(details['files_missing'])}"
+            if not details.get("size_ok", True):
+                actual = details.get("total_size_mb", 0)
+                expected = details.get("expected_size_mb", 0)
+                msg += f"\n  大小不足: {actual}MB < 预期 {expected}MB"
+            msg += "\n  建议: 请重新下载模型以确保文件完整性"
+            self._log(msg, "#FF9800")
+        # 更新模型管理UI
+        self._update_model_management_ui()
     
     def _pause_download(self):
         """暂停下载"""

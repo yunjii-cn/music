@@ -304,7 +304,20 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const previousModelRef = useRef<string>(selectedModel);
   
   // Available models fetched from backend
-  const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean; is_installed: boolean }[]>([]);
+  const [fetchedModels, setFetchedModels] = useState<{ 
+    name: string; 
+    is_active: boolean; 
+    is_preloaded: boolean; 
+    is_installed: boolean;
+    integrity_status?: 'complete' | 'incomplete' | 'missing';
+    integrity_details?: {
+      files_found: string[];
+      files_missing: string[];
+      total_size_mb: number;
+      expected_size_mb: number;
+      size_ok: boolean;
+    };
+  }[]>([]);
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
@@ -1210,7 +1223,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     {availableModels.map(model => {
                       const fetchedModel = fetchedModels.find(m => m.name === model.id);
                       const isAvailable = fetchedModel?.is_installed ?? false;
-                      console.log(`[CreatePanel] Model ${model.id}:`, { fetchedModel, isAvailable });
+                      const integrityStatus = fetchedModel?.integrity_status ?? (isAvailable ? 'complete' : 'missing');
+                      const integrityDetails = fetchedModel?.integrity_details;
+                      console.log(`[CreatePanel] Model ${model.id}:`, { fetchedModel, isAvailable, integrityStatus });
                       
                       const descriptions: Record<string, string> = {
                         'acestep-v15-base': '基础模型，适合从零开始创作，生成风格多样的音乐。',
@@ -1253,6 +1268,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
                                   {fetchedModel?.is_active ? '● 激活中' : '● 可用'}
                                 </span>
+                              ) : integrityStatus === 'incomplete' ? (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" title={integrityDetails?.files_missing?.length ? `缺少文件: ${integrityDetails.files_missing.join(', ')}` : '模型不完整，建议重新下载'}>
+                                  ● 不完整
+                                </span>
                               ) : (
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
                                   ● 未加载
@@ -1270,6 +1289,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                           <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">{model.id}</p>
                           {modelDescription && (
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 line-clamp-2">{modelDescription}</p>
+                          )}
+                          {integrityStatus === 'incomplete' && integrityDetails && (
+                            <p className="text-xs text-orange-500 dark:text-orange-400 mt-1">
+                              ⚠ 模型不完整{integrityDetails.files_missing?.length > 0 ? `，缺少: ${integrityDetails.files_missing.join(', ')}` : ''}，请重新下载
+                            </p>
                           )}
                         </button>
                       );
