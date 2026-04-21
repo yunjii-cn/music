@@ -66,7 +66,12 @@ class InitServiceOrchestratorMixin:
 
             # Resolve checkpoint path
             base_root = (self.last_init_params or {}).get("project_root") or self._get_project_root()
-            checkpoint_dir = os.path.join(base_root, "checkpoints")
+            models_dir = os.path.join(base_root, "models")
+            checkpoints_dir = os.path.join(base_root, "checkpoints")
+            if os.path.isdir(models_dir) and not os.path.isdir(checkpoints_dir):
+                checkpoint_dir = models_dir
+            else:
+                checkpoint_dir = checkpoints_dir
             model_path = os.path.join(checkpoint_dir, config_path)
 
             if not os.path.exists(model_path):
@@ -148,7 +153,13 @@ class InitServiceOrchestratorMixin:
             )
 
             base_root = project_root or self._get_project_root()
-            checkpoint_dir = os.path.join(base_root, "checkpoints")
+            # Prefer models/ directory if it exists, otherwise fall back to checkpoints/
+            models_dir = os.path.join(base_root, "models")
+            checkpoints_dir = os.path.join(base_root, "checkpoints")
+            if os.path.isdir(models_dir) and not os.path.isdir(checkpoints_dir):
+                checkpoint_dir = models_dir
+            else:
+                checkpoint_dir = checkpoints_dir
             checkpoint_path = Path(checkpoint_dir)
 
             precheck_failure = self._ensure_models_present(

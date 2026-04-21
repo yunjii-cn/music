@@ -2346,7 +2346,7 @@ class MainWindow(QMainWindow):
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         
-        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio"]
+        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft"]
         all_ok = True
         
         for dep in deps_to_check:
@@ -2370,15 +2370,30 @@ class MainWindow(QMainWindow):
         return all_ok
     
     def _verify_dependencies(self, venv_python):
-        """验证关键依赖是否安装"""
-        self._log("[信息] 验证关键依赖...")
+        """验证关键依赖是否安装，区分必须依赖和可选加速项"""
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         
-        deps_to_check = ["loguru", "psutil"]
+        # 必须依赖 - 缺失则功能不可用
+        required_deps = [
+            ("loguru", "日志库"),
+            ("psutil", "系统监控"),
+            ("torch", "PyTorch 核心"),
+            ("torchaudio", "音频处理"),
+            ("transformers", "模型加载"),
+            ("diffusers", "扩散模型"),
+            ("peft", "LoRA/训练"),
+            ("lycoris", "LoKr 训练"),
+        ]
+        # 可选加速 - 缺失只影响性能，不影响功能
+        optional_deps = [
+            ("flash_attn", "Flash Attention 加速推理"),
+        ]
+        
         all_ok = True
         
-        for dep in deps_to_check:
+        self._log("[信息] 验证必须依赖...")
+        for dep, desc in required_deps:
             try:
                 process = subprocess.Popen(
                     [venv_python, "-c", f"import {dep}"],
@@ -2390,18 +2405,38 @@ class MainWindow(QMainWindow):
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode == 0:
-                    self._log(f"✓ {dep} 已安装")
+                    self._log(f"✓ {dep} ({desc}) 已安装")
                 else:
-                    self._log(f"[警告] {dep} 未安装", "#FF9800")
+                    self._log(f"✗ {dep} ({desc}) 未安装", "#FF9800")
                     all_ok = False
             except Exception as e:
-                self._log(f"[警告] 检查 {dep} 失败: {e}", "#FF9800")
+                self._log(f"✗ 检查 {dep} 失败: {e}", "#FF9800")
                 all_ok = False
+        
+        self._log("[信息] 验证可选加速项...")
+        for dep, desc in optional_deps:
+            try:
+                process = subprocess.Popen(
+                    [venv_python, "-c", f"import {dep}; print({dep}.__version__)"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    startupinfo=startupinfo
+                )
+                stdout, stderr = process.communicate(timeout=10)
+                if process.returncode == 0:
+                    version = stdout.strip()
+                    self._log(f"✓ {dep} ({desc}) 已安装 v{version}")
+                else:
+                    self._log(f"⚠ {dep} ({desc}) 未安装 - 不影响功能，但推理速度会较慢", "#FF9800")
+            except Exception:
+                self._log(f"⚠ {dep} ({desc}) 检测失败 - 不影响功能", "#FF9800")
         
         if all_ok:
             self._log("✓ 关键依赖验证通过")
         else:
-            self._log("[警告] 部分关键依赖缺失", "#FF9800")
+            self._log("[警告] 部分必须依赖缺失", "#FF9800")
     
     def _quick_verify_environment(self):
         """快速验证环境 - 只做检查不做安装"""

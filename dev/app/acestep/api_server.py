@@ -1678,11 +1678,160 @@ def create_app() -> FastAPI:
             app.state.local_cache = None
 
         async def _ensure_initialized() -> None:
-            """Check if models are initialized (they should be loaded at startup)."""
+            """Check if models are initialized. If not (e.g. --no-init mode), lazy-load them."""
             if getattr(app.state, "_init_error", None):
                 raise RuntimeError(app.state._init_error)
-            if not getattr(app.state, "_initialized", False):
-                raise RuntimeError("Model not initialized")
+            if getattr(app.state, "_initialized", False):
+                return
+
+            # Lazy initialization: model not loaded yet (--no-init mode)
+            # Multiple concurrent requests will wait on the lock; after the first
+            # finishes initializing, the rest will see _initialized=True and return.
+            async with app.state._init_lock:
+                # Double-check after acquiring lock
+                if getattr(app.state, "_initialized", False):
+                    return
+                if getattr(app.state, "_init_error", None):
+                    raise RuntimeError(app.state._init_error)
+
+                print("[API Server] Lazy-initializing models on first request...")
+
+                try:
+                    project_root = _get_project_root()
+                    config_path = os.getenv("ACESTEP_CONFIG_PATH", "acestep-v15-turbo")
+                    device = os.getenv("ACESTEP_DEVICE", "auto")
+                    use_flash_attention = _env_bool("ACESTEP_USE_FLASH_ATTENTION", True)
+
+                    gpu_config = getattr(app.state, "gpu_config", None)
+                    gpu_memory_gb = getattr(gpu_config, "gpu_memory_gb", 0) if gpu_config else 0
+                    auto_offload = gpu_memory_gb > 0 and gpu_memory_gb < VRAM_AUTO_OFFLOAD_THRESHOLD_GB
+
+                    offload_to_cpu_env = os.getenv("ACESTEP_OFFLOAD_TO_CPU")
+                    if offload_to_cpu_env is not None:
+                        offload_to_cpu = _env_bool("ACESTEP_OFFLOAD_TO_CPU", False)
+                    else:
+                        offload_to_cpu = auto_offload
+
+                    offload_dit_to_cpu = _env_bool("ACESTEP_OFFLOAD_DIT_TO_CPU", False)
+                    compile_model = _env_bool("ACESTEP_COMPILE_MODEL", False)
+
+                    # Checkpoint directory (prefer models/ over checkpoints/)
+                    checkpoint_dir = os.path.join(project_root, "checkpoints")
+                    models_dir = os.path.join(project_root, "models")
+                    if os.path.isdir(models_dir) and not os.path.isdir(checkpoint_dir):
+                        checkpoint_dir = models_dir
+                    os.makedirs(checkpoint_dir, exist_ok=True)
+
+                    # Download and initialize primary DiT model
+                    dit_model_name = _get_model_name(config_path)
+                    if dit_model_name:
+                        try:
+                            _ensure_model_downloaded(dit_model_name, checkpoint_dir)
+                        except Exception as e:
+                            print(f"[API Server] Warning: Failed to download DiT model: {e}")
+
+                    # Download VAE model
+                    try:
+                        _ensure_model_downloaded("vae", checkpoint_dir)
+                    except Exception as e:
+                        print(f"[API Server] Warning: Failed to download VAE model: {e}")
+
+                    # Run model initialization in thread pool to avoid blocking event loop
+                    print(f"[API Server] Loading primary DiT model: {config_path}")
+                    status_msg, ok = await asyncio.to_thread(
+                        handler.initialize_service,
+                        project_root=project_root,
+                        config_path=config_path,
+                        device=device,
+                        use_flash_attention=use_flash_attention,
+                        compile_model=compile_model,
+                        offload_to_cpu=offload_to_cpu,
+                        offload_dit_to_cpu=offload_dit_to_cpu,
+                    )
+                    if not ok:
+                        app.state._init_error = status_msg
+                        print(f"[API Server] ERROR: Primary model failed to load: {status_msg}")
+                        raise RuntimeError(status_msg)
+
+                    app.state._initialized = True
+                    print(f"[API Server] Primary model lazy-loaded: {_get_model_name(config_path)}")
+
+                    # Initialize secondary models if configured
+                    for idx, (h, cp, init_flag) in enumerate([
+                        (app.state.handler2, app.state._config_path2, "_initialized2"),
+                        (app.state.handler3, app.state._config_path3, "_initialized3"),
+                    ], start=2):
+                        if h and cp:
+                            model_name = _get_model_name(cp)
+                            if model_name:
+                                try:
+                                    _ensure_model_downloaded(model_name, checkpoint_dir)
+                                except Exception as e:
+                                    print(f"[API Server] Warning: Failed to download model {model_name}: {e}")
+                            print(f"[API Server] Loading model #{idx}: {cp}")
+                            s, o = await asyncio.to_thread(
+                                h.initialize_service,
+                                project_root=project_root,
+                                config_path=cp,
+                                device=device,
+                                use_flash_attention=use_flash_attention,
+                                compile_model=compile_model,
+                                offload_to_cpu=offload_to_cpu,
+                                offload_dit_to_cpu=offload_dit_to_cpu,
+                            )
+                            if o:
+                                setattr(app.state, init_flag, True)
+                                print(f"[API Server] Model #{idx} loaded: {_get_model_name(cp)}")
+                            else:
+                                print(f"[API Server] Warning: Model #{idx} failed to load: {s}")
+
+                    # Initialize LLM if configured
+                    llm_configured = os.getenv("ACESTEP_INIT_LLM", "").strip().lower() in ("true", "1", "yes")
+                    if llm_configured:
+                        try:
+                            lm_model_path = os.getenv("ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B").strip()
+                            lm_backend = os.getenv("ACESTEP_LM_BACKEND", "vllm").strip().lower()
+                            if lm_backend not in {"vllm", "pt", "mlx"}:
+                                lm_backend = "vllm"
+                            lm_device = os.getenv("ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto"))
+                            lm_offload = _env_bool("ACESTEP_LM_OFFLOAD_TO_CPU", False)
+
+                            lm_model_name = _get_model_name(lm_model_path)
+                            if lm_model_name:
+                                try:
+                                    _ensure_model_downloaded(lm_model_name, checkpoint_dir)
+                                except Exception as e:
+                                    print(f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}")
+
+                            s, o = await asyncio.to_thread(
+                                llm_handler.initialize,
+                                checkpoint_dir=checkpoint_dir,
+                                lm_model_path=lm_model_path,
+                                backend=lm_backend,
+                                device=lm_device,
+                                offload_to_cpu=lm_offload,
+                            )
+                            if o:
+                                app.state._llm_initialized = True
+                                print(f"[API Server] LLM lazy-loaded: {lm_model_path}")
+                            else:
+                                app.state._llm_init_error = s
+                                print(f"[API Server] Warning: LLM failed to load: {s}")
+                        except Exception as e:
+                            app.state._llm_init_error = str(e)
+                            print(f"[API Server] Warning: LLM initialization failed: {e}")
+
+                    print("[API Server] Lazy initialization complete.")
+
+                except RuntimeError:
+                    raise
+                except Exception as e:
+                    app.state._init_error = str(e)
+                    print(f"[API Server] Lazy initialization failed: {e}")
+                    raise RuntimeError(f"Model initialization failed: {e}")
+
+        # Store on app.state so route handlers can call it too
+        app.state._ensure_initialized = _ensure_initialized
 
         async def _cleanup_job_temp_files(job_id: str) -> None:
             async with app.state.job_temp_files_lock:
@@ -2608,8 +2757,11 @@ def create_app() -> FastAPI:
             offload_dit_to_cpu = _env_bool("ACESTEP_OFFLOAD_DIT_TO_CPU", False)
             compile_model = _env_bool("ACESTEP_COMPILE_MODEL", False)
 
-            # Checkpoint directory
+            # Checkpoint directory (prefer models/ over checkpoints/)
             checkpoint_dir = os.path.join(project_root, "checkpoints")
+            models_dir = os.path.join(project_root, "models")
+            if os.path.isdir(models_dir) and not os.path.isdir(checkpoint_dir):
+                checkpoint_dir = models_dir
             os.makedirs(checkpoint_dir, exist_ok=True)
 
             # Download and initialize primary DiT model
@@ -3497,11 +3649,20 @@ def create_app() -> FastAPI:
 
     @app.post("/v1/lora/load")
     async def load_lora_endpoint(request: LoadLoRARequest, _: None = Depends(verify_api_key)):
-        """Load LoRA adapter into the primary model."""
+        """Load LoRA adapter into the primary model.
+        
+        Automatically lazy-initializes the model if not yet loaded (e.g. --no-init mode).
+        """
         handler: AceStepHandler = app.state.handler
 
-        if handler is None or handler.model is None:
-            raise HTTPException(status_code=500, detail="Model not initialized")
+        if handler is None:
+            raise HTTPException(status_code=500, detail="Handler not initialized")
+
+        # Ensure model is loaded (lazy-init if --no-init mode)
+        if handler.model is None:
+            await app.state._ensure_initialized()
+            if handler.model is None:
+                raise HTTPException(status_code=500, detail="Model not initialized after lazy load attempt")
 
         try:
             adapter_name = request.adapter_name.strip() if isinstance(request.adapter_name, str) else None
@@ -3601,6 +3762,38 @@ def create_app() -> FastAPI:
             "lora_scale": float(status.get("scale", getattr(handler, "lora_scale", 1.0))),
             "adapter_type": getattr(handler, "_adapter_type", None),
             # Extended fields from refactored LoRA service
+            "scales": status.get("scales", {}),
+            "active_adapter": status.get("active_adapter"),
+            "adapters": status.get("adapters", []),
+            "synthetic_default_mode": bool(status.get("synthetic_default_mode", False)),
+        })
+
+    @app.get("/api/lora/status")
+    async def get_lora_status_public():
+        """Get current LoRA/LoKr adapter state (public endpoint for frontend).
+        
+        Returns model initialization status along with LoRA state,
+        allowing the frontend to detect when the model needs recovery.
+        """
+        handler: AceStepHandler = app.state.handler
+        model_initialized = handler is not None and handler.model is not None
+
+        if not model_initialized:
+            return _wrap_response({
+                "model_initialized": False,
+                "lora_loaded": False,
+                "use_lora": False,
+                "lora_scale": 1.0,
+                "adapter_type": None,
+            })
+
+        status = handler.get_lora_status()
+        return _wrap_response({
+            "model_initialized": True,
+            "lora_loaded": bool(status.get("loaded", getattr(handler, "lora_loaded", False))),
+            "use_lora": bool(status.get("active", getattr(handler, "use_lora", False))),
+            "lora_scale": float(status.get("scale", getattr(handler, "lora_scale", 1.0))),
+            "adapter_type": getattr(handler, "_adapter_type", None),
             "scales": status.get("scales", {}),
             "active_adapter": status.get("active_adapter"),
             "adapters": status.get("adapters", []),
