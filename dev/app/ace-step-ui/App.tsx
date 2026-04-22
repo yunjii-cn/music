@@ -768,9 +768,13 @@ function AppContent() {
     if (!token) return;
     if (activeJobsRef.current.has(jobId)) return;
 
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5;
+
     const pollInterval = setInterval(async () => {
       try {
         const status = await generateApi.getStatus(jobId, token);
+        consecutiveErrors = 0;
         const normalizedProgress = Number.isFinite(Number(status.progress))
           ? (Number(status.progress) > 1 ? Number(status.progress) / 100 : Number(status.progress))
           : undefined;
@@ -800,8 +804,12 @@ function AppContent() {
           showToast(`Generation failed: ${status.error || 'Unknown error'}`, 'error');
         }
       } catch (pollError) {
-        console.error(`Polling error for job ${jobId}:`, pollError);
-        cleanupJob(jobId, tempId);
+        consecutiveErrors++;
+        console.error(`Polling error for job ${jobId} (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, pollError);
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          cleanupJob(jobId, tempId);
+          showToast('Generation failed: connection lost', 'error');
+        }
       }
     }, 2000);
 

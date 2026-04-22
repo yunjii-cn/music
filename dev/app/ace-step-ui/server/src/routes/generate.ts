@@ -20,6 +20,23 @@ const __filename_gen = fileURLToPath(import.meta.url);
 const __dirname_gen = path.dirname(__filename_gen);
 const AUDIO_DIR = path.join(__dirname_gen, '../../public/audio');
 
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<globalThis.Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const mergedOptions: RequestInit = { ...options, signal: controller.signal };
+  try {
+    const response: globalThis.Response = await fetch(url, mergedOptions);
+    clearTimeout(timer);
+    return response;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  }
+}
+
 function resolveAudioPath(audioUrl: string): string {
   if (audioUrl.startsWith('/audio/')) {
     return path.join(AUDIO_DIR, audioUrl.replace('/audio/', ''));
@@ -348,7 +365,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     );
 
     // Call 8001 API to start generation
-    const acestepResponse = await fetch(`${config.acestep.apiUrl}/release_task`, {
+    const acestepResponse = await fetchWithTimeout(`${config.acestep.apiUrl}/release_task`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -491,7 +508,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
         const jobAgeMs = Date.now() - createdAtMs;
 
         // Query 8001 API for task status
-        const queryResponse = await fetch(`${config.acestep.apiUrl}/query_result`, {
+        const queryResponse = await fetchWithTimeout(`${config.acestep.apiUrl}/query_result`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -705,8 +722,10 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
 
             for (let i = 0; i < audioUrls.length; i++) {
               const audioUrl = audioUrls[i];
+              const now = new Date();
+              const dateSuffix = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
               const variationSuffix = audioUrls.length > 1 ? ` (v${i + 1})` : '';
-              const songTitle = (params.title || 'Untitled') + variationSuffix;
+              const songTitle = (params.title || 'Untitled') + ` ${dateSuffix}` + variationSuffix;
 
               const songId = generateUUID();
 
@@ -943,7 +962,7 @@ router.get('/history', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
 router.get('/models', async (_req, res: Response) => {
   try {
-    const modelsResponse = await fetch(`${config.acestep.apiUrl}/api/generate/models`, {
+    const modelsResponse = await fetchWithTimeout(`${config.acestep.apiUrl}/api/generate/models`, {
       headers: {
         'x-api-key': process.env.ACESTEP_API_KEY || '',
       },
@@ -977,7 +996,7 @@ router.get('/models/verify', async (req, res: Response) => {
       return;
     }
 
-    const verifyResponse = await fetch(
+    const verifyResponse = await fetchWithTimeout(
       `${config.acestep.apiUrl}/api/generate/models/verify?model_name=${encodeURIComponent(modelName)}`,
       {
         headers: {
@@ -1105,7 +1124,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
     // Attempt 1: Call 8001 API format_input endpoint
     try {
-      const formatResponse = await fetch(`${config.acestep.apiUrl}/format_input`, {
+      const formatResponse = await fetchWithTimeout(`${config.acestep.apiUrl}/format_input`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

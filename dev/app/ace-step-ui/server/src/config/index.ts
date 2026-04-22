@@ -19,7 +19,7 @@ export const config = {
 
   // ACE-Step API (local)
   acestep: {
-    apiUrl: 'http://localhost:8001',
+    apiUrl: process.env.ACESTEP_API_URL || 'http://localhost:8001',
   },
 
   // Pexels (optional - for video backgrounds)

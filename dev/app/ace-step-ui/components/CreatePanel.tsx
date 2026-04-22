@@ -509,6 +509,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     let failCount = 0;
     let timerId: ReturnType<typeof setTimeout>;
     const syncLoraStatus = async () => {
+      if (isGenerating) {
+        timerId = setTimeout(syncLoraStatus, 5000);
+        return;
+      }
       try {
         const status = await generateApi.getLoraStatus(token || '');
         failCount = 0;
@@ -528,7 +532,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     };
     syncLoraStatus();
     return () => clearTimeout(timerId);
-  }, [token]);
+  }, [token, isGenerating]);
 
   // Auto-unload LoRA when model changes
   useEffect(() => {
