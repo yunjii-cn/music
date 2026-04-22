@@ -3930,6 +3930,71 @@ def create_app() -> FastAPI:
         except Exception:
             return {}
 
+    def _extract_training_hints(meta: dict, project_root: str) -> dict:
+        hints = {}
+        run_meta = meta.get("run_metadata")
+        if isinstance(run_meta, dict):
+            tc = run_meta.get("training_config", {})
+            shift = tc.get("shift")
+            steps = tc.get("num_inference_steps")
+            if shift is not None:
+                hints["recommended_shift"] = shift
+                if shift >= 2.5:
+                    hints["model_variant"] = "turbo"
+                else:
+                    hints["model_variant"] = "base"
+            if steps is not None:
+                hints["recommended_steps"] = steps
+            tensor_dir = run_meta.get("tensor_dir", "")
+            manifest = _find_dataset_manifest(tensor_dir, project_root)
+            if manifest:
+                hints["trigger_word"] = manifest.get("custom_tag", "")
+                hints["tag_position"] = manifest.get("tag_position", "prepend")
+                hints["dataset_name"] = manifest.get("name", "")
+                hints["genre_ratio"] = manifest.get("genre_ratio", 0)
+        if not hints.get("trigger_word"):
+            ds_meta = _scan_datasets_for_trigger(project_root)
+            if ds_meta:
+                hints.update(ds_meta)
+        return hints
+
+    def _find_dataset_manifest(tensor_dir: str, project_root: str) -> dict | None:
+        if tensor_dir and os.path.isdir(tensor_dir):
+            manifest_path = os.path.join(tensor_dir, "manifest.json")
+            if os.path.isfile(manifest_path):
+                try:
+                    with open(manifest_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    return data.get("metadata", {})
+                except Exception:
+                    pass
+        return None
+
+    def _scan_datasets_for_trigger(project_root: str) -> dict | None:
+        datasets_dir = os.path.join(project_root, "datasets")
+        if not os.path.isdir(datasets_dir):
+            return None
+        best = None
+        for name in os.listdir(datasets_dir):
+            fpath = os.path.join(datasets_dir, name)
+            if name.endswith(".json") and os.path.isfile(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    md = data.get("metadata", {})
+                    tag = md.get("custom_tag", "")
+                    if tag:
+                        best = {
+                            "trigger_word": tag,
+                            "tag_position": md.get("tag_position", "prepend"),
+                            "dataset_name": md.get("name", ""),
+                            "genre_ratio": md.get("genre_ratio", 0),
+                            "dataset_file": name,
+                        }
+                except Exception:
+                    continue
+        return best
+
     @app.get("/api/lora/discover")
     async def discover_lora_paths():
         """Discover available LoRA/LoKr adapter paths in the project directory."""
@@ -3965,6 +4030,7 @@ def create_app() -> FastAPI:
                         "priority": 0,
                         "metadata": meta,
                         "adapter_config": adapter_config or None,
+                        "training_hints": _extract_training_hints(meta, project_root),
                     })
                 elif os.path.isfile(adapter_model_path) or os.path.isfile(os.path.join(final_root, "adapter_config.json")):
                     rel_path = os.path.relpath(final_root, project_root).replace("\\", "/")
@@ -3978,6 +4044,7 @@ def create_app() -> FastAPI:
                         "priority": 0,
                         "metadata": meta,
                         "adapter_config": adapter_config or None,
+                        "training_hints": _extract_training_hints(meta, project_root),
                     })
                 else:
                     for f in os.listdir(final_root):
@@ -3995,6 +4062,7 @@ def create_app() -> FastAPI:
                                 "priority": 0,
                                 "metadata": meta,
                                 "adapter_config": adapter_config or None,
+                                "training_hints": _extract_training_hints(meta, project_root),
                             })
             
             checkpoints_dir = os.path.join(base_dir, "checkpoints")
@@ -4020,6 +4088,7 @@ def create_app() -> FastAPI:
                             "priority": 1,
                             "metadata": meta,
                             "adapter_config": adapter_config or None,
+                            "training_hints": _extract_training_hints(meta, project_root),
                         })
                     elif os.path.isfile(adapter_model_path) or os.path.isfile(os.path.join(epoch_path, "adapter_config.json")):
                         rel_path = os.path.relpath(epoch_path, project_root).replace("\\", "/")
@@ -4033,6 +4102,7 @@ def create_app() -> FastAPI:
                             "priority": 1,
                             "metadata": meta,
                             "adapter_config": adapter_config or None,
+                            "training_hints": _extract_training_hints(meta, project_root),
                         })
         
         discovered.sort(key=lambda x: (x.get("priority", 99), x.get("display_name", "")))

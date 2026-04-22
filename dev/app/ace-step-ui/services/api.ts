@@ -410,6 +410,13 @@ export const generateApi = {
     message: string;
   }> => api('/api/lora/unload', { method: 'POST', token }),
 
+  toggleLora: (params: {
+    use_lora: boolean;
+  }, token: string): Promise<{
+    message: string;
+    use_lora: boolean;
+  }> => api('/api/lora/toggle', { method: 'POST', body: params, token }),
+
   setLoraScale: (params: {
     scale: number;
   }, token: string): Promise<{

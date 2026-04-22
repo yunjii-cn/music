@@ -7,6 +7,22 @@ import { generateApi } from '../services/api';
 import { MAIN_STYLES, SUB_STYLES } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 
+function HelpTip({ text }: { text: string }) {
+  return (
+    <span className="relative inline-flex items-center ml-0.5 group">
+      <svg className="w-3 h-3 text-zinc-400 dark:text-zinc-500 cursor-help" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="8" cy="8" r="6.5" />
+        <path d="M6.5 6a1.5 1.5 0 1 1 2 1.4V8.5" strokeLinecap="round" />
+        <circle cx="8" cy="10.8" r="0.5" fill="currentColor" stroke="none" />
+      </svg>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-[10px] leading-tight text-white bg-zinc-800 dark:bg-zinc-700 rounded-md whitespace-normal w-max max-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 pointer-events-none z-50 shadow-lg">
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800 dark:border-t-zinc-700" />
+      </span>
+    </span>
+  );
+}
+
 interface ReferenceTrack {
   id: string;
   filename: string;
@@ -288,11 +304,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [maxDurationWithoutLm, setMaxDurationWithoutLm] = useState(240);
 
   // LoRA Parameters
-  const [showLoraPanel, setShowLoraPanel] = useState(false);
+  const [showLoraPanel, setShowLoraPanel] = useState(() => {
+    return localStorage.getItem('ace-loraEnabled') === 'true';
+  });
   const [loraPath, setLoraPath] = useState(() => {
     return localStorage.getItem('ace-loraPath') || '';
   });
   const [loraLoaded, setLoraLoaded] = useState(false);
+  const [loraAdapterInMemory, setLoraAdapterInMemory] = useState(false);
   const [loraScale, setLoraScale] = useState(() => {
     const saved = localStorage.getItem('ace-loraScale');
     return saved ? parseFloat(saved) : 1.0;
@@ -308,11 +327,35 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     priority?: number;
     metadata?: Record<string, any>;
     adapter_config?: Record<string, any> | null;
+    training_hints?: {
+      trigger_word?: string;
+      tag_position?: string;
+      model_variant?: string;
+      recommended_shift?: number;
+      recommended_steps?: number;
+      dataset_name?: string;
+      genre_ratio?: number;
+      dataset_file?: string;
+    };
   }>>([]);
   const [showLoraMenu, setShowLoraMenu] = useState(false);
   const [showCustomLoraInput, setShowCustomLoraInput] = useState(false);
   const [showAllLoraPaths, setShowAllLoraPaths] = useState(false);
+  const [showLoraHints, setShowLoraHints] = useState(false);
   const loraMenuRef = useRef<HTMLDivElement>(null);
+
+  const currentLoraHints = useMemo(() => {
+    if (!loraPath || !availableLoraPaths.length) return null;
+    const match = availableLoraPaths.find(p => p.path === loraPath);
+    return match?.training_hints || null;
+  }, [loraPath, availableLoraPaths]);
+
+  const effectiveStyleForLora = useMemo(() => {
+    if (!loraLoaded || !currentLoraHints?.trigger_word) return null;
+    const tag = currentLoraHints.trigger_word;
+    const pos = currentLoraHints.tag_position || 'prepend';
+    return { tag, pos };
+  }, [loraLoaded, currentLoraHints]);
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
@@ -517,12 +560,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         const status = await generateApi.getLoraStatus(token || '');
         failCount = 0;
         if (status?.lora_loaded) {
-          setLoraLoaded(true);
+          setLoraAdapterInMemory(true);
+          if (status.use_lora) {
+            setLoraLoaded(true);
+          } else {
+            setLoraLoaded(false);
+          }
           if (status.lora_scale !== undefined) {
             setLoraScale(status.lora_scale);
           }
         } else {
           setLoraLoaded(false);
+          setLoraAdapterInMemory(false);
         }
       } catch {
         failCount++;
@@ -537,7 +586,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Auto-unload LoRA when model changes
   useEffect(() => {
     if (previousModelRef.current !== selectedModel && loraLoaded) {
-      void handleLoraUnload();
+      generateApi.toggleLora({ use_lora: false }, token || '').catch(() => {});
+      setLoraLoaded(false);
+      setLoraAdapterInMemory(false);
+      setShowLoraPanel(false);
+      localStorage.setItem('ace-loraEnabled', 'false');
     }
     previousModelRef.current = selectedModel;
   }, [selectedModel, loraLoaded]);
@@ -556,47 +609,62 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       setLoraError('Please sign in to use LoRA');
       return;
     }
-    if (!loraPath.trim()) {
-      setLoraError('Please enter a LoRA path');
-      return;
-    }
 
-    setIsLoraLoading(true);
-    setLoraError(null);
-
-    try {
-      if (loraLoaded) {
-        await handleLoraUnload();
-      } else {
-        const result = await generateApi.loadLora({ lora_path: loraPath }, token);
-        setLoraLoaded(true);
-        console.log('LoRA loaded:', result?.message);
+    if (loraLoaded) {
+      setIsLoraLoading(true);
+      setLoraError(null);
+      try {
+        await generateApi.toggleLora({ use_lora: false }, token);
+        setLoraLoaded(false);
+        localStorage.setItem('ace-loraEnabled', 'false');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to disable LoRA';
+        setLoraError(message);
+        console.error('Toggle off error:', err);
+        setLoraLoaded(false);
+        localStorage.setItem('ace-loraEnabled', 'false');
+      } finally {
+        setIsLoraLoading(false);
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'LoRA operation failed';
-      setLoraError(message);
-      console.error('LoRA error:', err);
-    } finally {
-      setIsLoraLoading(false);
-    }
-  };
-
-  const handleLoraUnload = async () => {
-    if (!token) return;
-    
-    setIsLoraLoading(true);
-    setLoraError(null);
-
-    try {
-      const result = await generateApi.unloadLora(token);
-      setLoraLoaded(false);
-      console.log('LoRA unloaded:', result?.message);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to unload LoRA';
-      setLoraError(message);
-      console.error('Unload error:', err);
-    } finally {
-      setIsLoraLoading(false);
+    } else {
+      if (loraAdapterInMemory) {
+        setIsLoraLoading(true);
+        setLoraError(null);
+        try {
+          await generateApi.toggleLora({ use_lora: true }, token);
+          setLoraLoaded(true);
+          localStorage.setItem('ace-loraEnabled', 'true');
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to enable LoRA';
+          setLoraError(message);
+          console.error('Toggle on error:', err);
+        } finally {
+          setIsLoraLoading(false);
+        }
+      } else {
+        if (!loraPath.trim()) {
+          setLoraError('Please enter a LoRA path');
+          setShowLoraPanel(true);
+          localStorage.setItem('ace-loraEnabled', 'true');
+          return;
+        }
+        setIsLoraLoading(true);
+        setLoraError(null);
+        try {
+          const result = await generateApi.loadLora({ lora_path: loraPath }, token);
+          setLoraLoaded(true);
+          setLoraAdapterInMemory(true);
+          setShowLoraPanel(true);
+          localStorage.setItem('ace-loraEnabled', 'true');
+          console.log('LoRA loaded:', result?.message);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'LoRA load failed';
+          setLoraError(message);
+          console.error('LoRA error:', err);
+        } finally {
+          setIsLoraLoading(false);
+        }
+      }
     }
   };
 
@@ -1116,10 +1184,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   };
 
   const handleGenerate = () => {
+    let baseStyle = style;
+    if (effectiveStyleForLora && !baseStyle.includes(effectiveStyleForLora.tag)) {
+      const { tag, pos } = effectiveStyleForLora;
+      if (pos === 'prepend') baseStyle = `${tag}, ${baseStyle}`;
+      else if (pos === 'replace') baseStyle = tag;
+      else baseStyle = `${baseStyle}, ${tag}`;
+    }
     const styleWithGender = (() => {
-      if (!vocalGender) return style;
+      if (!vocalGender) return baseStyle;
       const genderHint = vocalGender === 'male' ? 'Male vocals' : 'Female vocals';
-      const trimmed = style.trim();
+      const trimmed = baseStyle.trim();
       return trimmed ? `${trimmed}\n${genderHint}` : genderHint;
     })();
 
@@ -1958,16 +2033,40 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         {/* LORA CONTROL PANEL */}
         {customMode && (
           <>
-            <button
-              onClick={() => setShowLoraPanel(!showLoraPanel)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
-            >
+            <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5">
               <div className="flex items-center gap-2">
-                <Sliders size={16} className="text-zinc-500" />
-                <span>LoRA</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={loraLoaded}
+                  onClick={handleLoraToggle}
+                  disabled={isLoraLoading}
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
+                    loraLoaded ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-zinc-700'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                      loraLoaded ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span className={`text-sm font-medium ${loraLoaded ? 'text-pink-600 dark:text-pink-400' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                  LoRA
+                </span>
+                {isLoraLoading && <span className="text-[10px] text-zinc-400">...</span>}
               </div>
-              <ChevronDown size={16} className={`text-zinc-500 transition-transform ${showLoraPanel ? 'rotate-180' : ''}`} />
-            </button>
+              <button
+                onClick={() => {
+                  const next = !showLoraPanel;
+                  setShowLoraPanel(next);
+                  localStorage.setItem('ace-loraEnabled', next.toString());
+                }}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-white/5 rounded transition-colors"
+              >
+                <ChevronDown size={16} className={`text-zinc-500 transition-transform ${showLoraPanel ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
 
             {showLoraPanel && (
               <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
@@ -2096,31 +2195,73 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   )}
                 </div>
 
-                {/* LoRA Load/Unload Toggle */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5">
+                {/* LoRA Load/Unload + Trigger Word */}
+                <div className="space-y-2 border-t border-zinc-100 dark:border-white/5 pt-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${
-                        loraLoaded ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                        loraAdapterInMemory ? 'bg-green-500 animate-pulse' : 'bg-red-500'
                       }`}></div>
                       <span className={`text-xs font-medium ${
-                        loraLoaded ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                        loraAdapterInMemory ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                       }`}>
-                        {loraLoaded ? t('loraLoaded') : t('loraUnloaded')}
+                        {loraAdapterInMemory ? (loraLoaded ? t('loraLoaded') : t('loraDisabled') || '已禁用') : t('loraUnloaded')}
                       </span>
                     </div>
                     <button
-                      onClick={handleLoraToggle}
-                      disabled={!loraPath.trim() || isLoraLoading}
+                      onClick={async () => {
+                        if (!token) { setLoraError('Please sign in'); return; }
+                        if (loraAdapterInMemory) {
+                          setIsLoraLoading(true);
+                          setLoraError(null);
+                          try {
+                            await generateApi.unloadLora(token);
+                            setLoraLoaded(false);
+                            setLoraAdapterInMemory(false);
+                            localStorage.setItem('ace-loraEnabled', 'false');
+                          } catch (err) {
+                            setLoraError(err instanceof Error ? err.message : 'Failed to unload LoRA');
+                          } finally {
+                            setIsLoraLoading(false);
+                          }
+                        } else {
+                          if (!loraPath.trim()) { setLoraError('Please enter a LoRA path'); return; }
+                          setIsLoraLoading(true);
+                          setLoraError(null);
+                          try {
+                            const result = await generateApi.loadLora({ lora_path: loraPath }, token);
+                            setLoraLoaded(true);
+                            setLoraAdapterInMemory(true);
+                            localStorage.setItem('ace-loraEnabled', 'true');
+                            console.log('LoRA loaded:', result?.message);
+                          } catch (err) {
+                            setLoraError(err instanceof Error ? err.message : 'LoRA load failed');
+                          } finally {
+                            setIsLoraLoading(false);
+                          }
+                        }
+                      }}
+                      disabled={isLoraLoading || (!loraAdapterInMemory && !loraPath.trim())}
                       className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                        loraLoaded
+                        loraAdapterInMemory
                           ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/20 hover:from-green-600 hover:to-emerald-700'
                           : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                       }`}
                     >
-                      {isLoraLoading ? '...' : (loraLoaded ? t('loraUnload') : t('loraLoad'))}
+                      {isLoraLoading ? '...' : (loraAdapterInMemory ? t('loraUnload') : t('loraLoad'))}
                     </button>
                   </div>
+                  {currentLoraHints?.trigger_word && loraPath && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400">{t('triggerWordLabel') || '触发词'}:</span>
+                      <code className="px-1.5 py-0.5 bg-pink-50 dark:bg-pink-900/30 rounded text-[10px] font-mono text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-800/40">
+                        {currentLoraHints.trigger_word}
+                      </code>
+                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                        {t('autoInsertTrigger') || '已自动生效'}
+                      </span>
+                    </div>
+                  )}
                   {loraError && (
                     <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
                       {loraError}
@@ -2141,6 +2282,52 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     helpText={t('loraScaleDescription')}
                   />
                 </div>
+
+                {/* Training Hints - Collapsible */}
+                {currentLoraHints && loraLoaded && (
+                  <div className="border-t border-zinc-100 dark:border-white/5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLoraHints(!showLoraHints)}
+                      className="flex items-center gap-1 text-[10px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                    >
+                      <svg
+                        className={`w-3 h-3 transition-transform ${showLoraHints ? 'rotate-90' : ''}`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                      {t('loraHintsTitle') || '训练提示'}
+                    </button>
+                    {showLoraHints && (
+                      <div className="mt-2 p-2.5 rounded-lg bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5 space-y-1.5">
+                        {currentLoraHints.trigger_word && (
+                          <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                            {t('triggerWordLabel') || '触发词'}: <code className="px-1 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-mono">{currentLoraHints.trigger_word}</code>
+                            <span className="ml-1">
+                              ({currentLoraHints.tag_position === 'prepend' ? (t('tagPrepend') || '前置') : currentLoraHints.tag_position === 'replace' ? (t('tagReplace') || '替换') : (t('tagAppend') || '后置')})
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+                          {currentLoraHints.model_variant && (
+                            <span>{t('modelVariant') || '模型'}: <strong>{currentLoraHints.model_variant}</strong></span>
+                          )}
+                          {currentLoraHints.recommended_shift != null && (
+                            <span>Shift: <strong>{currentLoraHints.recommended_shift}</strong></span>
+                          )}
+                          {currentLoraHints.recommended_steps != null && (
+                            <span>Steps: <strong>{currentLoraHints.recommended_steps}</strong></span>
+                          )}
+                          {currentLoraHints.dataset_name && (
+                            <span>{t('datasetName') || '数据集'}: {currentLoraHints.dataset_name}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -2379,7 +2566,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
             {/* Thinking Toggle */}
             <div className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5">
-              <span className={`text-xs font-medium ${loraLoaded ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-600 dark:text-zinc-400'}`} title="Lets the lyric model reason about structure and metadata. Slightly slower.">{t('thinkingCot')}</span>
+              <span className={`text-xs font-medium ${loraLoaded ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-600 dark:text-zinc-400'}`}>{t('thinkingCot')}<HelpTip text={t('thinkingCotHint')} /></span>
               <button
                 onClick={() => { if (loraLoaded) return; const newVal = !thinking; setThinking(newVal); localStorage.setItem('ace-thinking', newVal.toString()); }}
                 disabled={loraLoaded}
@@ -2655,46 +2842,45 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <label
                 className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400"
-                title="Adaptive Dual Guidance: dynamically adjusts CFG for quality. Base model only; slower."
               >
                 <input type="checkbox" checked={useAdg} onChange={() => setUseAdg(!useAdg)} />
-                {t('useAdg')}
+                {t('useAdg')}<HelpTip text={t('useAdgHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Allow the LM to run in larger batches for speed (more VRAM).">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={allowLmBatch} onChange={() => setAllowLmBatch(!allowLmBatch)} />
-                {t('allowLmBatch')}
+                {t('allowLmBatch')}<HelpTip text={t('allowLmBatchHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Let the LM reason about metadata like BPM, key, duration.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={useCotMetas} onChange={() => setUseCotMetas(!useCotMetas)} />
-                {t('useCotMetas')}
+                {t('useCotMetas')}<HelpTip text={t('useCotMetasHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Let the LM reason about the caption/style text.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={useCotCaption} onChange={() => setUseCotCaption(!useCotCaption)} />
-                {t('useCotCaption')}
+                {t('useCotCaption')}<HelpTip text={t('useCotCaptionHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Let the LM reason about language selection.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={useCotLanguage} onChange={() => setUseCotLanguage(!useCotLanguage)} />
-                {t('useCotLanguage')}
+                {t('useCotLanguage')}<HelpTip text={t('useCotLanguageHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Auto-generate missing fields when possible.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={autogen} onChange={() => setAutogen(!autogen)} />
-                {t('autogen')}
+                {t('autogen')}<HelpTip text={t('autogenHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Include debug info for constrained decoding.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={constrainedDecodingDebug} onChange={() => setConstrainedDecodingDebug(!constrainedDecodingDebug)} />
-                {t('constrainedDecodingDebug')}
+                {t('constrainedDecodingDebug')}<HelpTip text={t('constrainedDecodingDebugHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Use the formatted caption produced by the AI formatter.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={isFormatCaption} onChange={() => setIsFormatCaption(!isFormatCaption)} />
-                {t('formatCaption')}
+                {t('formatCaption')}<HelpTip text={t('formatCaptionHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Return scorer outputs for diagnostics.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={getScores} onChange={() => setGetScores(!getScores)} />
-                {t('getScores')}
+                {t('getScores')}<HelpTip text={t('getScoresHint')} />
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Return synced lyric (LRC) output when available.">
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" checked={getLrc} onChange={() => setGetLrc(!getLrc)} />
-                {t('getLrcLyrics')}
+                {t('getLrcLyrics')}<HelpTip text={t('getLrcHint')} />
               </label>
             </div>
           </div>
