@@ -1,23 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2 } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2 } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { generateApi } from '../services/api';
-import { MAIN_STYLES, SUB_STYLES } from '../data/genres';
+import { MAIN_STYLES, SUB_STYLES, getStyleMeta } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 
 function HelpTip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
   return (
-    <span className="relative inline-flex items-center ml-0.5 group">
-      <svg className="w-3 h-3 text-zinc-400 dark:text-zinc-500 cursor-help" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <circle cx="8" cy="8" r="6.5" />
-        <path d="M6.5 6a1.5 1.5 0 1 1 2 1.4V8.5" strokeLinecap="round" />
-        <circle cx="8" cy="10.8" r="0.5" fill="currentColor" stroke="none" />
-      </svg>
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-[10px] leading-tight text-white bg-zinc-800 dark:bg-zinc-700 rounded-md whitespace-normal w-max max-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 pointer-events-none z-50 shadow-lg">
-        {text}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800 dark:border-t-zinc-700" />
+    <span className="inline-flex items-center ml-0.5">
+      <span
+        className="relative inline-flex items-center cursor-help"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      >
+        <svg className="w-3 h-3 text-zinc-400 dark:text-zinc-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="8" cy="8" r="6.5" />
+          <path d="M6.5 6a1.5 1.5 0 1 1 2 1.4V8.5" strokeLinecap="round" />
+          <circle cx="8" cy="10.8" r="0.5" fill="currentColor" stroke="none" />
+        </svg>
+        {show && (
+          <span className="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 px-2 py-1 text-[10px] leading-tight text-white bg-zinc-800 dark:bg-zinc-700 rounded-md whitespace-normal w-max max-w-[200px] pointer-events-none z-50 shadow-lg">
+            {text}
+            <span className="absolute top-1/2 -translate-y-1/2 right-full border-4 border-transparent border-r-zinc-800 dark:border-r-zinc-700" />
+          </span>
+        )}
       </span>
     </span>
   );
@@ -278,30 +287,30 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [referenceAudioTitle, setReferenceAudioTitle] = useState('');
   const [sourceAudioTitle, setSourceAudioTitle] = useState('');
   const [audioCodes, setAudioCodes] = useState('');
-  const [repaintingStart, setRepaintingStart] = useState(0);
-  const [repaintingEnd, setRepaintingEnd] = useState(-1);
+  const [repaintingStart, setRepaintingStart] = useState(() => { const v = localStorage.getItem('ace-repaintingStart'); return v !== null ? parseFloat(v) : 0; });
+  const [repaintingEnd, setRepaintingEnd] = useState(() => { const v = localStorage.getItem('ace-repaintingEnd'); return v !== null ? parseFloat(v) : -1; });
   const [instruction, setInstruction] = useState('Fill the audio semantic mask based on the given conditions:');
-  const [audioCoverStrength, setAudioCoverStrength] = useState(1.0);
+  const [audioCoverStrength, setAudioCoverStrength] = useState(() => { const v = localStorage.getItem('ace-audioCoverStrength'); return v !== null ? parseFloat(v) : 1.0; });
   const [taskType, setTaskType] = useState('text2music');
-  const [useAdg, setUseAdg] = useState(false);
-  const [cfgIntervalStart, setCfgIntervalStart] = useState(0.0);
-  const [cfgIntervalEnd, setCfgIntervalEnd] = useState(1.0);
-  const [customTimesteps, setCustomTimesteps] = useState('');
-  const [useCotMetas, setUseCotMetas] = useState(true);
-  const [useCotCaption, setUseCotCaption] = useState(true);
-  const [useCotLanguage, setUseCotLanguage] = useState(true);
-  const [autogen, setAutogen] = useState(false);
-  const [constrainedDecodingDebug, setConstrainedDecodingDebug] = useState(false);
-  const [allowLmBatch, setAllowLmBatch] = useState(true);
-  const [getScores, setGetScores] = useState(false);
-  const [getLrc, setGetLrc] = useState(false);
-  const [scoreScale, setScoreScale] = useState(0.5);
-  const [lmBatchChunkSize, setLmBatchChunkSize] = useState(8);
+  const [useAdg, setUseAdg] = useState(() => localStorage.getItem('ace-useAdg') !== 'false');
+  const [cfgIntervalStart, setCfgIntervalStart] = useState(() => { const v = localStorage.getItem('ace-cfgIntervalStart'); return v !== null ? parseFloat(v) : 0.0; });
+  const [cfgIntervalEnd, setCfgIntervalEnd] = useState(() => { const v = localStorage.getItem('ace-cfgIntervalEnd'); return v !== null ? parseFloat(v) : 1.0; });
+  const [customTimesteps, setCustomTimesteps] = useState(() => localStorage.getItem('ace-customTimesteps') || '');
+  const [useCotMetas, setUseCotMetas] = useState(() => localStorage.getItem('ace-useCotMetas') !== 'false');
+  const [useCotCaption, setUseCotCaption] = useState(() => localStorage.getItem('ace-useCotCaption') !== 'false');
+  const [useCotLanguage, setUseCotLanguage] = useState(() => localStorage.getItem('ace-useCotLanguage') !== 'false');
+  const [autogen, setAutogen] = useState(() => localStorage.getItem('ace-autogen') === 'true');
+  const [constrainedDecodingDebug, setConstrainedDecodingDebug] = useState(() => localStorage.getItem('ace-constrainedDecodingDebug') === 'true');
+  const [allowLmBatch, setAllowLmBatch] = useState(() => localStorage.getItem('ace-allowLmBatch') !== 'false');
+  const [getScores, setGetScores] = useState(() => localStorage.getItem('ace-getScores') === 'true');
+  const [getLrc, setGetLrc] = useState(() => localStorage.getItem('ace-getLrc') === 'true');
+  const [scoreScale, setScoreScale] = useState(() => { const v = localStorage.getItem('ace-scoreScale'); return v !== null ? parseFloat(v) : 0.5; });
+  const [lmBatchChunkSize, setLmBatchChunkSize] = useState(() => { const v = localStorage.getItem('ace-lmBatchChunkSize'); return v !== null ? parseInt(v, 10) : 8; });
   const [trackName, setTrackName] = useState('');
   const [completeTrackClasses, setCompleteTrackClasses] = useState('');
-  const [isFormatCaption, setIsFormatCaption] = useState(false);
-  const [maxDurationWithLm, setMaxDurationWithLm] = useState(240);
-  const [maxDurationWithoutLm, setMaxDurationWithoutLm] = useState(240);
+  const [isFormatCaption, setIsFormatCaption] = useState(() => localStorage.getItem('ace-isFormatCaption') === 'true');
+  const [maxDurationWithLm, setMaxDurationWithLm] = useState(() => { const v = localStorage.getItem('ace-maxDurationWithLm'); return v !== null ? parseInt(v, 10) : 240; });
+  const [maxDurationWithoutLm, setMaxDurationWithoutLm] = useState(() => { const v = localStorage.getItem('ace-maxDurationWithoutLm'); return v !== null ? parseInt(v, 10) : 240; });
 
   // LoRA Parameters
   const [showLoraPanel, setShowLoraPanel] = useState(() => {
@@ -488,10 +497,23 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Resize Logic
   const [lyricsHeight, setLyricsHeight] = useState(() => {
     const saved = localStorage.getItem('acestep_lyrics_height');
-    return saved ? parseInt(saved, 10) : 144; // Default h-36 is 144px (9rem * 16)
+    return saved ? parseInt(saved, 10) : 144;
+  });
+  const [styleHeight, setStyleHeight] = useState(() => {
+    const saved = localStorage.getItem('acestep_style_height');
+    return saved ? parseInt(saved, 10) : 80;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [resizingTarget, setResizingTarget] = useState<'lyrics' | 'style'>('lyrics');
   const lyricsRef = useRef<HTMLDivElement>(null);
+  const styleRef = useRef<HTMLDivElement>(null);
+  const lyricsTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const styleTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [lyricsExpanded, setLyricsExpanded] = useState(false);
+  const [styleExpanded, setStyleExpanded] = useState(false);
+  const MAX_HEIGHT = 1000;
+  const MIN_LYRICS_HEIGHT = 96;
+  const MIN_STYLE_HEIGHT = 80;
 
 
   // Close model menu when clicking outside
@@ -705,22 +727,20 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
 
-      // Calculate new height based on mouse position relative to the lyrics container top
-      // We can't easily get the container top here without a ref to it, 
-      // but we can use dy (delta y) from the previous position if we tracked it,
-      // OR simpler: just update based on movement if we track the start.
-      //
-      // Better approach for absolute sizing: 
-      // 1. Get the bounding rect of the textarea wrapper on mount/resize start? 
-      //    We can just rely on the fact that we are dragging the bottom.
-      //    So new height = currentMouseY - topOfElement.
+      const ref = resizingTarget === 'lyrics' ? lyricsRef : styleRef;
+      const minHeight = resizingTarget === 'lyrics' ? MIN_LYRICS_HEIGHT : MIN_STYLE_HEIGHT;
 
-      if (lyricsRef.current) {
-        const rect = lyricsRef.current.getBoundingClientRect();
+      if (ref.current) {
+        const rect = ref.current.getBoundingClientRect();
         const newHeight = e.clientY - rect.top;
-        // detailed limits: min 96px (h-24), max 600px
-        if (newHeight > 96 && newHeight < 600) {
-          setLyricsHeight(newHeight);
+        if (newHeight > minHeight && newHeight < MAX_HEIGHT) {
+          if (resizingTarget === 'lyrics') {
+            setLyricsHeight(newHeight);
+            localStorage.setItem('acestep_lyrics_height', String(newHeight));
+          } else {
+            setStyleHeight(newHeight);
+            localStorage.setItem('acestep_style_height', String(newHeight));
+          }
         }
       }
     };
@@ -729,15 +749,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       setIsResizing(false);
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
-      // Save height to localStorage
-      localStorage.setItem('acestep_lyrics_height', String(lyricsHeight));
     };
 
     if (isResizing) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'ns-resize';
-      document.body.style.userSelect = 'none'; // Prevent text selection while dragging
+      document.body.style.userSelect = 'none';
     }
 
     return () => {
@@ -868,9 +886,44 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     };
   }, []);
 
-  const startResizing = (e: React.MouseEvent) => {
+  const startResizing = (e: React.MouseEvent, target: 'lyrics' | 'style') => {
     e.preventDefault();
+    setResizingTarget(target);
     setIsResizing(true);
+  };
+
+  const calcContentHeight = (textarea: HTMLTextAreaElement, minHeight: number): number => {
+    textarea.style.height = 'auto';
+    const scrollH = textarea.scrollHeight;
+    textarea.style.height = '';
+    const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20;
+    return Math.min(Math.max(scrollH + lineHeight, minHeight), MAX_HEIGHT);
+  };
+
+  const toggleLyricsExpand = () => {
+    if (lyricsExpanded) {
+      const saved = localStorage.getItem('acestep_lyrics_height');
+      setLyricsHeight(saved ? parseInt(saved, 10) : 144);
+      setLyricsExpanded(false);
+    } else {
+      if (lyricsTextareaRef.current) {
+        setLyricsHeight(calcContentHeight(lyricsTextareaRef.current, MIN_LYRICS_HEIGHT));
+      }
+      setLyricsExpanded(true);
+    }
+  };
+
+  const toggleStyleExpand = () => {
+    if (styleExpanded) {
+      const saved = localStorage.getItem('acestep_style_height');
+      setStyleHeight(saved ? parseInt(saved, 10) : 80);
+      setStyleExpanded(false);
+    } else {
+      if (styleTextareaRef.current) {
+        setStyleHeight(calcContentHeight(styleTextareaRef.current, MIN_STYLE_HEIGHT));
+      }
+      setStyleExpanded(true);
+    }
   };
 
   const uploadAudio = async (file: File, target: 'reference' | 'source') => {
@@ -1789,11 +1842,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               style={{ height: 'auto' }}
             >
               <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
-                <div>
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('lyrics')}</span>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">{t('leaveLyricsEmpty')}</p>
+                <div className="flex items-center">
+                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('lyrics')}<HelpTip text={t('leaveLyricsEmpty')} /></span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={toggleLyricsExpand}
+                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded text-zinc-500 hover:text-black dark:hover:text-white transition-colors ${lyricsExpanded ? 'text-pink-500 hover:text-pink-600' : ''}`}
+                    title={lyricsExpanded ? t('collapse') : t('expand')}
+                  >
+                    {lyricsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
                   <button
                     onClick={() => { setInstrumental(!instrumental); localStorage.setItem('ace-instrumental', (!instrumental).toString()); }}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
@@ -1821,16 +1880,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </div>
               </div>
               <textarea
+                ref={lyricsTextareaRef}
                 disabled={instrumental}
                 value={lyrics}
                 onChange={(e) => { setLyrics(e.target.value); localStorage.setItem('ace-lyrics', e.target.value); }}
                 placeholder={instrumental ? t('instrumental') + ' mode' : t('lyricsPlaceholder')}
                 className={`w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none font-mono leading-relaxed ${instrumental ? 'opacity-30 cursor-not-allowed' : ''}`}
-                style={{ height: `${lyricsHeight}px` }}
+                style={{ height: `${lyricsHeight}px`, maxHeight: `${MAX_HEIGHT}px` }}
               />
-              {/* Resize Handle */}
               <div
-                onMouseDown={startResizing}
+                onMouseDown={(e) => startResizing(e, 'lyrics')}
                 className="h-3 w-full cursor-ns-resize flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors absolute bottom-0 left-0 z-10"
               >
                 <div className="w-8 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700"></div>
@@ -1838,13 +1897,22 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             </div>
 
             {/* Style Input */}
-            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20">
-              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
-                <div>
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('styleOfMusic')}</span>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">{t('genreMoodInstruments')}</p>
+            <div
+              ref={styleRef}
+              className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20 relative flex flex-col"
+            >
+              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
+                <div className="flex items-center">
+                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('styleOfMusic')}<HelpTip text={t('genreMoodInstruments')} /></span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={toggleStyleExpand}
+                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded text-zinc-500 hover:text-black dark:hover:text-white transition-colors ${styleExpanded ? 'text-pink-500 hover:text-pink-600' : ''}`}
+                    title={styleExpanded ? t('collapse') : t('expand')}
+                  >
+                    {styleExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
                   <button
                     className="p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors text-zinc-500 hover:text-black dark:hover:text-white"
                     title={t('refreshGenres')}
@@ -1869,11 +1937,19 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </button>
               </div>
               <textarea
+                ref={styleTextareaRef}
                 value={style}
                 onChange={(e) => { setStyle(e.target.value); localStorage.setItem('ace-style', e.target.value); }}
                 placeholder={t('stylePlaceholder')}
-                className="w-full h-20 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
+                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none overflow-y-auto"
+                style={{ height: `${styleHeight}px`, maxHeight: `${MAX_HEIGHT}px` }}
               />
+              <div
+                onMouseDown={(e) => startResizing(e, 'style')}
+                className="h-3 w-full cursor-ns-resize flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors flex-shrink-0"
+              >
+                <div className="w-8 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700"></div>
+              </div>
               <div className="px-3 pb-3 space-y-3">
                 {/* Cascading Genre Selector */}
                 <div className="space-y-2">
@@ -1891,9 +1967,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                       className="flex-1 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                     >
                       <option value="">{t('mainGenre')}</option>
-                      {MAIN_STYLES.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
+                      {MAIN_STYLES.map(genre => {
+                        const meta = getStyleMeta(genre);
+                        return (
+                          <option key={genre} value={genre}>
+                            {meta ? `${genre} · ${meta.zh}` : genre}
+                          </option>
+                        );
+                      })}
                     </select>
                     {selectedMainGenre && (
                       <button
@@ -1923,9 +2004,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                         className="flex-1 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                       >
                         <option value="">{t('subGenre')} ({filteredSubGenres.length})</option>
-                        {filteredSubGenres.map(genre => (
-                          <option key={genre} value={genre}>{genre}</option>
-                        ))}
+                        {filteredSubGenres.map(genre => {
+                          const meta = getStyleMeta(genre);
+                          return (
+                            <option key={genre} value={genre}>
+                              {meta ? `${genre} · ${meta.zh}` : genre}
+                            </option>
+                          );
+                        })}
                       </select>
                       {selectedSubGenre && (
                         <button
@@ -1941,15 +2027,19 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </div>
                 {/* Quick Tags */}
                 <div className="flex flex-wrap gap-2">
-                  {musicTags.map(tag => (
-                    <button
-                      key={tag}
-                      onClick={() => setStyle(prev => prev ? `${prev}, ${tag}` : tag)}
-                      className="text-[10px] font-medium bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white px-2.5 py-1 rounded-full transition-colors border border-zinc-200 dark:border-white/5"
-                    >
-                      {tag}
-                    </button>
-                  ))}
+                  {musicTags.map(tag => {
+                    const meta = getStyleMeta(tag);
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => setStyle(prev => prev ? `${prev}, ${tag}` : tag)}
+                        className="text-[10px] font-medium bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white px-2.5 py-1 rounded-full transition-colors border border-zinc-200 dark:border-white/5"
+                        title={meta?.desc || ''}
+                      >
+                        {meta ? `${tag} · ${meta.zh}` : tag}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -2714,7 +2804,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   min="0"
                   max="1"
                   value={audioCoverStrength}
-                  onChange={(e) => setAudioCoverStrength(Number(e.target.value))}
+                  onChange={(e) => { const v = Number(e.target.value); setAudioCoverStrength(v); localStorage.setItem('ace-audioCoverStrength', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
@@ -2727,7 +2817,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   type="number"
                   step="0.1"
                   value={repaintingStart}
-                  onChange={(e) => setRepaintingStart(Number(e.target.value))}
+                  onChange={(e) => { const v = Number(e.target.value); setRepaintingStart(v); localStorage.setItem('ace-repaintingStart', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
@@ -2737,7 +2827,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   type="number"
                   step="0.1"
                   value={repaintingEnd}
-                  onChange={(e) => setRepaintingEnd(Number(e.target.value))}
+                  onChange={(e) => { const v = Number(e.target.value); setRepaintingEnd(v); localStorage.setItem('ace-repaintingEnd', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
@@ -2765,7 +2855,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   min="0"
                   max="1"
                   value={cfgIntervalStart}
-                  onChange={(e) => setCfgIntervalStart(Number(e.target.value))}
+                  onChange={(e) => { const v = Number(e.target.value); setCfgIntervalStart(v); localStorage.setItem('ace-cfgIntervalStart', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
@@ -2777,7 +2867,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   min="0"
                   max="1"
                   value={cfgIntervalEnd}
-                  onChange={(e) => setCfgIntervalEnd(Number(e.target.value))}
+                  onChange={(e) => { const v = Number(e.target.value); setCfgIntervalEnd(v); localStorage.setItem('ace-cfgIntervalEnd', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
@@ -2788,7 +2878,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <input
                 type="text"
                 value={customTimesteps}
-                onChange={(e) => setCustomTimesteps(e.target.value)}
+                onChange={(e) => { setCustomTimesteps(e.target.value); localStorage.setItem('ace-customTimesteps', e.target.value); }}
                 placeholder={t('timestepsPlaceholder')}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
               />
@@ -2801,7 +2891,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   type="number"
                   step="0.05"
                   value={scoreScale}
-                  onChange={(e) => setScoreScale(Number(e.target.value))}
+                  onChange={(e) => { const v = Number(e.target.value); setScoreScale(v); localStorage.setItem('ace-scoreScale', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
@@ -2811,7 +2901,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   type="number"
                   min="1"
                   value={lmBatchChunkSize}
-                  onChange={(e) => setLmBatchChunkSize(Number(e.target.value))}
+                  onChange={(e) => { const v = Number(e.target.value); setLmBatchChunkSize(v); localStorage.setItem('ace-lmBatchChunkSize', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
@@ -2843,43 +2933,43 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <label
                 className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400"
               >
-                <input type="checkbox" checked={useAdg} onChange={() => setUseAdg(!useAdg)} />
+                <input type="checkbox" checked={useAdg} onChange={() => { const v = !useAdg; setUseAdg(v); localStorage.setItem('ace-useAdg', String(v)); }} />
                 {t('useAdg')}<HelpTip text={t('useAdgHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={allowLmBatch} onChange={() => setAllowLmBatch(!allowLmBatch)} />
+                <input type="checkbox" checked={allowLmBatch} onChange={() => { const v = !allowLmBatch; setAllowLmBatch(v); localStorage.setItem('ace-allowLmBatch', String(v)); }} />
                 {t('allowLmBatch')}<HelpTip text={t('allowLmBatchHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={useCotMetas} onChange={() => setUseCotMetas(!useCotMetas)} />
+                <input type="checkbox" checked={useCotMetas} onChange={() => { const v = !useCotMetas; setUseCotMetas(v); localStorage.setItem('ace-useCotMetas', String(v)); }} />
                 {t('useCotMetas')}<HelpTip text={t('useCotMetasHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={useCotCaption} onChange={() => setUseCotCaption(!useCotCaption)} />
+                <input type="checkbox" checked={useCotCaption} onChange={() => { const v = !useCotCaption; setUseCotCaption(v); localStorage.setItem('ace-useCotCaption', String(v)); }} />
                 {t('useCotCaption')}<HelpTip text={t('useCotCaptionHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={useCotLanguage} onChange={() => setUseCotLanguage(!useCotLanguage)} />
+                <input type="checkbox" checked={useCotLanguage} onChange={() => { const v = !useCotLanguage; setUseCotLanguage(v); localStorage.setItem('ace-useCotLanguage', String(v)); }} />
                 {t('useCotLanguage')}<HelpTip text={t('useCotLanguageHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={autogen} onChange={() => setAutogen(!autogen)} />
+                <input type="checkbox" checked={autogen} onChange={() => { const v = !autogen; setAutogen(v); localStorage.setItem('ace-autogen', String(v)); }} />
                 {t('autogen')}<HelpTip text={t('autogenHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={constrainedDecodingDebug} onChange={() => setConstrainedDecodingDebug(!constrainedDecodingDebug)} />
+                <input type="checkbox" checked={constrainedDecodingDebug} onChange={() => { const v = !constrainedDecodingDebug; setConstrainedDecodingDebug(v); localStorage.setItem('ace-constrainedDecodingDebug', String(v)); }} />
                 {t('constrainedDecodingDebug')}<HelpTip text={t('constrainedDecodingDebugHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={isFormatCaption} onChange={() => setIsFormatCaption(!isFormatCaption)} />
+                <input type="checkbox" checked={isFormatCaption} onChange={() => { const v = !isFormatCaption; setIsFormatCaption(v); localStorage.setItem('ace-isFormatCaption', String(v)); }} />
                 {t('formatCaption')}<HelpTip text={t('formatCaptionHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={getScores} onChange={() => setGetScores(!getScores)} />
+                <input type="checkbox" checked={getScores} onChange={() => { const v = !getScores; setGetScores(v); localStorage.setItem('ace-getScores', String(v)); }} />
                 {t('getScores')}<HelpTip text={t('getScoresHint')} />
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <input type="checkbox" checked={getLrc} onChange={() => setGetLrc(!getLrc)} />
+                <input type="checkbox" checked={getLrc} onChange={() => { const v = !getLrc; setGetLrc(v); localStorage.setItem('ace-getLrc', String(v)); }} />
                 {t('getLrcLyrics')}<HelpTip text={t('getLrcHint')} />
               </label>
             </div>
