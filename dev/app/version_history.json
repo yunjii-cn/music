@@ -304,5 +304,15 @@
     ],
     "build_time": "2026-04-23T08:07:55.581533",
     "version_number": "2026.04.23.0806"
+  },
+  "云集智能音乐创意台-v2026.04.24.0631": {
+    "version": "云集智能音乐创意台-v2026.04.24.0631",
+    "changes": [
+      "修复启动时弹出控制台窗口",
+      "为所有subprocess调用添加wShowWindow=0",
+      "为所有PowerShell命令添加-WindowStyle Hidden参数"
+    ],
+    "build_time": "2026-04-24T06:32:39.990062",
+    "version_number": "2026.04.24.0631"
   }
 }

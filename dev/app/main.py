@@ -216,9 +216,12 @@ class ServiceProcess(QThread):
             
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+
             
             cmd = [
                 "powershell.exe",
+                "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
                 "-NoProfile",
                 "-Command", f"& '{self.script_path}' 2>&1"
@@ -320,6 +323,7 @@ class ModelDownloadThread(QThread):
             
             cmd = [
                 "powershell.exe",
+                "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
                 "-NoProfile",
                 "-Command", f"cd '{self.base_dir}'; {cmd_str}"
@@ -330,6 +334,8 @@ class ModelDownloadThread(QThread):
             
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+
             creationflags = subprocess.CREATE_NO_WINDOW
             
             self.process = subprocess.Popen(
@@ -439,6 +445,7 @@ class ModelDeleteThread(QThread):
             
             cmd = [
                 "powershell.exe",
+                "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
                 "-NoProfile",
                 "-Command", f"cd '{self.base_dir}'; {cmd_str}"
@@ -446,6 +453,8 @@ class ModelDeleteThread(QThread):
             
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+
             creationflags = subprocess.CREATE_NO_WINDOW
             
             self.process = subprocess.Popen(
@@ -1907,6 +1916,7 @@ class MainWindow(QMainWindow):
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                     startupinfo.wShowWindow = 0
+
                     
                     python_exe = os.path.join(venv_path, "Scripts", "python.exe")
                     self._log(f"[信息] 检查虚拟环境 Python: {python_exe}")
@@ -1993,9 +2003,10 @@ class MainWindow(QMainWindow):
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                         startupinfo.wShowWindow = 0
+
                         
                         process = subprocess.Popen(
-                            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", api_script],
+                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", api_script],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
@@ -2190,6 +2201,8 @@ class MainWindow(QMainWindow):
         try:
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+
             
             powershell_paths = [
                 "powershell.exe",
@@ -2273,9 +2286,11 @@ class MainWindow(QMainWindow):
                 try:
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0
+
                     
                     process = subprocess.Popen(
-                        ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                        ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
                         cwd=self.base_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
@@ -2352,6 +2367,8 @@ class MainWindow(QMainWindow):
         self._log("[信息] 正在安装关键依赖...")
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+
         
         minimal_deps = [
             "loguru",
@@ -2386,6 +2403,8 @@ class MainWindow(QMainWindow):
         """快速检查关键依赖是否已安装 - 返回True表示所有依赖都OK"""
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+
         
         deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft"]
         all_ok = True
@@ -2415,6 +2434,8 @@ class MainWindow(QMainWindow):
         """验证关键依赖是否安装，区分必须依赖和可选加速项"""
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+
         
         # 必须依赖 - 缺失则功能不可用
         required_deps = [
@@ -2514,8 +2535,10 @@ class MainWindow(QMainWindow):
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
                 process = subprocess.Popen(
-                    ["powershell.exe", "-Version"],
+                    ["powershell.exe", "-WindowStyle", "Hidden", "-Version"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -2534,6 +2557,8 @@ class MainWindow(QMainWindow):
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
                 portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
@@ -2621,6 +2646,8 @@ class MainWindow(QMainWindow):
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
                 
                 powershell_paths = [
                     "powershell.exe",
@@ -2679,6 +2706,8 @@ class MainWindow(QMainWindow):
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
                 
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
                 portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
@@ -2726,6 +2755,8 @@ class MainWindow(QMainWindow):
                     if os.path.exists(install_uv_script):
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        startupinfo.wShowWindow = 0
+
                         
                         process = subprocess.Popen(
                             ["cmd.exe", "/c", install_uv_script],
@@ -2762,9 +2793,11 @@ class MainWindow(QMainWindow):
                         
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        startupinfo.wShowWindow = 0
+
                         
                         process = subprocess.Popen(
-                            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-Command", powershell_script],
+                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", powershell_script],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
@@ -2803,6 +2836,8 @@ class MainWindow(QMainWindow):
                     # 使用 uv 创建虚拟环境
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0
+
                     
                     process = subprocess.Popen(
                         [uv_path, "venv"],
@@ -2854,6 +2889,8 @@ class MainWindow(QMainWindow):
                     self._log("[信息] 这可能需要较长时间，请耐心等待...")
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0
+
                     
                     # 设置国内镜像源
                     env = os.environ.copy()
@@ -2897,10 +2934,12 @@ class MainWindow(QMainWindow):
                         try:
                             startupinfo = subprocess.STARTUPINFO()
                             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                            startupinfo.wShowWindow = 0
+
                             
                             # 使用 PowerShell 执行脚本
                             ps_process = subprocess.Popen(
-                                ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", install_env_ps1],
+                                ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_env_ps1],
                                 cwd=scripts_dir,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
@@ -2952,6 +2991,8 @@ class MainWindow(QMainWindow):
                     try:
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        startupinfo.wShowWindow = 0
+
                         
                         # 初始化并更新子模块
                         process = subprocess.Popen(
@@ -3044,6 +3085,8 @@ try {
                                     # 运行测试
                                     startupinfo = subprocess.STARTUPINFO()
                                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                                    startupinfo.wShowWindow = 0
+
                                     
                                     test_process = subprocess.Popen(
                                         [test_node_exe, test_script],
@@ -3123,6 +3166,8 @@ try {
                             if npm_cmd and os.path.exists(npm_cmd):
                                 startupinfo = subprocess.STARTUPINFO()
                                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                                startupinfo.wShowWindow = 0
+
                                 
                                 # 先安装根目录依赖
                                 self._log("[信息] 安装根目录依赖...")
@@ -3229,6 +3274,8 @@ try {
                     try:
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        startupinfo.wShowWindow = 0
+
                         
                         # 获取当前用户 PATH
                         import winreg
@@ -3303,6 +3350,8 @@ try {
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
                 
                 process = subprocess.Popen(
                     [uv_path, "--version"],
@@ -3326,6 +3375,8 @@ try {
                 if os.path.exists(venv_python):
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0
+
                     
                     process = subprocess.Popen(
                         [venv_python, "--version"],
@@ -3436,6 +3487,8 @@ try {
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
                 
                 powershell_paths = [
                     "powershell.exe",
@@ -3495,6 +3548,8 @@ try {
             try:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
                 
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
                 portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
@@ -3685,10 +3740,12 @@ try {
                         
                         startupinfo = subprocess.STARTUPINFO()
                         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        startupinfo.wShowWindow = 0
+
                         
                         # 使用 subprocess.run 不捕获输出，避免阻塞
                         result = subprocess.run(
-                            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
                             cwd=self.base_dir,
                             capture_output=False,
                             text=True,
@@ -3927,6 +3984,8 @@ try {
             import subprocess
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+
             
             result = subprocess.run(
                 ["netstat", "-ano", "-p", "TCP"],

@@ -784,6 +784,7 @@ class HybridVersionManagerDialog(QDialog):
                 # 启动新的EXE
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = SW_HIDE
                 subprocess.Popen(
                     [version['path']],
                     cwd=os.path.dirname(version['path']),
