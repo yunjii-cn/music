@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 if sys.platform == 'win32':
-    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
 else:
     _HIDDEN_FLAGS = 0
 

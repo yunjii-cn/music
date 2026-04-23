@@ -325,5 +325,14 @@
     ],
     "build_time": "2026-04-24T07:00:59.128992",
     "version_number": "2026.04.24.0659"
+  },
+  "云集智能音乐创意台-v2026.04.24.0706": {
+    "version": "云集智能音乐创意台-v2026.04.24.0706",
+    "changes": [
+      "修复hidden_run/hidden_popen无限递归bug",
+      "移除DETACHED_PROCESS和CREATE_NEW_PROCESS_GROUP标志"
+    ],
+    "build_time": "2026-04-24T07:07:15.005032",
+    "version_number": "2026.04.24.0706"
   }
 }

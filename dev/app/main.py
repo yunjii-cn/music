@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Callable
 import psutil
 
 if sys.platform == 'win32':
-    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
 else:
     _HIDDEN_FLAGS = 0
 
@@ -62,12 +62,12 @@ def _hidden_startupinfo():
 def hidden_run(*args, **kwargs):
     kwargs.setdefault('startupinfo', _hidden_startupinfo())
     kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
-    return hidden_run(*args, **kwargs)
+    return subprocess.run(*args, **kwargs)
 
 def hidden_popen(*args, **kwargs):
     kwargs.setdefault('startupinfo', _hidden_startupinfo())
     kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
-    return hidden_popen(*args, **kwargs)
+    return subprocess.Popen(*args, **kwargs)
 
 # PyQt6 imports
 from PyQt6.QtWidgets import (
