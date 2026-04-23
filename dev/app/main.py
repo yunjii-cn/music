@@ -1405,8 +1405,8 @@ class MainWindow(QMainWindow):
         settings_layout.setSpacing(10)
         settings_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 加载系统信息或显示初始化流程
-        self._check_and_load_system_info()
+        # 加载系统信息或显示初始化流程（延迟执行，避免启动时弹窗）
+        QTimer.singleShot(500, self._check_and_load_system_info)
         
         # 1. 浏览器设置面板 - 一排横向布局
         browser_panel = QFrame()
@@ -1775,7 +1775,7 @@ class MainWindow(QMainWindow):
         if index == 2 and hasattr(self, 'version_manager_widget'):
             print("[DEBUG] 切换到软件更新页面，延迟调用_load_versions")
             # 使用QTimer延迟加载，避免UI卡顿
-            QTimer.singleShot(100, self._delayed_load_versions)
+            QTimer.singleShot(500, self._delayed_load_versions)
     
     def _delayed_load_versions(self):
         """延迟加载版本列表"""

@@ -41,9 +41,14 @@ class GitDetector:
     
     GIT_DOWNLOAD_URL = "https://git-scm.com/download/win"
     
+    _git_available = None
+    _git_version = None
+    
     @staticmethod
     def is_git_available():
-        """检查Git是否可用"""
+        """检查Git是否可用（带缓存）"""
+        if GitDetector._git_available is not None:
+            return GitDetector._git_available
         try:
             result = hidden_run(
                 ['git', '--version'],
@@ -51,13 +56,17 @@ class GitDetector:
                 text=True,
                 timeout=5
             )
-            return result.returncode == 0
+            GitDetector._git_available = result.returncode == 0
+            return GitDetector._git_available
         except Exception:
+            GitDetector._git_available = False
             return False
     
     @staticmethod
     def get_git_version():
-        """获取Git版本"""
+        """获取Git版本（带缓存）"""
+        if GitDetector._git_version is not None:
+            return GitDetector._git_version
         try:
             result = hidden_run(
                 ['git', '--version'],
@@ -66,7 +75,8 @@ class GitDetector:
                 timeout=5
             )
             if result.returncode == 0:
-                return result.stdout.strip()
+                GitDetector._git_version = result.stdout.strip()
+                return GitDetector._git_version
         except Exception:
             pass
         return None

@@ -62,12 +62,11 @@ class HybridVersionManagerDialog(QDialog):
         
         # 检测运行模式
         self.is_exe_mode = hasattr(sys, 'frozen')
-        self.has_git_repo = self._check_git_repo()
+        self.has_git_repo = False
         self.current_mode = "exe" if self.is_exe_mode else "git"
         
         self._setup_ui()
         self._load_version_history()
-        self._load_versions()
     
     def _load_version_history(self):
         """加载版本历史"""
@@ -518,7 +517,9 @@ class HybridVersionManagerDialog(QDialog):
             if item.widget():
                 item.widget().deleteLater()
         
-        # 检查Git是否可用
+        if not self.is_exe_mode and not self.has_git_repo:
+            self.has_git_repo = self._check_git_repo()
+        
         git_available = GitDetector.is_git_available()
         
         # 根据当前模式直接加载，不强制切换

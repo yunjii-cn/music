@@ -334,5 +334,16 @@
     ],
     "build_time": "2026-04-24T07:07:15.005032",
     "version_number": "2026.04.24.0706"
+  },
+  "云集智能音乐创意台-v2026.04.24.0725": {
+    "version": "云集智能音乐创意台-v2026.04.24.0725",
+    "changes": [
+      "彻底修复启动弹窗",
+      "移除HybridVersionManagerDialog.__init__中的_load_versions和_check_git_repo调用",
+      "延迟_check_and_load_system_info到500ms后执行",
+      "GitDetector添加缓存避免重复调用git"
+    ],
+    "build_time": "2026-04-24T07:27:01.722824",
+    "version_number": "2026.04.24.0725"
   }
 }
