@@ -48,6 +48,27 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable
 import psutil
 
+if sys.platform == 'win32':
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+else:
+    _HIDDEN_FLAGS = 0
+
+def _hidden_startupinfo():
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    return si
+
+def hidden_run(*args, **kwargs):
+    kwargs.setdefault('startupinfo', _hidden_startupinfo())
+    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    return hidden_run(*args, **kwargs)
+
+def hidden_popen(*args, **kwargs):
+    kwargs.setdefault('startupinfo', _hidden_startupinfo())
+    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    return hidden_popen(*args, **kwargs)
+
 # PyQt6 imports
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -214,9 +235,6 @@ class ServiceProcess(QThread):
                 self.finished.emit(1, 0)
                 return
             
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
 
             
             cmd = [
@@ -227,16 +245,12 @@ class ServiceProcess(QThread):
                 "-Command", f"& '{self.script_path}' 2>&1"
             ]
             
-            creationflags = subprocess.CREATE_NO_WINDOW
-            
-            self.process = subprocess.Popen(
+            self.process = hidden_popen(
                 cmd,
                 cwd=self.working_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True,
-                startupinfo=startupinfo,
-                creationflags=creationflags
+                text=True
             )
             
             for line in iter(self.process.stdout.readline, ''):
@@ -332,22 +346,15 @@ class ModelDownloadThread(QThread):
             self.current_progress = 15
             self.progress_updated.emit(self.current_progress, "连接下载源...")
             
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
 
-            creationflags = subprocess.CREATE_NO_WINDOW
-            
-            self.process = subprocess.Popen(
+            self.process = hidden_popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
                 encoding='utf-8',
-                errors='replace',
-                startupinfo=startupinfo,
-                creationflags=creationflags
+                errors='replace'
             )
             
             # 模拟下载进度
@@ -451,22 +458,15 @@ class ModelDeleteThread(QThread):
                 "-Command", f"cd '{self.base_dir}'; {cmd_str}"
             ]
             
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
 
-            creationflags = subprocess.CREATE_NO_WINDOW
-            
-            self.process = subprocess.Popen(
+            self.process = hidden_popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
                 encoding='utf-8',
-                errors='replace',
-                startupinfo=startupinfo,
-                creationflags=creationflags
+                errors='replace'
             )
             
             for line in iter(self.process.stdout.readline, ''):
@@ -1913,22 +1913,17 @@ class MainWindow(QMainWindow):
                 
                 # 检查虚拟环境中是否有 loguru 模块，确保依赖已安装
                 try:
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = 0
 
                     
                     python_exe = os.path.join(venv_path, "Scripts", "python.exe")
                     self._log(f"[信息] 检查虚拟环境 Python: {python_exe}")
                     
-                    process = subprocess.Popen(
+                    process = hidden_popen(
                         [python_exe, "-c", "import loguru"],
                         cwd=self.base_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        text=True
                     )
                     stdout, stderr = process.communicate(timeout=10)
                     
@@ -1941,28 +1936,24 @@ class MainWindow(QMainWindow):
                         self._log("✓ 虚拟环境依赖检查通过")
                     
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             [python_exe, "-c", "import transformers; v=transformers.__version__; major=int(v.split('.')[0]); print(v); exit(0 if major<5 else 1)"],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=10)
                         if process.returncode != 0:
                             installed_ver = stdout.strip() if stdout.strip() else "unknown"
                             self._log(f"[错误] transformers 版本不兼容: {installed_ver} (需要 <5.0)", "#F44336")
                             self._log("[信息] 正在自动修复: 降级 transformers 到兼容版本...", "#FF9800")
-                            fix_process = subprocess.Popen(
+                            fix_process = hidden_popen(
                                 [python_exe, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"],
                                 cwd=self.base_dir,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                text=True,
-                                startupinfo=startupinfo,
-                                creationflags=subprocess.CREATE_NO_WINDOW
+                                text=True
                             )
                             fix_stdout, fix_stderr = fix_process.communicate(timeout=120)
                             if fix_process.returncode == 0:
@@ -2000,19 +1991,14 @@ class MainWindow(QMainWindow):
                             self._enable_buttons()
                             return
                         
-                        startupinfo = subprocess.STARTUPINFO()
-                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = 0
 
                         
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", api_script],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         
                         self.api_process = process
@@ -2199,9 +2185,6 @@ class MainWindow(QMainWindow):
         self._log("0. 检查 PowerShell 安装...")
         
         try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
 
             
             powershell_paths = [
@@ -2213,13 +2196,11 @@ class MainWindow(QMainWindow):
             found = False
             for powershell_exe in powershell_paths:
                 try:
-                    process = subprocess.Popen(
+                    process = hidden_popen(
                         [powershell_exe, "-Version"],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        text=True
                     )
                     stdout, stderr = process.communicate(timeout=5)
                     if process.returncode == 0:
@@ -2232,13 +2213,11 @@ class MainWindow(QMainWindow):
             
             if not found:
                 try:
-                    process = subprocess.Popen(
+                    process = hidden_popen(
                         ["where", "powershell"],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        text=True
                     )
                     stdout, stderr = process.communicate(timeout=5)
                     if process.returncode == 0 and stdout.strip():
@@ -2284,19 +2263,14 @@ class MainWindow(QMainWindow):
             install_script = os.path.join(self.base_dir, "scripts", "1、install-uv-qinglong.ps1")
             if os.path.exists(install_script):
                 try:
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = 0
 
                     
-                    process = subprocess.Popen(
+                    process = hidden_popen(
                         ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
                         cwd=self.base_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        text=True
                     )
                     
                     while process.poll() is None:
@@ -2365,9 +2339,6 @@ class MainWindow(QMainWindow):
     def _install_minimal_dependencies(self, venv_python, uv_path, scripts_dir, env):
         """安装最小化的关键依赖（备用方案）"""
         self._log("[信息] 正在安装关键依赖...")
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = 0
 
         
         minimal_deps = [
@@ -2381,14 +2352,12 @@ class MainWindow(QMainWindow):
         for dep in minimal_deps:
             try:
                 self._log(f"[信息] 正在安装: {dep}")
-                process = subprocess.Popen(
+                process = hidden_popen(
                     [uv_path, "pip", "install", dep],
                     cwd=scripts_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    startupinfo=startupinfo,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
                     env=env
                 )
                 stdout, _ = process.communicate(timeout=120)
@@ -2401,9 +2370,6 @@ class MainWindow(QMainWindow):
     
     def _quick_check_dependencies(self, venv_python):
         """快速检查关键依赖是否已安装 - 返回True表示所有依赖都OK"""
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = 0
 
         
         deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft"]
@@ -2411,14 +2377,12 @@ class MainWindow(QMainWindow):
         
         for dep in deps_to_check:
             try:
-                process = subprocess.Popen(
+                process = hidden_popen(
                     [venv_python, "-c", f"import {dep}"],
                     cwd=self.base_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True,
-                    startupinfo=startupinfo,
-                    creationflags=subprocess.CREATE_NO_WINDOW
+                    text=True
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode != 0:
@@ -2432,9 +2396,6 @@ class MainWindow(QMainWindow):
     
     def _verify_dependencies(self, venv_python):
         """验证关键依赖是否安装，区分必须依赖和可选加速项"""
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = 0
 
         
         # 必须依赖 - 缺失则功能不可用
@@ -2458,14 +2419,12 @@ class MainWindow(QMainWindow):
         self._log("[信息] 验证必须依赖...")
         for dep, desc in required_deps:
             try:
-                process = subprocess.Popen(
+                process = hidden_popen(
                     [venv_python, "-c", f"import {dep}"],
                     cwd=self.base_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True,
-                    startupinfo=startupinfo,
-                    creationflags=subprocess.CREATE_NO_WINDOW
+                    text=True
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode == 0:
@@ -2478,14 +2437,12 @@ class MainWindow(QMainWindow):
                 all_ok = False
         
         try:
-            process = subprocess.Popen(
+            process = hidden_popen(
                 [venv_python, "-c", "import transformers; v=transformers.__version__; major=int(v.split('.')[0]); print(v); exit(0 if major<5 else 1)"],
                 cwd=self.base_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-                startupinfo=startupinfo,
-                creationflags=subprocess.CREATE_NO_WINDOW
+                text=True
             )
             stdout, stderr = process.communicate(timeout=10)
             if process.returncode != 0:
@@ -2500,14 +2457,12 @@ class MainWindow(QMainWindow):
         self._log("[信息] 验证可选加速项...")
         for dep, desc in optional_deps:
             try:
-                process = subprocess.Popen(
+                process = hidden_popen(
                     [venv_python, "-c", f"import {dep}; print({dep}.__version__)"],
                     cwd=self.base_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True,
-                    startupinfo=startupinfo,
-                    creationflags=subprocess.CREATE_NO_WINDOW
+                    text=True
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode == 0:
@@ -2533,17 +2488,12 @@ class MainWindow(QMainWindow):
             # 1. 检查 PowerShell
             self._log("1. 检查 PowerShell...")
             try:
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
 
-                process = subprocess.Popen(
+                process = hidden_popen(
                     ["powershell.exe", "-WindowStyle", "Hidden", "-Version"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True,
-                    startupinfo=startupinfo,
-                    creationflags=subprocess.CREATE_NO_WINDOW
+                    text=True
                 )
                 stdout, stderr = process.communicate(timeout=5)
                 if process.returncode == 0:
@@ -2555,9 +2505,6 @@ class MainWindow(QMainWindow):
             # 2. 检查 Node.js
             self._log("2. 检查 Node.js...")
             try:
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
 
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
                 portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
@@ -2568,13 +2515,11 @@ class MainWindow(QMainWindow):
                 ]
                 for node_exe in node_paths:
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             [node_exe, "--version"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -2644,9 +2589,6 @@ class MainWindow(QMainWindow):
             powershell_available = False
             
             try:
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
 
                 
                 powershell_paths = [
@@ -2657,13 +2599,11 @@ class MainWindow(QMainWindow):
                 
                 for powershell_exe in powershell_paths:
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             [powershell_exe, "-Version"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0:
@@ -2676,13 +2616,11 @@ class MainWindow(QMainWindow):
                 
                 if not powershell_available:
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             ["where", "powershell"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -2704,9 +2642,6 @@ class MainWindow(QMainWindow):
             node_available = False
             
             try:
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
 
                 
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
@@ -2721,13 +2656,11 @@ class MainWindow(QMainWindow):
                 
                 for node_exe in node_paths:
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             [node_exe, "--version"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -2753,19 +2686,14 @@ class MainWindow(QMainWindow):
                     # 下载并安装 uv
                     install_uv_script = os.path.join(self.base_dir, "install_uv.bat")
                     if os.path.exists(install_uv_script):
-                        startupinfo = subprocess.STARTUPINFO()
-                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = 0
 
                         
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             ["cmd.exe", "/c", install_uv_script],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         
                         while process.poll() is None:
@@ -2791,19 +2719,14 @@ class MainWindow(QMainWindow):
                             Remove-Item install-uv.ps1
                         """
                         
-                        startupinfo = subprocess.STARTUPINFO()
-                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = 0
 
                         
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", powershell_script],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         
                         while process.poll() is None:
@@ -2834,19 +2757,14 @@ class MainWindow(QMainWindow):
                 self._log("[信息] 虚拟环境不存在，正在创建...")
                 try:
                     # 使用 uv 创建虚拟环境
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = 0
 
                     
-                    process = subprocess.Popen(
+                    process = hidden_popen(
                         [uv_path, "venv"],
                         cwd=scripts_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        text=True
                     )
                     
                     while process.poll() is None:
@@ -2887,9 +2805,6 @@ class MainWindow(QMainWindow):
                     # 方案1: 尝试使用 uv sync
                     self._log("[信息] 方案1: 使用 uv sync 安装完整依赖...")
                     self._log("[信息] 这可能需要较长时间，请耐心等待...")
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = 0
 
                     
                     # 设置国内镜像源
@@ -2900,14 +2815,12 @@ class MainWindow(QMainWindow):
                     success = False
                     
                     # 尝试 uv sync
-                    process = subprocess.Popen(
+                    process = hidden_popen(
                         [uv_path, "sync"],
                         cwd=scripts_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW,
                         env=env
                     )
                     
@@ -2932,20 +2845,15 @@ class MainWindow(QMainWindow):
                     if not success and os.path.exists(install_env_ps1):
                         self._log("[信息] 方案2: 使用 install-env.ps1 安装依赖...")
                         try:
-                            startupinfo = subprocess.STARTUPINFO()
-                            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                            startupinfo.wShowWindow = 0
 
                             
                             # 使用 PowerShell 执行脚本
-                            ps_process = subprocess.Popen(
+                            ps_process = hidden_popen(
                                 ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_env_ps1],
                                 cwd=scripts_dir,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
-                                text=True,
-                                startupinfo=startupinfo,
-                                creationflags=subprocess.CREATE_NO_WINDOW
+                                text=True
                             )
                             
                             stdout_ps, _ = ps_process.communicate(timeout=1800)
@@ -2989,20 +2897,15 @@ class MainWindow(QMainWindow):
                 if not os.path.exists(git_dir):
                     self._log("[信息] ace-step-ui 是git子模块，当前未初始化，正在初始化...")
                     try:
-                        startupinfo = subprocess.STARTUPINFO()
-                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = 0
 
                         
                         # 初始化并更新子模块
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             ["git", "submodule", "update", "--init", "--recursive"],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         
                         try:
@@ -3083,19 +2986,14 @@ try {
 """)
                                     
                                     # 运行测试
-                                    startupinfo = subprocess.STARTUPINFO()
-                                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                                    startupinfo.wShowWindow = 0
 
                                     
-                                    test_process = subprocess.Popen(
+                                    test_process = hidden_popen(
                                         [test_node_exe, test_script],
                                         cwd=os.path.join(ace_step_ui_path, "server"),
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
-                                        text=True,
-                                        startupinfo=startupinfo,
-                                        creationflags=subprocess.CREATE_NO_WINDOW
+                                        text=True
                                     )
                                     
                                     test_stdout, test_stderr = test_process.communicate(timeout=10)
@@ -3164,21 +3062,16 @@ try {
                                 os.environ["npm_config_python"] = venv_python
                             
                             if npm_cmd and os.path.exists(npm_cmd):
-                                startupinfo = subprocess.STARTUPINFO()
-                                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                                startupinfo.wShowWindow = 0
 
                                 
                                 # 先安装根目录依赖
                                 self._log("[信息] 安装根目录依赖...")
-                                process = subprocess.Popen(
+                                process = hidden_popen(
                                     [npm_cmd, "install"],
                                     cwd=ace_step_ui_path,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT,
-                                    text=True,
-                                    startupinfo=startupinfo,
-                                    creationflags=subprocess.CREATE_NO_WINDOW
+                                    text=True
                                 )
                                 
                                 try:
@@ -3203,14 +3096,12 @@ try {
                                 server_path = os.path.join(ace_step_ui_path, "server")
                                 if os.path.exists(server_path):
                                     self._log("[信息] 安装 server 目录依赖...")
-                                    process2 = subprocess.Popen(
+                                    process2 = hidden_popen(
                                         [npm_cmd, "install"],
                                         cwd=server_path,
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT,
-                                        text=True,
-                                        startupinfo=startupinfo,
-                                        creationflags=subprocess.CREATE_NO_WINDOW
+                                        text=True
                                     )
                                     
                                     try:
@@ -3272,9 +3163,6 @@ try {
                     self._log("[信息] uv 路径未在环境变量中，正在添加...")
                     # 使用 setx 命令添加到用户环境变量
                     try:
-                        startupinfo = subprocess.STARTUPINFO()
-                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = 0
 
                         
                         # 获取当前用户 PATH
@@ -3288,13 +3176,11 @@ try {
                             new_user_path = current_user_path + ";" + uv_dir
                             
                             # 使用 setx 设置
-                            process = subprocess.Popen(
+                            process = hidden_popen(
                                 ["setx", "PATH", new_user_path],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                text=True,
-                                startupinfo=startupinfo,
-                                creationflags=subprocess.CREATE_NO_WINDOW
+                                text=True
                             )
                             process.communicate(timeout=10)
                             
@@ -3348,18 +3234,13 @@ try {
             
             # 检查 uv 是否可用
             try:
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
 
                 
-                process = subprocess.Popen(
+                process = hidden_popen(
                     [uv_path, "--version"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True,
-                    startupinfo=startupinfo,
-                    creationflags=subprocess.CREATE_NO_WINDOW
+                    text=True
                 )
                 stdout, stderr = process.communicate(timeout=5)
                 if process.returncode == 0:
@@ -3373,18 +3254,13 @@ try {
             try:
                 venv_python = os.path.join(venv_path, "Scripts", "python.exe")
                 if os.path.exists(venv_python):
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = 0
 
                     
-                    process = subprocess.Popen(
+                    process = hidden_popen(
                         [venv_python, "--version"],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        text=True
                     )
                     stdout, stderr = process.communicate(timeout=5)
                     if process.returncode == 0:
@@ -3485,9 +3361,6 @@ try {
             powershell_available = False
             
             try:
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
 
                 
                 powershell_paths = [
@@ -3498,13 +3371,11 @@ try {
                 
                 for powershell_exe in powershell_paths:
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             [powershell_exe, "-Version"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0:
@@ -3517,13 +3388,11 @@ try {
                 
                 if not powershell_available:
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             ["where", "powershell"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -3546,9 +3415,6 @@ try {
             node_path = None
             
             try:
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
 
                 
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
@@ -3563,13 +3429,11 @@ try {
                 
                 for node_exe in node_paths:
                     try:
-                        process = subprocess.Popen(
+                        process = hidden_popen(
                             [node_exe, "--version"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            text=True
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -3639,13 +3503,11 @@ try {
                                 if os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
                                     node_available = True
                                     node_path = os.path.join(portable_node24_dir, "node.exe")
-                                    ver_process = subprocess.Popen(
+                                    ver_process = hidden_popen(
                                         [node_path, "--version"],
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
-                                        text=True,
-                                        startupinfo=startupinfo,
-                                        creationflags=subprocess.CREATE_NO_WINDOW
+                                        text=True
                                     )
                                     v_stdout, _ = ver_process.communicate(timeout=5)
                                     self._log(f"✓ Node.js 便携版安装成功: {v_stdout.strip()}", "#4CAF50")
@@ -3658,13 +3520,11 @@ try {
                         self._log("[信息] 尝试使用 winget 安装 Node.js...", "#FF9800")
                         winget_available = False
                         try:
-                            process = subprocess.Popen(
+                            process = hidden_popen(
                                 ["winget", "--version"],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                text=True,
-                                startupinfo=startupinfo,
-                                creationflags=subprocess.CREATE_NO_WINDOW
+                                text=True
                             )
                             stdout, stderr = process.communicate(timeout=10)
                             if process.returncode == 0:
@@ -3678,13 +3538,11 @@ try {
                             self._log("这可能需要几分钟，请稍候...")
                             
                             try:
-                                process = subprocess.Popen(
+                                process = hidden_popen(
                                     ["winget", "install", "--id", "OpenJS.NodeJS.LTS.22", "--silent", "--accept-package-agreements", "--accept-source-agreements"],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
-                                    text=True,
-                                    startupinfo=startupinfo,
-                                    creationflags=subprocess.CREATE_NO_WINDOW
+                                    text=True
                                 )
                                 
                                 while process.poll() is None:
@@ -3738,20 +3596,15 @@ try {
                         self._log("4. 执行环境安装脚本...")
                         self._log("[信息] 这可能需要几分钟，请稍候...")
                         
-                        startupinfo = subprocess.STARTUPINFO()
-                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = 0
 
                         
                         # 使用 subprocess.run 不捕获输出，避免阻塞
-                        result = subprocess.run(
+                        result = hidden_run(
                             ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
                             cwd=self.base_dir,
                             capture_output=False,
                             text=True,
-                            timeout=1800,
-                            startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW
+                            timeout=1800
                         )
                         
                         if result.returncode == 0:
@@ -3982,18 +3835,13 @@ try {
         port = service["port"]
         try:
             import subprocess
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
 
             
-            result = subprocess.run(
+            result = hidden_run(
                 ["netstat", "-ano", "-p", "TCP"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                startupinfo=startupinfo,
-                creationflags=subprocess.CREATE_NO_WINDOW,
                 timeout=5
             )
             
@@ -4004,12 +3852,10 @@ try {
                         if len(parts) >= 5:
                             pid = parts[-1]
                             try:
-                                subprocess.run(
+                                hidden_run(
                                     ["taskkill", "/F", "/PID", pid],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
-                                    startupinfo=startupinfo,
-                                    creationflags=subprocess.CREATE_NO_WINDOW,
                                     timeout=5
                                 )
                                 self._log(f"已终止占用端口 {port} 的进程 (PID: {pid})")
@@ -4213,7 +4059,7 @@ try {
         """使用选择的浏览器打开URL"""
         if (self.selected_browser == "custom" or self.selected_browser == "自定义浏览器") and self.custom_browser_path and os.path.exists(self.custom_browser_path):
             try:
-                subprocess.Popen([self.custom_browser_path, url], creationflags=subprocess.CREATE_NO_WINDOW),
+                hidden_popen([self.custom_browser_path, url]),
                 self._log(f"使用自定义浏览器打开: {url}")
             except Exception as e:
                 self._log(f"打开自定义浏览器失败: {e}", "#F44336")
@@ -4228,7 +4074,7 @@ try {
                 browser_path = self.browsers.get(selected_browser)
                 if browser_path:
                     try:
-                        subprocess.Popen([browser_path, url], creationflags=subprocess.CREATE_NO_WINDOW),
+                        hidden_popen([browser_path, url]),
                         self._log(f"使用 {selected_browser} 打开: {url}")
                     except Exception as e:
                         self._log(f"打开浏览器失败: {e}", "#F44336")

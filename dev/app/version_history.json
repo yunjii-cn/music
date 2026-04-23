@@ -314,5 +314,16 @@
     ],
     "build_time": "2026-04-24T06:32:39.990062",
     "version_number": "2026.04.24.0631"
+  },
+  "云集智能音乐创意台-v2026.04.24.0659": {
+    "version": "云集智能音乐创意台-v2026.04.24.0659",
+    "changes": [
+      "彻底修复启动弹窗问题",
+      "创建hidden_run/hidden_popen统一封装",
+      "使用CREATE_NO_WINDOW|CREATE_NEW_PROCESS_GROUP|DETACHED_PROCESS三重标志",
+      "替换main.py/version_manager.py/git_detector.py中所有subprocess调用"
+    ],
+    "build_time": "2026-04-24T07:00:59.128992",
+    "version_number": "2026.04.24.0659"
   }
 }

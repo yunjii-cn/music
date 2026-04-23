@@ -17,8 +17,28 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
-from subprocess import SW_HIDE, CREATE_NO_WINDOW
 from git_detector import GitDetector, GitInstallDialog
+
+if sys.platform == 'win32':
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+else:
+    _HIDDEN_FLAGS = 0
+
+def _hidden_startupinfo():
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    return si
+
+def hidden_run(*args, **kwargs):
+    kwargs.setdefault('startupinfo', _hidden_startupinfo())
+    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    return hidden_run(*args, **kwargs)
+
+def hidden_popen(*args, **kwargs):
+    kwargs.setdefault('startupinfo', _hidden_startupinfo())
+    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    return hidden_popen(*args, **kwargs)
 
 
 class HybridVersionManagerDialog(QDialog):
@@ -78,15 +98,10 @@ class HybridVersionManagerDialog(QDialog):
     def _check_git_repo(self):
         """检查是否是Git仓库"""
         try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = SW_HIDE
-            result = subprocess.run(
+            result = hidden_run(
                 ['git', 'rev-parse', '--is-inside-work-tree'],
                 capture_output=True, text=True,
-                cwd=self.base_dir, timeout=3,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW
+                cwd=self.base_dir, timeout=3
             )
             return result.returncode == 0 and result.stdout.strip() == 'true'
         except Exception:
@@ -441,15 +456,10 @@ class HybridVersionManagerDialog(QDialog):
     def _get_current_git_version(self):
         """获取当前Git版本信息"""
         try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = SW_HIDE
-            result = subprocess.run(
+            result = hidden_run(
                 ['git', 'log', '-1', '--pretty=format:%h|||%s|||%ai|||%b'],
                 capture_output=True, text=True,
-                cwd=self.base_dir, timeout=5,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW
+                cwd=self.base_dir, timeout=5
             )
             
             if result.returncode == 0 and result.stdout.strip():
@@ -472,15 +482,10 @@ class HybridVersionManagerDialog(QDialog):
     def _get_available_git_versions(self, limit=30):
         """获取可用Git版本列表"""
         try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = SW_HIDE
-            result = subprocess.run(
+            result = hidden_run(
                 ['git', 'log', f'-n {limit}', '--pretty=format:%h|||%s|||%ai|||%b'],
                 capture_output=True, text=True,
-                cwd=self.base_dir, timeout=5,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW
+                cwd=self.base_dir, timeout=5
             )
             
             versions = []
@@ -782,14 +787,9 @@ class HybridVersionManagerDialog(QDialog):
                 import os
                 
                 # 启动新的EXE
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = SW_HIDE
-                subprocess.Popen(
+                hidden_popen(
                     [version['path']],
-                    cwd=os.path.dirname(version['path']),
-                    startupinfo=startupinfo,
-                    creationflags=CREATE_NO_WINDOW
+                    cwd=os.path.dirname(version['path'])
                 )
                 
                 # 关闭当前程序
@@ -1005,15 +1005,10 @@ class HybridVersionManagerDialog(QDialog):
     def _preview_git_version(self, version):
         """预览Git版本详情"""
         try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = SW_HIDE
-            result = subprocess.run(
+            result = hidden_run(
                 ['git', 'show', '-s', '--pretty=format:%B', version['hash']],
                 capture_output=True, text=True,
-                cwd=self.base_dir, timeout=5,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW
+                cwd=self.base_dir, timeout=5
             )
             
             detail_dialog = QDialog(self)
@@ -1174,15 +1169,10 @@ class GitVersionSwitchThread(QThread):
                         shutil.copy2(src, dst)
             
             # 2. 切换 Git 分支
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = SW_HIDE
-            result = subprocess.run(
+            result = hidden_run(
                 ['git', 'checkout', self.commit_hash],
                 capture_output=True, text=True,
-                cwd=self.base_dir,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW
+                cwd=self.base_dir
             )
             
             if result.returncode != 0:

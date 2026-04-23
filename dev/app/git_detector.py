@@ -14,13 +14,26 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-# Windows隐藏窗口常量
 if sys.platform == 'win32':
-    CREATE_NO_WINDOW = 0x08000000
-    SW_HIDE = 0
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
 else:
-    CREATE_NO_WINDOW = 0
-    SW_HIDE = 0
+    _HIDDEN_FLAGS = 0
+
+def _hidden_startupinfo():
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    return si
+
+def hidden_run(*args, **kwargs):
+    kwargs.setdefault('startupinfo', _hidden_startupinfo())
+    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    return subprocess.run(*args, **kwargs)
+
+def hidden_popen(*args, **kwargs):
+    kwargs.setdefault('startupinfo', _hidden_startupinfo())
+    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    return subprocess.Popen(*args, **kwargs)
 
 
 class GitDetector:
@@ -32,19 +45,11 @@ class GitDetector:
     def is_git_available():
         """检查Git是否可用"""
         try:
-            startupinfo = None
-            if sys.platform == 'win32':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = SW_HIDE
-            
-            result = subprocess.run(
+            result = hidden_run(
                 ['git', '--version'],
                 capture_output=True,
                 text=True,
-                timeout=5,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                timeout=5
             )
             return result.returncode == 0
         except Exception:
@@ -54,19 +59,11 @@ class GitDetector:
     def get_git_version():
         """获取Git版本"""
         try:
-            startupinfo = None
-            if sys.platform == 'win32':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = SW_HIDE
-            
-            result = subprocess.run(
+            result = hidden_run(
                 ['git', '--version'],
                 capture_output=True,
                 text=True,
-                timeout=5,
-                startupinfo=startupinfo,
-                creationflags=CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                timeout=5
             )
             if result.returncode == 0:
                 return result.stdout.strip()
