@@ -445,7 +445,7 @@ class HybridVersionManagerDialog(QDialog):
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = SW_HIDE
             result = subprocess.run(
-                ['git', 'log', '-1', '--pretty=format:%h|%s|%ai'],
+                ['git', 'log', '-1', '--pretty=format:%h|||%s|||%ai|||%b'],
                 capture_output=True, text=True,
                 cwd=self.base_dir, timeout=5,
                 startupinfo=startupinfo,
@@ -453,12 +453,15 @@ class HybridVersionManagerDialog(QDialog):
             )
             
             if result.returncode == 0 and result.stdout.strip():
-                parts = result.stdout.split('|')
+                parts = result.stdout.strip().split('|||', 3)
                 if len(parts) >= 3:
+                    body = parts[3].strip() if len(parts) > 3 else ''
+                    body = '\n'.join(line.strip() for line in body.split('\n') if line.strip())
                     return {
                         'hash': parts[0],
                         'message': parts[1],
-                        'date': parts[2][:16]
+                        'date': parts[2][:16],
+                        'body': body
                     }
             
             return None
@@ -473,7 +476,7 @@ class HybridVersionManagerDialog(QDialog):
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = SW_HIDE
             result = subprocess.run(
-                ['git', 'log', f'-n {limit}', '--pretty=format:%h|%s|%ai'],
+                ['git', 'log', f'-n {limit}', '--pretty=format:%h|||%s|||%ai|||%b'],
                 capture_output=True, text=True,
                 cwd=self.base_dir, timeout=5,
                 startupinfo=startupinfo,
@@ -482,15 +485,21 @@ class HybridVersionManagerDialog(QDialog):
             
             versions = []
             if result.returncode == 0 and result.stdout.strip():
-                for line in result.stdout.strip().split('\n'):
-                    if line:
-                        parts = line.split('|')
-                        if len(parts) >= 3:
-                            versions.append({
-                                'hash': parts[0],
-                                'message': parts[1],
-                                'date': parts[2][:16]
-                            })
+                entries = result.stdout.strip().split('\n\n')
+                for entry in entries:
+                    entry = entry.strip()
+                    if not entry:
+                        continue
+                    parts = entry.split('|||', 3)
+                    if len(parts) >= 3:
+                        body = parts[3].strip() if len(parts) > 3 else ''
+                        body = '\n'.join(line.strip() for line in body.split('\n') if line.strip())
+                        versions.append({
+                            'hash': parts[0],
+                            'message': parts[1],
+                            'date': parts[2][:16],
+                            'body': body
+                        })
             
             return versions
         except Exception as e:
@@ -778,7 +787,8 @@ class HybridVersionManagerDialog(QDialog):
                 subprocess.Popen(
                     [version['path']],
                     cwd=os.path.dirname(version['path']),
-                    startupinfo=startupinfo
+                    startupinfo=startupinfo,
+                    creationflags=CREATE_NO_WINDOW
                 )
                 
                 # 关闭当前程序
@@ -826,23 +836,32 @@ class HybridVersionManagerDialog(QDialog):
     
     def _toggle_expand_all(self, checked):
         """全部展开/收起"""
-        # 更新按钮文字
         self.expand_all_btn.setText("全部收起" if checked else "全部展开")
         
-        # 处理EXE版本项（Git版本项已简化，无展开/收起功能）
         if hasattr(self, 'exe_version_items'):
             for item in self.exe_version_items:
                 try:
                     item['expanded'] = checked
-                    if hasattr(item, 'detail_widget') and item['detail_widget']:
+                    if item.get('detail_widget'):
                         item['detail_widget'].setVisible(checked)
-                    if hasattr(item, 'toggle_btn') and item['toggle_btn']:
+                    if item.get('toggle_btn'):
                         item['toggle_btn'].setText("收起" if checked else "展开")
                 except Exception as e:
                     print(f"更新EXE版本项状态失败: {e}")
+        
+        if hasattr(self, 'git_version_items'):
+            for item in self.git_version_items:
+                try:
+                    item['expanded'] = checked
+                    if item.get('detail_widget'):
+                        item['detail_widget'].setVisible(checked)
+                    if item.get('toggle_btn'):
+                        item['toggle_btn'].setText("收起" if checked else "展开")
+                except Exception as e:
+                    print(f"更新Git版本项状态失败: {e}")
     
     def _create_git_version_item(self, version, is_current):
-        """创建Git版本项 - 简化版"""
+        """创建Git版本项"""
         frame = QFrame()
         if is_current:
             frame.setStyleSheet("""
@@ -871,11 +890,13 @@ class HybridVersionManagerDialog(QDialog):
         main_layout.setSpacing(6)
         main_layout.setContentsMargins(10, 8, 10, 8)
         
-        # 顶部：版本信息行
+        is_expanded = False
+        body = version.get('body', '')
+        has_detail = bool(body)
+        
         top_layout = QHBoxLayout()
         top_layout.setSpacing(10)
         
-        # 提交哈希
         hash_label = QLabel(version['hash'])
         hash_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         if is_current:
@@ -884,27 +905,41 @@ class HybridVersionManagerDialog(QDialog):
             hash_label.setStyleSheet("color: #E53935; min-width: 60px;")
         top_layout.addWidget(hash_label)
         
-        # 日期
         date_label = QLabel(version['date'])
         date_label.setFont(QFont("Consolas", 9))
         date_label.setStyleSheet("color: #666666; min-width: 130px;")
         top_layout.addWidget(date_label)
         
-        # 消息
         message_label = QLabel(version['message'])
         message_label.setFont(QFont("Microsoft YaHei", 9))
         message_label.setStyleSheet("color: #F0F0F0;")
         message_label.setWordWrap(True)
         top_layout.addWidget(message_label, 1)
         
-        # 当前标记
+        toggle_btn = None
+        if has_detail:
+            toggle_btn = QPushButton("展开")
+            toggle_btn.setMinimumWidth(55)
+            toggle_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #AAAAAA;
+                    border: none;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    color: #FFFFFF;
+                }
+            """)
+            top_layout.addWidget(toggle_btn)
+        
         if is_current:
             current_tag = QLabel("当前")
             current_tag.setFont(QFont("Microsoft YaHei", 8, QFont.Weight.Bold))
             current_tag.setStyleSheet("color: #4CAF50;")
             top_layout.addWidget(current_tag)
         else:
-            # 切换按钮
             switch_btn = QPushButton("切换")
             switch_btn.setMinimumWidth(55)
             switch_btn.clicked.connect(lambda checked, v=version: self._switch_git_version(v['hash']))
@@ -925,6 +960,45 @@ class HybridVersionManagerDialog(QDialog):
             top_layout.addWidget(switch_btn)
         
         main_layout.addLayout(top_layout)
+        
+        detail_widget = None
+        if has_detail:
+            detail_widget = QWidget()
+            detail_layout = QVBoxLayout(detail_widget)
+            detail_layout.setSpacing(4)
+            detail_layout.setContentsMargins(10, 0, 0, 0)
+            
+            detail_label = QLabel("详细说明：")
+            detail_label.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
+            detail_label.setStyleSheet("color: #FF9800;")
+            detail_layout.addWidget(detail_label)
+            
+            for line in body.split('\n'):
+                if line.strip():
+                    line_label = QLabel(f"  • {line.strip()}")
+                    line_label.setFont(QFont("Microsoft YaHei", 9))
+                    line_label.setStyleSheet("color: #AAAAAA;")
+                    line_label.setWordWrap(True)
+                    detail_layout.addWidget(line_label)
+            
+            detail_widget.setVisible(False)
+            main_layout.addWidget(detail_widget)
+            
+            if toggle_btn:
+                def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
+                    is_visible = not dw.isVisible()
+                    dw.setVisible(is_visible)
+                    tb.setText("收起" if is_visible else "展开")
+                toggle_btn.clicked.connect(toggle_detail)
+        
+        if not hasattr(self, 'git_version_items'):
+            self.git_version_items = []
+        self.git_version_items.append({
+            'expanded': is_expanded,
+            'detail_widget': detail_widget,
+            'toggle_btn': toggle_btn
+        })
+        
         self.versions_layout.addWidget(frame)
     
     def _preview_git_version(self, version):

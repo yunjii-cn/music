@@ -316,10 +316,8 @@ class ModelDownloadThread(QThread):
             if self.download_source != "auto":
                 cmd_args.extend(["--source", self.download_source])
             
-            # 构建完整命令字符串
-            cmd_str = " ".join(cmd_args)
+            cmd_str = " ".join(f'"{arg}"' if ' ' in arg else arg for arg in cmd_args)
             
-            # 使用虚拟环境中的Python
             cmd = [
                 "powershell.exe",
                 "-ExecutionPolicy", "Bypass",
@@ -437,7 +435,7 @@ class ModelDeleteThread(QThread):
                 return
             
             cmd_args = [venv_python, "-m", "acestep.model_downloader", "--delete", self.model_name]
-            cmd_str = " ".join(cmd_args)
+            cmd_str = " ".join(f'"{arg}"' if ' ' in arg else arg for arg in cmd_args)
             
             cmd = [
                 "powershell.exe",
@@ -1919,7 +1917,8 @@ class MainWindow(QMainWindow):
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     stdout, stderr = process.communicate(timeout=10)
                     
@@ -1938,7 +1937,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=10)
                         if process.returncode != 0:
@@ -1951,7 +1951,8 @@ class MainWindow(QMainWindow):
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 text=True,
-                                startupinfo=startupinfo
+                                startupinfo=startupinfo,
+                                creationflags=subprocess.CREATE_NO_WINDOW
                             )
                             fix_stdout, fix_stderr = fix_process.communicate(timeout=120)
                             if fix_process.returncode == 0:
@@ -1999,7 +2000,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         
                         self.api_process = process
@@ -2203,7 +2205,8 @@ class MainWindow(QMainWindow):
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     stdout, stderr = process.communicate(timeout=5)
                     if process.returncode == 0:
@@ -2221,7 +2224,8 @@ class MainWindow(QMainWindow):
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     stdout, stderr = process.communicate(timeout=5)
                     if process.returncode == 0 and stdout.strip():
@@ -2276,7 +2280,8 @@ class MainWindow(QMainWindow):
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     
                     while process.poll() is None:
@@ -2366,6 +2371,7 @@ class MainWindow(QMainWindow):
                     stderr=subprocess.STDOUT,
                     text=True,
                     startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                     env=env
                 )
                 stdout, _ = process.communicate(timeout=120)
@@ -2392,7 +2398,8 @@ class MainWindow(QMainWindow):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    startupinfo=startupinfo
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode != 0:
@@ -2436,7 +2443,8 @@ class MainWindow(QMainWindow):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    startupinfo=startupinfo
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode == 0:
@@ -2455,7 +2463,8 @@ class MainWindow(QMainWindow):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                startupinfo=startupinfo
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW
             )
             stdout, stderr = process.communicate(timeout=10)
             if process.returncode != 0:
@@ -2476,7 +2485,8 @@ class MainWindow(QMainWindow):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    startupinfo=startupinfo
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode == 0:
@@ -2509,7 +2519,8 @@ class MainWindow(QMainWindow):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    startupinfo=startupinfo
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 stdout, stderr = process.communicate(timeout=5)
                 if process.returncode == 0:
@@ -2537,7 +2548,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -2623,7 +2635,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0:
@@ -2641,7 +2654,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -2683,7 +2697,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -2718,7 +2733,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         
                         while process.poll() is None:
@@ -2753,7 +2769,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         
                         while process.poll() is None:
@@ -2793,7 +2810,8 @@ class MainWindow(QMainWindow):
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     
                     while process.poll() is None:
@@ -2852,6 +2870,7 @@ class MainWindow(QMainWindow):
                         stderr=subprocess.STDOUT,
                         text=True,
                         startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW,
                         env=env
                     )
                     
@@ -2941,7 +2960,8 @@ class MainWindow(QMainWindow):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         
                         try:
@@ -3031,7 +3051,8 @@ try {
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
                                         text=True,
-                                        startupinfo=startupinfo
+                                        startupinfo=startupinfo,
+                                        creationflags=subprocess.CREATE_NO_WINDOW
                                     )
                                     
                                     test_stdout, test_stderr = test_process.communicate(timeout=10)
@@ -3111,7 +3132,8 @@ try {
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT,
                                     text=True,
-                                    startupinfo=startupinfo
+                                    startupinfo=startupinfo,
+                                    creationflags=subprocess.CREATE_NO_WINDOW
                                 )
                                 
                                 try:
@@ -3142,7 +3164,8 @@ try {
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT,
                                         text=True,
-                                        startupinfo=startupinfo
+                                        startupinfo=startupinfo,
+                                        creationflags=subprocess.CREATE_NO_WINDOW
                                     )
                                     
                                     try:
@@ -3223,7 +3246,8 @@ try {
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 text=True,
-                                startupinfo=startupinfo
+                                startupinfo=startupinfo,
+                                creationflags=subprocess.CREATE_NO_WINDOW
                             )
                             process.communicate(timeout=10)
                             
@@ -3285,7 +3309,8 @@ try {
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    startupinfo=startupinfo
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 stdout, stderr = process.communicate(timeout=5)
                 if process.returncode == 0:
@@ -3307,7 +3332,8 @@ try {
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
-                        startupinfo=startupinfo
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     stdout, stderr = process.communicate(timeout=5)
                     if process.returncode == 0:
@@ -3424,7 +3450,8 @@ try {
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0:
@@ -3442,7 +3469,8 @@ try {
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -3485,7 +3513,8 @@ try {
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
-                            startupinfo=startupinfo
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         stdout, stderr = process.communicate(timeout=5)
                         if process.returncode == 0 and stdout.strip():
@@ -3560,7 +3589,8 @@ try {
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
                                         text=True,
-                                        startupinfo=startupinfo
+                                        startupinfo=startupinfo,
+                                        creationflags=subprocess.CREATE_NO_WINDOW
                                     )
                                     v_stdout, _ = ver_process.communicate(timeout=5)
                                     self._log(f"✓ Node.js 便携版安装成功: {v_stdout.strip()}", "#4CAF50")
@@ -3578,7 +3608,8 @@ try {
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 text=True,
-                                startupinfo=startupinfo
+                                startupinfo=startupinfo,
+                                creationflags=subprocess.CREATE_NO_WINDOW
                             )
                             stdout, stderr = process.communicate(timeout=10)
                             if process.returncode == 0:
@@ -3597,7 +3628,8 @@ try {
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     text=True,
-                                    startupinfo=startupinfo
+                                    startupinfo=startupinfo,
+                                    creationflags=subprocess.CREATE_NO_WINDOW
                                 )
                                 
                                 while process.poll() is None:
@@ -3902,6 +3934,7 @@ try {
                 stderr=subprocess.PIPE,
                 text=True,
                 startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW,
                 timeout=5
             )
             
@@ -3917,6 +3950,7 @@ try {
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     startupinfo=startupinfo,
+                                    creationflags=subprocess.CREATE_NO_WINDOW,
                                     timeout=5
                                 )
                                 self._log(f"已终止占用端口 {port} 的进程 (PID: {pid})")
@@ -4120,7 +4154,7 @@ try {
         """使用选择的浏览器打开URL"""
         if (self.selected_browser == "custom" or self.selected_browser == "自定义浏览器") and self.custom_browser_path and os.path.exists(self.custom_browser_path):
             try:
-                subprocess.Popen([self.custom_browser_path, url])
+                subprocess.Popen([self.custom_browser_path, url], creationflags=subprocess.CREATE_NO_WINDOW),
                 self._log(f"使用自定义浏览器打开: {url}")
             except Exception as e:
                 self._log(f"打开自定义浏览器失败: {e}", "#F44336")
@@ -4135,7 +4169,7 @@ try {
                 browser_path = self.browsers.get(selected_browser)
                 if browser_path:
                     try:
-                        subprocess.Popen([browser_path, url])
+                        subprocess.Popen([browser_path, url], creationflags=subprocess.CREATE_NO_WINDOW),
                         self._log(f"使用 {selected_browser} 打开: {url}")
                     except Exception as e:
                         self._log(f"打开浏览器失败: {e}", "#F44336")
