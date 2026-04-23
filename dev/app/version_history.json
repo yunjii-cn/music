@@ -345,5 +345,15 @@
     ],
     "build_time": "2026-04-24T07:27:01.722824",
     "version_number": "2026.04.24.0725"
+  },
+  "云集智能音乐创意台-v2026.04.24.0749": {
+    "version": "云集智能音乐创意台-v2026.04.24.0749",
+    "changes": [
+      "用gitpython替代git subprocess调用",
+      "添加深色调色板消除白色闪烁",
+      "GitDetector使用gitpython缓存"
+    ],
+    "build_time": "2026-04-24T07:50:25.195544",
+    "version_number": "2026.04.24.0749"
   }
 }

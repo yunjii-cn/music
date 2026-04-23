@@ -4800,16 +4800,23 @@ def extract_scripts():
 
 
 def main():
-    # 先提取脚本文件
     extract_scripts()
     
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
     
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#0D0D0D"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#F0F0F0"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#1A1A1A"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#F0F0F0"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#1A1A1A"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F0F0F0"))
+    app.setPalette(palette)
+    
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
-    # 直接创建并显示主窗口
     window = MainWindow()
     window.show()
     

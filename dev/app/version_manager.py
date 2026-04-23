@@ -97,12 +97,9 @@ class HybridVersionManagerDialog(QDialog):
     def _check_git_repo(self):
         """检查是否是Git仓库"""
         try:
-            result = hidden_run(
-                ['git', 'rev-parse', '--is-inside-work-tree'],
-                capture_output=True, text=True,
-                cwd=self.base_dir, timeout=3
-            )
-            return result.returncode == 0 and result.stdout.strip() == 'true'
+            import git
+            repo = git.Repo(self.base_dir, search_parent_directories=True)
+            return True
         except Exception:
             return False
     
@@ -455,25 +452,16 @@ class HybridVersionManagerDialog(QDialog):
     def _get_current_git_version(self):
         """获取当前Git版本信息"""
         try:
-            result = hidden_run(
-                ['git', 'log', '-1', '--pretty=format:%h|||%s|||%ai|||%b'],
-                capture_output=True, text=True,
-                cwd=self.base_dir, timeout=5
-            )
-            
-            if result.returncode == 0 and result.stdout.strip():
-                parts = result.stdout.strip().split('|||', 3)
-                if len(parts) >= 3:
-                    body = parts[3].strip() if len(parts) > 3 else ''
-                    body = '\n'.join(line.strip() for line in body.split('\n') if line.strip())
-                    return {
-                        'hash': parts[0],
-                        'message': parts[1],
-                        'date': parts[2][:16],
-                        'body': body
-                    }
-            
-            return None
+            import git
+            repo = git.Repo(self.base_dir, search_parent_directories=True)
+            commit = repo.head.commit
+            body = '\n'.join(line.strip() for line in commit.message.split('\n')[1:] if line.strip())
+            return {
+                'hash': commit.hexsha[:7],
+                'message': commit.message.split('\n')[0],
+                'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M'),
+                'body': body
+            }
         except Exception as e:
             print(f"获取当前Git版本失败：{e}")
             return None
@@ -481,30 +469,17 @@ class HybridVersionManagerDialog(QDialog):
     def _get_available_git_versions(self, limit=30):
         """获取可用Git版本列表"""
         try:
-            result = hidden_run(
-                ['git', 'log', f'-n {limit}', '--pretty=format:%h|||%s|||%ai|||%b'],
-                capture_output=True, text=True,
-                cwd=self.base_dir, timeout=5
-            )
-            
+            import git
+            repo = git.Repo(self.base_dir, search_parent_directories=True)
             versions = []
-            if result.returncode == 0 and result.stdout.strip():
-                entries = result.stdout.strip().split('\n\n')
-                for entry in entries:
-                    entry = entry.strip()
-                    if not entry:
-                        continue
-                    parts = entry.split('|||', 3)
-                    if len(parts) >= 3:
-                        body = parts[3].strip() if len(parts) > 3 else ''
-                        body = '\n'.join(line.strip() for line in body.split('\n') if line.strip())
-                        versions.append({
-                            'hash': parts[0],
-                            'message': parts[1],
-                            'date': parts[2][:16],
-                            'body': body
-                        })
-            
+            for commit in list(repo.iter_commits(max_count=limit)):
+                body = '\n'.join(line.strip() for line in commit.message.split('\n')[1:] if line.strip())
+                versions.append({
+                    'hash': commit.hexsha[:7],
+                    'message': commit.message.split('\n')[0],
+                    'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M'),
+                    'body': body
+                })
             return versions
         except Exception as e:
             print(f"获取Git版本列表失败：{e}")
@@ -1006,11 +981,10 @@ class HybridVersionManagerDialog(QDialog):
     def _preview_git_version(self, version):
         """预览Git版本详情"""
         try:
-            result = hidden_run(
-                ['git', 'show', '-s', '--pretty=format:%B', version['hash']],
-                capture_output=True, text=True,
-                cwd=self.base_dir, timeout=5
-            )
+            import git
+            repo = git.Repo(self.base_dir, search_parent_directories=True)
+            commit = repo.commit(version['hash'])
+            commit_body = commit.message
             
             detail_dialog = QDialog(self)
             detail_dialog.setWindowTitle(f"版本详情 - {version['hash']}")
@@ -1063,7 +1037,7 @@ class HybridVersionManagerDialog(QDialog):
                     color: #F0F0F0;
                 }
             """)
-            desc_text.setPlainText(result.stdout.strip() if result.stdout else "无详细说明")
+            desc_text.setPlainText(commit_body.strip() if commit_body else "无详细说明")
             layout.addWidget(desc_text, stretch=1)
             
             detail_dialog.exec()
@@ -1170,14 +1144,10 @@ class GitVersionSwitchThread(QThread):
                         shutil.copy2(src, dst)
             
             # 2. 切换 Git 分支
-            result = hidden_run(
-                ['git', 'checkout', self.commit_hash],
-                capture_output=True, text=True,
-                cwd=self.base_dir
-            )
-            
-            if result.returncode != 0:
-                raise Exception(f"Git checkout 失败:\n{result.stderr}")
+            import git
+            repo = git.Repo(self.base_dir, search_parent_directories=True)
+            repo.head.reference = repo.commit(self.commit_hash)
+            repo.head.reset(index=True, working_tree=True)
             
             # 3. 恢复用户数据
             for dir_name in user_dirs:

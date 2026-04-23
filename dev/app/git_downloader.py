@@ -152,7 +152,8 @@ class GitDownloadThread(QThread):
                 capture_output=True,
                 text=True,
                 timeout=120,
-                startupinfo=startupinfo
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
             
             if result.returncode == 0:
@@ -406,14 +407,9 @@ def get_git_path(base_dir=None):
     """
     # 1. 先检查系统Git
     try:
-        result = subprocess.run(
-            ['git', '--version'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            return "git"  # 使用系统Git
+        import git
+        git.refresh()
+        return "git"
     except Exception:
         pass
     

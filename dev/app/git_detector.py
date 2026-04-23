@@ -1,11 +1,11 @@
 """
 Git检测和安装引导模块
 检测系统是否安装Git，如果没有则提供安装引导
+使用gitpython库替代subprocess调用，避免弹窗
 """
 
 import os
 import sys
-import subprocess
 import webbrowser
 from pathlib import Path
 from PyQt6.QtWidgets import (
@@ -14,30 +14,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-if sys.platform == 'win32':
-    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
-else:
-    _HIDDEN_FLAGS = 0
-
-def _hidden_startupinfo():
-    si = subprocess.STARTUPINFO()
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = 0
-    return si
-
-def hidden_run(*args, **kwargs):
-    kwargs.setdefault('startupinfo', _hidden_startupinfo())
-    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
-    return subprocess.run(*args, **kwargs)
-
-def hidden_popen(*args, **kwargs):
-    kwargs.setdefault('startupinfo', _hidden_startupinfo())
-    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
-    return subprocess.Popen(*args, **kwargs)
-
 
 class GitDetector:
-    """Git检测器"""
+    """Git检测器 - 使用gitpython，无需subprocess"""
     
     GIT_DOWNLOAD_URL = "https://git-scm.com/download/win"
     
@@ -46,37 +25,26 @@ class GitDetector:
     
     @staticmethod
     def is_git_available():
-        """检查Git是否可用（带缓存）"""
+        """检查Git是否可用（带缓存，使用gitpython）"""
         if GitDetector._git_available is not None:
             return GitDetector._git_available
         try:
-            result = hidden_run(
-                ['git', '--version'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            GitDetector._git_available = result.returncode == 0
-            return GitDetector._git_available
+            import git
+            git.refresh()
+            GitDetector._git_available = True
         except Exception:
             GitDetector._git_available = False
-            return False
+        return GitDetector._git_available
     
     @staticmethod
     def get_git_version():
-        """获取Git版本（带缓存）"""
+        """获取Git版本（带缓存，使用gitpython）"""
         if GitDetector._git_version is not None:
             return GitDetector._git_version
         try:
-            result = hidden_run(
-                ['git', '--version'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                GitDetector._git_version = result.stdout.strip()
-                return GitDetector._git_version
+            import git
+            GitDetector._git_version = git.Git().version()
+            return GitDetector._git_version
         except Exception:
             pass
         return None
