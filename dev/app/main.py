@@ -36,6 +36,22 @@
 """
 
 import sys
+import subprocess as _subprocess
+
+if sys.platform == 'win32':
+    _HIDDEN_FLAGS = _subprocess.CREATE_NO_WINDOW
+    _orig_popen = _subprocess.Popen
+    def _patched_popen(*args, **kwargs):
+        si = _subprocess.STARTUPINFO()
+        si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0
+        kwargs.setdefault('startupinfo', si)
+        if 'creationflags' not in kwargs:
+            kwargs['creationflags'] = _HIDDEN_FLAGS
+        return _orig_popen(*args, **kwargs)
+    _subprocess.Popen = _patched_popen
+
+import subprocess
 import os
 import json
 import time
