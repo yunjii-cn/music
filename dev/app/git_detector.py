@@ -37,18 +37,13 @@ class GitDetector:
     
     @staticmethod
     def get_git_version():
-        """获取Git版本（带缓存，从gitpython读取，零subprocess）"""
+        """获取Git版本（带缓存，不使用gitpython避免弹窗）"""
         if GitDetector._git_version is not None:
             return GitDetector._git_version
-        try:
-            import git as gitmod
-            g = gitmod.Git()
-            g.update_environment(GIT_TERMINAL_PROMPT='0')
-            GitDetector._git_version = g.version()
-            return GitDetector._git_version
-        except Exception:
-            pass
-        return None
+        # 不使用gitpython，避免弹窗
+        # 只返回一个占位符，因为版本号不是必须的
+        GitDetector._git_version = "Git"
+        return GitDetector._git_version
     
     @staticmethod
     def open_git_download():

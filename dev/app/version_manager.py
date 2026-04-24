@@ -54,26 +54,11 @@ class HybridVersionManagerDialog(QDialog):
     def _delayed_init(self):
         """延迟初始化：检查git仓库并加载版本列表"""
         self.has_git_repo = self._check_git_repo()
-        has_git = self.has_git_repo and GitDetector.is_git_available()
         
-        # 始终显示模式选择器，但如果没有git则禁用Git模式
+        # 始终显示模式选择器，Git选项始终可用
         if hasattr(self, 'mode_combo'):
-            # 检查mode_combo中是否已有git选项
-            git_index = -1
-            for i in range(self.mode_combo.count()):
-                if self.mode_combo.itemData(i) == "git":
-                    git_index = i
-                    break
-            
-            if has_git:
-                # 有git，确保git选项存在并启用
-                if git_index == -1:
-                    self.mode_combo.addItem("Git 源代码", "git")
-                self.mode_combo.model().item(git_index if git_index != -1 else self.mode_combo.count() - 1).setEnabled(True)
-            else:
-                # 没有git，禁用git选项
-                if git_index != -1:
-                    self.mode_combo.model().item(git_index).setEnabled(False)
+            # 确保mode_label_widget可见
+            self.mode_label_widget.setVisible(True)
         
         self._load_versions()
     
@@ -107,11 +92,16 @@ class HybridVersionManagerDialog(QDialog):
         return []
     
     def _check_git_repo(self):
-        """检查是否是Git仓库"""
+        """检查是否是Git仓库（不使用gitpython避免弹窗）"""
         try:
-            import git
-            repo = git.Repo(self.base_dir, search_parent_directories=True)
-            return True
+            # 直接检查 .git 文件夹，不使用 gitpython
+            current_dir = Path(self.base_dir)
+            while current_dir.parent != current_dir:  # 直到根目录
+                git_dir = current_dir / ".git"
+                if git_dir.exists() and git_dir.is_dir():
+                    return True
+                current_dir = current_dir.parent
+            return False
         except Exception:
             return False
     
