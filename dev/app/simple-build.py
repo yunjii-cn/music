@@ -172,9 +172,10 @@ def build_exe():
         pyinstaller_args.append(f"{str(icon_path)};.")
         print(f"  已添加图标: {icon_path}")
     
-    runtime_hook = ROOT_DIR / "hook-subprocess-popen.py"
-    if runtime_hook.exists():
-        pyinstaller_args.extend(["--runtime-hook", str(runtime_hook)])
+    # 添加 PyInstaller runtime hook (pyi_rth_*.py 会被优先执行)
+    rth_hook = ROOT_DIR / "pyi_rth_subprocess.py"
+    if rth_hook.exists():
+        pyinstaller_args.extend(["--runtime-hook", str(rth_hook)])
     
     # 最后添加main.py
     pyinstaller_args.append("main.py")

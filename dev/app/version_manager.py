@@ -54,11 +54,27 @@ class HybridVersionManagerDialog(QDialog):
     def _delayed_init(self):
         """延迟初始化：检查git仓库并加载版本列表"""
         self.has_git_repo = self._check_git_repo()
+        has_git = self.has_git_repo and GitDetector.is_git_available()
+        
+        # 始终显示模式选择器，但如果没有git则禁用Git模式
         if hasattr(self, 'mode_combo'):
-            has_git = self.has_git_repo and GitDetector.is_git_available()
-            self.mode_combo.setVisible(has_git)
-            if hasattr(self, 'mode_label_widget'):
-                self.mode_label_widget.setVisible(has_git)
+            # 检查mode_combo中是否已有git选项
+            git_index = -1
+            for i in range(self.mode_combo.count()):
+                if self.mode_combo.itemData(i) == "git":
+                    git_index = i
+                    break
+            
+            if has_git:
+                # 有git，确保git选项存在并启用
+                if git_index == -1:
+                    self.mode_combo.addItem("Git 源代码", "git")
+                self.mode_combo.model().item(git_index if git_index != -1 else self.mode_combo.count() - 1).setEnabled(True)
+            else:
+                # 没有git，禁用git选项
+                if git_index != -1:
+                    self.mode_combo.model().item(git_index).setEnabled(False)
+        
         self._load_versions()
     
     def _load_version_history(self):
@@ -167,10 +183,6 @@ class HybridVersionManagerDialog(QDialog):
         self.mode_combo.blockSignals(False)
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         top_bar.addWidget(self.mode_combo)
-        
-        # 初始隐藏模式选择器（延迟初始化后根据git状态决定是否显示）
-        self.mode_label_widget.setVisible(False)
-        self.mode_combo.setVisible(False)
         
         top_bar.addStretch()
         
