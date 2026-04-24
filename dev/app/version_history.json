@@ -355,5 +355,16 @@
     ],
     "build_time": "2026-04-24T07:50:25.195544",
     "version_number": "2026.04.24.0749"
+  },
+  "云集智能音乐创意台-v2026.04.24.1603": {
+    "version": "云集智能音乐创意台-v2026.04.24.1603",
+    "changes": [
+      "彻底修复弹窗+Git模式+展开收起",
+      "monkey-patch subprocess.Popen确保所有git调用隐藏窗口",
+      "用shutil.which替代git--version检测",
+      "所有版本项都有展开收起按钮"
+    ],
+    "build_time": "2026-04-24T16:04:20.532829",
+    "version_number": "2026.04.24.1603"
   }
 }

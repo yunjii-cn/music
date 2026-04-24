@@ -1,13 +1,41 @@
 """
 Git检测和安装引导模块
 检测系统是否安装Git，如果没有则提供安装引导
-使用gitpython库替代subprocess调用，避免弹窗
+使用shutil.which检测Git，避免subprocess弹窗
 """
 
 import os
 import sys
+import shutil
+import subprocess
 import webbrowser
 from pathlib import Path
+
+if sys.platform == 'win32':
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
+else:
+    _HIDDEN_FLAGS = 0
+
+def _hidden_startupinfo():
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    return si
+
+def _patch_gitpython_popen():
+    try:
+        _orig_popen = subprocess.Popen
+        def _patched_popen(*args, **kwargs):
+            kwargs.setdefault('startupinfo', _hidden_startupinfo())
+            if sys.platform == 'win32' and 'creationflags' not in kwargs:
+                kwargs['creationflags'] = _HIDDEN_FLAGS
+            return _orig_popen(*args, **kwargs)
+        subprocess.Popen = _patched_popen
+    except Exception:
+        pass
+
+_patch_gitpython_popen()
+
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QMessageBox, QProgressBar
@@ -16,7 +44,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 
 class GitDetector:
-    """Git检测器 - 使用gitpython，无需subprocess"""
+    """Git检测器 - 使用shutil.which检测，避免任何subprocess调用"""
     
     GIT_DOWNLOAD_URL = "https://git-scm.com/download/win"
     
@@ -25,25 +53,23 @@ class GitDetector:
     
     @staticmethod
     def is_git_available():
-        """检查Git是否可用（带缓存，使用gitpython）"""
+        """检查Git是否可用（带缓存，使用shutil.which，零subprocess）"""
         if GitDetector._git_available is not None:
             return GitDetector._git_available
-        try:
-            import git
-            git.refresh()
-            GitDetector._git_available = True
-        except Exception:
-            GitDetector._git_available = False
+        git_path = shutil.which('git')
+        GitDetector._git_available = git_path is not None
         return GitDetector._git_available
     
     @staticmethod
     def get_git_version():
-        """获取Git版本（带缓存，使用gitpython）"""
+        """获取Git版本（带缓存，从gitpython读取，零subprocess）"""
         if GitDetector._git_version is not None:
             return GitDetector._git_version
         try:
-            import git
-            GitDetector._git_version = git.Git().version()
+            import git as gitmod
+            g = gitmod.Git()
+            g.update_environment(GIT_TERMINAL_PROMPT='0')
+            GitDetector._git_version = g.version()
             return GitDetector._git_version
         except Exception:
             pass

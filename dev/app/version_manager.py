@@ -10,14 +10,6 @@ import re
 from datetime import datetime
 import json
 from pathlib import Path
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
-    QComboBox, QTabWidget
-)
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
-from PyQt6.QtGui import QFont
-from git_detector import GitDetector, GitInstallDialog
 
 if sys.platform == 'win32':
     _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
@@ -39,6 +31,29 @@ def hidden_popen(*args, **kwargs):
     kwargs.setdefault('startupinfo', _hidden_startupinfo())
     kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
     return subprocess.Popen(*args, **kwargs)
+
+def _patch_gitpython_popen():
+    try:
+        _orig_popen = subprocess.Popen
+        def _patched_popen(*args, **kwargs):
+            kwargs.setdefault('startupinfo', _hidden_startupinfo())
+            if sys.platform == 'win32' and 'creationflags' not in kwargs:
+                kwargs['creationflags'] = _HIDDEN_FLAGS
+            return _orig_popen(*args, **kwargs)
+        subprocess.Popen = _patched_popen
+    except Exception:
+        pass
+
+_patch_gitpython_popen()
+
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
+    QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
+    QComboBox, QTabWidget
+)
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt6.QtGui import QFont
+from git_detector import GitDetector, GitInstallDialog
 
 
 class HybridVersionManagerDialog(QDialog):
@@ -62,11 +77,12 @@ class HybridVersionManagerDialog(QDialog):
         
         # 检测运行模式
         self.is_exe_mode = hasattr(sys, 'frozen')
-        self.has_git_repo = False
+        self.has_git_repo = self._check_git_repo()
         self.current_mode = "exe" if self.is_exe_mode else "git"
         
         self._setup_ui()
         self._load_version_history()
+        self._load_versions()
     
     def _load_version_history(self):
         """加载版本历史"""
@@ -492,9 +508,6 @@ class HybridVersionManagerDialog(QDialog):
             if item.widget():
                 item.widget().deleteLater()
         
-        if not self.is_exe_mode and not self.has_git_repo:
-            self.has_git_repo = self._check_git_repo()
-        
         git_available = GitDetector.is_git_available()
         
         # 根据当前模式直接加载，不强制切换
@@ -661,55 +674,54 @@ class HybridVersionManagerDialog(QDialog):
             current_tag.setFont(QFont("Microsoft YaHei", 8, QFont.Weight.Bold))
             current_tag.setStyleSheet("color: #4CAF50;")
             top_layout.addWidget(current_tag)
-        elif is_available:
-            # 展开/收起按钮
-            if changes:
-                toggle_btn = QPushButton("收起" if is_expanded else "展开")
-                toggle_btn.setMinimumWidth(55)
-                toggle_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: transparent;
-                        color: #AAAAAA;
-                        border: none;
-                        padding: 4px 8px;
-                        font-size: 11px;
-                    }
-                    QPushButton:hover {
-                        color: #FFFFFF;
-                    }
-                """)
-                top_layout.addWidget(toggle_btn)
-            
-            # 切换版本按钮
-            switch_btn = QPushButton("切换版本")
-            switch_btn.setMinimumWidth(75)
-            switch_btn.clicked.connect(lambda checked, v=version: self._launch_exe_version(v))
-            switch_btn.setStyleSheet("""
+        else:
+            # 展开/收起按钮（所有版本都有）
+            toggle_btn = QPushButton("收起" if is_expanded else "展开")
+            toggle_btn.setMinimumWidth(55)
+            toggle_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #4CAF50;
+                    background-color: transparent;
+                    color: #AAAAAA;
                     border: none;
-                    border-radius: 3px;
-                    padding: 4px 12px;
+                    padding: 4px 8px;
                     font-size: 11px;
-                    color: white;
-                    font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #43A047;
+                    color: #FFFFFF;
                 }
             """)
-            top_layout.addWidget(switch_btn)
+            top_layout.addWidget(toggle_btn)
+            
+            # 切换版本按钮（仅可用版本）
+            if is_available:
+                switch_btn = QPushButton("切换版本")
+                switch_btn.setMinimumWidth(75)
+                switch_btn.clicked.connect(lambda checked, v=version: self._launch_exe_version(v))
+                switch_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #4CAF50;
+                        border: none;
+                        border-radius: 3px;
+                        padding: 4px 12px;
+                        font-size: 11px;
+                        color: white;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #43A047;
+                    }
+                """)
+                top_layout.addWidget(switch_btn)
         
         layout.addLayout(top_layout)
         
-        # 底部：版本修改内容（所有版本都显示，如果有）
-        detail_widget = None
+        # 底部：版本修改内容（所有版本都有详情区域）
+        detail_widget = QWidget()
+        changes_layout = QVBoxLayout(detail_widget)
+        changes_layout.setSpacing(4)
+        changes_layout.setContentsMargins(10, 0, 0, 0)
+        
         if changes:
-            detail_widget = QWidget()
-            changes_layout = QVBoxLayout(detail_widget)
-            changes_layout.setSpacing(4)
-            changes_layout.setContentsMargins(10, 0, 0, 0)
-            
             changes_label = QLabel("修改内容：")
             changes_label.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
             changes_label.setStyleSheet("color: #FF9800;")
@@ -721,27 +733,31 @@ class HybridVersionManagerDialog(QDialog):
                 change_label.setStyleSheet("color: #AAAAAA;")
                 change_label.setWordWrap(True)
                 changes_layout.addWidget(change_label)
-            
-            detail_widget.setVisible(is_expanded)
-            layout.addWidget(detail_widget)
-            
-            # 连接展开/收起按钮
-            if is_available and changes:
-                def toggle_detail(checked=False):
-                    is_visible = not detail_widget.isVisible()
-                    detail_widget.setVisible(is_visible)
-                    toggle_btn.setText("收起" if is_visible else "展开")
-                toggle_btn.clicked.connect(toggle_detail)
+        else:
+            no_changes_label = QLabel("暂无修改记录")
+            no_changes_label.setFont(QFont("Microsoft YaHei", 9))
+            no_changes_label.setStyleSheet("color: #666666;")
+            changes_layout.addWidget(no_changes_label)
+        
+        detail_widget.setVisible(is_expanded)
+        layout.addWidget(detail_widget)
+        
+        # 连接展开/收起按钮
+        if not is_current:
+            def toggle_detail(checked=False):
+                is_visible = not detail_widget.isVisible()
+                detail_widget.setVisible(is_visible)
+                toggle_btn.setText("收起" if is_visible else "展开")
+            toggle_btn.clicked.connect(toggle_detail)
         
         # 保存到列表用于全部展开/收起
         if not hasattr(self, 'exe_version_items'):
             self.exe_version_items = []
-        if changes:
-            self.exe_version_items.append({
-                'expanded': is_expanded,
-                'detail_widget': detail_widget,
-                'toggle_btn': toggle_btn if (is_available and changes) else None
-            })
+        self.exe_version_items.append({
+            'expanded': is_expanded,
+            'detail_widget': detail_widget,
+            'toggle_btn': toggle_btn if not is_current else None
+        })
         
         self.versions_layout.addWidget(frame)
     
@@ -869,7 +885,6 @@ class HybridVersionManagerDialog(QDialog):
         
         is_expanded = False
         body = version.get('body', '')
-        has_detail = bool(body)
         
         top_layout = QHBoxLayout()
         top_layout.setSpacing(10)
@@ -893,23 +908,22 @@ class HybridVersionManagerDialog(QDialog):
         message_label.setWordWrap(True)
         top_layout.addWidget(message_label, 1)
         
-        toggle_btn = None
-        if has_detail:
-            toggle_btn = QPushButton("展开")
-            toggle_btn.setMinimumWidth(55)
-            toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: transparent;
-                    color: #AAAAAA;
-                    border: none;
-                    padding: 4px 8px;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    color: #FFFFFF;
-                }
-            """)
-            top_layout.addWidget(toggle_btn)
+        # 展开/收起按钮（所有版本都有）
+        toggle_btn = QPushButton("展开")
+        toggle_btn.setMinimumWidth(55)
+        toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #AAAAAA;
+                border: none;
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                color: #FFFFFF;
+            }
+        """)
+        top_layout.addWidget(toggle_btn)
         
         if is_current:
             current_tag = QLabel("当前")
@@ -938,13 +952,13 @@ class HybridVersionManagerDialog(QDialog):
         
         main_layout.addLayout(top_layout)
         
-        detail_widget = None
-        if has_detail:
-            detail_widget = QWidget()
-            detail_layout = QVBoxLayout(detail_widget)
-            detail_layout.setSpacing(4)
-            detail_layout.setContentsMargins(10, 0, 0, 0)
-            
+        # 详情区域（所有版本都有）
+        detail_widget = QWidget()
+        detail_layout = QVBoxLayout(detail_widget)
+        detail_layout.setSpacing(4)
+        detail_layout.setContentsMargins(10, 0, 0, 0)
+        
+        if body:
             detail_label = QLabel("详细说明：")
             detail_label.setFont(QFont("Microsoft YaHei", 10, QFont.Weight.Bold))
             detail_label.setStyleSheet("color: #FF9800;")
@@ -957,16 +971,20 @@ class HybridVersionManagerDialog(QDialog):
                     line_label.setStyleSheet("color: #AAAAAA;")
                     line_label.setWordWrap(True)
                     detail_layout.addWidget(line_label)
-            
-            detail_widget.setVisible(False)
-            main_layout.addWidget(detail_widget)
-            
-            if toggle_btn:
-                def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
-                    is_visible = not dw.isVisible()
-                    dw.setVisible(is_visible)
-                    tb.setText("收起" if is_visible else "展开")
-                toggle_btn.clicked.connect(toggle_detail)
+        else:
+            no_detail_label = QLabel("暂无详细说明")
+            no_detail_label.setFont(QFont("Microsoft YaHei", 9))
+            no_detail_label.setStyleSheet("color: #666666;")
+            detail_layout.addWidget(no_detail_label)
+        
+        detail_widget.setVisible(False)
+        main_layout.addWidget(detail_widget)
+        
+        def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
+            is_visible = not dw.isVisible()
+            dw.setVisible(is_visible)
+            tb.setText("收起" if is_visible else "展开")
+        toggle_btn.clicked.connect(toggle_detail)
         
         if not hasattr(self, 'git_version_items'):
             self.git_version_items = []
