@@ -397,5 +397,14 @@
     ],
     "build_time": "2026-04-25T04:17:49.206560",
     "version_number": "2026.04.25.0416"
+  },
+  "云集智能音乐创意台-v2026.04.25.0427": {
+    "version": "云集智能音乐创意台-v2026.04.25.0427",
+    "changes": [
+      "PyInstaller运行时hook确保Popen patch最早执行",
+      "卡片式设计修复-子控件明确border:none和background:transparent"
+    ],
+    "build_time": "2026-04-25T04:29:24.423649",
+    "version_number": "2026.04.25.0427"
   }
 }

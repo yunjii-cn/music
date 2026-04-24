@@ -299,6 +299,7 @@ class HybridVersionManagerDialog(QDialog):
         """)
         
         self.versions_container = QWidget()
+        self.versions_container.setStyleSheet("background-color: transparent; border: none;")
         self.versions_layout = QVBoxLayout(self.versions_container)
         self.versions_layout.setSpacing(8)
         self.versions_layout.setContentsMargins(4, 4, 4, 4)
@@ -575,12 +576,13 @@ class HybridVersionManagerDialog(QDialog):
                     background-color: #162016;
                     border: 1px solid #1f3a1f;
                     border-radius: 8px;
-                    padding: 2px;
                 }
                 #versionCard:hover {
                     background-color: #1a2a1a;
                     border-color: #2a4a2a;
                 }
+                QLabel { border: none; background: transparent; }
+                QWidget { border: none; background: transparent; }
             """)
         elif is_available:
             card.setStyleSheet("""
@@ -588,12 +590,13 @@ class HybridVersionManagerDialog(QDialog):
                     background-color: #161616;
                     border: 1px solid #222222;
                     border-radius: 8px;
-                    padding: 2px;
                 }
                 #versionCard:hover {
                     background-color: #1c1c1c;
                     border-color: #333333;
                 }
+                QLabel { border: none; background: transparent; }
+                QWidget { border: none; background: transparent; }
             """)
         else:
             card.setStyleSheet("""
@@ -601,17 +604,18 @@ class HybridVersionManagerDialog(QDialog):
                     background-color: #111111;
                     border: 1px solid #1a1a1a;
                     border-radius: 8px;
-                    padding: 2px;
                 }
                 #versionCard:hover {
                     background-color: #161616;
                     border-color: #222222;
                 }
+                QLabel { border: none; background: transparent; }
+                QWidget { border: none; background: transparent; }
             """)
         
         layout = QVBoxLayout(card)
-        layout.setSpacing(6)
-        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(4)
+        layout.setContentsMargins(16, 12, 16, 12)
         
         header = QHBoxLayout()
         header.setSpacing(10)
@@ -619,17 +623,17 @@ class HybridVersionManagerDialog(QDialog):
         version_label = QLabel(f"v{version['version']}")
         version_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         if is_current:
-            version_label.setStyleSheet("color: #4CAF50;")
+            version_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
         elif not is_available:
-            version_label.setStyleSheet("color: #555555;")
+            version_label.setStyleSheet("color: #555555; border: none; background: transparent;")
         else:
-            version_label.setStyleSheet("color: #E0E0E0;")
+            version_label.setStyleSheet("color: #E0E0E0; border: none; background: transparent;")
         header.addWidget(version_label)
         
         if version.get('date'):
             date_label = QLabel(version['date'])
             date_label.setFont(QFont("Consolas", 9))
-            date_label.setStyleSheet("color: #555555;")
+            date_label.setStyleSheet("color: #555555; border: none; background: transparent;")
             header.addWidget(date_label)
         
         header.addStretch()
@@ -637,18 +641,18 @@ class HybridVersionManagerDialog(QDialog):
         if is_available and version.get('size'):
             size_label = QLabel(version['size'])
             size_label.setFont(QFont("Consolas", 9))
-            size_label.setStyleSheet("color: #555555;")
+            size_label.setStyleSheet("color: #555555; border: none; background: transparent;")
             header.addWidget(size_label)
         elif not is_available:
             status_label = QLabel("未提供")
             status_label.setFont(QFont("Microsoft YaHei", 9))
-            status_label.setStyleSheet("color: #444444;")
+            status_label.setStyleSheet("color: #444444; border: none; background: transparent;")
             header.addWidget(status_label)
         
         if is_current:
             current_tag = QLabel("● 当前版本")
             current_tag.setFont(QFont("Microsoft YaHei", 9))
-            current_tag.setStyleSheet("color: #4CAF50; padding: 2px 8px; background-color: #1a2e1a; border-radius: 4px;")
+            current_tag.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
             header.addWidget(current_tag)
         else:
             toggle_btn = QPushButton("详情" if not is_expanded else "收起")
@@ -693,13 +697,14 @@ class HybridVersionManagerDialog(QDialog):
         name_label = QLabel(version['name'])
         name_label.setFont(QFont("Microsoft YaHei", 9))
         if not is_available:
-            name_label.setStyleSheet("color: #444444;")
+            name_label.setStyleSheet("color: #444444; border: none; background: transparent;")
         else:
-            name_label.setStyleSheet("color: #777777;")
+            name_label.setStyleSheet("color: #777777; border: none; background: transparent;")
         name_label.setWordWrap(True)
         layout.addWidget(name_label)
         
         detail_widget = QWidget()
+        detail_widget.setStyleSheet("border: none; background: transparent;")
         changes_layout = QVBoxLayout(detail_widget)
         changes_layout.setSpacing(2)
         changes_layout.setContentsMargins(0, 4, 0, 0)
@@ -708,13 +713,13 @@ class HybridVersionManagerDialog(QDialog):
             for change in changes:
                 change_label = QLabel(f"· {change}")
                 change_label.setFont(QFont("Microsoft YaHei", 9))
-                change_label.setStyleSheet("color: #777777;")
+                change_label.setStyleSheet("color: #777777; border: none; background: transparent;")
                 change_label.setWordWrap(True)
                 changes_layout.addWidget(change_label)
         else:
             no_changes_label = QLabel("暂无修改记录")
             no_changes_label.setFont(QFont("Microsoft YaHei", 9))
-            no_changes_label.setStyleSheet("color: #3a3a3a;")
+            no_changes_label.setStyleSheet("color: #3a3a3a; border: none; background: transparent;")
             changes_layout.addWidget(no_changes_label)
         
         detail_widget.setVisible(is_expanded)
@@ -839,12 +844,13 @@ class HybridVersionManagerDialog(QDialog):
                     background-color: #162016;
                     border: 1px solid #1f3a1f;
                     border-radius: 8px;
-                    padding: 2px;
                 }
                 #gitVersionCard:hover {
                     background-color: #1a2a1a;
                     border-color: #2a4a2a;
                 }
+                QLabel { border: none; background: transparent; }
+                QWidget { border: none; background: transparent; }
             """)
         else:
             card.setStyleSheet("""
@@ -852,17 +858,18 @@ class HybridVersionManagerDialog(QDialog):
                     background-color: #161616;
                     border: 1px solid #222222;
                     border-radius: 8px;
-                    padding: 2px;
                 }
                 #gitVersionCard:hover {
                     background-color: #1c1c1c;
                     border-color: #333333;
                 }
+                QLabel { border: none; background: transparent; }
+                QWidget { border: none; background: transparent; }
             """)
         
         main_layout = QVBoxLayout(card)
-        main_layout.setSpacing(6)
-        main_layout.setContentsMargins(14, 10, 14, 10)
+        main_layout.setSpacing(4)
+        main_layout.setContentsMargins(16, 12, 16, 12)
         
         is_expanded = False
         body = version.get('body', '')
@@ -873,14 +880,14 @@ class HybridVersionManagerDialog(QDialog):
         hash_label = QLabel(version['hash'])
         hash_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         if is_current:
-            hash_label.setStyleSheet("color: #4CAF50;")
+            hash_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
         else:
-            hash_label.setStyleSheet("color: #888888;")
+            hash_label.setStyleSheet("color: #888888; border: none; background: transparent;")
         header.addWidget(hash_label)
         
         date_label = QLabel(version['date'])
         date_label.setFont(QFont("Consolas", 9))
-        date_label.setStyleSheet("color: #555555;")
+        date_label.setStyleSheet("color: #555555; border: none; background: transparent;")
         header.addWidget(date_label)
         
         header.addStretch()
@@ -904,7 +911,7 @@ class HybridVersionManagerDialog(QDialog):
         if is_current:
             current_tag = QLabel("● 当前版本")
             current_tag.setFont(QFont("Microsoft YaHei", 9))
-            current_tag.setStyleSheet("color: #4CAF50; padding: 2px 8px; background-color: #1a2e1a; border-radius: 4px;")
+            current_tag.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
             header.addWidget(current_tag)
         else:
             switch_btn = QPushButton("切换")
@@ -931,11 +938,12 @@ class HybridVersionManagerDialog(QDialog):
         
         message_label = QLabel(version['message'])
         message_label.setFont(QFont("Microsoft YaHei", 9))
-        message_label.setStyleSheet("color: #AAAAAA;")
+        message_label.setStyleSheet("color: #AAAAAA; border: none; background: transparent;")
         message_label.setWordWrap(True)
         main_layout.addWidget(message_label)
         
         detail_widget = QWidget()
+        detail_widget.setStyleSheet("border: none; background: transparent;")
         detail_layout = QVBoxLayout(detail_widget)
         detail_layout.setSpacing(2)
         detail_layout.setContentsMargins(0, 4, 0, 0)
@@ -945,13 +953,13 @@ class HybridVersionManagerDialog(QDialog):
                 if line.strip():
                     line_label = QLabel(f"· {line.strip()}")
                     line_label.setFont(QFont("Microsoft YaHei", 9))
-                    line_label.setStyleSheet("color: #777777;")
+                    line_label.setStyleSheet("color: #777777; border: none; background: transparent;")
                     line_label.setWordWrap(True)
                     detail_layout.addWidget(line_label)
         else:
             no_detail_label = QLabel("暂无详细说明")
             no_detail_label.setFont(QFont("Microsoft YaHei", 9))
-            no_detail_label.setStyleSheet("color: #3a3a3a;")
+            no_detail_label.setStyleSheet("color: #3a3a3a; border: none; background: transparent;")
             detail_layout.addWidget(no_detail_label)
         
         detail_widget.setVisible(False)
