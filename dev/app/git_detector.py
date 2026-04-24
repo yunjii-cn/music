@@ -11,37 +11,6 @@ import subprocess
 import webbrowser
 from pathlib import Path
 
-if sys.platform == 'win32':
-    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
-else:
-    _HIDDEN_FLAGS = 0
-
-def _hidden_startupinfo():
-    si = subprocess.STARTUPINFO()
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = 0
-    return si
-
-def _patch_gitpython_popen():
-    try:
-        _orig_popen = subprocess.Popen
-        def _patched_popen(*args, **kwargs):
-            si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0
-            kwargs['startupinfo'] = si
-            if sys.platform == 'win32':
-                if 'creationflags' in kwargs:
-                    kwargs['creationflags'] = kwargs['creationflags'] | subprocess.CREATE_NO_WINDOW
-                else:
-                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-            return _orig_popen(*args, **kwargs)
-        subprocess.Popen = _patched_popen
-    except Exception:
-        pass
-
-_patch_gitpython_popen()
-
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QMessageBox, QProgressBar

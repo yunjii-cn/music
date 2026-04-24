@@ -11,87 +11,6 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-if sys.platform == 'win32':
-    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
-else:
-    _HIDDEN_FLAGS = 0
-
-def _hidden_startupinfo():
-    si = subprocess.STARTUPINFO()
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = 0
-    return si
-
-def hidden_run(*args, **kwargs):
-    si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = 0
-    kwargs['startupinfo'] = si
-    if sys.platform == 'win32':
-        if 'creationflags' in kwargs:
-            kwargs['creationflags'] = kwargs['creationflags'] | _HIDDEN_FLAGS
-        else:
-            kwargs['creationflags'] = _HIDDEN_FLAGS
-    return subprocess.run(*args, **kwargs)
-
-def hidden_popen(*args, **kwargs):
-    si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = 0
-    kwargs['startupinfo'] = si
-    if sys.platform == 'win32':
-        if 'creationflags' in kwargs:
-            kwargs['creationflags'] = kwargs['creationflags'] | _HIDDEN_FLAGS
-        else:
-            kwargs['creationflags'] = _HIDDEN_FLAGS
-    return subprocess.Popen(*args, **kwargs)
-
-def _patch_gitpython_popen():
-    try:
-        _orig_popen = subprocess.Popen
-        def _patched_popen(*args, **kwargs):
-            si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0
-            kwargs['startupinfo'] = si
-            if sys.platform == 'win32':
-                if 'creationflags' in kwargs:
-                    kwargs['creationflags'] = kwargs['creationflags'] | subprocess.CREATE_NO_WINDOW
-                else:
-                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-            return _orig_popen(*args, **kwargs)
-        subprocess.Popen = _patched_popen
-    except Exception:
-        pass
-
-_gitcmd_patched = False
-
-def _patch_gitcmd_popen():
-    global _gitcmd_patched
-    if _gitcmd_patched:
-        return
-    _gitcmd_patched = True
-    try:
-        import git.cmd
-        _orig_safer_popen = git.cmd.safer_popen
-        def _patched_safer_popen(*args, **kwargs):
-            si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0
-            kwargs['startupinfo'] = si
-            if sys.platform == 'win32':
-                if 'creationflags' in kwargs:
-                    kwargs['creationflags'] = kwargs['creationflags'] | subprocess.CREATE_NO_WINDOW
-                else:
-                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-            return _orig_safer_popen(*args, **kwargs)
-        git.cmd.safer_popen = _patched_safer_popen
-        git.cmd.Popen = _patched_popen
-    except Exception:
-        pass
-
-_patch_gitpython_popen()
-
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
@@ -175,7 +94,6 @@ class HybridVersionManagerDialog(QDialog):
         """检查是否是Git仓库"""
         try:
             import git
-            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             return True
         except Exception:
@@ -382,8 +300,8 @@ class HybridVersionManagerDialog(QDialog):
         
         self.versions_container = QWidget()
         self.versions_layout = QVBoxLayout(self.versions_container)
-        self.versions_layout.setSpacing(6)
-        self.versions_layout.setContentsMargins(0, 0, 0, 0)
+        self.versions_layout.setSpacing(8)
+        self.versions_layout.setContentsMargins(4, 4, 4, 4)
         
         scroll_area.setWidget(self.versions_container)
         layout.addWidget(scroll_area, stretch=1)
@@ -534,7 +452,6 @@ class HybridVersionManagerDialog(QDialog):
         """获取当前Git版本信息"""
         try:
             import git
-            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             commit = repo.head.commit
             body = '\n'.join(line.strip() for line in commit.message.split('\n')[1:] if line.strip())
@@ -552,7 +469,6 @@ class HybridVersionManagerDialog(QDialog):
         """获取可用Git版本列表"""
         try:
             import git
-            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             versions = []
             for commit in list(repo.iter_commits(max_count=limit)):
@@ -640,7 +556,7 @@ class HybridVersionManagerDialog(QDialog):
             self._create_exe_version_item(version, is_current)
     
     def _create_exe_version_item(self, version, is_current):
-        """创建EXE版本项"""
+        """创建EXE版本项-卡片式设计"""
         changes = self._get_version_changes(version['name'])
         is_available = version.get('available', False)
         
@@ -651,138 +567,154 @@ class HybridVersionManagerDialog(QDialog):
             except:
                 is_expanded = True
         
-        frame = QFrame()
+        card = QFrame()
+        card.setObjectName("versionCard")
         if is_current:
-            frame.setStyleSheet("""
-                QFrame {
-                    background-color: transparent;
-                    border: none;
-                    border-bottom: 1px solid #1a3a1a;
-                    padding: 8px 4px;
+            card.setStyleSheet("""
+                #versionCard {
+                    background-color: #162016;
+                    border: 1px solid #1f3a1f;
+                    border-radius: 8px;
+                    padding: 2px;
+                }
+                #versionCard:hover {
+                    background-color: #1a2a1a;
+                    border-color: #2a4a2a;
+                }
+            """)
+        elif is_available:
+            card.setStyleSheet("""
+                #versionCard {
+                    background-color: #161616;
+                    border: 1px solid #222222;
+                    border-radius: 8px;
+                    padding: 2px;
+                }
+                #versionCard:hover {
+                    background-color: #1c1c1c;
+                    border-color: #333333;
                 }
             """)
         else:
-            frame.setStyleSheet("""
-                QFrame {
-                    background-color: transparent;
-                    border: none;
-                    border-bottom: 1px solid #1a1a1a;
-                    padding: 8px 4px;
+            card.setStyleSheet("""
+                #versionCard {
+                    background-color: #111111;
+                    border: 1px solid #1a1a1a;
+                    border-radius: 8px;
+                    padding: 2px;
+                }
+                #versionCard:hover {
+                    background-color: #161616;
+                    border-color: #222222;
                 }
             """)
         
-        layout = QVBoxLayout(frame)
+        layout = QVBoxLayout(card)
         layout.setSpacing(6)
-        layout.setContentsMargins(4, 6, 4, 6)
+        layout.setContentsMargins(14, 10, 14, 10)
         
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(12)
+        header = QHBoxLayout()
+        header.setSpacing(10)
         
         version_label = QLabel(f"v{version['version']}")
         version_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         if is_current:
-            version_label.setStyleSheet("color: #4CAF50; min-width: 120px;")
+            version_label.setStyleSheet("color: #4CAF50;")
         elif not is_available:
-            version_label.setStyleSheet("color: #555555; min-width: 120px;")
+            version_label.setStyleSheet("color: #555555;")
         else:
-            version_label.setStyleSheet("color: #E0E0E0; min-width: 120px;")
-        top_layout.addWidget(version_label)
+            version_label.setStyleSheet("color: #E0E0E0;")
+        header.addWidget(version_label)
         
         if version.get('date'):
             date_label = QLabel(version['date'])
             date_label.setFont(QFont("Consolas", 9))
-            date_label.setStyleSheet("color: #555555; min-width: 130px;")
-            top_layout.addWidget(date_label)
-        else:
-            spacer = QLabel("")
-            spacer.setStyleSheet("min-width: 130px;")
-            top_layout.addWidget(spacer)
+            date_label.setStyleSheet("color: #555555;")
+            header.addWidget(date_label)
         
-        name_label = QLabel(version['name'])
-        name_label.setFont(QFont("Microsoft YaHei", 9))
-        if not is_available:
-            name_label.setStyleSheet("color: #555555;")
-        else:
-            name_label.setStyleSheet("color: #CCCCCC;")
-        name_label.setWordWrap(True)
-        top_layout.addWidget(name_label, 1)
+        header.addStretch()
         
         if is_available and version.get('size'):
             size_label = QLabel(version['size'])
             size_label.setFont(QFont("Consolas", 9))
-            size_label.setStyleSheet("color: #666666; min-width: 70px;")
-            top_layout.addWidget(size_label)
+            size_label.setStyleSheet("color: #555555;")
+            header.addWidget(size_label)
         elif not is_available:
             status_label = QLabel("未提供")
             status_label.setFont(QFont("Microsoft YaHei", 9))
-            status_label.setStyleSheet("color: #555555;")
-            top_layout.addWidget(status_label)
-        else:
-            spacer = QLabel("")
-            spacer.setStyleSheet("min-width: 70px;")
-            top_layout.addWidget(spacer)
+            status_label.setStyleSheet("color: #444444;")
+            header.addWidget(status_label)
         
         if is_current:
-            current_tag = QLabel("● 当前")
+            current_tag = QLabel("● 当前版本")
             current_tag.setFont(QFont("Microsoft YaHei", 9))
-            current_tag.setStyleSheet("color: #4CAF50;")
-            top_layout.addWidget(current_tag)
+            current_tag.setStyleSheet("color: #4CAF50; padding: 2px 8px; background-color: #1a2e1a; border-radius: 4px;")
+            header.addWidget(current_tag)
         else:
-            toggle_btn = QPushButton("收起" if is_expanded else "展开")
-            toggle_btn.setMinimumWidth(55)
+            toggle_btn = QPushButton("详情" if not is_expanded else "收起")
+            toggle_btn.setFixedWidth(50)
             toggle_btn.setStyleSheet("""
                 QPushButton {
                     background-color: transparent;
-                    color: #777777;
+                    color: #666666;
                     border: none;
-                    padding: 4px 8px;
+                    padding: 2px 6px;
                     font-size: 11px;
                 }
                 QPushButton:hover {
-                    color: #FFFFFF;
+                    color: #AAAAAA;
                 }
             """)
-            top_layout.addWidget(toggle_btn)
+            header.addWidget(toggle_btn)
             
             if is_available:
-                switch_btn = QPushButton("切换版本")
-                switch_btn.setMinimumWidth(75)
+                switch_btn = QPushButton("切换")
+                switch_btn.setFixedWidth(55)
                 switch_btn.clicked.connect(lambda checked, v=version: self._launch_exe_version(v))
                 switch_btn.setStyleSheet("""
                     QPushButton {
-                        background-color: #2a2a2a;
-                        border: 1px solid #3a3a3a;
-                        border-radius: 3px;
-                        padding: 4px 12px;
+                        background-color: #1e1e1e;
+                        border: 1px solid #2a2a2a;
+                        border-radius: 4px;
+                        padding: 3px 10px;
                         font-size: 11px;
-                        color: #CCCCCC;
+                        color: #AAAAAA;
                     }
                     QPushButton:hover {
-                        background-color: #3a3a3a;
-                        border-color: #4a4a4a;
+                        background-color: #2a2a2a;
+                        border-color: #3a3a3a;
                         color: #FFFFFF;
                     }
                 """)
-                top_layout.addWidget(switch_btn)
+                header.addWidget(switch_btn)
         
-        layout.addLayout(top_layout)
+        layout.addLayout(header)
+        
+        name_label = QLabel(version['name'])
+        name_label.setFont(QFont("Microsoft YaHei", 9))
+        if not is_available:
+            name_label.setStyleSheet("color: #444444;")
+        else:
+            name_label.setStyleSheet("color: #777777;")
+        name_label.setWordWrap(True)
+        layout.addWidget(name_label)
         
         detail_widget = QWidget()
         changes_layout = QVBoxLayout(detail_widget)
-        changes_layout.setSpacing(3)
-        changes_layout.setContentsMargins(20, 4, 0, 0)
+        changes_layout.setSpacing(2)
+        changes_layout.setContentsMargins(0, 4, 0, 0)
         
         if changes:
             for change in changes:
                 change_label = QLabel(f"· {change}")
                 change_label.setFont(QFont("Microsoft YaHei", 9))
-                change_label.setStyleSheet("color: #888888;")
+                change_label.setStyleSheet("color: #777777;")
                 change_label.setWordWrap(True)
                 changes_layout.addWidget(change_label)
         else:
             no_changes_label = QLabel("暂无修改记录")
             no_changes_label.setFont(QFont("Microsoft YaHei", 9))
-            no_changes_label.setStyleSheet("color: #444444;")
+            no_changes_label.setStyleSheet("color: #3a3a3a;")
             changes_layout.addWidget(no_changes_label)
         
         detail_widget.setVisible(is_expanded)
@@ -792,7 +724,7 @@ class HybridVersionManagerDialog(QDialog):
             def toggle_detail(checked=False):
                 is_visible = not detail_widget.isVisible()
                 detail_widget.setVisible(is_visible)
-                toggle_btn.setText("收起" if is_visible else "展开")
+                toggle_btn.setText("收起" if is_visible else "详情")
             toggle_btn.clicked.connect(toggle_detail)
         
         if not hasattr(self, 'exe_version_items'):
@@ -803,7 +735,7 @@ class HybridVersionManagerDialog(QDialog):
             'toggle_btn': toggle_btn if not is_current else None
         })
         
-        self.versions_layout.addWidget(frame)
+        self.versions_layout.addWidget(card)
     
     def _launch_exe_version(self, version):
         """启动EXE版本"""
@@ -823,7 +755,7 @@ class HybridVersionManagerDialog(QDialog):
                 import os
                 
                 # 启动新的EXE
-                hidden_popen(
+                subprocess.Popen(
                     [version['path']],
                     cwd=os.path.dirname(version['path'])
                 )
@@ -882,7 +814,7 @@ class HybridVersionManagerDialog(QDialog):
                     if item.get('detail_widget'):
                         item['detail_widget'].setVisible(checked)
                     if item.get('toggle_btn'):
-                        item['toggle_btn'].setText("收起" if checked else "展开")
+                        item['toggle_btn'].setText("收起" if checked else "详情")
                 except Exception as e:
                     print(f"更新EXE版本项状态失败: {e}")
         
@@ -893,122 +825,133 @@ class HybridVersionManagerDialog(QDialog):
                     if item.get('detail_widget'):
                         item['detail_widget'].setVisible(checked)
                     if item.get('toggle_btn'):
-                        item['toggle_btn'].setText("收起" if checked else "展开")
+                        item['toggle_btn'].setText("收起" if checked else "详情")
                 except Exception as e:
                     print(f"更新Git版本项状态失败: {e}")
     
     def _create_git_version_item(self, version, is_current):
-        """创建Git版本项"""
-        frame = QFrame()
+        """创建Git版本项-卡片式设计"""
+        card = QFrame()
+        card.setObjectName("gitVersionCard")
         if is_current:
-            frame.setStyleSheet("""
-                QFrame {
-                    background-color: transparent;
-                    border: none;
-                    border-bottom: 1px solid #1a3a1a;
-                    padding: 8px 4px;
+            card.setStyleSheet("""
+                #gitVersionCard {
+                    background-color: #162016;
+                    border: 1px solid #1f3a1f;
+                    border-radius: 8px;
+                    padding: 2px;
+                }
+                #gitVersionCard:hover {
+                    background-color: #1a2a1a;
+                    border-color: #2a4a2a;
                 }
             """)
         else:
-            frame.setStyleSheet("""
-                QFrame {
-                    background-color: transparent;
-                    border: none;
-                    border-bottom: 1px solid #1a1a1a;
-                    padding: 8px 4px;
+            card.setStyleSheet("""
+                #gitVersionCard {
+                    background-color: #161616;
+                    border: 1px solid #222222;
+                    border-radius: 8px;
+                    padding: 2px;
+                }
+                #gitVersionCard:hover {
+                    background-color: #1c1c1c;
+                    border-color: #333333;
                 }
             """)
         
-        main_layout = QVBoxLayout(frame)
+        main_layout = QVBoxLayout(card)
         main_layout.setSpacing(6)
-        main_layout.setContentsMargins(4, 6, 4, 6)
+        main_layout.setContentsMargins(14, 10, 14, 10)
         
         is_expanded = False
         body = version.get('body', '')
         
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(10)
+        header = QHBoxLayout()
+        header.setSpacing(10)
         
         hash_label = QLabel(version['hash'])
         hash_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         if is_current:
-            hash_label.setStyleSheet("color: #4CAF50; min-width: 60px;")
+            hash_label.setStyleSheet("color: #4CAF50;")
         else:
-            hash_label.setStyleSheet("color: #888888; min-width: 60px;")
-        top_layout.addWidget(hash_label)
+            hash_label.setStyleSheet("color: #888888;")
+        header.addWidget(hash_label)
         
         date_label = QLabel(version['date'])
         date_label.setFont(QFont("Consolas", 9))
-        date_label.setStyleSheet("color: #555555; min-width: 130px;")
-        top_layout.addWidget(date_label)
+        date_label.setStyleSheet("color: #555555;")
+        header.addWidget(date_label)
         
-        message_label = QLabel(version['message'])
-        message_label.setFont(QFont("Microsoft YaHei", 9))
-        message_label.setStyleSheet("color: #CCCCCC;")
-        message_label.setWordWrap(True)
-        top_layout.addWidget(message_label, 1)
+        header.addStretch()
         
-        toggle_btn = QPushButton("展开")
-        toggle_btn.setMinimumWidth(55)
+        toggle_btn = QPushButton("详情")
+        toggle_btn.setFixedWidth(50)
         toggle_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
-                color: #777777;
+                color: #666666;
                 border: none;
-                padding: 4px 8px;
+                padding: 2px 6px;
                 font-size: 11px;
             }
             QPushButton:hover {
-                color: #FFFFFF;
+                color: #AAAAAA;
             }
         """)
-        top_layout.addWidget(toggle_btn)
+        header.addWidget(toggle_btn)
         
         if is_current:
-            current_tag = QLabel("● 当前")
+            current_tag = QLabel("● 当前版本")
             current_tag.setFont(QFont("Microsoft YaHei", 9))
-            current_tag.setStyleSheet("color: #4CAF50;")
-            top_layout.addWidget(current_tag)
+            current_tag.setStyleSheet("color: #4CAF50; padding: 2px 8px; background-color: #1a2e1a; border-radius: 4px;")
+            header.addWidget(current_tag)
         else:
             switch_btn = QPushButton("切换")
-            switch_btn.setMinimumWidth(55)
+            switch_btn.setFixedWidth(55)
             switch_btn.clicked.connect(lambda checked, v=version: self._switch_git_version(v['hash']))
             switch_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #2a2a2a;
-                    border: 1px solid #3a3a3a;
-                    border-radius: 3px;
-                    padding: 4px 10px;
+                    background-color: #1e1e1e;
+                    border: 1px solid #2a2a2a;
+                    border-radius: 4px;
+                    padding: 3px 10px;
                     font-size: 11px;
-                    color: #CCCCCC;
+                    color: #AAAAAA;
                 }
                 QPushButton:hover {
-                    background-color: #3a3a3a;
-                    border-color: #4a4a4a;
+                    background-color: #2a2a2a;
+                    border-color: #3a3a3a;
                     color: #FFFFFF;
                 }
             """)
-            top_layout.addWidget(switch_btn)
+            header.addWidget(switch_btn)
         
-        main_layout.addLayout(top_layout)
+        main_layout.addLayout(header)
+        
+        message_label = QLabel(version['message'])
+        message_label.setFont(QFont("Microsoft YaHei", 9))
+        message_label.setStyleSheet("color: #AAAAAA;")
+        message_label.setWordWrap(True)
+        main_layout.addWidget(message_label)
         
         detail_widget = QWidget()
         detail_layout = QVBoxLayout(detail_widget)
-        detail_layout.setSpacing(3)
-        detail_layout.setContentsMargins(20, 4, 0, 0)
+        detail_layout.setSpacing(2)
+        detail_layout.setContentsMargins(0, 4, 0, 0)
         
         if body:
             for line in body.split('\n'):
                 if line.strip():
                     line_label = QLabel(f"· {line.strip()}")
                     line_label.setFont(QFont("Microsoft YaHei", 9))
-                    line_label.setStyleSheet("color: #888888;")
+                    line_label.setStyleSheet("color: #777777;")
                     line_label.setWordWrap(True)
                     detail_layout.addWidget(line_label)
         else:
             no_detail_label = QLabel("暂无详细说明")
             no_detail_label.setFont(QFont("Microsoft YaHei", 9))
-            no_detail_label.setStyleSheet("color: #444444;")
+            no_detail_label.setStyleSheet("color: #3a3a3a;")
             detail_layout.addWidget(no_detail_label)
         
         detail_widget.setVisible(False)
@@ -1017,7 +960,7 @@ class HybridVersionManagerDialog(QDialog):
         def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
             is_visible = not dw.isVisible()
             dw.setVisible(is_visible)
-            tb.setText("收起" if is_visible else "展开")
+            tb.setText("收起" if is_visible else "详情")
         toggle_btn.clicked.connect(toggle_detail)
         
         if not hasattr(self, 'git_version_items'):
@@ -1028,13 +971,12 @@ class HybridVersionManagerDialog(QDialog):
             'toggle_btn': toggle_btn
         })
         
-        self.versions_layout.addWidget(frame)
+        self.versions_layout.addWidget(card)
     
     def _preview_git_version(self, version):
         """预览Git版本详情"""
         try:
             import git
-            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             commit = repo.commit(version['hash'])
             commit_body = commit.message
@@ -1198,7 +1140,6 @@ class GitVersionSwitchThread(QThread):
             
             # 2. 切换 Git 分支
             import git
-            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             repo.head.reference = repo.commit(self.commit_hash)
             repo.head.reset(index=True, working_tree=True)
