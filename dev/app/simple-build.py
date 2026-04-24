@@ -177,6 +177,13 @@ def build_exe():
     if rth_hook.exists():
         pyinstaller_args.extend(["--runtime-hook", str(rth_hook)])
     
+    # 添加 sitecustomize.py 到 _MEIPASS 根目录，Python 启动时自动导入
+    sitecustomize = ROOT_DIR / "sitecustomize.py"
+    if sitecustomize.exists():
+        pyinstaller_args.append("--add-data")
+        pyinstaller_args.append(f"{str(sitecustomize)};.")
+        print(f"  已添加 sitecustomize.py: {sitecustomize}")
+    
     # 最后添加main.py
     pyinstaller_args.append("main.py")
     

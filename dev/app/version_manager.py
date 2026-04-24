@@ -506,37 +506,101 @@ class HybridVersionManagerDialog(QDialog):
         
         git_available = GitDetector.is_git_available()
         
-        # 根据当前模式直接加载，不强制切换
+        # 根据当前模式直接加载
         if self.current_mode == "exe":
             self._load_exe_versions()
         else:
-            # 检查Git仓库和Git是否可用
-            if not self.has_git_repo or not git_available:
-                # Git模式但没有Git，引导安装
-                reply = QMessageBox.question(
-                    self,
-                    "需要Git",
-                    "Git模式需要安装Git才能使用。\n\n"
-                    "是否打开Git安装引导？",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.Yes
-                )
-                if reply == QMessageBox.StandardButton.Yes:
-                    dialog = GitInstallDialog(self)
-                    if dialog.exec() == QDialog.DialogCode.Accepted:
-                        # 用户安装了Git，重新加载
-                        self.has_git_repo = self._check_git_repo()
-                        self._load_versions()
-                        return
-                # 切换回EXE模式
-                self.current_mode = "exe"
-                if hasattr(self, 'mode_combo'):
-                    self.mode_combo.blockSignals(True)
-                    self.mode_combo.setCurrentIndex(0)
-                    self.mode_combo.blockSignals(False)
-                self._load_exe_versions()
+            # Git模式
+            if not git_available:
+                # Git未安装，显示提示但不强制弹窗
+                self._show_git_not_available()
+            elif not self.has_git_repo:
+                # Git已安装但当前目录不是Git仓库
+                self._show_no_git_repo()
             else:
                 self._load_git_versions()
+    
+    def _show_git_not_available(self):
+        """显示Git未安装提示"""
+        self.current_mode_label.setText("Git 模式")
+        
+        info_widget = QWidget()
+        info_layout = QVBoxLayout(info_widget)
+        info_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_layout.setSpacing(15)
+        
+        icon_label = QLabel("⚠️")
+        icon_label.setStyleSheet("font-size: 48px;")
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_layout.addWidget(icon_label)
+        
+        title_label = QLabel("Git 未安装")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #FF9800;")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_layout.addWidget(title_label)
+        
+        desc_label = QLabel(
+            "Git模式需要安装Git才能查看源代码版本历史。\n\n"
+            "Git是一个免费的开源版本控制系统。"
+        )
+        desc_label.setStyleSheet("color: #AAAAAA; font-size: 13px; line-height: 1.6;")
+        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc_label.setWordWrap(True)
+        info_layout.addWidget(desc_label)
+        
+        download_btn = QPushButton("📥 下载Git")
+        download_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1565C0;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px 20px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        download_btn.clicked.connect(self._open_git_download)
+        info_layout.addWidget(download_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        self.versions_layout.addWidget(info_widget)
+    
+    def _show_no_git_repo(self):
+        """显示当前目录不是Git仓库提示"""
+        self.current_mode_label.setText("Git 模式")
+        
+        info_widget = QWidget()
+        info_layout = QVBoxLayout(info_widget)
+        info_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_layout.setSpacing(15)
+        
+        icon_label = QLabel("📁")
+        icon_label.setStyleSheet("font-size: 48px;")
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_layout.addWidget(icon_label)
+        
+        title_label = QLabel("不是Git仓库")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #FF9800;")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_layout.addWidget(title_label)
+        
+        desc_label = QLabel(
+            "当前目录不是Git仓库，无法查看源代码版本历史。\n\n"
+            "请切换到包含 .git 文件夹的目录，或克隆项目仓库。"
+        )
+        desc_label.setStyleSheet("color: #AAAAAA; font-size: 13px; line-height: 1.6;")
+        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc_label.setWordWrap(True)
+        info_layout.addWidget(desc_label)
+        
+        self.versions_layout.addWidget(info_widget)
+    
+    def _open_git_download(self):
+        """打开Git下载页面"""
+        GitDetector.open_git_download()
     
     def _load_exe_versions(self):
         """加载EXE版本列表"""
@@ -771,10 +835,16 @@ class HybridVersionManagerDialog(QDialog):
                 import subprocess
                 import os
                 
-                # 启动新的EXE
+                # 启动新的EXE（隐藏窗口）
+                import subprocess
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = 0
                 subprocess.Popen(
                     [version['path']],
-                    cwd=os.path.dirname(version['path'])
+                    cwd=os.path.dirname(version['path']),
+                    startupinfo=si,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 
                 # 关闭当前程序
