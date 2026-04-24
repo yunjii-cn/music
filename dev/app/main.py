@@ -42,11 +42,13 @@ if sys.platform == 'win32':
     _HIDDEN_FLAGS = _subprocess.CREATE_NO_WINDOW
     _orig_popen = _subprocess.Popen
     def _patched_popen(*args, **kwargs):
-        si = _subprocess.STARTUPINFO()
+        si = kwargs.get('startupinfo', _subprocess.STARTUPINFO())
         si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0
-        kwargs.setdefault('startupinfo', si)
-        if 'creationflags' not in kwargs:
+        kwargs['startupinfo'] = si
+        if 'creationflags' in kwargs:
+            kwargs['creationflags'] = kwargs['creationflags'] | _HIDDEN_FLAGS
+        else:
             kwargs['creationflags'] = _HIDDEN_FLAGS
         return _orig_popen(*args, **kwargs)
     _subprocess.Popen = _patched_popen
@@ -76,13 +78,27 @@ def _hidden_startupinfo():
     return si
 
 def hidden_run(*args, **kwargs):
-    kwargs.setdefault('startupinfo', _hidden_startupinfo())
-    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    kwargs['startupinfo'] = si
+    if sys.platform == 'win32':
+        if 'creationflags' in kwargs:
+            kwargs['creationflags'] = kwargs['creationflags'] | _HIDDEN_FLAGS
+        else:
+            kwargs['creationflags'] = _HIDDEN_FLAGS
     return subprocess.run(*args, **kwargs)
 
 def hidden_popen(*args, **kwargs):
-    kwargs.setdefault('startupinfo', _hidden_startupinfo())
-    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    kwargs['startupinfo'] = si
+    if sys.platform == 'win32':
+        if 'creationflags' in kwargs:
+            kwargs['creationflags'] = kwargs['creationflags'] | _HIDDEN_FLAGS
+        else:
+            kwargs['creationflags'] = _HIDDEN_FLAGS
     return subprocess.Popen(*args, **kwargs)
 
 # PyQt6 imports

@@ -23,24 +23,70 @@ def _hidden_startupinfo():
     return si
 
 def hidden_run(*args, **kwargs):
-    kwargs.setdefault('startupinfo', _hidden_startupinfo())
-    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    kwargs['startupinfo'] = si
+    if sys.platform == 'win32':
+        if 'creationflags' in kwargs:
+            kwargs['creationflags'] = kwargs['creationflags'] | _HIDDEN_FLAGS
+        else:
+            kwargs['creationflags'] = _HIDDEN_FLAGS
     return subprocess.run(*args, **kwargs)
 
 def hidden_popen(*args, **kwargs):
-    kwargs.setdefault('startupinfo', _hidden_startupinfo())
-    kwargs.setdefault('creationflags', _HIDDEN_FLAGS)
+    si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0
+    kwargs['startupinfo'] = si
+    if sys.platform == 'win32':
+        if 'creationflags' in kwargs:
+            kwargs['creationflags'] = kwargs['creationflags'] | _HIDDEN_FLAGS
+        else:
+            kwargs['creationflags'] = _HIDDEN_FLAGS
     return subprocess.Popen(*args, **kwargs)
 
 def _patch_gitpython_popen():
     try:
         _orig_popen = subprocess.Popen
         def _patched_popen(*args, **kwargs):
-            kwargs.setdefault('startupinfo', _hidden_startupinfo())
-            if sys.platform == 'win32' and 'creationflags' not in kwargs:
-                kwargs['creationflags'] = _HIDDEN_FLAGS
+            si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            kwargs['startupinfo'] = si
+            if sys.platform == 'win32':
+                if 'creationflags' in kwargs:
+                    kwargs['creationflags'] = kwargs['creationflags'] | subprocess.CREATE_NO_WINDOW
+                else:
+                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
             return _orig_popen(*args, **kwargs)
         subprocess.Popen = _patched_popen
+    except Exception:
+        pass
+
+_gitcmd_patched = False
+
+def _patch_gitcmd_popen():
+    global _gitcmd_patched
+    if _gitcmd_patched:
+        return
+    _gitcmd_patched = True
+    try:
+        import git.cmd
+        _orig_safer_popen = git.cmd.safer_popen
+        def _patched_safer_popen(*args, **kwargs):
+            si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            kwargs['startupinfo'] = si
+            if sys.platform == 'win32':
+                if 'creationflags' in kwargs:
+                    kwargs['creationflags'] = kwargs['creationflags'] | subprocess.CREATE_NO_WINDOW
+                else:
+                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            return _orig_safer_popen(*args, **kwargs)
+        git.cmd.safer_popen = _patched_safer_popen
+        git.cmd.Popen = _patched_popen
     except Exception:
         pass
 
@@ -129,6 +175,7 @@ class HybridVersionManagerDialog(QDialog):
         """检查是否是Git仓库"""
         try:
             import git
+            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             return True
         except Exception:
@@ -487,6 +534,7 @@ class HybridVersionManagerDialog(QDialog):
         """获取当前Git版本信息"""
         try:
             import git
+            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             commit = repo.head.commit
             body = '\n'.join(line.strip() for line in commit.message.split('\n')[1:] if line.strip())
@@ -504,6 +552,7 @@ class HybridVersionManagerDialog(QDialog):
         """获取可用Git版本列表"""
         try:
             import git
+            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             versions = []
             for commit in list(repo.iter_commits(max_count=limit)):
@@ -985,6 +1034,7 @@ class HybridVersionManagerDialog(QDialog):
         """预览Git版本详情"""
         try:
             import git
+            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             commit = repo.commit(version['hash'])
             commit_body = commit.message
@@ -1148,6 +1198,7 @@ class GitVersionSwitchThread(QThread):
             
             # 2. 切换 Git 分支
             import git
+            _patch_gitcmd_popen()
             repo = git.Repo(self.base_dir, search_parent_directories=True)
             repo.head.reference = repo.commit(self.commit_hash)
             repo.head.reset(index=True, working_tree=True)

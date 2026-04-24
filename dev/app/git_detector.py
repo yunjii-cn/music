@@ -26,9 +26,15 @@ def _patch_gitpython_popen():
     try:
         _orig_popen = subprocess.Popen
         def _patched_popen(*args, **kwargs):
-            kwargs.setdefault('startupinfo', _hidden_startupinfo())
-            if sys.platform == 'win32' and 'creationflags' not in kwargs:
-                kwargs['creationflags'] = _HIDDEN_FLAGS
+            si = kwargs.get('startupinfo', subprocess.STARTUPINFO())
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            kwargs['startupinfo'] = si
+            if sys.platform == 'win32':
+                if 'creationflags' in kwargs:
+                    kwargs['creationflags'] = kwargs['creationflags'] | subprocess.CREATE_NO_WINDOW
+                else:
+                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
             return _orig_popen(*args, **kwargs)
         subprocess.Popen = _patched_popen
     except Exception:
