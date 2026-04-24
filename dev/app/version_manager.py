@@ -22,7 +22,7 @@ from git_detector import GitDetector, GitInstallDialog
 
 
 class HybridVersionManagerDialog(QDialog):
-    """EXE模式版本管理器 - 仅支持EXE文件版本管理"""
+    """混合模式版本管理器 - 支持Git和EXE两种模式"""
     
     def __init__(self, parent=None, base_dir=None, as_widget=False):
         super().__init__(parent)
@@ -46,7 +46,21 @@ class HybridVersionManagerDialog(QDialog):
         self._setup_ui()
         self._load_version_history()
         
-        # 立即加载版本列表
+        # 延迟加载版本列表，避免启动时弹窗
+        QTimer.singleShot(800, self._delayed_init)
+    
+    def _delayed_init(self):
+        """延迟初始化：检查git仓库并加载版本列表"""
+        self.has_git_repo = self._check_git_repo()
+        
+        # 如果有Git仓库，显示模式选择器
+        if self.has_git_repo and hasattr(self, 'mode_combo'):
+            self.mode_label_widget.setVisible(True)
+            self.mode_combo.setVisible(True)
+            self.mode_combo.blockSignals(True)
+            self.mode_combo.setCurrentIndex(0)
+            self.mode_combo.blockSignals(False)
+        
         self._load_versions()
     
     def _load_version_history(self):
@@ -105,6 +119,49 @@ class HybridVersionManagerDialog(QDialog):
         title_label.setFont(QFont("Microsoft YaHei", 14, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #FFFFFF;")
         top_bar.addWidget(title_label)
+        
+        # 模式选择
+        self.mode_label_widget = QLabel("模式:")
+        self.mode_label_widget.setStyleSheet("font-size: 12px; color: #AAAAAA;")
+        self.mode_label_widget.setVisible(False)
+        top_bar.addWidget(self.mode_label_widget)
+        
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem("EXE 版本", "exe")
+        self.mode_combo.addItem("Git 源代码", "git")
+        self.mode_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #252525;
+                color: #FFFFFF;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                padding: 6px 30px 6px 10px;
+                font-size: 12px;
+                min-width: 130px;
+            }
+            QComboBox:hover { border-color: #444444; }
+            QComboBox:focus { border-color: #1976D2; }
+            QComboBox::drop-down { border: none; width: 25px; }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #888888;
+                width: 0; height: 0; right: 8px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #252525;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                outline: none;
+                selection-background-color: #1976D2;
+                selection-color: #FFFFFF;
+            }
+            QComboBox QAbstractItemView::item { padding: 6px 10px; }
+        """)
+        self.mode_combo.setVisible(False)
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        top_bar.addWidget(self.mode_combo)
         
         top_bar.addStretch()
         
@@ -406,8 +463,12 @@ class HybridVersionManagerDialog(QDialog):
             if item.widget():
                 item.widget().deleteLater()
         
-        # 只加载EXE版本
-        self._load_exe_versions()
+        if self.current_mode == "exe":
+            self._load_exe_versions()
+        elif self.has_git_repo:
+            self._load_git_versions()
+        else:
+            self._load_exe_versions()
     
     def _show_git_not_available(self):
         """显示Git未安装提示"""
@@ -493,7 +554,7 @@ class HybridVersionManagerDialog(QDialog):
     
     def _load_exe_versions(self):
         """加载EXE版本列表"""
-        self.current_mode_label.setText("")
+        self.current_mode_label.setText("EXE 模式")
         
         current = self._get_current_exe_version()
         if current:

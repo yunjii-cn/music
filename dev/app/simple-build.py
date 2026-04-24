@@ -172,20 +172,13 @@ def build_exe():
         pyinstaller_args.append(f"{str(icon_path)};.")
         print(f"  已添加图标: {icon_path}")
     
-    # 添加 PyInstaller runtime hook (pyi_rth_*.py 会被优先执行)
-    rth_hook = ROOT_DIR / "pyi_rth_subprocess.py"
-    if rth_hook.exists():
-        pyinstaller_args.extend(["--runtime-hook", str(rth_hook)])
-    
-    # 添加 sitecustomize.py 到 _MEIPASS 根目录，Python 启动时自动导入
-    sitecustomize = ROOT_DIR / "sitecustomize.py"
-    if sitecustomize.exists():
-        pyinstaller_args.append("--add-data")
-        pyinstaller_args.append(f"{str(sitecustomize)};.")
-        print(f"  已添加 sitecustomize.py: {sitecustomize}")
-    
-    # 最后添加main.py
-    pyinstaller_args.append("main.py")
+    # 使用launcher.py作为入口，确保subprocess patch最早执行
+    launcher = ROOT_DIR / "launcher.py"
+    if launcher.exists():
+        pyinstaller_args.append(str(launcher))
+        print(f"  使用launcher.py作为入口")
+    else:
+        pyinstaller_args.append("main.py")
     
     print("  运行 PyInstaller...")
     subprocess.run(pyinstaller_args, check=True)
