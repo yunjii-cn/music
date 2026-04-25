@@ -52,15 +52,18 @@ class HybridVersionManagerDialog(QDialog):
     
     def _delayed_init(self):
         """延迟初始化：检查git仓库并加载版本列表"""
+        # 如果作为widget且当前不可见，延迟到可见时再执行
+        if self.as_widget and not self.isVisible():
+            QTimer.singleShot(500, self._delayed_init)
+            return
+        
         self.has_git_repo = self._check_git_repo()
         
         # 如果有Git仓库，显示模式选择器
-        if self.has_git_repo and hasattr(self, 'mode_combo'):
-            self.mode_label_widget.setVisible(True)
-            self.mode_combo.setVisible(True)
-            self.mode_combo.blockSignals(True)
-            self.mode_combo.setCurrentIndex(0)
-            self.mode_combo.blockSignals(False)
+        if self.has_git_repo and hasattr(self, 'mode_buttons_widget'):
+            self.mode_buttons_widget.setVisible(True)
+            self.btn_mode_exe.setChecked(True)
+            self.btn_mode_git.setChecked(False)
         
         self._load_versions()
     
@@ -121,48 +124,87 @@ class HybridVersionManagerDialog(QDialog):
         title_label.setStyleSheet("color: #FFFFFF;")
         top_bar.addWidget(title_label)
         
-        # 模式选择
-        self.mode_label_widget = QLabel("模式:")
-        self.mode_label_widget.setStyleSheet("font-size: 12px; color: #AAAAAA;")
-        self.mode_label_widget.setVisible(False)
-        top_bar.addWidget(self.mode_label_widget)
+        # 模式选择 - 横向按钮组
+        self.mode_btn_group = QHBoxLayout()
+        self.mode_btn_group.setSpacing(0)
+        self.mode_btn_group.setContentsMargins(0, 0, 0, 0)
         
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItem("EXE 版本", "exe")
-        self.mode_combo.addItem("Git 源代码", "git")
-        self.mode_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #252525;
+        self.btn_mode_exe = QPushButton("EXE 版本")
+        self.btn_mode_exe.setCheckable(True)
+        self.btn_mode_exe.setChecked(True)
+        self.btn_mode_exe.setFixedHeight(32)
+        self.btn_mode_exe.setStyleSheet("""
+            QPushButton {
+                background-color: #1976D2;
                 color: #FFFFFF;
-                border: 1px solid #333333;
-                border-radius: 4px;
-                padding: 6px 30px 6px 10px;
+                border: 1px solid #1976D2;
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+                border-top-right-radius: 0px;
+                border-bottom-right-radius: 0px;
+                padding: 6px 16px;
                 font-size: 12px;
-                min-width: 130px;
+                font-weight: bold;
             }
-            QComboBox:hover { border-color: #444444; }
-            QComboBox:focus { border-color: #1976D2; }
-            QComboBox::drop-down { border: none; width: 25px; }
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid #888888;
-                width: 0; height: 0; right: 8px;
+            QPushButton:hover {
+                background-color: #1565C0;
+                border-color: #1565C0;
             }
-            QComboBox QAbstractItemView {
+            QPushButton:!checked {
                 background-color: #252525;
+                color: #AAAAAA;
                 border: 1px solid #333333;
-                border-radius: 4px;
-                outline: none;
-                selection-background-color: #1976D2;
-                selection-color: #FFFFFF;
+                font-weight: normal;
             }
-            QComboBox QAbstractItemView::item { padding: 6px 10px; }
+            QPushButton:!checked:hover {
+                background-color: #333333;
+                border-color: #444444;
+                color: #FFFFFF;
+            }
         """)
-        self.mode_combo.setVisible(False)
-        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        top_bar.addWidget(self.mode_combo)
+        self.btn_mode_exe.clicked.connect(lambda: self._on_mode_changed("exe"))
+        self.mode_btn_group.addWidget(self.btn_mode_exe)
+        
+        self.btn_mode_git = QPushButton("Git 源代码")
+        self.btn_mode_git.setCheckable(True)
+        self.btn_mode_git.setChecked(False)
+        self.btn_mode_git.setFixedHeight(32)
+        self.btn_mode_git.setStyleSheet("""
+            QPushButton {
+                background-color: #1976D2;
+                color: #FFFFFF;
+                border: 1px solid #1976D2;
+                border-top-left-radius: 0px;
+                border-bottom-left-radius: 0px;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+                padding: 6px 16px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1565C0;
+                border-color: #1565C0;
+            }
+            QPushButton:!checked {
+                background-color: #252525;
+                color: #AAAAAA;
+                border: 1px solid #333333;
+                font-weight: normal;
+            }
+            QPushButton:!checked:hover {
+                background-color: #333333;
+                border-color: #444444;
+                color: #FFFFFF;
+            }
+        """)
+        self.btn_mode_git.clicked.connect(lambda: self._on_mode_changed("git"))
+        self.mode_btn_group.addWidget(self.btn_mode_git)
+        
+        self.mode_buttons_widget = QWidget()
+        self.mode_buttons_widget.setLayout(self.mode_btn_group)
+        self.mode_buttons_widget.setVisible(False)
+        top_bar.addWidget(self.mode_buttons_widget)
         
         top_bar.addStretch()
         
@@ -279,13 +321,19 @@ class HybridVersionManagerDialog(QDialog):
         scroll_area.setWidget(self.versions_container)
         layout.addWidget(scroll_area, stretch=1)
     
-    def _on_mode_changed(self, index):
+    def _on_mode_changed(self, new_mode):
         """模式切换"""
         try:
-            new_mode = self.mode_combo.itemData(index)
-            if new_mode:
-                self.current_mode = new_mode
-                self._load_versions()
+            if new_mode == self.current_mode:
+                return
+            self.current_mode = new_mode
+            if new_mode == "exe":
+                self.btn_mode_exe.setChecked(True)
+                self.btn_mode_git.setChecked(False)
+            else:
+                self.btn_mode_exe.setChecked(False)
+                self.btn_mode_git.setChecked(True)
+            self._load_versions()
         except Exception as e:
             print(f"模式切换失败：{e}")
     
@@ -459,17 +507,28 @@ class HybridVersionManagerDialog(QDialog):
     
     def _load_versions(self):
         """加载版本列表"""
+        # 隐藏滚动区域避免重绘闪烁
+        scroll_area = self.versions_container.parent()
+        if scroll_area:
+            scroll_area.setVisible(False)
+        
+        # 清除旧内容
         while self.versions_layout.count():
             item = self.versions_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         
+        # 加载新版本列表
         if self.current_mode == "exe":
             self._load_exe_versions()
         elif self.has_git_repo:
             self._load_git_versions()
         else:
             self._load_exe_versions()
+        
+        # 重新显示滚动区域
+        if scroll_area:
+            scroll_area.setVisible(True)
     
     def _show_git_not_available(self):
         """显示Git未安装提示"""
@@ -782,16 +841,24 @@ class HybridVersionManagerDialog(QDialog):
                 import subprocess
                 import os
                 
-                # 启动新的EXE（隐藏窗口）
-                import subprocess
+                # 启动新的EXE（彻底隐藏窗口，使用DETACHED_PROCESS避免任何窗口闪烁）
                 si = subprocess.STARTUPINFO()
                 si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 si.wShowWindow = 0
+                creation_flags = subprocess.CREATE_NO_WINDOW
+                if hasattr(subprocess, 'DETACHED_PROCESS'):
+                    creation_flags |= subprocess.DETACHED_PROCESS
+                if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+                    creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
                 subprocess.Popen(
                     [version['path']],
                     cwd=os.path.dirname(version['path']),
                     startupinfo=si,
-                    creationflags=subprocess.CREATE_NO_WINDOW
+                    creationflags=creation_flags,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    close_fds=True
                 )
                 
                 # 关闭当前程序

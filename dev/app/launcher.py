@@ -25,10 +25,13 @@ if sys.platform == 'win32':
         si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0
         kwargs['startupinfo'] = si
+        flags = _subprocess.CREATE_NO_WINDOW
+        if hasattr(_subprocess, 'DETACHED_PROCESS'):
+            flags |= _subprocess.DETACHED_PROCESS
         if 'creationflags' in kwargs:
-            kwargs['creationflags'] = kwargs['creationflags'] | _subprocess.CREATE_NO_WINDOW
+            kwargs['creationflags'] = kwargs['creationflags'] | flags
         else:
-            kwargs['creationflags'] = _subprocess.CREATE_NO_WINDOW
+            kwargs['creationflags'] = flags
         _orig_popen_init(self, *args, **kwargs)
 
     _subprocess.Popen.__init__ = _patched_popen_init
@@ -51,10 +54,13 @@ if sys.platform == 'win32':
         si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0
         kwargs['startupinfo'] = si
+        flags = _subprocess.CREATE_NO_WINDOW
+        if hasattr(_subprocess, 'DETACHED_PROCESS'):
+            flags |= _subprocess.DETACHED_PROCESS
         if 'creationflags' in kwargs:
-            kwargs['creationflags'] = kwargs['creationflags'] | _subprocess.CREATE_NO_WINDOW
+            kwargs['creationflags'] = kwargs['creationflags'] | flags
         else:
-            kwargs['creationflags'] = _subprocess.CREATE_NO_WINDOW
+            kwargs['creationflags'] = flags
         return _orig_run(*args, **kwargs)
 
     _subprocess.run = _patched_run
