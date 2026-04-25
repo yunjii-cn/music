@@ -18,7 +18,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
-from git_detector import GitDetector, GitInstallDialog
+# 延迟导入git_detector避免弹窗
+# from git_detector import GitDetector, GitInstallDialog
 
 
 class HybridVersionManagerDialog(QDialog):
@@ -550,6 +551,7 @@ class HybridVersionManagerDialog(QDialog):
     
     def _open_git_download(self):
         """打开Git下载页面"""
+        from git_detector import GitDetector
         GitDetector.open_git_download()
     
     def _load_exe_versions(self):
