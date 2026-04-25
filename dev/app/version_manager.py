@@ -469,36 +469,105 @@ class HybridVersionManagerDialog(QDialog):
             traceback.print_exc()
             return []
     
-    def _get_current_git_version(self):
-        """获取当前Git版本信息"""
+    def _run_git_command(self, args, cwd=None):
+        """运行Git命令（隐藏窗口）"""
         try:
-            import git
-            repo = git.Repo(self.base_dir, search_parent_directories=True)
-            commit = repo.head.commit
-            body = '\n'.join(line.strip() for line in commit.message.split('\n')[1:] if line.strip())
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            creation_flags = subprocess.CREATE_NO_WINDOW
+            if hasattr(subprocess, 'DETACHED_PROCESS'):
+                creation_flags |= subprocess.DETACHED_PROCESS
+            if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+                creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+            result = subprocess.run(
+                ['git'] + args,
+                cwd=cwd or self.base_dir,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                startupinfo=si,
+                creationflags=creation_flags,
+                stdin=subprocess.DEVNULL,
+                timeout=30
+            )
+            return result
+        except Exception as e:
+            print(f"Git命令执行失败：{e}")
+            return None
+
+    def _get_current_git_version(self):
+        """获取当前Git版本信息（使用subprocess避免弹窗）"""
+        try:
+            # 获取当前提交的hash
+            result = self._run_git_command(['rev-parse', 'HEAD'])
+            if not result or result.returncode != 0:
+                return None
+            commit_hash = result.stdout.strip()[:7]
+
+            # 获取提交信息
+            result = self._run_git_command(['log', '-1', '--format=%H%n%s%n%ci%n%b'])
+            if not result or result.returncode != 0:
+                return None
+
+            lines = result.stdout.strip().split('\n')
+            full_hash = lines[0].strip() if lines else ''
+            message = lines[1].strip() if len(lines) > 1 else ''
+            date_str = lines[2].strip() if len(lines) > 2 else ''
+            body = '\n'.join(line.strip() for line in lines[3:] if line.strip())
+
+            # 解析日期
+            try:
+                from datetime import datetime
+                date = datetime.strptime(date_str.split('+')[0].strip(), '%Y-%m-%d %H:%M:%S')
+                date_formatted = date.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                date_formatted = date_str[:16] if date_str else ''
+
             return {
-                'hash': commit.hexsha[:7],
-                'message': commit.message.split('\n')[0],
-                'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M'),
+                'hash': commit_hash,
+                'message': message,
+                'date': date_formatted,
                 'body': body
             }
         except Exception as e:
             print(f"获取当前Git版本失败：{e}")
             return None
-    
+
     def _get_available_git_versions(self, limit=30):
-        """获取可用Git版本列表"""
+        """获取可用Git版本列表（使用subprocess避免弹窗）"""
         try:
-            import git
-            repo = git.Repo(self.base_dir, search_parent_directories=True)
+            result = self._run_git_command([
+                'log', f'-{limit}', '--format=%H|%s|%ci'
+            ])
+            if not result or result.returncode != 0:
+                return []
+
             versions = []
-            for commit in list(repo.iter_commits(max_count=limit)):
-                body = '\n'.join(line.strip() for line in commit.message.split('\n')[1:] if line.strip())
+            for line in result.stdout.strip().split('\n'):
+                if not line.strip():
+                    continue
+                parts = line.split('|', 2)
+                if len(parts) < 3:
+                    continue
+
+                full_hash = parts[0].strip()
+                message = parts[1].strip()
+                date_str = parts[2].strip()
+
+                try:
+                    from datetime import datetime
+                    date = datetime.strptime(date_str.split('+')[0].strip(), '%Y-%m-%d %H:%M:%S')
+                    date_formatted = date.strftime('%Y-%m-%d %H:%M')
+                except Exception:
+                    date_formatted = date_str[:16] if date_str else ''
+
                 versions.append({
-                    'hash': commit.hexsha[:7],
-                    'message': commit.message.split('\n')[0],
-                    'date': commit.committed_datetime.strftime('%Y-%m-%d %H:%M'),
-                    'body': body
+                    'hash': full_hash[:7],
+                    'message': message,
+                    'date': date_formatted,
+                    'body': ''
                 })
             return versions
         except Exception as e:
@@ -1078,28 +1147,30 @@ class HybridVersionManagerDialog(QDialog):
         self.versions_layout.addWidget(card)
     
     def _preview_git_version(self, version):
-        """预览Git版本详情"""
+        """预览Git版本详情（使用subprocess避免弹窗）"""
         try:
-            import git
-            repo = git.Repo(self.base_dir, search_parent_directories=True)
-            commit = repo.commit(version['hash'])
-            commit_body = commit.message
-            
+            result = self._run_git_command(['show', '-s', '--format=%B', version['hash']])
+            if not result or result.returncode != 0:
+                QMessageBox.critical(self, "错误", "获取版本详情失败")
+                return
+
+            commit_body = result.stdout.strip()
+
             detail_dialog = QDialog(self)
             detail_dialog.setWindowTitle(f"版本详情 - {version['hash']}")
             detail_dialog.setMinimumSize(500, 350)
             detail_dialog.setStyleSheet("QDialog { background-color: #0D0D0D; }")
-            
+
             layout = QVBoxLayout(detail_dialog)
-            
+
             header = QHBoxLayout()
             title = QLabel(f"{version['hash']}")
             title.setFont(QFont("Consolas", 12, QFont.Weight.Bold))
             title.setStyleSheet("color: #E53935;")
             header.addWidget(title)
-            
+
             header.addStretch()
-            
+
             close_btn = QPushButton("关闭")
             close_btn.clicked.connect(detail_dialog.accept)
             close_btn.setStyleSheet("""
@@ -1116,13 +1187,13 @@ class HybridVersionManagerDialog(QDialog):
                 }
             """)
             header.addWidget(close_btn)
-            
+
             layout.addLayout(header)
-            
+
             date = QLabel(f"{version['date']}")
             date.setStyleSheet("color: #666666; padding: 4px 0;")
             layout.addWidget(date)
-            
+
             desc_text = QTextEdit()
             desc_text.setReadOnly(True)
             desc_text.setStyleSheet("""
@@ -1136,11 +1207,11 @@ class HybridVersionManagerDialog(QDialog):
                     color: #F0F0F0;
                 }
             """)
-            desc_text.setPlainText(commit_body.strip() if commit_body else "无详细说明")
+            desc_text.setPlainText(commit_body if commit_body else "无详细说明")
             layout.addWidget(desc_text, stretch=1)
-            
+
             detail_dialog.exec()
-            
+
         except Exception as e:
             QMessageBox.critical(self, "错误", f"获取版本详情失败:\n{str(e)}")
     
@@ -1220,8 +1291,37 @@ class GitVersionSwitchThread(QThread):
         self.base_dir = base_dir
         self.commit_hash = commit_hash
     
+    def _run_git_command(self, args, cwd=None):
+        """运行Git命令（隐藏窗口）"""
+        try:
+            import subprocess
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            creation_flags = subprocess.CREATE_NO_WINDOW
+            if hasattr(subprocess, 'DETACHED_PROCESS'):
+                creation_flags |= subprocess.DETACHED_PROCESS
+            if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+                creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+            result = subprocess.run(
+                ['git'] + args,
+                cwd=cwd or self.base_dir,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                startupinfo=si,
+                creationflags=creation_flags,
+                stdin=subprocess.DEVNULL,
+                timeout=60
+            )
+            return result
+        except Exception as e:
+            print(f"Git命令执行失败：{e}")
+            return None
+
     def run(self):
-        """执行版本切换"""
+        """执行版本切换（使用subprocess避免弹窗）"""
         import os
         import shutil
         try:
@@ -1229,11 +1329,11 @@ class GitVersionSwitchThread(QThread):
             user_dirs = ['config', 'models', 'output', '.env']
             backup_dir = os.path.join(self.base_dir, '.git_backup')
             os.makedirs(backup_dir, exist_ok=True)
-            
+
             for dir_name in user_dirs:
                 src = os.path.join(self.base_dir, dir_name)
                 dst = os.path.join(backup_dir, dir_name)
-                
+
                 if os.path.exists(src):
                     if os.path.isdir(src):
                         if os.path.exists(dst):
@@ -1241,18 +1341,18 @@ class GitVersionSwitchThread(QThread):
                         shutil.copytree(src, dst)
                     else:
                         shutil.copy2(src, dst)
-            
-            # 2. 切换 Git 分支
-            import git
-            repo = git.Repo(self.base_dir, search_parent_directories=True)
-            repo.head.reference = repo.commit(self.commit_hash)
-            repo.head.reset(index=True, working_tree=True)
-            
+
+            # 2. 切换 Git 版本（使用subprocess）
+            result = self._run_git_command(['checkout', '-f', self.commit_hash])
+            if not result or result.returncode != 0:
+                error_msg = result.stderr.strip() if result and result.stderr else "Git checkout失败"
+                raise Exception(error_msg)
+
             # 3. 恢复用户数据
             for dir_name in user_dirs:
                 src = os.path.join(backup_dir, dir_name)
                 dst = os.path.join(self.base_dir, dir_name)
-                
+
                 if os.path.exists(src):
                     if os.path.isdir(src):
                         if os.path.exists(dst):
@@ -1260,13 +1360,13 @@ class GitVersionSwitchThread(QThread):
                         shutil.copytree(src, dst)
                     else:
                         shutil.copy2(src, dst)
-            
+
             # 4. 清理备份目录
             if os.path.exists(backup_dir):
                 shutil.rmtree(backup_dir)
-            
+
             self.finished.emit(self.commit_hash)
-            
+
         except Exception as e:
             self.error_occurred.emit(str(e))
 

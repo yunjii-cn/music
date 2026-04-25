@@ -242,14 +242,7 @@ def main():
         print("=" * 60)
         print()
         
-        # 2. 复制一份到ver目录（作为稳定版本备份）
-        ver_dir = DEV_DIR / "ver"
-        ver_exe_path = ver_dir / exe_path.name
-        print(f"复制到ver目录作为稳定版本...")
-        ver_dir.mkdir(exist_ok=True)
-        shutil.copy2(exe_path, ver_exe_path)
-        print(f"  ✓ 已复制到：{ver_exe_path}")
-        print()
+
         
         # 3. 更新version_history.json
         print("更新版本历史...")
