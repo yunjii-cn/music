@@ -160,7 +160,10 @@ def build_exe():
         "--exclude-module", "modelscope",
         "--exclude-module", "transformers",
         "--exclude-module", "datasets",
-        "--exclude-module", "acestep"
+        "--exclude-module", "acestep",
+        "--exclude-module", "git",
+        "--exclude-module", "gitdb",
+        "--exclude-module", "gitpython"
     ]
     
     # 检查是否有icon.ico
@@ -171,6 +174,12 @@ def build_exe():
         pyinstaller_args.append("--add-data")
         pyinstaller_args.append(f"{str(icon_path)};.")
         print(f"  已添加图标: {icon_path}")
+    
+    # 添加runtime hook来全局隐藏subprocess窗口（在launcher.py之前执行）
+    rthook = ROOT_DIR / "pyi_rth_subprocess.py"
+    if rthook.exists():
+        pyinstaller_args.extend(["--runtime-hook", str(rthook)])
+        print(f"  已添加runtime hook: {rthook}")
     
     # 使用launcher.py作为入口，确保subprocess patch最早执行
     launcher = ROOT_DIR / "launcher.py"

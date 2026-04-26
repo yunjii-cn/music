@@ -404,14 +404,11 @@ def get_git_path(base_dir=None):
     """
     获取Git路径
     优先使用系统Git，没有则返回便携版路径（可能不存在）
+    使用shutil.which避免gitpython弹窗
     """
-    # 1. 先检查系统Git
-    try:
-        import git
-        git.refresh()
+    # 1. 先检查系统Git（使用shutil.which，零弹窗）
+    if shutil.which('git'):
         return "git"
-    except Exception:
-        pass
     
     # 2. 检查便携版Git
     if base_dir:

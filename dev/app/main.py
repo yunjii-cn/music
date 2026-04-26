@@ -39,8 +39,7 @@ import sys
 import subprocess as _subprocess
 
 if sys.platform == 'win32':
-    _orig_popen_init = _subprocess.Popen.__init__
-    def _patched_popen_init(self, *args, **kwargs):
+    def _ensure_hidden(kwargs):
         si = kwargs.get('startupinfo', _subprocess.STARTUPINFO())
         si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0
@@ -48,12 +47,43 @@ if sys.platform == 'win32':
         flags = _subprocess.CREATE_NO_WINDOW
         if hasattr(_subprocess, 'DETACHED_PROCESS'):
             flags |= _subprocess.DETACHED_PROCESS
+        if hasattr(_subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+            flags |= _subprocess.CREATE_NEW_PROCESS_GROUP
         if 'creationflags' in kwargs:
             kwargs['creationflags'] = kwargs['creationflags'] | flags
         else:
             kwargs['creationflags'] = flags
+        return kwargs
+
+    _orig_popen_init = _subprocess.Popen.__init__
+    def _patched_popen_init(self, *args, **kwargs):
+        kwargs = _ensure_hidden(kwargs)
         _orig_popen_init(self, *args, **kwargs)
     _subprocess.Popen.__init__ = _patched_popen_init
+
+    _orig_run = _subprocess.run
+    def _patched_run(*args, **kwargs):
+        kwargs = _ensure_hidden(kwargs)
+        return _orig_run(*args, **kwargs)
+    _subprocess.run = _patched_run
+
+    _orig_call = _subprocess.call
+    def _patched_call(*args, **kwargs):
+        kwargs = _ensure_hidden(kwargs)
+        return _orig_call(*args, **kwargs)
+    _subprocess.call = _patched_call
+
+    _orig_check_call = _subprocess.check_call
+    def _patched_check_call(*args, **kwargs):
+        kwargs = _ensure_hidden(kwargs)
+        return _orig_check_call(*args, **kwargs)
+    _subprocess.check_call = _patched_check_call
+
+    _orig_check_output = _subprocess.check_output
+    def _patched_check_output(*args, **kwargs):
+        kwargs = _ensure_hidden(kwargs)
+        return _orig_check_output(*args, **kwargs)
+    _subprocess.check_output = _patched_check_output
 
 import subprocess
 import os
@@ -69,7 +99,7 @@ from typing import Dict, List, Optional, Callable
 import psutil
 
 if sys.platform == 'win32':
-    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
 else:
     _HIDDEN_FLAGS = 0
 
@@ -1793,31 +1823,31 @@ class MainWindow(QMainWindow):
     
     def _switch_page(self, index):
         """切换页面"""
-        # 更新导航按钮状态
         self.btn_home.setChecked(index == 0)
         self.btn_model_nav.setChecked(index == 1)
         self.btn_version_nav.setChecked(index == 2)
         
-        # 切换到对应页面
         self.page_stack.setCurrentIndex(index)
         
-        # 如果切换到模型管理页面，更新UI
         if index == 1 and hasattr(self, 'model_manager_widget'):
             self.model_manager_widget._update_ui()
         
-        # 如果切换到软件更新页面，延迟刷新版本列表（避免卡顿和窗口）
         if index == 2 and hasattr(self, 'version_manager_widget'):
-            print("[DEBUG] 切换到软件更新页面，延迟调用_load_versions")
-            # 使用QTimer延迟加载，避免UI卡顿
-            QTimer.singleShot(500, self._delayed_load_versions)
+            if not self.version_manager_widget._versions_loaded:
+                QTimer.singleShot(300, self._delayed_load_versions)
     
     def _delayed_load_versions(self):
         """延迟加载版本列表"""
         if hasattr(self, 'version_manager_widget'):
-            self.version_manager_widget._load_versions()
-            # 避免强制更新UI带来的问题
-            # self.version_manager_widget.update()
-            # self.version_manager_widget.repaint()
+            vm = self.version_manager_widget
+            if not vm._git_repo_checked:
+                vm.has_git_repo = vm._check_git_repo()
+                vm._git_repo_checked = True
+                if vm.has_git_repo and hasattr(vm, 'mode_buttons_widget'):
+                    vm.mode_buttons_widget.setVisible(True)
+                    vm.btn_mode_exe.setChecked(True)
+                    vm.btn_mode_git.setChecked(False)
+            vm._load_versions(force=True)
     
     def _setup_monitor(self):
         """设置监控"""

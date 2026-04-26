@@ -43,29 +43,31 @@ class HybridVersionManagerDialog(QDialog):
         
         # 仅使用EXE模式
         self.current_mode = "exe"
+        self._versions_loaded = False
+        self._git_repo_checked = False
+        self.has_git_repo = False
         
         self._setup_ui()
         self._load_version_history()
         
-        # 延迟加载版本列表，避免启动时弹窗
         QTimer.singleShot(800, self._delayed_init)
     
     def _delayed_init(self):
-        """延迟初始化：检查git仓库并加载版本列表"""
-        # 如果作为widget且当前不可见，延迟到可见时再执行
+        """延迟初始化：仅检查git仓库，不加载版本列表"""
         if self.as_widget and not self.isVisible():
             QTimer.singleShot(500, self._delayed_init)
             return
         
+        if self._git_repo_checked:
+            return
+        self._git_repo_checked = True
+        
         self.has_git_repo = self._check_git_repo()
         
-        # 如果有Git仓库，显示模式选择器
         if self.has_git_repo and hasattr(self, 'mode_buttons_widget'):
             self.mode_buttons_widget.setVisible(True)
             self.btn_mode_exe.setChecked(True)
             self.btn_mode_git.setChecked(False)
-        
-        self._load_versions()
     
     def _load_version_history(self):
         """加载版本历史"""
@@ -333,7 +335,7 @@ class HybridVersionManagerDialog(QDialog):
             else:
                 self.btn_mode_exe.setChecked(False)
                 self.btn_mode_git.setChecked(True)
-            self._load_versions()
+            self._load_versions(force=True)
         except Exception as e:
             print(f"模式切换失败：{e}")
     
@@ -574,20 +576,21 @@ class HybridVersionManagerDialog(QDialog):
             print(f"获取Git版本列表失败：{e}")
             return []
     
-    def _load_versions(self):
+    def _load_versions(self, force=False):
         """加载版本列表"""
-        # 隐藏滚动区域避免重绘闪烁
+        if self._versions_loaded and not force:
+            return
+        self._versions_loaded = True
+        
         scroll_area = self.versions_container.parent()
         if scroll_area:
             scroll_area.setVisible(False)
         
-        # 清除旧内容
         while self.versions_layout.count():
             item = self.versions_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         
-        # 加载新版本列表
         if self.current_mode == "exe":
             self._load_exe_versions()
         elif self.has_git_repo:
@@ -595,7 +598,6 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self._load_exe_versions()
         
-        # 重新显示滚动区域
         if scroll_area:
             scroll_area.setVisible(True)
     
