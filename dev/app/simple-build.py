@@ -181,6 +181,8 @@ def build_exe():
         "--hidden-import", "PyQt6.QtGui",
         "--hidden-import", "PyQt6.QtWidgets",
         "--hidden-import", "psutil",
+        "--hidden-import", "psutil._psutil_windows",
+        "--hidden-import", "psutil._psutil_windows_cffi",
         "--exclude-module", "matplotlib",
         "--exclude-module", "scipy",
         "--exclude-module", "numpy",
