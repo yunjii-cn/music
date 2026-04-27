@@ -1,15 +1,16 @@
 """
 版本管理器模块 - 混合模式版本管理器
-支持Git源代码版本管理和EXE文件版本管理
+支持远程版本管理（Gitee API）和EXE文件版本管理
 """
 
-import subprocess
 import sys
 import os
 import re
 from datetime import datetime
 import json
 from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError, HTTPError
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
@@ -18,8 +19,11 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
-# 延迟导入git_detector避免弹窗
-# from git_detector import GitDetector, GitInstallDialog
+
+
+REMOTE_REPO_OWNER = "yunjii"
+REMOTE_REPO_NAME = "ace"
+REMOTE_VERSIONS_URL = f"https://gitee.com/{REMOTE_REPO_OWNER}/{REMOTE_REPO_NAME}/raw/master/dev/versions.json"
 
 
 class HybridVersionManagerDialog(QDialog):
@@ -167,7 +171,7 @@ class HybridVersionManagerDialog(QDialog):
         self.btn_mode_exe.clicked.connect(lambda: self._on_mode_changed("exe"))
         self.mode_btn_group.addWidget(self.btn_mode_exe)
         
-        self.btn_mode_git = QPushButton("Git 源代码")
+        self.btn_mode_git = QPushButton("远程版本")
         self.btn_mode_git.setCheckable(True)
         self.btn_mode_git.setChecked(False)
         self.btn_mode_git.setFixedHeight(32)
@@ -471,110 +475,49 @@ class HybridVersionManagerDialog(QDialog):
             traceback.print_exc()
             return []
     
-    def _run_git_command(self, args, cwd=None):
-        """运行Git命令（隐藏窗口）"""
+    def _fetch_remote_versions(self):
+        """通过 Gitee Raw URL 获取远程版本列表（零 subprocess，零弹窗）"""
         try:
-            si = subprocess.STARTUPINFO()
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0
-            creation_flags = subprocess.CREATE_NO_WINDOW
-            if hasattr(subprocess, 'DETACHED_PROCESS'):
-                creation_flags |= subprocess.DETACHED_PROCESS
-            if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
-                creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
-            result = subprocess.run(
-                ['git'] + args,
-                cwd=cwd or self.base_dir,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                startupinfo=si,
-                creationflags=creation_flags,
-                stdin=subprocess.DEVNULL,
-                timeout=30
-            )
-            return result
-        except Exception as e:
-            print(f"Git命令执行失败：{e}")
-            return None
-
-    def _get_current_git_version(self):
-        """获取当前Git版本信息（使用subprocess避免弹窗）"""
-        try:
-            # 获取当前提交的hash
-            result = self._run_git_command(['rev-parse', 'HEAD'])
-            if not result or result.returncode != 0:
-                return None
-            commit_hash = result.stdout.strip()[:7]
-
-            # 获取提交信息
-            result = self._run_git_command(['log', '-1', '--format=%H%n%s%n%ci%n%b'])
-            if not result or result.returncode != 0:
-                return None
-
-            lines = result.stdout.strip().split('\n')
-            full_hash = lines[0].strip() if lines else ''
-            message = lines[1].strip() if len(lines) > 1 else ''
-            date_str = lines[2].strip() if len(lines) > 2 else ''
-            body = '\n'.join(line.strip() for line in lines[3:] if line.strip())
-
-            # 解析日期
-            try:
-                from datetime import datetime
-                date = datetime.strptime(date_str.split('+')[0].strip(), '%Y-%m-%d %H:%M:%S')
-                date_formatted = date.strftime('%Y-%m-%d %H:%M')
-            except Exception:
-                date_formatted = date_str[:16] if date_str else ''
-
-            return {
-                'hash': commit_hash,
-                'message': message,
-                'date': date_formatted,
-                'body': body
-            }
-        except Exception as e:
-            print(f"获取当前Git版本失败：{e}")
-            return None
-
-    def _get_available_git_versions(self, limit=30):
-        """获取可用Git版本列表（使用subprocess避免弹窗）"""
-        try:
-            result = self._run_git_command([
-                'log', f'-{limit}', '--format=%H|%s|%ci'
-            ])
-            if not result or result.returncode != 0:
-                return []
-
-            versions = []
-            for line in result.stdout.strip().split('\n'):
-                if not line.strip():
-                    continue
-                parts = line.split('|', 2)
-                if len(parts) < 3:
-                    continue
-
-                full_hash = parts[0].strip()
-                message = parts[1].strip()
-                date_str = parts[2].strip()
-
-                try:
-                    from datetime import datetime
-                    date = datetime.strptime(date_str.split('+')[0].strip(), '%Y-%m-%d %H:%M:%S')
-                    date_formatted = date.strftime('%Y-%m-%d %H:%M')
-                except Exception:
-                    date_formatted = date_str[:16] if date_str else ''
-
-                versions.append({
-                    'hash': full_hash[:7],
-                    'message': message,
-                    'date': date_formatted,
-                    'body': ''
-                })
+            req = Request(REMOTE_VERSIONS_URL)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            resp = urlopen(req, timeout=10)
+            versions = json.loads(resp.read().decode('utf-8'))
             return versions
-        except Exception as e:
-            print(f"获取Git版本列表失败：{e}")
+        except HTTPError as e:
+            print(f"远程版本获取失败 (HTTP {e.code}): {e.reason}")
             return []
+        except URLError as e:
+            print(f"远程版本获取失败 (网络错误): {e.reason}")
+            return []
+        except Exception as e:
+            print(f"远程版本获取失败: {e}")
+            return []
+
+    def _get_current_remote_version(self):
+        """获取当前版本对应的远程版本信息"""
+        try:
+            current_version = self._get_local_version_string()
+            if not current_version:
+                return None
+            versions = self._fetch_remote_versions()
+            for v in versions:
+                if v.get('version') == current_version or v.get('name', '').replace('.exe', '') == f"云集智能音乐创意台-v{current_version}":
+                    return v
+            return None
+        except Exception:
+            return None
+
+    def _get_local_version_string(self):
+        """从 EXE 文件名获取当前版本号"""
+        try:
+            if hasattr(sys, 'frozen'):
+                exe_name = os.path.basename(sys.executable)
+                match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_name)
+                if match:
+                    return match.group(1)
+            return None
+        except Exception:
+            return None
     
     def _load_versions(self, force=False):
         """加载版本列表"""
@@ -593,17 +536,15 @@ class HybridVersionManagerDialog(QDialog):
         
         if self.current_mode == "exe":
             self._load_exe_versions()
-        elif self.has_git_repo:
-            self._load_git_versions()
         else:
-            self._load_exe_versions()
+            self._load_remote_versions()
         
         if scroll_area:
             scroll_area.setVisible(True)
     
     def _show_git_not_available(self):
         """显示Git未安装提示"""
-        self.current_mode_label.setText("Git 模式")
+        self.current_mode_label.setText("远程版本")
         
         info_widget = QWidget()
         info_layout = QVBoxLayout(info_widget)
@@ -650,8 +591,8 @@ class HybridVersionManagerDialog(QDialog):
         self.versions_layout.addWidget(info_widget)
     
     def _show_no_git_repo(self):
-        """显示当前目录不是Git仓库提示"""
-        self.current_mode_label.setText("Git 模式")
+        """显示无法获取远程版本提示"""
+        self.current_mode_label.setText("远程版本")
         
         info_widget = QWidget()
         info_layout = QVBoxLayout(info_widget)
@@ -945,35 +886,38 @@ class HybridVersionManagerDialog(QDialog):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"启动版本失败:\n{str(e)}")
     
-    def _load_git_versions(self):
-        """加载Git版本列表"""
-        self.current_mode_label.setText("Git 模式")
+    def _load_remote_versions(self):
+        """加载远程版本列表（Gitee API，零 subprocess）"""
+        self.current_mode_label.setText("远程版本")
         
-        current = self._get_current_git_version()
+        current = self._get_current_remote_version()
         if current:
             self.current_info_label.setText(
-                f"提交: {current['hash']} | {current['message']} | {current['date']}"
+                f"版本: v{current.get('version', '?')} | {current.get('message', '')} | {current.get('date', '')}"
             )
         else:
-            self.current_info_label.setText("⚠️ 无法获取当前版本信息")
+            local_ver = self._get_local_version_string()
+            if local_ver:
+                self.current_info_label.setText(f"当前版本: v{local_ver}")
+            else:
+                self.current_info_label.setText("⚠️ 无法获取当前版本信息")
         
-        versions = self._get_available_git_versions()
+        versions = self._fetch_remote_versions()
         
         if not versions:
-            no_version_label = QLabel("未找到Git版本信息")
+            no_version_label = QLabel("未找到远程版本信息\n\n请检查网络连接")
             no_version_label.setStyleSheet("color: #666666; padding: 20px;")
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.versions_layout.addWidget(no_version_label)
             return
         
-        current_hash = current['hash'] if current else None
+        current_version = current.get('version') if current else None
         
-        # 初始化列表
         self.git_version_items = []
         
         for version in versions:
-            is_current = version['hash'] == current_hash
-            self._create_git_version_item(version, is_current)
+            is_current = version.get('version') == current_version
+            self._create_remote_version_item(version, is_current)
     
     def _toggle_expand_all(self, checked):
         """全部展开/收起"""
@@ -1001,18 +945,18 @@ class HybridVersionManagerDialog(QDialog):
                 except Exception as e:
                     print(f"更新Git版本项状态失败: {e}")
     
-    def _create_git_version_item(self, version, is_current):
-        """创建Git版本项-卡片式设计"""
+    def _create_remote_version_item(self, version, is_current):
+        """创建远程版本项-卡片式设计"""
         card = QFrame()
-        card.setObjectName("gitVersionCard")
+        card.setObjectName("remoteVersionCard")
         if is_current:
             card.setStyleSheet("""
-                #gitVersionCard {
+                #remoteVersionCard {
                     background-color: #162016;
                     border: 1px solid #1f3a1f;
                     border-radius: 8px;
                 }
-                #gitVersionCard:hover {
+                #remoteVersionCard:hover {
                     background-color: #1a2a1a;
                     border-color: #2a4a2a;
                 }
@@ -1021,12 +965,12 @@ class HybridVersionManagerDialog(QDialog):
             """)
         else:
             card.setStyleSheet("""
-                #gitVersionCard {
+                #remoteVersionCard {
                     background-color: #161616;
                     border: 1px solid #222222;
                     border-radius: 8px;
                 }
-                #gitVersionCard:hover {
+                #remoteVersionCard:hover {
                     background-color: #1c1c1c;
                     border-color: #333333;
                 }
@@ -1038,42 +982,45 @@ class HybridVersionManagerDialog(QDialog):
         main_layout.setSpacing(4)
         main_layout.setContentsMargins(16, 12, 16, 12)
         
-        is_expanded = False
-        body = version.get('body', '')
+        changes = version.get('changes', [])
+        version_str = version.get('version', '?')
+        date_str = version.get('date', '')
         
         header = QHBoxLayout()
         header.setSpacing(10)
         
-        hash_label = QLabel(version['hash'])
-        hash_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+        ver_label = QLabel(f"v{version_str}")
+        ver_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         if is_current:
-            hash_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
+            ver_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
         else:
-            hash_label.setStyleSheet("color: #888888; border: none; background: transparent;")
-        header.addWidget(hash_label)
+            ver_label.setStyleSheet("color: #888888; border: none; background: transparent;")
+        header.addWidget(ver_label)
         
-        date_label = QLabel(version['date'])
-        date_label.setFont(QFont("Consolas", 9))
-        date_label.setStyleSheet("color: #555555; border: none; background: transparent;")
-        header.addWidget(date_label)
+        if date_str:
+            date_label = QLabel(date_str)
+            date_label.setFont(QFont("Consolas", 9))
+            date_label.setStyleSheet("color: #555555; border: none; background: transparent;")
+            header.addWidget(date_label)
         
         header.addStretch()
         
-        toggle_btn = QPushButton("详情")
-        toggle_btn.setFixedWidth(50)
-        toggle_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #666666;
-                border: none;
-                padding: 2px 6px;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                color: #AAAAAA;
-            }
-        """)
-        header.addWidget(toggle_btn)
+        if changes:
+            toggle_btn = QPushButton("详情")
+            toggle_btn.setFixedWidth(50)
+            toggle_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #666666;
+                    border: none;
+                    padding: 2px 6px;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    color: #AAAAAA;
+                }
+            """)
+            header.addWidget(toggle_btn)
         
         if is_current:
             current_tag = QLabel("● 当前版本")
@@ -1081,297 +1028,76 @@ class HybridVersionManagerDialog(QDialog):
             current_tag.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
             header.addWidget(current_tag)
         else:
-            switch_btn = QPushButton("切换")
-            switch_btn.setFixedWidth(55)
-            switch_btn.clicked.connect(lambda checked, v=version: self._switch_git_version(v['hash']))
-            switch_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1e1e1e;
-                    border: 1px solid #2a2a2a;
-                    border-radius: 4px;
-                    padding: 3px 10px;
-                    font-size: 11px;
-                    color: #AAAAAA;
-                }
-                QPushButton:hover {
-                    background-color: #2a2a2a;
-                    border-color: #3a3a3a;
-                    color: #FFFFFF;
-                }
-            """)
-            header.addWidget(switch_btn)
+            download_url = version.get('download_url', '')
+            if download_url:
+                download_btn = QPushButton("下载")
+                download_btn.setFixedWidth(55)
+                download_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #1e1e1e;
+                        border: 1px solid #2a2a2a;
+                        border-radius: 4px;
+                        padding: 3px 10px;
+                        font-size: 11px;
+                        color: #AAAAAA;
+                    }
+                    QPushButton:hover {
+                        background-color: #2a2a2a;
+                        border-color: #3a3a3a;
+                        color: #FFFFFF;
+                    }
+                """)
+                download_btn.clicked.connect(lambda checked, url=download_url: self._download_version(url))
+                header.addWidget(download_btn)
         
         main_layout.addLayout(header)
         
-        message_label = QLabel(version['message'])
-        message_label.setFont(QFont("Microsoft YaHei", 9))
-        message_label.setStyleSheet("color: #AAAAAA; border: none; background: transparent;")
-        message_label.setWordWrap(True)
-        main_layout.addWidget(message_label)
+        message = version.get('message', '')
+        if message:
+            message_label = QLabel(message)
+            message_label.setFont(QFont("Microsoft YaHei", 9))
+            message_label.setStyleSheet("color: #AAAAAA; border: none; background: transparent;")
+            message_label.setWordWrap(True)
+            main_layout.addWidget(message_label)
         
-        detail_widget = QWidget()
-        detail_widget.setStyleSheet("border: none; background: transparent;")
-        detail_layout = QVBoxLayout(detail_widget)
-        detail_layout.setSpacing(2)
-        detail_layout.setContentsMargins(0, 4, 0, 0)
-        
-        if body:
-            for line in body.split('\n'):
-                if line.strip():
-                    line_label = QLabel(f"· {line.strip()}")
-                    line_label.setFont(QFont("Microsoft YaHei", 9))
-                    line_label.setStyleSheet("color: #777777; border: none; background: transparent;")
-                    line_label.setWordWrap(True)
-                    detail_layout.addWidget(line_label)
-        else:
-            no_detail_label = QLabel("暂无详细说明")
-            no_detail_label.setFont(QFont("Microsoft YaHei", 9))
-            no_detail_label.setStyleSheet("color: #3a3a3a; border: none; background: transparent;")
-            detail_layout.addWidget(no_detail_label)
-        
-        detail_widget.setVisible(False)
-        main_layout.addWidget(detail_widget)
-        
-        def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
-            is_visible = not dw.isVisible()
-            dw.setVisible(is_visible)
-            tb.setText("收起" if is_visible else "详情")
-        toggle_btn.clicked.connect(toggle_detail)
+        if changes:
+            detail_widget = QWidget()
+            detail_widget.setStyleSheet("border: none; background: transparent;")
+            detail_layout = QVBoxLayout(detail_widget)
+            detail_layout.setSpacing(2)
+            detail_layout.setContentsMargins(0, 4, 0, 0)
+            
+            for change in changes:
+                line_label = QLabel(f"· {change}")
+                line_label.setFont(QFont("Microsoft YaHei", 9))
+                line_label.setStyleSheet("color: #777777; border: none; background: transparent;")
+                line_label.setWordWrap(True)
+                detail_layout.addWidget(line_label)
+            
+            detail_widget.setVisible(False)
+            main_layout.addWidget(detail_widget)
+            
+            def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
+                is_visible = not dw.isVisible()
+                dw.setVisible(is_visible)
+                tb.setText("收起" if is_visible else "详情")
+            toggle_btn.clicked.connect(toggle_detail)
         
         if not hasattr(self, 'git_version_items'):
             self.git_version_items = []
         self.git_version_items.append({
-            'expanded': is_expanded,
-            'detail_widget': detail_widget,
-            'toggle_btn': toggle_btn
+            'expanded': False,
+            'detail_widget': detail_widget if changes else None,
+            'toggle_btn': toggle_btn if changes else None
         })
         
         self.versions_layout.addWidget(card)
     
-    def _preview_git_version(self, version):
-        """预览Git版本详情（使用subprocess避免弹窗）"""
-        try:
-            result = self._run_git_command(['show', '-s', '--format=%B', version['hash']])
-            if not result or result.returncode != 0:
-                QMessageBox.critical(self, "错误", "获取版本详情失败")
-                return
-
-            commit_body = result.stdout.strip()
-
-            detail_dialog = QDialog(self)
-            detail_dialog.setWindowTitle(f"版本详情 - {version['hash']}")
-            detail_dialog.setMinimumSize(500, 350)
-            detail_dialog.setStyleSheet("QDialog { background-color: #0D0D0D; }")
-
-            layout = QVBoxLayout(detail_dialog)
-
-            header = QHBoxLayout()
-            title = QLabel(f"{version['hash']}")
-            title.setFont(QFont("Consolas", 12, QFont.Weight.Bold))
-            title.setStyleSheet("color: #E53935;")
-            header.addWidget(title)
-
-            header.addStretch()
-
-            close_btn = QPushButton("关闭")
-            close_btn.clicked.connect(detail_dialog.accept)
-            close_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2D2D2D;
-                    border: 1px solid #424242;
-                    border-radius: 4px;
-                    padding: 6px 14px;
-                    font-size: 11px;
-                    color: #F0F0F0;
-                }
-                QPushButton:hover {
-                    background-color: #424242;
-                }
-            """)
-            header.addWidget(close_btn)
-
-            layout.addLayout(header)
-
-            date = QLabel(f"{version['date']}")
-            date.setStyleSheet("color: #666666; padding: 4px 0;")
-            layout.addWidget(date)
-
-            desc_text = QTextEdit()
-            desc_text.setReadOnly(True)
-            desc_text.setStyleSheet("""
-                QTextEdit {
-                    background-color: #1A1A1A;
-                    border: 1px solid #333333;
-                    border-radius: 4px;
-                    padding: 10px;
-                    font-family: 'Consolas', monospace;
-                    font-size: 11px;
-                    color: #F0F0F0;
-                }
-            """)
-            desc_text.setPlainText(commit_body if commit_body else "无详细说明")
-            layout.addWidget(desc_text, stretch=1)
-
-            detail_dialog.exec()
-
-        except Exception as e:
-            QMessageBox.critical(self, "错误", f"获取版本详情失败:\n{str(e)}")
+    def _download_version(self, url):
+        """下载指定版本"""
+        import webbrowser
+        webbrowser.open(url)
     
-    def _switch_git_version(self, commit_hash):
-        """切换Git版本"""
-        reply = QMessageBox.question(
-            self,
-            "确认切换",
-            f"确定要切换到版本 {commit_hash} 吗？\n\n"
-            f"程序将会自动保存配置并重启。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                self.switch_thread = GitVersionSwitchThread(self.base_dir, commit_hash, self)
-                self.switch_thread.finished.connect(self._on_git_switch_finished)
-                self.switch_thread.error_occurred.connect(self._on_git_switch_error)
-                
-                # 显示切换中提示
-                self.switching_dialog = QDialog(self)
-                self.switching_dialog.setWindowTitle("正在切换版本")
-                self.switching_dialog.setMinimumSize(320, 100)
-                self.switching_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-                self.switching_dialog.setStyleSheet("QDialog { background-color: #0D0D0D; }")
-                
-                dialog_layout = QVBoxLayout(self.switching_dialog)
-                
-                label = QLabel(f"正在切换到 {commit_hash}...")
-                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                label.setStyleSheet("color: #F0F0F0; font-size: 12px; padding: 15px;")
-                dialog_layout.addWidget(label)
-                
-                self.switching_dialog.show()
-                QApplication.processEvents()
-                
-                # 启动线程
-                self.switch_thread.start()
-                
-            except Exception as e:
-                QMessageBox.critical(self, "错误", f"启动版本切换失败:\n{str(e)}")
-    
-    def _on_git_switch_finished(self, commit_hash):
-        """Git版本切换完成"""
-        if hasattr(self, 'switching_dialog'):
-            self.switching_dialog.accept()
-        
-        self.accept()
-        
-        # 提示重启
-        QMessageBox.information(
-            self,
-            "切换成功",
-            f"已成功切换到版本 {commit_hash}\n\n请重新启动程序。",
-            QMessageBox.StandardButton.Ok
-        )
-        
-        # 退出当前程序
-        QApplication.quit()
-    
-    def _on_git_switch_error(self, error_message):
-        """Git版本切换错误"""
-        if hasattr(self, 'switching_dialog'):
-            self.switching_dialog.accept()
-        
-        QMessageBox.critical(self, "错误", f"切换版本失败:\n{error_message}")
-
-
-class GitVersionSwitchThread(QThread):
-    """Git版本切换线程 - 避免UI假死"""
-    finished = pyqtSignal(str)
-    error_occurred = pyqtSignal(str)
-    
-    def __init__(self, base_dir, commit_hash, parent=None):
-        super().__init__(parent)
-        self.base_dir = base_dir
-        self.commit_hash = commit_hash
-    
-    def _run_git_command(self, args, cwd=None):
-        """运行Git命令（隐藏窗口）"""
-        try:
-            import subprocess
-            si = subprocess.STARTUPINFO()
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0
-            creation_flags = subprocess.CREATE_NO_WINDOW
-            if hasattr(subprocess, 'DETACHED_PROCESS'):
-                creation_flags |= subprocess.DETACHED_PROCESS
-            if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
-                creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
-            result = subprocess.run(
-                ['git'] + args,
-                cwd=cwd or self.base_dir,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                startupinfo=si,
-                creationflags=creation_flags,
-                stdin=subprocess.DEVNULL,
-                timeout=60
-            )
-            return result
-        except Exception as e:
-            print(f"Git命令执行失败：{e}")
-            return None
-
-    def run(self):
-        """执行版本切换（使用subprocess避免弹窗）"""
-        import os
-        import shutil
-        try:
-            # 1. 备份用户数据
-            user_dirs = ['config', 'models', 'output', '.env']
-            backup_dir = os.path.join(self.base_dir, '.git_backup')
-            os.makedirs(backup_dir, exist_ok=True)
-
-            for dir_name in user_dirs:
-                src = os.path.join(self.base_dir, dir_name)
-                dst = os.path.join(backup_dir, dir_name)
-
-                if os.path.exists(src):
-                    if os.path.isdir(src):
-                        if os.path.exists(dst):
-                            shutil.rmtree(dst)
-                        shutil.copytree(src, dst)
-                    else:
-                        shutil.copy2(src, dst)
-
-            # 2. 切换 Git 版本（使用subprocess）
-            result = self._run_git_command(['checkout', '-f', self.commit_hash])
-            if not result or result.returncode != 0:
-                error_msg = result.stderr.strip() if result and result.stderr else "Git checkout失败"
-                raise Exception(error_msg)
-
-            # 3. 恢复用户数据
-            for dir_name in user_dirs:
-                src = os.path.join(backup_dir, dir_name)
-                dst = os.path.join(self.base_dir, dir_name)
-
-                if os.path.exists(src):
-                    if os.path.isdir(src):
-                        if os.path.exists(dst):
-                            shutil.rmtree(dst)
-                        shutil.copytree(src, dst)
-                    else:
-                        shutil.copy2(src, dst)
-
-            # 4. 清理备份目录
-            if os.path.exists(backup_dir):
-                shutil.rmtree(backup_dir)
-
-            self.finished.emit(self.commit_hash)
-
-        except Exception as e:
-            self.error_occurred.emit(str(e))
-
 
 class ModelManagerDialog(QDialog):
     """模型管理器对话框 - 可以作为对话框或widget使用"""

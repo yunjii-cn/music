@@ -1841,9 +1841,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'version_manager_widget'):
             vm = self.version_manager_widget
             if not vm._git_repo_checked:
-                vm.has_git_repo = vm._check_git_repo()
                 vm._git_repo_checked = True
-                if vm.has_git_repo and hasattr(vm, 'mode_buttons_widget'):
+                if hasattr(vm, 'mode_buttons_widget'):
                     vm.mode_buttons_widget.setVisible(True)
                     vm.btn_mode_exe.setChecked(True)
                     vm.btn_mode_git.setChecked(False)

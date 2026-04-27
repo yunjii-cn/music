@@ -127,6 +127,36 @@ def git_commit_and_push(commit_message):
         return False
 
 
+def update_versions_json(version, changes, exe_name):
+    """更新 dev/versions.json（随常规 git commit 一起推送）"""
+    try:
+        versions_file = ROOT_DIR / "versions.json"
+        versions = []
+        if versions_file.exists():
+            with open(versions_file, 'r', encoding='utf-8') as f:
+                versions = json.load(f)
+        
+        new_entry = {
+            "version": version,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "message": changes[0] if changes else "优化和修复",
+            "changes": changes,
+            "name": exe_name,
+            "download_url": ""
+        }
+        
+        versions.insert(0, new_entry)
+        
+        with open(versions_file, 'w', encoding='utf-8') as f:
+            json.dump(versions, f, ensure_ascii=False, indent=2)
+        
+        print("  ✓ versions.json 已更新")
+        return True
+            
+    except Exception as e:
+        print(f"  ✗ 更新 versions.json 失败: {e}")
+        return False
+
 def build_exe():
     """构建EXE - 直接输出到dev目录"""
     print(f"构建 EXE (v{VERSION})...")
@@ -267,7 +297,11 @@ def main():
         print("  ✓ 版本历史已更新")
         print()
         
-        # 4. Git提交和推送
+        # 4. 更新 versions.json（在 git commit 之前）
+        update_versions_json(VERSION, changes, exe_path.name)
+        print()
+        
+        # 5. Git提交和推送
         commit_message = f"feat: 发布版本 v{VERSION}\n\n" + "\n".join([f"- {change}" for change in changes])
         push_success = git_commit_and_push(commit_message)
         print()
