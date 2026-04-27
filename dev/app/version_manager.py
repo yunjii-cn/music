@@ -1,7 +1,7 @@
 """
 版本管理器模块 - 混合模式版本管理器
 支持Git开发版（Gitee API）和EXE稳定版管理
-所有远程数据获取均通过 urlopen，零 subprocess，零弹窗
+所有远程数据获取均通过 QThread + urlopen，零 subprocess，零弹窗
 """
 
 import sys
@@ -124,6 +124,40 @@ def _build_api_url(base_url):
     return base_url
 
 
+class _FetchWorker(QThread):
+    """后台数据获取线程 - 避免urlopen在主线程触发系统级弹窗"""
+    result_ready = pyqtSignal(str, object)
+
+    def __init__(self, tasks):
+        super().__init__()
+        self.tasks = tasks
+
+    def run(self):
+        for task_id, url in self.tasks:
+            try:
+                req = Request(url)
+                req.add_header('User-Agent', 'Mozilla/5.0')
+                resp = urlopen(req, timeout=15)
+                raw = resp.read().decode('utf-8')
+                data = json.loads(raw)
+                if task_id == "remote_versions":
+                    content_b64 = data.get('content', '')
+                    content = base64.b64decode(content_b64).decode('utf-8')
+                    versions = json.loads(content)
+                    self.result_ready.emit(task_id, versions)
+                else:
+                    self.result_ready.emit(task_id, data)
+            except HTTPError as e:
+                print(f"[{task_id}] HTTP {e.code}: {e.reason}")
+                self.result_ready.emit(task_id, [])
+            except URLError as e:
+                print(f"[{task_id}] 网络错误: {e.reason}")
+                self.result_ready.emit(task_id, [])
+            except Exception as e:
+                print(f"[{task_id}] 获取失败: {e}")
+                self.result_ready.emit(task_id, [])
+
+
 class HybridVersionManagerDialog(QDialog):
     """混合模式版本管理器 - 支持Git和EXE两种模式"""
 
@@ -148,6 +182,9 @@ class HybridVersionManagerDialog(QDialog):
         self._git_repo_checked = False
         self.has_git_repo = False
         self._remote_versions_cache = None
+        self._all_expanded = True
+        self._detail_widgets = []
+        self._fetch_worker = None
 
         self._setup_ui()
         self._load_local_version_history()
@@ -169,10 +206,13 @@ class HybridVersionManagerDialog(QDialog):
 
     def _load_local_version_history(self):
         self.version_history = {}
-        possible_paths = [
+        possible_paths = []
+        if hasattr(sys, '_MEIPASS'):
+            possible_paths.append(Path(sys._MEIPASS) / 'version_history.json')
+        possible_paths.extend([
             Path(self.base_dir) / 'version_history.json',
             Path(self.base_dir) / 'dist' / 'version_history.json',
-        ]
+        ])
         for history_path in possible_paths:
             if history_path.exists():
                 try:
@@ -357,6 +397,13 @@ class HybridVersionManagerDialog(QDialog):
         list_label.setStyleSheet("color: #888888;")
         list_header.addWidget(list_label)
         list_header.addStretch()
+
+        self.toggle_all_btn = QPushButton("全部收起")
+        self.toggle_all_btn.setFixedWidth(80)
+        self.toggle_all_btn.setStyleSheet(DARK_BTN_STYLE)
+        self.toggle_all_btn.clicked.connect(self._toggle_all_details)
+        list_header.addWidget(self.toggle_all_btn)
+
         layout.addLayout(list_header)
 
         scroll_area = QScrollArea()
@@ -377,6 +424,12 @@ class HybridVersionManagerDialog(QDialog):
 
         scroll_area.setWidget(self.versions_container)
         layout.addWidget(scroll_area, stretch=1)
+
+    def _toggle_all_details(self):
+        self._all_expanded = not self._all_expanded
+        for dw in self._detail_widgets:
+            dw.setVisible(self._all_expanded)
+        self.toggle_all_btn.setText("全部收起" if self._all_expanded else "全部展开")
 
     def _on_mode_changed(self, new_mode):
         try:
@@ -430,30 +483,6 @@ class HybridVersionManagerDialog(QDialog):
             print(f"获取当前EXE版本失败：{e}")
             return None
 
-    def _fetch_remote_versions(self):
-        if self._remote_versions_cache is not None:
-            return self._remote_versions_cache
-        try:
-            url = _build_api_url(REMOTE_VERSIONS_API)
-            req = Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0')
-            resp = urlopen(req, timeout=10)
-            data = json.loads(resp.read().decode('utf-8'))
-            content_b64 = data.get('content', '')
-            content = base64.b64decode(content_b64).decode('utf-8')
-            versions = json.loads(content)
-            self._remote_versions_cache = versions
-            return versions
-        except HTTPError as e:
-            print(f"远程稳定版获取失败 (HTTP {e.code}): {e.reason}")
-            return []
-        except URLError as e:
-            print(f"远程稳定版获取失败 (网络错误): {e.reason}")
-            return []
-        except Exception as e:
-            print(f"远程稳定版获取失败: {e}")
-            return []
-
     def _get_local_exe_versions(self):
         local_versions = {}
         ver_dir = Path(self.base_dir) / "ver"
@@ -479,40 +508,7 @@ class HybridVersionManagerDialog(QDialog):
                         'name': exe_file.name,
                     }
 
-        if Path(self.base_dir).exists():
-            for exe_file in Path(self.base_dir).glob("*.exe"):
-                match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
-                if match:
-                    version = match.group(1)
-                    if version not in local_versions:
-                        file_size = exe_file.stat().st_size / (1024 * 1024)
-                        mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
-                        local_versions[version] = {
-                            'path': str(exe_file),
-                            'size': f"{file_size:.2f} MB",
-                            'date': mtime.strftime("%Y-%m-%d %H:%M"),
-                            'name': exe_file.name,
-                        }
-
         return local_versions
-
-    def _fetch_git_commits(self):
-        try:
-            url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
-            req = Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0')
-            resp = urlopen(req, timeout=10)
-            commits = json.loads(resp.read().decode('utf-8'))
-            return commits
-        except HTTPError as e:
-            print(f"远程版本获取失败 (HTTP {e.code}): {e.reason}")
-            return []
-        except URLError as e:
-            print(f"远程版本获取失败 (网络错误): {e.reason}")
-            return []
-        except Exception as e:
-            print(f"远程版本获取失败: {e}")
-            return []
 
     def _get_local_version_string(self):
         try:
@@ -530,10 +526,9 @@ class HybridVersionManagerDialog(QDialog):
             return
         self._versions_loaded = True
         self._remote_versions_cache = None
-
-        scroll_area = self.versions_container.parent()
-        if scroll_area:
-            scroll_area.setVisible(False)
+        self._detail_widgets = []
+        self._all_expanded = True
+        self.toggle_all_btn.setText("全部收起")
 
         while self.versions_layout.count():
             item = self.versions_layout.takeAt(0)
@@ -541,14 +536,11 @@ class HybridVersionManagerDialog(QDialog):
                 item.widget().deleteLater()
 
         if self.current_mode == "exe":
-            self._load_exe_versions()
+            self._load_exe_versions_async()
         else:
-            self._load_git_versions()
+            self._load_git_versions_async()
 
-        if scroll_area:
-            scroll_area.setVisible(True)
-
-    def _load_exe_versions(self):
+    def _load_exe_versions_async(self):
         self.current_mode_label.setText("EXE 稳定版")
 
         current = self._get_current_exe_version()
@@ -559,9 +551,27 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
-        remote_versions = self._fetch_remote_versions()
+        loading_label = QLabel("正在获取远程版本信息...")
+        loading_label.setStyleSheet("color: #666666; padding: 20px;")
+        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.versions_layout.addWidget(loading_label)
+
         local_versions = self._get_local_exe_versions()
         current_version = current['version'] if current else None
+
+        url = _build_api_url(REMOTE_VERSIONS_API)
+        self._fetch_worker = _FetchWorker([("remote_versions", url)])
+        self._fetch_worker.result_ready.connect(
+            lambda task_id, data: self._on_exe_versions_fetched(data, local_versions, current_version, loading_label)
+        )
+        self._fetch_worker.start()
+
+    def _on_exe_versions_fetched(self, remote_versions, local_versions, current_version, loading_label):
+        if loading_label and loading_label.parent():
+            self.versions_layout.removeWidget(loading_label)
+            loading_label.deleteLater()
+
+        self._detail_widgets = []
 
         if not remote_versions and not local_versions:
             no_version_label = QLabel("未找到稳定版信息\n\n请检查网络连接")
@@ -569,6 +579,8 @@ class HybridVersionManagerDialog(QDialog):
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.versions_layout.addWidget(no_version_label)
             return
+
+        self._remote_versions_cache = remote_versions
 
         merged = {}
         for rv in remote_versions:
@@ -584,6 +596,7 @@ class HybridVersionManagerDialog(QDialog):
                 'local_size': local_versions.get(ver, {}).get('size'),
                 'local_date': local_versions.get(ver, {}).get('date'),
                 'download_url': rv.get('download_url', ''),
+                'is_remote': True,
             }
 
         for ver, lv in local_versions.items():
@@ -600,6 +613,7 @@ class HybridVersionManagerDialog(QDialog):
                     'local_size': lv.get('size'),
                     'local_date': lv.get('date'),
                     'download_url': '',
+                    'is_remote': False,
                 }
 
         all_versions = list(merged.values())
@@ -612,7 +626,7 @@ class HybridVersionManagerDialog(QDialog):
     def _create_exe_version_item(self, version, is_current):
         changes = version.get('changes', [])
         is_available = version.get('available', False)
-        is_expanded = True
+        is_remote = version.get('is_remote', False)
 
         card = QFrame()
         card.setObjectName("versionCard")
@@ -647,13 +661,13 @@ class HybridVersionManagerDialog(QDialog):
         else:
             card.setStyleSheet("""
                 #versionCard {
-                    background-color: #111111;
-                    border: 1px solid #1a1a1a;
+                    background-color: #161616;
+                    border: 1px solid #222222;
                     border-radius: 8px;
                 }
                 #versionCard:hover {
-                    background-color: #161616;
-                    border-color: #222222;
+                    background-color: #1c1c1c;
+                    border-color: #333333;
                 }
                 QLabel { border: none; background: transparent; }
                 QWidget { border: none; background: transparent; }
@@ -670,10 +684,10 @@ class HybridVersionManagerDialog(QDialog):
         version_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         if is_current:
             version_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
-        elif not is_available:
-            version_label.setStyleSheet("color: #555555; border: none; background: transparent;")
-        else:
+        elif is_available:
             version_label.setStyleSheet("color: #E0E0E0; border: none; background: transparent;")
+        else:
+            version_label.setStyleSheet("color: #AAAAAA; border: none; background: transparent;")
         header.addWidget(version_label)
 
         if version.get('date'):
@@ -702,13 +716,18 @@ class HybridVersionManagerDialog(QDialog):
                 switch_btn.clicked.connect(lambda checked, v=version: self._launch_exe_version(v))
                 switch_btn.setStyleSheet(DARK_BTN_PRIMARY)
                 header.addWidget(switch_btn)
+            elif is_remote:
+                provided_tag = QLabel("已提供")
+                provided_tag.setFont(QFont("Microsoft YaHei", 9))
+                provided_tag.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
+                header.addWidget(provided_tag)
             else:
-                status_label = QLabel("远程版本")
+                status_label = QLabel("未提供")
                 status_label.setFont(QFont("Microsoft YaHei", 9))
-                status_label.setStyleSheet("color: #444444; border: none; background: transparent;")
+                status_label.setStyleSheet("color: #555555; border: none; background: transparent;")
                 header.addWidget(status_label)
 
-            toggle_btn = QPushButton("详情" if not is_expanded else "收起")
+            toggle_btn = QPushButton("收起" if self._all_expanded else "详情")
             toggle_btn.setFixedWidth(60)
             toggle_btn.setStyleSheet(DARK_BTN_STYLE)
             header.addWidget(toggle_btn)
@@ -724,10 +743,7 @@ class HybridVersionManagerDialog(QDialog):
 
         name_label = QLabel(version['name'])
         name_label.setFont(QFont("Microsoft YaHei", 9))
-        if not is_available:
-            name_label.setStyleSheet("color: #444444; border: none; background: transparent;")
-        else:
-            name_label.setStyleSheet("color: #777777; border: none; background: transparent;")
+        name_label.setStyleSheet("color: #777777; border: none; background: transparent;")
         name_label.setWordWrap(True)
         layout.addWidget(name_label)
 
@@ -750,7 +766,8 @@ class HybridVersionManagerDialog(QDialog):
             no_changes_label.setStyleSheet("color: #3a3a3a; border: none; background: transparent;")
             changes_layout.addWidget(no_changes_label)
 
-        detail_widget.setVisible(is_expanded)
+        detail_widget.setVisible(self._all_expanded)
+        self._detail_widgets.append(detail_widget)
         layout.addWidget(detail_widget)
 
         if not is_current:
@@ -811,7 +828,7 @@ class HybridVersionManagerDialog(QDialog):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"启动版本失败:\n{str(e)}")
 
-    def _load_git_versions(self):
+    def _load_git_versions_async(self):
         self.current_mode_label.setText("Git 开发版")
 
         local_ver = self._get_local_version_string()
@@ -820,7 +837,24 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
-        commits = self._fetch_git_commits()
+        loading_label = QLabel("正在获取远程提交历史...")
+        loading_label.setStyleSheet("color: #666666; padding: 20px;")
+        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.versions_layout.addWidget(loading_label)
+
+        url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
+        self._fetch_worker = _FetchWorker([("git_commits", url)])
+        self._fetch_worker.result_ready.connect(
+            lambda task_id, data: self._on_git_commits_fetched(data, local_ver, loading_label)
+        )
+        self._fetch_worker.start()
+
+    def _on_git_commits_fetched(self, commits, current_version, loading_label):
+        if loading_label and loading_label.parent():
+            self.versions_layout.removeWidget(loading_label)
+            loading_label.deleteLater()
+
+        self._detail_widgets = []
 
         if not commits:
             no_version_label = QLabel("未获取到远程提交历史\n\n请检查网络连接")
@@ -828,8 +862,6 @@ class HybridVersionManagerDialog(QDialog):
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.versions_layout.addWidget(no_version_label)
             return
-
-        current_version = local_ver
 
         for commit_data in commits:
             commit = commit_data.get('commit', {})
@@ -928,7 +960,7 @@ class HybridVersionManagerDialog(QDialog):
             )
             header.addWidget(switch_btn)
 
-        toggle_btn = QPushButton("详情")
+        toggle_btn = QPushButton("收起" if self._all_expanded else "详情")
         toggle_btn.setFixedWidth(60)
         toggle_btn.setStyleSheet(DARK_BTN_STYLE)
         header.addWidget(toggle_btn)
@@ -961,7 +993,8 @@ class HybridVersionManagerDialog(QDialog):
             no_detail_label.setStyleSheet("color: #3a3a3a; border: none; background: transparent;")
             detail_layout.addWidget(no_detail_label)
 
-        detail_widget.setVisible(False)
+        detail_widget.setVisible(self._all_expanded)
+        self._detail_widgets.append(detail_widget)
         main_layout.addWidget(detail_widget)
 
         def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):

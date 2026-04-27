@@ -5,6 +5,7 @@ Git自动下载器模块
 
 import os
 import sys
+import shutil
 import subprocess
 import zipfile
 import tempfile
