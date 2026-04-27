@@ -14,26 +14,6 @@ from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
-_DEBUG_LOG_FILE = None
-
-def _debug_log(msg):
-    global _DEBUG_LOG_FILE
-    if _DEBUG_LOG_FILE is None:
-        try:
-            if hasattr(sys, 'frozen'):
-                log_dir = os.path.dirname(sys.executable)
-            else:
-                log_dir = os.path.dirname(os.path.abspath(__file__))
-            _DEBUG_LOG_FILE = open(os.path.join(log_dir, "vm_debug.log"), "a", encoding="utf-8")
-        except Exception:
-            return
-    try:
-        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        _DEBUG_LOG_FILE.write(f"[{ts}] {msg}\n")
-        _DEBUG_LOG_FILE.flush()
-    except Exception:
-        pass
-
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
@@ -182,10 +162,8 @@ class HybridVersionManagerDialog(QDialog):
             return
         if self._git_repo_checked:
             return
-        _debug_log("_delayed_init 开始")
         self._git_repo_checked = True
         self.has_git_repo = self._check_git_repo()
-        _debug_log(f"_delayed_init 完成, has_git_repo={self.has_git_repo}")
         if hasattr(self, 'mode_buttons_widget'):
             self.mode_buttons_widget.setVisible(True)
             self.btn_mode_exe.setChecked(True)
@@ -414,7 +392,6 @@ class HybridVersionManagerDialog(QDialog):
 
     def _on_mode_changed(self, new_mode):
         try:
-            _debug_log(f"_on_mode_changed: {self.current_mode} -> {new_mode}")
             if new_mode == self.current_mode:
                 return
             self.current_mode = new_mode
@@ -473,23 +450,17 @@ class HybridVersionManagerDialog(QDialog):
 
     def _fetch_remote_versions(self):
         if self._remote_versions_cache is not None:
-            _debug_log("_fetch_remote_versions 使用缓存")
             return self._remote_versions_cache
         try:
             url = _build_api_url(REMOTE_VERSIONS_API)
-            _debug_log(f"_fetch_remote_versions 请求 URL: {url[:80]}...")
             req = Request(url)
             req.add_header('User-Agent', 'Mozilla/5.0')
-            _debug_log("_fetch_remote_versions urlopen 开始")
             resp = urlopen(req, timeout=10)
-            _debug_log("_fetch_remote_versions urlopen 完成, 开始读取响应")
             data = json.loads(resp.read().decode('utf-8'))
-            _debug_log("_fetch_remote_versions json 解析完成, 开始 base64 解码")
             content_b64 = data.get('content', '')
             content = base64.b64decode(content_b64).decode('utf-8')
             versions = json.loads(content)
             self._remote_versions_cache = versions
-            _debug_log(f"_fetch_remote_versions 全部完成: {len(versions)} 个版本")
             return versions
         except HTTPError as e:
             print(f"远程稳定版获取失败 (HTTP {e.code}): {e.reason}")
@@ -507,22 +478,17 @@ class HybridVersionManagerDialog(QDialog):
         ver_dir = Path(self.base_dir) / "ver"
         if ver_dir.exists():
             ver_dirs.append(ver_dir)
-            _debug_log(f"_get_local_exe_versions 找到 ver_dir: {ver_dir}")
         dev_dir = Path(self.base_dir).parent
         alt_ver = dev_dir / "ver"
         if alt_ver.exists() and alt_ver not in ver_dirs:
             ver_dirs.append(alt_ver)
-            _debug_log(f"_get_local_exe_versions 找到 alt_ver: {alt_ver}")
         if hasattr(sys, '_MEIPASS'):
             meipass_ver = Path(sys._MEIPASS) / "ver"
             if meipass_ver.exists() and meipass_ver not in ver_dirs:
                 ver_dirs.append(meipass_ver)
-                _debug_log(f"_get_local_exe_versions 找到 meipass_ver: {meipass_ver}")
         exe_dir_ver = Path(os.path.dirname(sys.executable)) / "ver"
         if exe_dir_ver.exists() and exe_dir_ver not in ver_dirs:
             ver_dirs.append(exe_dir_ver)
-            _debug_log(f"_get_local_exe_versions 找到 exe_dir_ver: {exe_dir_ver}")
-        _debug_log(f"_get_local_exe_versions 搜索目录: {[str(d) for d in ver_dirs]}")
 
         for vd in ver_dirs:
             for exe_file in vd.glob("*.exe"):
@@ -544,14 +510,10 @@ class HybridVersionManagerDialog(QDialog):
     def _fetch_git_commits(self):
         try:
             url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
-            _debug_log(f"_fetch_git_commits 请求 URL: {url[:80]}...")
             req = Request(url)
             req.add_header('User-Agent', 'Mozilla/5.0')
-            _debug_log("_fetch_git_commits urlopen 开始")
             resp = urlopen(req, timeout=10)
-            _debug_log("_fetch_git_commits urlopen 完成")
             commits = json.loads(resp.read().decode('utf-8'))
-            _debug_log(f"_fetch_git_commits 全部完成: {len(commits)} 条提交")
             return commits
         except HTTPError as e:
             print(f"远程版本获取失败 (HTTP {e.code}): {e.reason}")
@@ -582,7 +544,6 @@ class HybridVersionManagerDialog(QDialog):
         self._detail_widgets = []
         self._all_expanded = True
         self.toggle_all_btn.setText("全部收起")
-        _debug_log(f"_load_versions 开始, mode={self.current_mode}")
 
         scroll_area = self.versions_container.parent()
         if scroll_area:
@@ -602,12 +563,9 @@ class HybridVersionManagerDialog(QDialog):
             scroll_area.setVisible(True)
 
     def _load_exe_versions(self):
-        _debug_log("_load_exe_versions 开始")
         self.current_mode_label.setText("EXE 稳定版")
 
-        _debug_log("_get_current_exe_version 开始")
         current = self._get_current_exe_version()
-        _debug_log(f"_get_current_exe_version 完成: {current}")
         if current:
             self.current_info_label.setText(
                 f"版本: v{current['version']} | 文件: {current['name']} | 大小: {current['size']}"
@@ -615,12 +573,8 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
-        _debug_log("_fetch_remote_versions 开始")
         remote_versions = self._fetch_remote_versions()
-        _debug_log(f"_fetch_remote_versions 完成: {len(remote_versions)} 个版本")
-        _debug_log("_get_local_exe_versions 开始")
         local_versions = self._get_local_exe_versions()
-        _debug_log(f"_get_local_exe_versions 完成: {len(local_versions)} 个版本")
         current_version = current['version'] if current else None
 
         if not remote_versions and not local_versions:
@@ -877,7 +831,6 @@ class HybridVersionManagerDialog(QDialog):
                 QMessageBox.critical(self, "错误", f"启动版本失败:\n{str(e)}")
 
     def _load_git_versions(self):
-        _debug_log("_load_git_versions 开始")
         self.current_mode_label.setText("Git 开发版")
 
         local_ver = self._get_local_version_string()
@@ -886,9 +839,7 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
-        _debug_log("_fetch_git_commits 开始")
         commits = self._fetch_git_commits()
-        _debug_log(f"_fetch_git_commits 完成: {len(commits)} 条提交")
 
         if not commits:
             no_version_label = QLabel("未获取到远程提交历史\n\n请检查网络连接")

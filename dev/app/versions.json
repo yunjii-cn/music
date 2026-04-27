@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.28.0641",
+    "date": "2026-04-28 06:43",
+    "message": "修复弹窗：添加--hide-console hide-early，恢复--hidden-import psutil，排除非Windows平台psutil模块",
+    "changes": [
+      "修复弹窗：添加--hide-console hide-early，恢复--hidden-import psutil，排除非Windows平台psutil模块"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0641.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.28.0619",
     "date": "2026-04-28 06:22",
     "message": "调试版2：添加subprocess调用日志",
