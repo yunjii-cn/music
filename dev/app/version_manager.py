@@ -26,6 +26,22 @@ REMOTE_REPO_NAME = "ace"
 REMOTE_COMMITS_URL = f"https://gitee.com/api/v5/repos/{REMOTE_REPO_OWNER}/{REMOTE_REPO_NAME}/commits"
 REMOTE_VERSIONS_URL = f"https://gitee.com/{REMOTE_REPO_OWNER}/{REMOTE_REPO_NAME}/raw/master/dev/versions.json"
 
+def _get_gitee_token():
+    if hasattr(sys, '_MEIPASS'):
+        token_file = Path(sys._MEIPASS) / ".gitee_token"
+    else:
+        token_file = Path(__file__).parent / ".gitee_token"
+    if token_file.exists():
+        return token_file.read_text(encoding='utf-8').strip()
+    return ""
+
+def _build_api_url(base_url):
+    token = _get_gitee_token()
+    if token:
+        sep = "&" if "?" in base_url else "?"
+        return f"{base_url}{sep}access_token={token}"
+    return base_url
+
 
 class HybridVersionManagerDialog(QDialog):
     """混合模式版本管理器 - 支持Git和EXE两种模式"""
@@ -136,7 +152,7 @@ class HybridVersionManagerDialog(QDialog):
         self.mode_btn_group.setSpacing(0)
         self.mode_btn_group.setContentsMargins(0, 0, 0, 0)
         
-        self.btn_mode_exe = QPushButton("EXE 版本")
+        self.btn_mode_exe = QPushButton("EXE 稳定版")
         self.btn_mode_exe.setCheckable(True)
         self.btn_mode_exe.setChecked(True)
         self.btn_mode_exe.setFixedHeight(32)
@@ -479,7 +495,7 @@ class HybridVersionManagerDialog(QDialog):
     def _fetch_git_commits(self):
         """通过 Gitee API 获取远程 commit 历史（零 subprocess，零弹窗）"""
         try:
-            url = f"{REMOTE_COMMITS_URL}?per_page=30"
+            url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
             req = Request(url)
             req.add_header('User-Agent', 'Mozilla/5.0')
             resp = urlopen(req, timeout=10)
@@ -631,7 +647,7 @@ class HybridVersionManagerDialog(QDialog):
     
     def _load_exe_versions(self):
         """加载EXE版本列表"""
-        self.current_mode_label.setText("EXE 模式")
+        self.current_mode_label.setText("EXE 稳定版")
         
         current = self._get_current_exe_version()
         if current:

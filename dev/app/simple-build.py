@@ -211,6 +211,20 @@ def build_exe():
         pyinstaller_args.extend(["--runtime-hook", str(rthook)])
         print(f"  已添加runtime hook: {rthook}")
     
+    # 添加 .gitee_token 文件
+    token_file = ROOT_DIR / ".gitee_token"
+    if token_file.exists():
+        pyinstaller_args.append("--add-data")
+        pyinstaller_args.append(f"{str(token_file)};.")
+        print(f"  已添加 Gitee Token")
+    
+    # 添加 version_history.json
+    vh_file = ROOT_DIR / "version_history.json"
+    if vh_file.exists():
+        pyinstaller_args.append("--add-data")
+        pyinstaller_args.append(f"{str(vh_file)};.")
+        print(f"  已添加版本历史")
+    
     # 使用launcher.py作为入口，确保subprocess patch最早执行
     launcher = ROOT_DIR / "launcher.py"
     if launcher.exists():

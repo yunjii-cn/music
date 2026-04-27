@@ -230,6 +230,7 @@ celerybeat.pid
 # Environments
 .env
 .envrc
+.gitee_token
 .venv
 env/
 venv/

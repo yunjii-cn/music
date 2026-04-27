@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.04.27.2237",
+    "date": "2026-04-27 22:38",
+    "message": "Git开发版用Gitee Token访问私有仓库API",
+    "changes": [
+      "Git开发版用Gitee Token访问私有仓库API",
+      "EXE模式改名为EXE稳定版",
+      "添加.gitee_token到PyInstaller打包"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.27.2237.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.27.2108",
     "date": "2026-04-27 21:10",
     "message": "Git开发版改用Gitee Commits API获取历史",
