@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.04.27.2108",
+    "date": "2026-04-27 21:10",
+    "message": "Git开发版改用Gitee Commits API获取历史",
+    "changes": [
+      "Git开发版改用Gitee Commits API获取历史",
+      "零subprocess零弹窗",
+      "EXE稳定版+Git开发版双模式"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.27.2108.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.27.1853",
     "date": "2026-04-27 18:54",
     "message": "﻿??????????????",

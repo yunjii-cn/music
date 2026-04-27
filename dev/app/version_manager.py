@@ -1,6 +1,6 @@
 """
 版本管理器模块 - 混合模式版本管理器
-支持远程版本管理（Gitee API）和EXE文件版本管理
+支持Git开发版（Gitee API）和EXE稳定版管理
 """
 
 import sys
@@ -23,6 +23,7 @@ from PyQt6.QtGui import QFont
 
 REMOTE_REPO_OWNER = "yunjii"
 REMOTE_REPO_NAME = "ace"
+REMOTE_COMMITS_URL = f"https://gitee.com/api/v5/repos/{REMOTE_REPO_OWNER}/{REMOTE_REPO_NAME}/commits"
 REMOTE_VERSIONS_URL = f"https://gitee.com/{REMOTE_REPO_OWNER}/{REMOTE_REPO_NAME}/raw/master/dev/versions.json"
 
 
@@ -171,7 +172,7 @@ class HybridVersionManagerDialog(QDialog):
         self.btn_mode_exe.clicked.connect(lambda: self._on_mode_changed("exe"))
         self.mode_btn_group.addWidget(self.btn_mode_exe)
         
-        self.btn_mode_git = QPushButton("远程版本")
+        self.btn_mode_git = QPushButton("Git 开发版")
         self.btn_mode_git.setCheckable(True)
         self.btn_mode_git.setChecked(False)
         self.btn_mode_git.setFixedHeight(32)
@@ -475,14 +476,15 @@ class HybridVersionManagerDialog(QDialog):
             traceback.print_exc()
             return []
     
-    def _fetch_remote_versions(self):
-        """通过 Gitee Raw URL 获取远程版本列表（零 subprocess，零弹窗）"""
+    def _fetch_git_commits(self):
+        """通过 Gitee API 获取远程 commit 历史（零 subprocess，零弹窗）"""
         try:
-            req = Request(REMOTE_VERSIONS_URL)
+            url = f"{REMOTE_COMMITS_URL}?per_page=30"
+            req = Request(url)
             req.add_header('User-Agent', 'Mozilla/5.0')
             resp = urlopen(req, timeout=10)
-            versions = json.loads(resp.read().decode('utf-8'))
-            return versions
+            commits = json.loads(resp.read().decode('utf-8'))
+            return commits
         except HTTPError as e:
             print(f"远程版本获取失败 (HTTP {e.code}): {e.reason}")
             return []
@@ -494,15 +496,17 @@ class HybridVersionManagerDialog(QDialog):
             return []
 
     def _get_current_remote_version(self):
-        """获取当前版本对应的远程版本信息"""
+        """获取当前版本对应的远程 commit 信息"""
         try:
             current_version = self._get_local_version_string()
             if not current_version:
                 return None
-            versions = self._fetch_remote_versions()
-            for v in versions:
-                if v.get('version') == current_version or v.get('name', '').replace('.exe', '') == f"云集智能音乐创意台-v{current_version}":
-                    return v
+            commits = self._fetch_git_commits()
+            for c in commits:
+                commit = c.get('commit', {})
+                message = commit.get('message', '')
+                if f"v{current_version}" in message:
+                    return c
             return None
         except Exception:
             return None
@@ -537,14 +541,14 @@ class HybridVersionManagerDialog(QDialog):
         if self.current_mode == "exe":
             self._load_exe_versions()
         else:
-            self._load_remote_versions()
+            self._load_git_versions()
         
         if scroll_area:
             scroll_area.setVisible(True)
     
     def _show_git_not_available(self):
         """显示Git未安装提示"""
-        self.current_mode_label.setText("远程版本")
+        self.current_mode_label.setText("Git 开发版")
         
         info_widget = QWidget()
         info_layout = QVBoxLayout(info_widget)
@@ -556,21 +560,21 @@ class HybridVersionManagerDialog(QDialog):
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info_layout.addWidget(icon_label)
         
-        title_label = QLabel("Git 未安装")
+        title_label = QLabel("网络连接失败")
         title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #FF9800;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info_layout.addWidget(title_label)
         
         desc_label = QLabel(
-            "Git模式需要安装Git才能查看源代码版本历史。\n\n"
-            "Git是一个免费的开源版本控制系统。"
+            "无法连接到 Gitee 获取开发版历史。\n\n"
+            "请检查网络连接后重试。"
         )
         desc_label.setStyleSheet("color: #AAAAAA; font-size: 13px; line-height: 1.6;")
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc_label.setWordWrap(True)
         info_layout.addWidget(desc_label)
         
-        download_btn = QPushButton("📥 下载Git")
+        download_btn = QPushButton("🔄 重试")
         download_btn.setStyleSheet("""
             QPushButton {
                 background-color: #1565C0;
@@ -585,33 +589,33 @@ class HybridVersionManagerDialog(QDialog):
                 background-color: #1976D2;
             }
         """)
-        download_btn.clicked.connect(self._open_git_download)
+        download_btn.clicked.connect(lambda: self._load_versions(force=True))
         info_layout.addWidget(download_btn, alignment=Qt.AlignmentFlag.AlignCenter)
         
         self.versions_layout.addWidget(info_widget)
     
     def _show_no_git_repo(self):
         """显示无法获取远程版本提示"""
-        self.current_mode_label.setText("远程版本")
+        self.current_mode_label.setText("Git 开发版")
         
         info_widget = QWidget()
         info_layout = QVBoxLayout(info_widget)
         info_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info_layout.setSpacing(15)
         
-        icon_label = QLabel("📁")
+        icon_label = QLabel("📡")
         icon_label.setStyleSheet("font-size: 48px;")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info_layout.addWidget(icon_label)
         
-        title_label = QLabel("不是Git仓库")
+        title_label = QLabel("无法获取开发版历史")
         title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #FF9800;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info_layout.addWidget(title_label)
         
         desc_label = QLabel(
-            "当前目录不是Git仓库，无法查看源代码版本历史。\n\n"
-            "请切换到包含 .git 文件夹的目录，或克隆项目仓库。"
+            "无法从 Gitee 获取开发版提交历史。\n\n"
+            "请检查网络连接后重试。"
         )
         desc_label.setStyleSheet("color: #AAAAAA; font-size: 13px; line-height: 1.6;")
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -886,38 +890,49 @@ class HybridVersionManagerDialog(QDialog):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"启动版本失败:\n{str(e)}")
     
-    def _load_remote_versions(self):
-        """加载远程版本列表（Gitee API，零 subprocess）"""
-        self.current_mode_label.setText("远程版本")
+    def _load_git_versions(self):
+        """加载 Git 开发版历史（Gitee Commits API，零 subprocess）"""
+        self.current_mode_label.setText("Git 开发版")
         
-        current = self._get_current_remote_version()
-        if current:
-            self.current_info_label.setText(
-                f"版本: v{current.get('version', '?')} | {current.get('message', '')} | {current.get('date', '')}"
-            )
+        local_ver = self._get_local_version_string()
+        if local_ver:
+            self.current_info_label.setText(f"当前版本: v{local_ver}")
         else:
-            local_ver = self._get_local_version_string()
-            if local_ver:
-                self.current_info_label.setText(f"当前版本: v{local_ver}")
-            else:
-                self.current_info_label.setText("⚠️ 无法获取当前版本信息")
+            self.current_info_label.setText("⚠️ 无法获取当前版本信息")
         
-        versions = self._fetch_remote_versions()
+        commits = self._fetch_git_commits()
         
-        if not versions:
-            no_version_label = QLabel("未找到远程版本信息\n\n请检查网络连接")
+        if not commits:
+            no_version_label = QLabel("未获取到远程提交历史\n\n请检查网络连接")
             no_version_label.setStyleSheet("color: #666666; padding: 20px;")
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.versions_layout.addWidget(no_version_label)
             return
         
-        current_version = current.get('version') if current else None
+        current_version = local_ver
         
         self.git_version_items = []
         
-        for version in versions:
-            is_current = version.get('version') == current_version
-            self._create_remote_version_item(version, is_current)
+        for commit_data in commits:
+            commit = commit_data.get('commit', {})
+            sha = commit_data.get('sha', '?')[:7]
+            message = commit.get('message', '').split('\n')[0]
+            body = '\n'.join(commit.get('message', '').split('\n')[1:]).strip()
+            date_str = commit.get('committer', {}).get('date', '')[:16].replace('T', ' ')
+            author = commit.get('author', {}).get('name', '')
+            
+            is_current = current_version and f"v{current_version}" in commit.get('message', '')
+            
+            version = {
+                'hash': sha,
+                'full_sha': commit_data.get('sha', ''),
+                'message': message,
+                'body': body,
+                'date': date_str,
+                'author': author
+            }
+            
+            self._create_git_version_item(version, is_current)
     
     def _toggle_expand_all(self, checked):
         """全部展开/收起"""
@@ -945,18 +960,18 @@ class HybridVersionManagerDialog(QDialog):
                 except Exception as e:
                     print(f"更新Git版本项状态失败: {e}")
     
-    def _create_remote_version_item(self, version, is_current):
-        """创建远程版本项-卡片式设计"""
+    def _create_git_version_item(self, version, is_current):
+        """创建 Git 开发版版本项-卡片式设计"""
         card = QFrame()
-        card.setObjectName("remoteVersionCard")
+        card.setObjectName("gitVersionCard")
         if is_current:
             card.setStyleSheet("""
-                #remoteVersionCard {
+                #gitVersionCard {
                     background-color: #162016;
                     border: 1px solid #1f3a1f;
                     border-radius: 8px;
                 }
-                #remoteVersionCard:hover {
+                #gitVersionCard:hover {
                     background-color: #1a2a1a;
                     border-color: #2a4a2a;
                 }
@@ -965,12 +980,12 @@ class HybridVersionManagerDialog(QDialog):
             """)
         else:
             card.setStyleSheet("""
-                #remoteVersionCard {
+                #gitVersionCard {
                     background-color: #161616;
                     border: 1px solid #222222;
                     border-radius: 8px;
                 }
-                #remoteVersionCard:hover {
+                #gitVersionCard:hover {
                     background-color: #1c1c1c;
                     border-color: #333333;
                 }
@@ -982,121 +997,100 @@ class HybridVersionManagerDialog(QDialog):
         main_layout.setSpacing(4)
         main_layout.setContentsMargins(16, 12, 16, 12)
         
-        changes = version.get('changes', [])
-        version_str = version.get('version', '?')
-        date_str = version.get('date', '')
+        body = version.get('body', '')
         
         header = QHBoxLayout()
         header.setSpacing(10)
         
-        ver_label = QLabel(f"v{version_str}")
-        ver_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+        hash_label = QLabel(version['hash'])
+        hash_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         if is_current:
-            ver_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
+            hash_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
         else:
-            ver_label.setStyleSheet("color: #888888; border: none; background: transparent;")
-        header.addWidget(ver_label)
+            hash_label.setStyleSheet("color: #888888; border: none; background: transparent;")
+        header.addWidget(hash_label)
         
-        if date_str:
-            date_label = QLabel(date_str)
-            date_label.setFont(QFont("Consolas", 9))
-            date_label.setStyleSheet("color: #555555; border: none; background: transparent;")
-            header.addWidget(date_label)
+        date_label = QLabel(version['date'])
+        date_label.setFont(QFont("Consolas", 9))
+        date_label.setStyleSheet("color: #555555; border: none; background: transparent;")
+        header.addWidget(date_label)
+        
+        if version.get('author'):
+            author_label = QLabel(version['author'])
+            author_label.setFont(QFont("Microsoft YaHei", 9))
+            author_label.setStyleSheet("color: #555555; border: none; background: transparent;")
+            header.addWidget(author_label)
         
         header.addStretch()
         
-        if changes:
-            toggle_btn = QPushButton("详情")
-            toggle_btn.setFixedWidth(50)
-            toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: transparent;
-                    color: #666666;
-                    border: none;
-                    padding: 2px 6px;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    color: #AAAAAA;
-                }
-            """)
-            header.addWidget(toggle_btn)
+        toggle_btn = QPushButton("详情")
+        toggle_btn.setFixedWidth(50)
+        toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #666666;
+                border: none;
+                padding: 2px 6px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                color: #AAAAAA;
+            }
+        """)
+        header.addWidget(toggle_btn)
         
         if is_current:
             current_tag = QLabel("● 当前版本")
             current_tag.setFont(QFont("Microsoft YaHei", 9))
             current_tag.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
             header.addWidget(current_tag)
-        else:
-            download_url = version.get('download_url', '')
-            if download_url:
-                download_btn = QPushButton("下载")
-                download_btn.setFixedWidth(55)
-                download_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #1e1e1e;
-                        border: 1px solid #2a2a2a;
-                        border-radius: 4px;
-                        padding: 3px 10px;
-                        font-size: 11px;
-                        color: #AAAAAA;
-                    }
-                    QPushButton:hover {
-                        background-color: #2a2a2a;
-                        border-color: #3a3a3a;
-                        color: #FFFFFF;
-                    }
-                """)
-                download_btn.clicked.connect(lambda checked, url=download_url: self._download_version(url))
-                header.addWidget(download_btn)
         
         main_layout.addLayout(header)
         
-        message = version.get('message', '')
-        if message:
-            message_label = QLabel(message)
-            message_label.setFont(QFont("Microsoft YaHei", 9))
-            message_label.setStyleSheet("color: #AAAAAA; border: none; background: transparent;")
-            message_label.setWordWrap(True)
-            main_layout.addWidget(message_label)
+        message_label = QLabel(version['message'])
+        message_label.setFont(QFont("Microsoft YaHei", 9))
+        message_label.setStyleSheet("color: #AAAAAA; border: none; background: transparent;")
+        message_label.setWordWrap(True)
+        main_layout.addWidget(message_label)
         
-        if changes:
-            detail_widget = QWidget()
-            detail_widget.setStyleSheet("border: none; background: transparent;")
-            detail_layout = QVBoxLayout(detail_widget)
-            detail_layout.setSpacing(2)
-            detail_layout.setContentsMargins(0, 4, 0, 0)
-            
-            for change in changes:
-                line_label = QLabel(f"· {change}")
-                line_label.setFont(QFont("Microsoft YaHei", 9))
-                line_label.setStyleSheet("color: #777777; border: none; background: transparent;")
-                line_label.setWordWrap(True)
-                detail_layout.addWidget(line_label)
-            
-            detail_widget.setVisible(False)
-            main_layout.addWidget(detail_widget)
-            
-            def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
-                is_visible = not dw.isVisible()
-                dw.setVisible(is_visible)
-                tb.setText("收起" if is_visible else "详情")
-            toggle_btn.clicked.connect(toggle_detail)
+        detail_widget = QWidget()
+        detail_widget.setStyleSheet("border: none; background: transparent;")
+        detail_layout = QVBoxLayout(detail_widget)
+        detail_layout.setSpacing(2)
+        detail_layout.setContentsMargins(0, 4, 0, 0)
+        
+        if body:
+            for line in body.split('\n'):
+                if line.strip():
+                    line_label = QLabel(f"· {line.strip()}")
+                    line_label.setFont(QFont("Microsoft YaHei", 9))
+                    line_label.setStyleSheet("color: #777777; border: none; background: transparent;")
+                    line_label.setWordWrap(True)
+                    detail_layout.addWidget(line_label)
+        else:
+            no_detail_label = QLabel("暂无详细说明")
+            no_detail_label.setFont(QFont("Microsoft YaHei", 9))
+            no_detail_label.setStyleSheet("color: #3a3a3a; border: none; background: transparent;")
+            detail_layout.addWidget(no_detail_label)
+        
+        detail_widget.setVisible(False)
+        main_layout.addWidget(detail_widget)
+        
+        def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
+            is_visible = not dw.isVisible()
+            dw.setVisible(is_visible)
+            tb.setText("收起" if is_visible else "详情")
+        toggle_btn.clicked.connect(toggle_detail)
         
         if not hasattr(self, 'git_version_items'):
             self.git_version_items = []
         self.git_version_items.append({
             'expanded': False,
-            'detail_widget': detail_widget if changes else None,
-            'toggle_btn': toggle_btn if changes else None
+            'detail_widget': detail_widget,
+            'toggle_btn': toggle_btn
         })
         
         self.versions_layout.addWidget(card)
-    
-    def _download_version(self, url):
-        """下载指定版本"""
-        import webbrowser
-        webbrowser.open(url)
     
 
 class ModelManagerDialog(QDialog):
