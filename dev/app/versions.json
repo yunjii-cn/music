@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.28.0700",
+    "date": "2026-04-28 07:02",
+    "message": "修复psutil导入：将_ntuples从排除列表移到hidden-import",
+    "changes": [
+      "修复psutil导入：将_ntuples从排除列表移到hidden-import"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0700.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.28.0641",
     "date": "2026-04-28 06:43",
     "message": "修复弹窗：添加--hide-console hide-early，恢复--hidden-import psutil，排除非Windows平台psutil模块",
