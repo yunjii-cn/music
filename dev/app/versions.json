@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.28.0619",
+    "date": "2026-04-28 06:22",
+    "message": "调试版2：添加subprocess调用日志",
+    "changes": [
+      "调试版2：添加subprocess调用日志"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0619.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.28.0558",
     "date": "2026-04-28 06:00",
     "message": "调试版：添加vm_debug.log定位弹窗来源",
