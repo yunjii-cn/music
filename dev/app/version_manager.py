@@ -1,7 +1,7 @@
 """
 版本管理器模块 - 混合模式版本管理器
 支持Git开发版（Gitee API）和EXE稳定版管理
-所有远程数据获取均通过 QThread + urlopen，零 subprocess，零弹窗
+所有远程数据获取均通过 urlopen，零 subprocess，零弹窗
 """
 
 import sys
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
     QComboBox, QTabWidget
 )
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
 
@@ -124,40 +124,6 @@ def _build_api_url(base_url):
     return base_url
 
 
-class _FetchWorker(QThread):
-    """后台数据获取线程 - 避免urlopen在主线程触发系统级弹窗"""
-    result_ready = pyqtSignal(str, object)
-
-    def __init__(self, tasks):
-        super().__init__()
-        self.tasks = tasks
-
-    def run(self):
-        for task_id, url in self.tasks:
-            try:
-                req = Request(url)
-                req.add_header('User-Agent', 'Mozilla/5.0')
-                resp = urlopen(req, timeout=15)
-                raw = resp.read().decode('utf-8')
-                data = json.loads(raw)
-                if task_id == "remote_versions":
-                    content_b64 = data.get('content', '')
-                    content = base64.b64decode(content_b64).decode('utf-8')
-                    versions = json.loads(content)
-                    self.result_ready.emit(task_id, versions)
-                else:
-                    self.result_ready.emit(task_id, data)
-            except HTTPError as e:
-                print(f"[{task_id}] HTTP {e.code}: {e.reason}")
-                self.result_ready.emit(task_id, [])
-            except URLError as e:
-                print(f"[{task_id}] 网络错误: {e.reason}")
-                self.result_ready.emit(task_id, [])
-            except Exception as e:
-                print(f"[{task_id}] 获取失败: {e}")
-                self.result_ready.emit(task_id, [])
-
-
 class HybridVersionManagerDialog(QDialog):
     """混合模式版本管理器 - 支持Git和EXE两种模式"""
 
@@ -184,7 +150,6 @@ class HybridVersionManagerDialog(QDialog):
         self._remote_versions_cache = None
         self._all_expanded = True
         self._detail_widgets = []
-        self._fetch_worker = None
 
         self._setup_ui()
         self._load_local_version_history()
@@ -485,28 +450,36 @@ class HybridVersionManagerDialog(QDialog):
 
     def _get_local_exe_versions(self):
         local_versions = {}
+        ver_dirs = []
         ver_dir = Path(self.base_dir) / "ver"
-        if not ver_dir.exists():
-            dev_dir = Path(self.base_dir).parent
-            alt_ver = dev_dir / "ver"
-            if alt_ver.exists():
-                ver_dir = alt_ver
-            else:
-                ver_dir = None
+        if ver_dir.exists():
+            ver_dirs.append(ver_dir)
+        dev_dir = Path(self.base_dir).parent
+        alt_ver = dev_dir / "ver"
+        if alt_ver.exists():
+            ver_dirs.append(alt_ver)
+        if hasattr(sys, '_MEIPASS'):
+            meipass_ver = Path(sys._MEIPASS) / "ver"
+            if meipass_ver.exists():
+                ver_dirs.append(meipass_ver)
+        exe_dir_ver = Path(os.path.dirname(sys.executable)) / "ver"
+        if exe_dir_ver.exists() and exe_dir_ver not in ver_dirs:
+            ver_dirs.append(exe_dir_ver)
 
-        if ver_dir and ver_dir.exists():
-            for exe_file in ver_dir.glob("*.exe"):
+        for vd in ver_dirs:
+            for exe_file in vd.glob("*.exe"):
                 match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                 if match:
                     version = match.group(1)
-                    file_size = exe_file.stat().st_size / (1024 * 1024)
-                    mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
-                    local_versions[version] = {
-                        'path': str(exe_file),
-                        'size': f"{file_size:.2f} MB",
-                        'date': mtime.strftime("%Y-%m-%d %H:%M"),
-                        'name': exe_file.name,
-                    }
+                    if version not in local_versions:
+                        file_size = exe_file.stat().st_size / (1024 * 1024)
+                        mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
+                        local_versions[version] = {
+                            'path': str(exe_file),
+                            'size': f"{file_size:.2f} MB",
+                            'date': mtime.strftime("%Y-%m-%d %H:%M"),
+                            'name': exe_file.name,
+                        }
 
         return local_versions
 
@@ -530,17 +503,66 @@ class HybridVersionManagerDialog(QDialog):
         self._all_expanded = True
         self.toggle_all_btn.setText("全部收起")
 
+        scroll_area = self.versions_container.parent()
+        if scroll_area:
+            scroll_area.setVisible(False)
+
         while self.versions_layout.count():
             item = self.versions_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
         if self.current_mode == "exe":
-            self._load_exe_versions_async()
+            self._load_exe_versions()
         else:
-            self._load_git_versions_async()
+            self._load_git_versions()
 
-    def _load_exe_versions_async(self):
+        if scroll_area:
+            scroll_area.setVisible(True)
+
+    def _fetch_remote_versions(self):
+        if self._remote_versions_cache is not None:
+            return self._remote_versions_cache
+        try:
+            url = _build_api_url(REMOTE_VERSIONS_API)
+            req = Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            resp = urlopen(req, timeout=10)
+            data = json.loads(resp.read().decode('utf-8'))
+            content_b64 = data.get('content', '')
+            content = base64.b64decode(content_b64).decode('utf-8')
+            versions = json.loads(content)
+            self._remote_versions_cache = versions
+            return versions
+        except HTTPError as e:
+            print(f"远程稳定版获取失败 (HTTP {e.code}): {e.reason}")
+            return []
+        except URLError as e:
+            print(f"远程稳定版获取失败 (网络错误): {e.reason}")
+            return []
+        except Exception as e:
+            print(f"远程稳定版获取失败: {e}")
+            return []
+
+    def _fetch_git_commits(self):
+        try:
+            url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
+            req = Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            resp = urlopen(req, timeout=10)
+            commits = json.loads(resp.read().decode('utf-8'))
+            return commits
+        except HTTPError as e:
+            print(f"远程版本获取失败 (HTTP {e.code}): {e.reason}")
+            return []
+        except URLError as e:
+            print(f"远程版本获取失败 (网络错误): {e.reason}")
+            return []
+        except Exception as e:
+            print(f"远程版本获取失败: {e}")
+            return []
+
+    def _load_exe_versions(self):
         self.current_mode_label.setText("EXE 稳定版")
 
         current = self._get_current_exe_version()
@@ -551,27 +573,9 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
-        loading_label = QLabel("正在获取远程版本信息...")
-        loading_label.setStyleSheet("color: #666666; padding: 20px;")
-        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.versions_layout.addWidget(loading_label)
-
+        remote_versions = self._fetch_remote_versions()
         local_versions = self._get_local_exe_versions()
         current_version = current['version'] if current else None
-
-        url = _build_api_url(REMOTE_VERSIONS_API)
-        self._fetch_worker = _FetchWorker([("remote_versions", url)])
-        self._fetch_worker.result_ready.connect(
-            lambda task_id, data: self._on_exe_versions_fetched(data, local_versions, current_version, loading_label)
-        )
-        self._fetch_worker.start()
-
-    def _on_exe_versions_fetched(self, remote_versions, local_versions, current_version, loading_label):
-        if loading_label and loading_label.parent():
-            self.versions_layout.removeWidget(loading_label)
-            loading_label.deleteLater()
-
-        self._detail_widgets = []
 
         if not remote_versions and not local_versions:
             no_version_label = QLabel("未找到稳定版信息\n\n请检查网络连接")
@@ -579,8 +583,6 @@ class HybridVersionManagerDialog(QDialog):
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.versions_layout.addWidget(no_version_label)
             return
-
-        self._remote_versions_cache = remote_versions
 
         merged = {}
         for rv in remote_versions:
@@ -828,7 +830,7 @@ class HybridVersionManagerDialog(QDialog):
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"启动版本失败:\n{str(e)}")
 
-    def _load_git_versions_async(self):
+    def _load_git_versions(self):
         self.current_mode_label.setText("Git 开发版")
 
         local_ver = self._get_local_version_string()
@@ -837,24 +839,7 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
-        loading_label = QLabel("正在获取远程提交历史...")
-        loading_label.setStyleSheet("color: #666666; padding: 20px;")
-        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.versions_layout.addWidget(loading_label)
-
-        url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
-        self._fetch_worker = _FetchWorker([("git_commits", url)])
-        self._fetch_worker.result_ready.connect(
-            lambda task_id, data: self._on_git_commits_fetched(data, local_ver, loading_label)
-        )
-        self._fetch_worker.start()
-
-    def _on_git_commits_fetched(self, commits, current_version, loading_label):
-        if loading_label and loading_label.parent():
-            self.versions_layout.removeWidget(loading_label)
-            loading_label.deleteLater()
-
-        self._detail_widgets = []
+        commits = self._fetch_git_commits()
 
         if not commits:
             no_version_label = QLabel("未获取到远程提交历史\n\n请检查网络连接")
@@ -862,6 +847,8 @@ class HybridVersionManagerDialog(QDialog):
             no_version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.versions_layout.addWidget(no_version_label)
             return
+
+        current_version = local_ver
 
         for commit_data in commits:
             commit = commit_data.get('commit', {})
