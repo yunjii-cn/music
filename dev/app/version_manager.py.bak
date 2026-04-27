@@ -1,4 +1,4 @@
-"""
+﻿"""
 版本管理器模块 - 混合模式版本管理器
 支持Git开发版（Gitee API）和EXE稳定版管理
 所有远程数据获取均通过 urlopen，零 subprocess，零弹窗
@@ -148,8 +148,6 @@ class HybridVersionManagerDialog(QDialog):
         self._git_repo_checked = False
         self.has_git_repo = False
         self._remote_versions_cache = None
-        self._detail_widgets = []
-        self._all_expanded = True
 
         self._setup_ui()
         self._load_local_version_history()
@@ -175,8 +173,6 @@ class HybridVersionManagerDialog(QDialog):
             Path(self.base_dir) / 'version_history.json',
             Path(self.base_dir) / 'dist' / 'version_history.json',
         ]
-        if hasattr(sys, '_MEIPASS'):
-            possible_paths.append(Path(sys._MEIPASS) / 'version_history.json')
         for history_path in possible_paths:
             if history_path.exists():
                 try:
@@ -361,12 +357,6 @@ class HybridVersionManagerDialog(QDialog):
         list_label.setStyleSheet("color: #888888;")
         list_header.addWidget(list_label)
         list_header.addStretch()
-
-        self.toggle_all_btn = QPushButton("全部收起")
-        self.toggle_all_btn.setFixedWidth(90)
-        self.toggle_all_btn.setStyleSheet(DARK_BTN_STYLE)
-        self.toggle_all_btn.clicked.connect(self._toggle_all_details)
-        list_header.addWidget(self.toggle_all_btn)
         layout.addLayout(list_header)
 
         scroll_area = QScrollArea()
@@ -402,12 +392,6 @@ class HybridVersionManagerDialog(QDialog):
             self._load_versions(force=True)
         except Exception as e:
             print(f"模式切换失败：{e}")
-
-    def _toggle_all_details(self):
-        self._all_expanded = not self._all_expanded
-        for dw in self._detail_widgets:
-            dw.setVisible(self._all_expanded)
-        self.toggle_all_btn.setText("全部收起" if self._all_expanded else "全部展开")
 
     def _get_current_exe_version(self):
         try:
@@ -472,36 +456,28 @@ class HybridVersionManagerDialog(QDialog):
 
     def _get_local_exe_versions(self):
         local_versions = {}
-        ver_dirs = []
         ver_dir = Path(self.base_dir) / "ver"
-        if ver_dir.exists():
-            ver_dirs.append(ver_dir)
-        dev_dir = Path(self.base_dir).parent
-        alt_ver = dev_dir / "ver"
-        if alt_ver.exists() and alt_ver not in ver_dirs:
-            ver_dirs.append(alt_ver)
-        if hasattr(sys, '_MEIPASS'):
-            meipass_ver = Path(sys._MEIPASS) / "ver"
-            if meipass_ver.exists() and meipass_ver not in ver_dirs:
-                ver_dirs.append(meipass_ver)
-        exe_dir_ver = Path(os.path.dirname(sys.executable)) / "ver"
-        if exe_dir_ver.exists() and exe_dir_ver not in ver_dirs:
-            ver_dirs.append(exe_dir_ver)
+        if not ver_dir.exists():
+            dev_dir = Path(self.base_dir).parent
+            alt_ver = dev_dir / "ver"
+            if alt_ver.exists():
+                ver_dir = alt_ver
+            else:
+                ver_dir = None
 
-        for vd in ver_dirs:
-            for exe_file in vd.glob("*.exe"):
+        if ver_dir and ver_dir.exists():
+            for exe_file in ver_dir.glob("*.exe"):
                 match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                 if match:
                     version = match.group(1)
-                    if version not in local_versions:
-                        file_size = exe_file.stat().st_size / (1024 * 1024)
-                        mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
-                        local_versions[version] = {
-                            'path': str(exe_file),
-                            'size': f"{file_size:.2f} MB",
-                            'date': mtime.strftime("%Y-%m-%d %H:%M"),
-                            'name': exe_file.name,
-                        }
+                    file_size = exe_file.stat().st_size / (1024 * 1024)
+                    mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
+                    local_versions[version] = {
+                        'path': str(exe_file),
+                        'size': f"{file_size:.2f} MB",
+                        'date': mtime.strftime("%Y-%m-%d %H:%M"),
+                        'name': exe_file.name,
+                    }
 
         if Path(self.base_dir).exists():
             for exe_file in Path(self.base_dir).glob("*.exe"):
@@ -554,9 +530,6 @@ class HybridVersionManagerDialog(QDialog):
             return
         self._versions_loaded = True
         self._remote_versions_cache = None
-        self._detail_widgets = []
-        self._all_expanded = True
-        self.toggle_all_btn.setText("全部收起")
 
         scroll_area = self.versions_container.parent()
         if scroll_area:
@@ -730,9 +703,9 @@ class HybridVersionManagerDialog(QDialog):
                 switch_btn.setStyleSheet(DARK_BTN_PRIMARY)
                 header.addWidget(switch_btn)
             else:
-                status_label = QLabel("已提供")
+                status_label = QLabel("远程版本")
                 status_label.setFont(QFont("Microsoft YaHei", 9))
-                status_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
+                status_label.setStyleSheet("color: #444444; border: none; background: transparent;")
                 header.addWidget(status_label)
 
             toggle_btn = QPushButton("详情" if not is_expanded else "收起")
@@ -778,7 +751,6 @@ class HybridVersionManagerDialog(QDialog):
             changes_layout.addWidget(no_changes_label)
 
         detail_widget.setVisible(is_expanded)
-        self._detail_widgets.append(detail_widget)
         layout.addWidget(detail_widget)
 
         if not is_current:
@@ -990,7 +962,6 @@ class HybridVersionManagerDialog(QDialog):
             detail_layout.addWidget(no_detail_label)
 
         detail_widget.setVisible(False)
-        self._detail_widgets.append(detail_widget)
         main_layout.addWidget(detail_widget)
 
         def toggle_detail(checked=False, dw=detail_widget, tb=toggle_btn):
