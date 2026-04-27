@@ -390,12 +390,6 @@ class HybridVersionManagerDialog(QDialog):
         scroll_area.setWidget(self.versions_container)
         layout.addWidget(scroll_area, stretch=1)
 
-    def _toggle_all_details(self):
-        self._all_expanded = not self._all_expanded
-        for dw in self._detail_widgets:
-            dw.setVisible(self._all_expanded)
-        self.toggle_all_btn.setText("全部收起" if self._all_expanded else "全部展开")
-
     def _on_mode_changed(self, new_mode):
         try:
             if new_mode == self.current_mode:
@@ -410,6 +404,12 @@ class HybridVersionManagerDialog(QDialog):
             self._load_versions(force=True)
         except Exception as e:
             print(f"模式切换失败：{e}")
+
+    def _toggle_all_details(self):
+        self._all_expanded = not self._all_expanded
+        for dw in self._detail_widgets:
+            dw.setVisible(self._all_expanded)
+        self.toggle_all_btn.setText("全部收起" if self._all_expanded else "全部展开")
 
     def _get_current_exe_version(self):
         try:
@@ -448,6 +448,30 @@ class HybridVersionManagerDialog(QDialog):
             print(f"获取当前EXE版本失败：{e}")
             return None
 
+    def _fetch_remote_versions(self):
+        if self._remote_versions_cache is not None:
+            return self._remote_versions_cache
+        try:
+            url = _build_api_url(REMOTE_VERSIONS_API)
+            req = Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            resp = urlopen(req, timeout=10)
+            data = json.loads(resp.read().decode('utf-8'))
+            content_b64 = data.get('content', '')
+            content = base64.b64decode(content_b64).decode('utf-8')
+            versions = json.loads(content)
+            self._remote_versions_cache = versions
+            return versions
+        except HTTPError as e:
+            print(f"远程稳定版获取失败 (HTTP {e.code}): {e.reason}")
+            return []
+        except URLError as e:
+            print(f"远程稳定版获取失败 (网络错误): {e.reason}")
+            return []
+        except Exception as e:
+            print(f"远程稳定版获取失败: {e}")
+            return []
+
     def _get_local_exe_versions(self):
         local_versions = {}
         ver_dirs = []
@@ -456,11 +480,11 @@ class HybridVersionManagerDialog(QDialog):
             ver_dirs.append(ver_dir)
         dev_dir = Path(self.base_dir).parent
         alt_ver = dev_dir / "ver"
-        if alt_ver.exists():
+        if alt_ver.exists() and alt_ver not in ver_dirs:
             ver_dirs.append(alt_ver)
         if hasattr(sys, '_MEIPASS'):
             meipass_ver = Path(sys._MEIPASS) / "ver"
-            if meipass_ver.exists():
+            if meipass_ver.exists() and meipass_ver not in ver_dirs:
                 ver_dirs.append(meipass_ver)
         exe_dir_ver = Path(os.path.dirname(sys.executable)) / "ver"
         if exe_dir_ver.exists() and exe_dir_ver not in ver_dirs:
@@ -482,6 +506,24 @@ class HybridVersionManagerDialog(QDialog):
                         }
 
         return local_versions
+
+    def _fetch_git_commits(self):
+        try:
+            url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
+            req = Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            resp = urlopen(req, timeout=10)
+            commits = json.loads(resp.read().decode('utf-8'))
+            return commits
+        except HTTPError as e:
+            print(f"远程版本获取失败 (HTTP {e.code}): {e.reason}")
+            return []
+        except URLError as e:
+            print(f"远程版本获取失败 (网络错误): {e.reason}")
+            return []
+        except Exception as e:
+            print(f"远程版本获取失败: {e}")
+            return []
 
     def _get_local_version_string(self):
         try:
@@ -519,48 +561,6 @@ class HybridVersionManagerDialog(QDialog):
 
         if scroll_area:
             scroll_area.setVisible(True)
-
-    def _fetch_remote_versions(self):
-        if self._remote_versions_cache is not None:
-            return self._remote_versions_cache
-        try:
-            url = _build_api_url(REMOTE_VERSIONS_API)
-            req = Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0')
-            resp = urlopen(req, timeout=10)
-            data = json.loads(resp.read().decode('utf-8'))
-            content_b64 = data.get('content', '')
-            content = base64.b64decode(content_b64).decode('utf-8')
-            versions = json.loads(content)
-            self._remote_versions_cache = versions
-            return versions
-        except HTTPError as e:
-            print(f"远程稳定版获取失败 (HTTP {e.code}): {e.reason}")
-            return []
-        except URLError as e:
-            print(f"远程稳定版获取失败 (网络错误): {e.reason}")
-            return []
-        except Exception as e:
-            print(f"远程稳定版获取失败: {e}")
-            return []
-
-    def _fetch_git_commits(self):
-        try:
-            url = _build_api_url(f"{REMOTE_COMMITS_URL}?per_page=30")
-            req = Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0')
-            resp = urlopen(req, timeout=10)
-            commits = json.loads(resp.read().decode('utf-8'))
-            return commits
-        except HTTPError as e:
-            print(f"远程版本获取失败 (HTTP {e.code}): {e.reason}")
-            return []
-        except URLError as e:
-            print(f"远程版本获取失败 (网络错误): {e.reason}")
-            return []
-        except Exception as e:
-            print(f"远程版本获取失败: {e}")
-            return []
 
     def _load_exe_versions(self):
         self.current_mode_label.setText("EXE 稳定版")
@@ -663,13 +663,13 @@ class HybridVersionManagerDialog(QDialog):
         else:
             card.setStyleSheet("""
                 #versionCard {
-                    background-color: #161616;
-                    border: 1px solid #222222;
+                    background-color: #111111;
+                    border: 1px solid #1a1a1a;
                     border-radius: 8px;
                 }
                 #versionCard:hover {
-                    background-color: #1c1c1c;
-                    border-color: #333333;
+                    background-color: #161616;
+                    border-color: #222222;
                 }
                 QLabel { border: none; background: transparent; }
                 QWidget { border: none; background: transparent; }
@@ -686,10 +686,10 @@ class HybridVersionManagerDialog(QDialog):
         version_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         if is_current:
             version_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
-        elif is_available:
-            version_label.setStyleSheet("color: #E0E0E0; border: none; background: transparent;")
+        elif not is_available:
+            version_label.setStyleSheet("color: #555555; border: none; background: transparent;")
         else:
-            version_label.setStyleSheet("color: #AAAAAA; border: none; background: transparent;")
+            version_label.setStyleSheet("color: #E0E0E0; border: none; background: transparent;")
         header.addWidget(version_label)
 
         if version.get('date'):
