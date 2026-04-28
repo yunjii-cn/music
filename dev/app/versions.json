@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0705",
+    "date": "2026-04-29 07:06",
+    "message": "修复依赖缺失不自动安装：1._quick_verify_environment发现缺失时自动触发_install_missing_dependencies 2.新增_install_missing_dependencies方法(先uv sync再install-env.ps1最后逐个安装) 3.所有安装命令使用清华镜像源",
+    "changes": [
+      "修复依赖缺失不自动安装：1._quick_verify_environment发现缺失时自动触发_install_missing_dependencies 2.新增_install_missing_dependencies方法(先uv sync再install-env.ps1最后逐个安装) 3.所有安装命令使用清华镜像源"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0705.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0655",
     "date": "2026-04-29 06:57",
     "message": "修复RecursionError：1.删除main.py重复的Popen patch 2.launcher.py添加_pyi_hidden_patched防重复patch 3.pyi_rth_subprocess.py添加标记",

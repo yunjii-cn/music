@@ -2393,6 +2393,126 @@ class MainWindow(QMainWindow):
         self._log("环境检测完成！", "#E53935")
         self._log("========================================")
     
+    def _install_missing_dependencies(self, venv_python, scripts_dir):
+        """检测并安装缺失的依赖"""
+        uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+        if not os.path.exists(uv_path):
+            self._log("[错误] uv 未安装，无法自动修复依赖", "#F44336")
+            return
+        
+        env = os.environ.copy()
+        env["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+        env["UV_EXTRA_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
+        
+        required_deps = [
+            ("loguru", "日志库"),
+            ("psutil", "系统监控"),
+            ("torch", "PyTorch 核心"),
+            ("torchaudio", "音频处理"),
+            ("transformers", "模型加载"),
+            ("diffusers", "扩散模型"),
+            ("peft", "LoRA/训练"),
+            ("lycoris", "LoKr 训练"),
+        ]
+        
+        missing = []
+        for dep, desc in required_deps:
+            try:
+                process = hidden_popen(
+                    [venv_python, "-c", f"import {dep}"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                stdout, stderr = process.communicate(timeout=10)
+                if process.returncode != 0:
+                    missing.append(dep)
+                    self._log(f"[信息] {dep} ({desc}) 缺失，需要安装")
+            except Exception:
+                missing.append(dep)
+        
+        if not missing:
+            return
+        
+        self._log(f"[信息] 共 {len(missing)} 个依赖缺失，开始安装...")
+        
+        pyproject_toml = os.path.join(scripts_dir, "pyproject.toml")
+        install_env_ps1 = os.path.join(scripts_dir, "install-env.ps1")
+        
+        if os.path.exists(pyproject_toml):
+            self._log("[信息] 使用 uv sync 安装完整依赖...")
+            try:
+                process = hidden_popen(
+                    [uv_path, "sync"],
+                    cwd=scripts_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    env=env
+                )
+                stdout, _ = process.communicate(timeout=1200)
+                if stdout:
+                    for line in stdout.splitlines():
+                        if line.strip():
+                            self._log(f"[安装依赖] {line.strip()}")
+                if process.returncode == 0:
+                    self._log("✓ 依赖安装完成")
+                    return
+                else:
+                    self._log(f"[警告] uv sync 返回码: {process.returncode}", "#FF9800")
+            except subprocess.TimeoutExpired:
+                process.kill()
+                self._log("[警告] uv sync 超时", "#FF9800")
+            except Exception as e:
+                self._log(f"[警告] uv sync 失败: {e}", "#FF9800")
+        
+        if os.path.exists(install_env_ps1):
+            self._log("[信息] 使用 install-env.ps1 安装依赖...")
+            try:
+                process = hidden_popen(
+                    ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_env_ps1],
+                    cwd=scripts_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+                stdout, _ = process.communicate(timeout=1800)
+                if stdout:
+                    for line in stdout.splitlines():
+                        if line.strip():
+                            self._log(f"[install-env] {line.strip()}")
+                if process.returncode == 0:
+                    self._log("✓ 依赖安装完成")
+                    return
+                else:
+                    self._log(f"[警告] install-env.ps1 返回码: {process.returncode}", "#FF9800")
+            except subprocess.TimeoutExpired:
+                process.kill()
+                self._log("[警告] install-env.ps1 超时", "#FF9800")
+            except Exception as e:
+                self._log(f"[警告] install-env.ps1 失败: {e}", "#FF9800")
+        
+        self._log("[信息] 逐个安装缺失依赖...")
+        for dep in missing:
+            try:
+                self._log(f"[信息] 正在安装: {dep}")
+                process = hidden_popen(
+                    [uv_path, "pip", "install", dep],
+                    cwd=scripts_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    env=env
+                )
+                stdout, _ = process.communicate(timeout=300)
+                if process.returncode == 0:
+                    self._log(f"✓ {dep} 安装完成")
+                else:
+                    self._log(f"[警告] {dep} 安装失败", "#FF9800")
+            except Exception as e:
+                self._log(f"[警告] 安装 {dep} 失败: {e}", "#FF9800")
+    
     def _install_minimal_dependencies(self, venv_python, uv_path, scripts_dir, env):
         """安装最小化的关键依赖（备用方案）"""
         self._log("[信息] 正在安装关键依赖...")
@@ -2603,6 +2723,10 @@ class MainWindow(QMainWindow):
             # 5. 验证关键依赖
             self._log("5. 验证关键依赖...")
             venv_python = os.path.join(scripts_dir, ".venv", "Scripts", "python.exe")
+            deps_ok = self._quick_check_dependencies(venv_python)
+            if not deps_ok:
+                self._log("[警告] 检测到关键依赖缺失，自动修复...", "#FF9800")
+                self._install_missing_dependencies(venv_python, scripts_dir)
             self._verify_dependencies(venv_python)
             
             # 6. 检查 git 子模块
