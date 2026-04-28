@@ -96,7 +96,6 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
-import psutil
 
 if sys.platform == 'win32':
     _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
@@ -138,13 +137,13 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTextEdit, QFrame, QGridLayout, QScrollArea,
     QGroupBox, QMessageBox, QProgressBar, QSplitter, QSystemTrayIcon,
-    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog
+    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog,
+    QSplashScreen
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess
-from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QRect
+from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPixmap, QPainter
 
-# Version manager
-from version_manager import VersionManagerDialog, ModelManagerDialog
+# Version manager - lazy imported
 
 # Version based on executable filename
 def get_version_from_filename():
@@ -1092,7 +1091,7 @@ class MainWindow(QMainWindow):
         
         # 模型管理相关
         self.model_list = []
-        self._load_model_list()
+        self._model_list_loaded = False
         
         # 模型下载线程
         self.model_download_thread = None
@@ -1327,13 +1326,15 @@ class MainWindow(QMainWindow):
         self.home_page = self._create_home_page()
         self.page_stack.addWidget(self.home_page)
         
-        # 页面1：模型管理器
-        self.model_page = self._create_model_page()
-        self.page_stack.addWidget(self.model_page)
+        # 页面1：模型管理器（延迟创建）
+        self.model_page = None
+        self.model_manager_widget = None
+        self.page_stack.addWidget(QWidget())
         
-        # 页面2：版本管理器
-        self.version_page = self._create_version_page()
-        self.page_stack.addWidget(self.version_page)
+        # 页面2：版本管理器（延迟创建）
+        self.version_page = None
+        self.version_manager_widget = None
+        self.page_stack.addWidget(QWidget())
         
         main_layout.addWidget(self.page_stack, 1)
     
@@ -1827,25 +1828,38 @@ class MainWindow(QMainWindow):
         self.btn_model_nav.setChecked(index == 1)
         self.btn_version_nav.setChecked(index == 2)
         
+        if index == 1 and self.model_page is None:
+            self.model_page = self._create_model_page()
+            self.page_stack.removeWidget(self.page_stack.widget(1))
+            self.page_stack.insertWidget(1, self.model_page)
+        
+        if index == 2 and self.version_page is None:
+            self.version_page = self._create_version_page()
+            self.page_stack.removeWidget(self.page_stack.widget(2))
+            self.page_stack.insertWidget(2, self.version_page)
+        
         self.page_stack.setCurrentIndex(index)
         
-        if index == 1 and hasattr(self, 'model_manager_widget'):
+        if index == 1 and self.model_manager_widget is not None:
+            if not self._model_list_loaded:
+                self._model_list_loaded = True
+                self._load_model_list()
             self.model_manager_widget._update_ui()
         
-        if index == 2 and hasattr(self, 'version_manager_widget'):
+        if index == 2 and self.version_manager_widget is not None:
             if not self.version_manager_widget._versions_loaded:
                 QTimer.singleShot(300, self._delayed_load_versions)
     
     def _delayed_load_versions(self):
         """延迟加载版本列表"""
-        if hasattr(self, 'version_manager_widget'):
+        if self.version_manager_widget is not None:
             vm = self.version_manager_widget
             if not vm._git_repo_checked:
                 vm._git_repo_checked = True
                 if hasattr(vm, 'mode_buttons_widget'):
                     vm.mode_buttons_widget.setVisible(True)
-                    vm.btn_mode_exe.setChecked(True)
-                    vm.btn_mode_git.setChecked(False)
+                    vm.btn_mode_exe.setChecked(False)
+                    vm.btn_mode_git.setChecked(True)
             vm._load_versions(force=True)
     
     def _setup_monitor(self):
@@ -1939,6 +1953,7 @@ class MainWindow(QMainWindow):
     def _open_full_version_dialog(self):
         """打开完整的版本管理器对话框"""
         try:
+            from version_manager import VersionManagerDialog
             dialog = VersionManagerDialog(self, self.base_dir)
             dialog.exec()
         except Exception as e:
@@ -3776,6 +3791,7 @@ try {
                 for service_id, service in SERVICES.items():
                     port = service["port"]
                     try:
+                        import psutil
                         for conn in psutil.net_connections():
                             if conn.laddr.port == port and conn.status == 'LISTEN':
                                 try:
@@ -4334,7 +4350,7 @@ try {
         self._update_model_management_ui()
         
         # 显示进度条
-        if hasattr(self, 'model_manager_widget') and self.model_manager_widget:
+        if self.model_manager_widget is not None:
             self.model_manager_widget.show_progress(f"正在下载: {model_name}")
         
         # 创建下载线程
@@ -4357,7 +4373,7 @@ try {
     
     def _on_download_progress_updated(self, value: int, desc: str):
         """下载进度更新回调"""
-        if hasattr(self, 'model_manager_widget') and self.model_manager_widget:
+        if self.model_manager_widget is not None:
             self.model_manager_widget.update_progress(value, desc)
     
     def _on_download_finished(self, success: bool, model_name: str):
@@ -4366,7 +4382,7 @@ try {
         self.current_operation_model = None
         
         # 隐藏进度条
-        if hasattr(self, 'model_manager_widget') and self.model_manager_widget:
+        if self.model_manager_widget is not None:
             self.model_manager_widget.hide_progress()
         
         if success:
@@ -4507,7 +4523,7 @@ try {
             verify_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
             # 如果有模型管理器widget，更新它
-            if hasattr(self, 'model_manager_widget'):
+            if self.model_manager_widget is not None:
                 self.model_manager_widget.last_verify_time = verify_time
                 self.model_manager_widget.last_verify_result = (total_models, installed_models)
                 # 更新标签
@@ -4793,6 +4809,7 @@ try {
         
         self._stop_all_services()
         
+        import psutil
         process_names = ["python.exe", "python", "node.exe", "node", "powershell.exe", "pwsh.exe"]
         
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
@@ -4880,8 +4897,34 @@ def main():
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
+    splash = QSplashScreen()
+    splash_pixmap = QPixmap(480, 320)
+    splash_pixmap.fill(QColor("#0D0D0D"))
+    painter = QPainter(splash_pixmap)
+    painter.setPen(QColor("#F0F0F0"))
+    title_font = QFont("Microsoft YaHei", 18, QFont.Weight.Bold)
+    painter.setFont(title_font)
+    painter.drawText(splash_pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "云集智能音乐创意台")
+    sub_font = QFont("Microsoft YaHei", 10)
+    painter.setFont(sub_font)
+    painter.setPen(QColor("#888888"))
+    sub_rect = QRect(0, splash_pixmap.height() // 2 + 30, splash_pixmap.width(), 30)
+    painter.drawText(sub_rect, Qt.AlignmentFlag.AlignCenter, "正在加载，请稍候...")
+    bar_rect = QRect(90, splash_pixmap.height() - 60, 300, 6)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor("#333333"))
+    painter.drawRoundedRect(bar_rect, 3, 3)
+    progress_rect = QRect(90, splash_pixmap.height() - 60, 60, 6)
+    painter.setBrush(QColor("#1565C0"))
+    painter.drawRoundedRect(progress_rect, 3, 3)
+    painter.end()
+    splash.setPixmap(splash_pixmap)
+    splash.show()
+    app.processEvents()
+    
     window = MainWindow()
     window.show()
+    splash.finish(window)
     
     sys.exit(app.exec())
 
