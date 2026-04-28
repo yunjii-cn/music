@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0510",
+    "date": "2026-04-29 05:12",
+    "message": "回滚到v0309+启动优化：splash提前到launcher.py创建，点击EXE后更快显示动态进度条",
+    "changes": [
+      "回滚到v0309+启动优化：splash提前到launcher.py创建，点击EXE后更快显示动态进度条"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0510.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0453",
     "date": "2026-04-29 04:55",
     "message": "去掉PyInstaller Tk splash，改用Qt QSplashScreen+QTimer动态进度条",

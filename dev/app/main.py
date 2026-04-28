@@ -140,7 +140,7 @@ from PyQt6.QtWidgets import (
     QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog,
     QSplashScreen
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QRectF
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QPropertyAnimation, QRectF, pyqtProperty
 from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPainter, QPixmap, QLinearGradient
 
 # Version manager - lazy imported
@@ -1025,34 +1025,12 @@ class ServiceCard(QFrame):
 
 
 class SplashScreen(QSplashScreen):
-    _inst = None
-
-    @classmethod
-    def instance(cls):
-        if cls._inst is None:
-            cls._inst = cls()
-        return cls._inst
-
-    @classmethod
-    def update_progress(cls, progress, message=""):
-        inst = cls.instance()
-        inst._target = progress
-        if message:
-            inst._message = message
-
-    @classmethod
-    def close_splash(cls):
-        if cls._inst:
-            cls._inst._timer.stop()
-            cls._inst = None
-
     def __init__(self):
         pixmap = QPixmap(520, 360)
         pixmap.fill(QColor("#0D0D0D"))
         super().__init__(pixmap)
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
         self._progress = 0.0
-        self._target = 0.0
         self._message = "正在初始化..."
         self._icon_pixmap = None
         try:
@@ -1064,20 +1042,28 @@ class SplashScreen(QSplashScreen):
                 self._icon_pixmap = QPixmap(icon_path)
         except Exception:
             pass
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start(33)
 
-    def _tick(self):
-        diff = self._target - self._progress
-        if abs(diff) < 0.005:
-            self._progress = self._target
-        else:
-            step = diff * 0.18
-            if abs(step) < 0.002:
-                step = 0.002 if diff > 0 else -0.002
-            self._progress = max(0.0, min(1.0, self._progress + step))
+    def _get_progress(self):
+        return self._progress
+
+    def _set_progress(self, val):
+        self._progress = val
         self.repaint()
+
+    progress = pyqtProperty(float, _get_progress, _set_progress)
+
+    def set_progress(self, value, message=""):
+        if message:
+            self._message = message
+        anim = QPropertyAnimation(self, b"progress")
+        anim.setDuration(300)
+        anim.setStartValue(self._progress)
+        anim.setEndValue(value)
+        anim.start()
+        self._anim = anim
+        if message:
+            self._message = message
+            self.repaint()
 
     def drawContents(self, painter):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -1088,7 +1074,7 @@ class SplashScreen(QSplashScreen):
             icon_size = 80
             scaled = self._icon_pixmap.scaled(icon_size, icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             ix = (w - scaled.width()) // 2
-            painter.drawPixmap(ix, 50, scaled)
+            painter.drawPixmap(ix, 60, scaled)
 
         painter.setPen(QColor("#F0F0F0"))
         title_font = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
@@ -1096,20 +1082,20 @@ class SplashScreen(QSplashScreen):
         title = "云集智能音乐创意台"
         fm = painter.fontMetrics()
         tw = fm.horizontalAdvance(title)
-        painter.drawText((w - tw) // 2, 170, title)
+        painter.drawText((w - tw) // 2, 180, title)
 
-        bar_x, bar_y, bar_w, bar_h = 60, 240, w - 120, 12
+        bar_x, bar_y, bar_w, bar_h = 60, 240, w - 120, 10
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor("#222222"))
-        painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h), 6, 6)
+        painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h), 5, 5)
 
         fill_w = bar_w * min(self._progress, 1.0)
-        if fill_w > 1:
+        if fill_w > 0:
             grad = QLinearGradient(bar_x, bar_y, bar_x + fill_w, bar_y)
             grad.setColorAt(0, QColor("#1565C0"))
             grad.setColorAt(1, QColor("#42A5F5"))
             painter.setBrush(grad)
-            painter.drawRoundedRect(QRectF(bar_x, bar_y, fill_w, bar_h), 6, 6)
+            painter.drawRoundedRect(QRectF(bar_x, bar_y, fill_w, bar_h), 5, 5)
 
         painter.setPen(QColor("#888888"))
         msg_font = QFont("Microsoft YaHei", 10)
@@ -1117,16 +1103,15 @@ class SplashScreen(QSplashScreen):
         msg = self._message
         fm2 = painter.fontMetrics()
         mw = fm2.horizontalAdvance(msg)
-        painter.drawText((w - mw) // 2, 268, msg)
+        painter.drawText((w - mw) // 2, 275, msg)
 
-        if self._progress > 0.01:
-            pct = f"{int(min(self._progress, 1.0) * 100)}%"
-            painter.setPen(QColor("#42A5F5"))
-            pct_font = QFont("Microsoft YaHei", 9)
-            painter.setFont(pct_font)
-            fm3 = painter.fontMetrics()
-            pw = fm3.horizontalAdvance(pct)
-            painter.drawText((w - pw) // 2, 295, pct)
+        pct = f"{int(min(self._progress, 1.0) * 100)}%"
+        painter.setPen(QColor("#42A5F5"))
+        pct_font = QFont("Microsoft YaHei", 9)
+        painter.setFont(pct_font)
+        fm3 = painter.fontMetrics()
+        pw = fm3.horizontalAdvance(pct)
+        painter.drawText((w - pw) // 2, 300, pct)
 
 
 class MainWindow(QMainWindow):
@@ -1134,8 +1119,9 @@ class MainWindow(QMainWindow):
     log_signal = pyqtSignal(str, str)
     enable_buttons_signal = pyqtSignal()
     
-    def __init__(self):
+    def __init__(self, splash=None):
         super().__init__()
+        self._splash = splash
         self.setWindowTitle(f"云集智能音乐创意台 v{VERSION}")
         self.setStyleSheet("""
             QMainWindow {
@@ -1331,14 +1317,17 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(self.page_stack, 1)
         
-        SplashScreen.update_progress(0.2, "正在初始化框架...")
+        if self._splash:
+            self._splash.set_progress(0.2, "正在初始化框架...")
     
     def _deferred_init(self):
-        SplashScreen.update_progress(0.3, "正在加载配置...")
+        if self._splash:
+            self._splash.set_progress(0.3, "正在加载配置...")
         
         self.config = ConfigManager(self.base_dir)
         
-        SplashScreen.update_progress(0.4, "正在检测浏览器...")
+        if self._splash:
+            self._splash.set_progress(0.4, "正在检测浏览器...")
         
         self.browsers = self._detect_browsers()
         self.selected_browser = self.config.get("browser.default", "system")
@@ -1347,7 +1336,8 @@ class MainWindow(QMainWindow):
             self.browsers["自定义浏览器"] = self.custom_browser_path
         self.selected_download_source = self.config.get("download.source", "auto")
         
-        SplashScreen.update_progress(0.5, "正在构建主界面...")
+        if self._splash:
+            self._splash.set_progress(0.5, "正在构建主界面...")
         
         while self.home_layout.count():
             item = self.home_layout.takeAt(0)
@@ -1356,7 +1346,8 @@ class MainWindow(QMainWindow):
         
         self._populate_home_page()
         
-        SplashScreen.update_progress(0.75, "正在启动监控...")
+        if self._splash:
+            self._splash.set_progress(0.75, "正在启动监控...")
         
         self._setup_monitor()
         self._setup_tray()
@@ -1366,7 +1357,8 @@ class MainWindow(QMainWindow):
         
         self._home_loaded = True
         
-        SplashScreen.update_progress(1.0, "加载完成！")
+        if self._splash:
+            self._splash.set_progress(1.0, "加载完成！")
     
     def _populate_home_page(self):
         """填充首页内容到已有的home_layout"""
@@ -4903,39 +4895,34 @@ def extract_scripts():
                     pass
 
 
-def main():
+def main(app=None, splash=None):
     extract_scripts()
     
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
+    if app is None:
+        app = QApplication(sys.argv)
+        app.setStyle('Fusion')
+        
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("#0D0D0D"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#F0F0F0"))
+        palette.setColor(QPalette.ColorRole.Base, QColor("#1A1A1A"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#F0F0F0"))
+        palette.setColor(QPalette.ColorRole.Button, QColor("#1A1A1A"))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F0F0F0"))
+        app.setPalette(palette)
+        
+        font = QFont("Microsoft YaHei", 10)
+        app.setFont(font)
     
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor("#0D0D0D"))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor("#F0F0F0"))
-    palette.setColor(QPalette.ColorRole.Base, QColor("#1A1A1A"))
-    palette.setColor(QPalette.ColorRole.Text, QColor("#F0F0F0"))
-    palette.setColor(QPalette.ColorRole.Button, QColor("#1A1A1A"))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F0F0F0"))
-    app.setPalette(palette)
+    if splash is None:
+        splash = SplashScreen()
+        splash.show()
+        app.processEvents()
     
-    font = QFont("Microsoft YaHei", 10)
-    app.setFont(font)
-    
-    try:
-        import pyi_splash
-        pyi_splash.close()
-    except Exception:
-        pass
-    
-    splash = SplashScreen.instance()
-    splash.show()
-    splash.repaint()
+    splash.set_progress(0.1, "正在创建主窗口...")
     app.processEvents()
     
-    SplashScreen.update_progress(0.1, "正在创建主窗口...")
-    app.processEvents()
-    
-    window = MainWindow()
+    window = MainWindow(splash=splash)
     window.show()
     
     splash.finish(window)
