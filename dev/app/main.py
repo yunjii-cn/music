@@ -4898,6 +4898,12 @@ def extract_scripts():
 def main():
     extract_scripts()
     
+    try:
+        import pyi_splash
+        pyi_splash.update_text("正在启动应用...")
+    except Exception:
+        pass
+    
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
     
@@ -4913,11 +4919,17 @@ def main():
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
+    
     splash = SplashScreen()
     splash.show()
     app.processEvents()
     
-    splash.set_progress(0.1, "正在创建主窗口...")
+    splash.set_progress(0.05, "正在创建主窗口...")
     app.processEvents()
     
     window = MainWindow(splash=splash)
