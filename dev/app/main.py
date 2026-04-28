@@ -4914,10 +4914,42 @@ def main(app=None, splash=None):
         font = QFont("Microsoft YaHei", 10)
         app.setFont(font)
     
+    pyi_pos = None
+    try:
+        import ctypes
+        import ctypes.wintypes
+        user32 = ctypes.windll.user32
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+        found = []
+        @WNDENUMPROC
+        def _enum(hwnd, lparam):
+            if user32.IsWindowVisible(hwnd):
+                cls_buf = ctypes.create_unicode_buffer(256)
+                user32.GetClassNameW(hwnd, cls_buf, 256)
+                if 'Tk' in cls_buf.value:
+                    rect = ctypes.wintypes.RECT()
+                    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                    found.append((rect.left, rect.top))
+            return True
+        user32.EnumWindows(_enum, 0)
+        if found:
+            pyi_pos = found[0]
+    except Exception:
+        pass
+    
     if splash is None:
         splash = SplashScreen()
-        splash.show()
-        app.processEvents()
+    if pyi_pos:
+        splash.move(pyi_pos[0], pyi_pos[1])
+    splash.show()
+    splash.repaint()
+    app.processEvents()
+    
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
     
     splash.set_progress(0.1, "正在创建主窗口...")
     app.processEvents()
