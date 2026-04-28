@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0547",
+    "date": "2026-04-29 05:49",
+    "message": "修复splash位置：Qt splash居中显示匹配Tk splash位置",
+    "changes": [
+      "修复splash位置：Qt splash居中显示匹配Tk splash位置"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0547.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0527",
     "date": "2026-04-29 05:29",
     "message": "PyInstaller Tk splash瞬间显示+Qt动态进度条无缝切换",
