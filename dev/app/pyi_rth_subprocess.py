@@ -113,3 +113,5 @@ if sys.platform == 'win32':
         kwargs = _ensure_hidden(kwargs)
         return _orig_check_output(*args, **kwargs)
     _subprocess.check_output = _patched_check_output
+
+    _subprocess._pyi_hidden_patched = True

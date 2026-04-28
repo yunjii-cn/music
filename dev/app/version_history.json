@@ -808,5 +808,13 @@
     ],
     "build_time": "2026-04-29T06:32:21.895897",
     "version_number": "2026.04.29.0630"
+  },
+  "云集智能音乐创意台-v2026.04.29.0655": {
+    "version": "云集智能音乐创意台-v2026.04.29.0655",
+    "changes": [
+      "修复RecursionError：1.删除main.py重复的Popen patch 2.launcher.py添加_pyi_hidden_patched防重复patch 3.pyi_rth_subprocess.py添加标记"
+    ],
+    "build_time": "2026-04-29T06:57:33.170263",
+    "version_number": "2026.04.29.0655"
   }
 }
