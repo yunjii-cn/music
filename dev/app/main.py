@@ -1023,167 +1023,198 @@ class ServiceCard(QFrame):
             """)
 
 
-class NativeSplash:
-    _hwnd = None
-    _display_progress = 0.0
-    _target_progress = 0.0
-    _message = ""
-    _bar_x = 60
-    _bar_y = 240
-    _bar_w = 400
-    _bar_h = 10
-    _anim_thread = None
-    _anim_stop = False
-    _pct_rect = None
+class NativeSplashWindow:
+    _inst = None
 
     @classmethod
-    def find_splash_hwnd(cls):
-        if cls._hwnd:
-            return cls._hwnd
-        try:
-            import ctypes
-            import ctypes.wintypes
-            user32 = ctypes.windll.user32
-            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-            found = []
-            @WNDENUMPROC
-            def _enum(hwnd, lparam):
-                if user32.IsWindowVisible(hwnd):
-                    cls_buf = ctypes.create_unicode_buffer(256)
-                    user32.GetClassNameW(hwnd, cls_buf, 256)
-                    if 'Tk' in cls_buf.value or 'Splash' in cls_buf.value:
-                        found.append(hwnd)
-                return True
-            user32.EnumWindows(_enum, 0)
-            if found:
-                cls._hwnd = found[0]
-        except Exception:
-            pass
-        return cls._hwnd
+    def show(cls):
+        if cls._inst is None:
+            cls._inst = cls()
+            cls._inst._create()
+        return cls._inst
 
     @classmethod
-    def _start_anim(cls):
-        if cls._anim_thread and cls._anim_thread.is_alive():
-            return
-        import threading
-        cls._anim_stop = False
-        cls._anim_thread = threading.Thread(target=cls._anim_loop, daemon=True)
-        cls._anim_thread.start()
-
-    @classmethod
-    def _anim_loop(cls):
-        import time
-        while not cls._anim_stop:
-            diff = cls._target_progress - cls._display_progress
-            if abs(diff) < 0.005:
-                cls._display_progress = cls._target_progress
-                cls._repaint_bar()
-                break
-            step = diff * 0.15
-            if abs(step) < 0.003:
-                step = 0.003 if diff > 0 else -0.003
-            cls._display_progress += step
-            cls._display_progress = max(0.0, min(1.0, cls._display_progress))
-            cls._repaint_bar()
-            time.sleep(0.033)
-
-    @classmethod
-    def _repaint_bar(cls):
-        hwnd = cls._hwnd
-        if not hwnd:
-            return
-        try:
-            import ctypes
-            import ctypes.wintypes
-            user32 = ctypes.windll.user32
-            gdi32 = ctypes.windll.gdi32
-
-            rect = ctypes.wintypes.RECT()
-            user32.GetClientRect(hwnd, ctypes.byref(rect))
-            cw = rect.right - rect.left
-            ch = rect.bottom - rect.top
-
-            hdc = user32.GetDC(hwnd)
-            if not hdc:
-                return
-
-            bar_x = int(cw * cls._bar_x / 520)
-            bar_y = int(ch * cls._bar_y / 360)
-            bar_w = int(cw * cls._bar_w / 520)
-            bar_h = int(ch * cls._bar_h / 360)
-
-            bg_brush = gdi32.CreateSolidBrush(0x00222222)
-            gdi32.SelectObject(hdc, bg_brush)
-            gdi32.RoundRect(hdc, bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, 5, 5)
-            gdi32.DeleteObject(bg_brush)
-
-            fill_w = int(bar_w * min(cls._display_progress, 1.0))
-            if fill_w > 0:
-                fill_brush = gdi32.CreateSolidBrush(0x00A54215)
-                gdi32.SelectObject(hdc, fill_brush)
-                gdi32.RoundRect(hdc, bar_x, bar_y, bar_x + fill_w, bar_y + bar_h, 5, 5)
-                gdi32.DeleteObject(fill_brush)
-
-            if cls._pct_rect:
-                pr = cls._pct_rect
-                bg2 = gdi32.CreateSolidBrush(0x000D0D0D)
-                gdi32.SelectObject(hdc, bg2)
-                gdi32.FillRect(hdc, ctypes.byref(pr), bg2)
-                gdi32.DeleteObject(bg2)
-
-            if cls._display_progress > 0.01:
-                pct_text = f"{int(min(cls._display_progress, 1.0) * 100)}%"
-                font = gdi32.CreateFontW(14, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, "Microsoft YaHei")
-                old_font = gdi32.SelectObject(hdc, font)
-                gdi32.SetTextColor(hdc, 0x00F5A542)
-                gdi32.SetBkMode(hdc, 1)
-                pct_x = bar_x + (bar_w - 50) // 2
-                pct_y = bar_y + bar_h + 6
-                gdi32.TextOutW(hdc, pct_x, pct_y, pct_text, len(pct_text))
-                gdi32.SelectObject(hdc, old_font)
-                gdi32.DeleteObject(font)
-                cls._pct_rect = ctypes.wintypes.RECT(pct_x, pct_y, pct_x + 50, pct_y + 20)
-
-            user32.ReleaseDC(hwnd, hdc)
-        except Exception:
-            pass
-
-    @classmethod
-    def draw_progress(cls, progress, message=""):
-        hwnd = cls.find_splash_hwnd()
-        if not hwnd:
-            try:
-                import pyi_splash
-                if message:
-                    pyi_splash.update_text(message)
-            except Exception:
-                pass
-            return
-        if message:
-            cls._message = message
-            try:
-                import pyi_splash
-                pyi_splash.update_text(message)
-            except Exception:
-                pass
-        cls._target_progress = progress
-        cls._start_anim()
+    def update_progress(cls, progress, message=""):
+        if cls._inst:
+            cls._inst._set_progress(progress, message)
 
     @classmethod
     def close(cls):
-        cls._anim_stop = True
+        if cls._inst:
+            cls._inst._destroy()
+            cls._inst = None
+
+    def __init__(self):
+        self._hwnd = None
+        self._target = 0.0
+        self._display = 0.0
+        self._msg = "正在初始化..."
+        self._hicon = None
+        self._wndproc_cb = None
+        self._ready = threading.Event()
+        self._closed = False
+
+    def _create(self):
+        t = threading.Thread(target=self._thread_run, daemon=True)
+        t.start()
+        self._ready.wait(timeout=5)
+
+    def _thread_run(self):
+        import ctypes
+        import ctypes.wintypes
+        user32 = ctypes.windll.user32
+        gdi32 = ctypes.windll.gdi32
+        kernel32 = ctypes.windll.kernel32
+
+        hinst = kernel32.GetModuleHandleW(None)
+
+        self._wndproc_cb = ctypes.WINFUNCTYPE(
+            ctypes.wintypes.LPARAM,
+            ctypes.wintypes.HWND,
+            ctypes.wintypes.UINT,
+            ctypes.wintypes.WPARAM,
+            ctypes.wintypes.LPARAM,
+        )(self._wndproc)
+
+        wc = ctypes.WNDCLASSW()
+        wc.lpfnWndProc = self._wndproc_cb
+        wc.hInstance = hinst
+        wc.lpszClassName = "PySplash"
+        wc.hCursor = user32.LoadCursorW(None, 32512)
+        wc.hbrBackground = gdi32.CreateSolidBrush(0x000D0D0D)
+        user32.RegisterClassW(ctypes.byref(wc))
+
+        sw = user32.GetSystemMetrics(0)
+        sh = user32.GetSystemMetrics(1)
+        x = (sw - 520) // 2
+        y = (sh - 360) // 2
+
+        self._hwnd = user32.CreateWindowExW(
+            0x00000008,
+            "PySplash", "",
+            0x80000000 | 0x10000000,
+            x, y, 520, 360,
+            0, 0, hinst, 0
+        )
+
         try:
-            import pyi_splash
-            pyi_splash.close()
+            if hasattr(sys, '_MEIPASS'):
+                ico = os.path.join(sys._MEIPASS, 'icon.ico')
+            else:
+                ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
+            if os.path.exists(ico):
+                self._hicon = user32.LoadImageW(None, ico, 1, 80, 80, 0x0010)
         except Exception:
             pass
-        if cls._hwnd:
-            try:
-                import ctypes
-                ctypes.windll.user32.PostMessageW(cls._hwnd, 0x0010, 0, 0)
-            except Exception:
-                pass
-            cls._hwnd = None
+
+        user32.SetTimer(self._hwnd, 1, 33, None)
+        self._ready.set()
+
+        msg = ctypes.wintypes.MSG()
+        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            user32.TranslateMessage(ctypes.byref(msg))
+            user32.DispatchMessageW(ctypes.byref(msg))
+
+    def _wndproc(self, hwnd, msg, wp, lp):
+        import ctypes
+        import ctypes.wintypes
+        user32 = ctypes.windll.user32
+
+        if msg == 0x000F:
+            ps = ctypes.wintypes.PAINTSTRUCT()
+            hdc = user32.BeginPaint(hwnd, ctypes.byref(ps))
+            self._on_paint(hdc)
+            user32.EndPaint(hwnd, ctypes.byref(ps))
+            return 0
+
+        if msg == 0x0113:
+            diff = self._target - self._display
+            if abs(diff) > 0.003:
+                step = diff * 0.18
+                if abs(step) < 0.002:
+                    step = 0.002 if diff > 0 else -0.002
+                self._display = max(0.0, min(1.0, self._display + step))
+                user32.InvalidateRect(hwnd, None, False)
+            elif diff != 0:
+                self._display = self._target
+                user32.InvalidateRect(hwnd, None, False)
+            return 0
+
+        if msg == 0x0010:
+            user32.DestroyWindow(hwnd)
+            return 0
+
+        if msg == 0x0002:
+            user32.KillTimer(hwnd, 1)
+            user32.PostQuitMessage(0)
+            return 0
+
+        return user32.DefWindowProcW(hwnd, msg, wp, lp)
+
+    def _on_paint(self, hdc):
+        import ctypes
+        import ctypes.wintypes
+        gdi32 = ctypes.windll.gdi32
+        user32 = ctypes.windll.user32
+
+        if self._hicon:
+            user32.DrawIconEx(hdc, (520 - 80) // 2, 50, self._hicon, 80, 80, 0, None, 0x0003)
+
+        title = "云集智能音乐创意台"
+        hfont = gdi32.CreateFontW(-28, 0, 0, 0, 700, 0, 0, 0, 0x86, 0, 0, 0, 0, "Microsoft YaHei")
+        old = gdi32.SelectObject(hdc, hfont)
+        gdi32.SetBkMode(hdc, 1)
+        gdi32.SetTextColor(hdc, 0x00F0F0F0)
+        sz = ctypes.wintypes.SIZE()
+        gdi32.GetTextExtentPoint32W(hdc, title, len(title), ctypes.byref(sz))
+        gdi32.TextOutW(hdc, (520 - sz.cx) // 2, 170, title, len(title))
+        gdi32.SelectObject(hdc, old)
+        gdi32.DeleteObject(hfont)
+
+        bx, by, bw, bh = 60, 240, 400, 12
+        bg = gdi32.CreateSolidBrush(0x00222222)
+        gdi32.SelectObject(hdc, bg)
+        gdi32.RoundRect(hdc, bx, by, bx + bw, by + bh, 6, 6)
+        gdi32.DeleteObject(bg)
+
+        fw = int(bw * min(self._display, 1.0))
+        if fw > 1:
+            fb = gdi32.CreateSolidBrush(0x00A54215)
+            gdi32.SelectObject(hdc, fb)
+            gdi32.RoundRect(hdc, bx, by, bx + fw, by + bh, 6, 6)
+            gdi32.DeleteObject(fb)
+
+        mf = gdi32.CreateFontW(-14, 0, 0, 0, 0, 0, 0, 0, 0x86, 0, 0, 0, 0, "Microsoft YaHei")
+        old2 = gdi32.SelectObject(hdc, mf)
+        gdi32.SetTextColor(hdc, 0x00888888)
+        sz2 = ctypes.wintypes.SIZE()
+        gdi32.GetTextExtentPoint32W(hdc, self._msg, len(self._msg), ctypes.byref(sz2))
+        gdi32.TextOutW(hdc, (520 - sz2.cx) // 2, 268, self._msg, len(self._msg))
+        gdi32.SelectObject(hdc, old2)
+        gdi32.DeleteObject(mf)
+
+        if self._display > 0.01:
+            pct = f"{int(min(self._display, 1.0) * 100)}%"
+            pf = gdi32.CreateFontW(-13, 0, 0, 0, 0, 0, 0, 0, 0x86, 0, 0, 0, 0, "Microsoft YaHei")
+            old3 = gdi32.SelectObject(hdc, pf)
+            gdi32.SetTextColor(hdc, 0x00F5A542)
+            sz3 = ctypes.wintypes.SIZE()
+            gdi32.GetTextExtentPoint32W(hdc, pct, len(pct), ctypes.byref(sz3))
+            gdi32.TextOutW(hdc, (520 - sz3.cx) // 2, 295, pct, len(pct))
+            gdi32.SelectObject(hdc, old3)
+            gdi32.DeleteObject(pf)
+
+    def _set_progress(self, progress, message=""):
+        self._target = progress
+        if message:
+            self._msg = message
+        if self._hwnd and not self._closed:
+            ctypes.windll.user32.InvalidateRect(self._hwnd, None, False)
+
+    def _destroy(self):
+        self._closed = True
+        if self._hwnd:
+            ctypes.windll.user32.PostMessageW(self._hwnd, 0x0010, 0, 0)
 
 
 class MainWindow(QMainWindow):
@@ -1388,14 +1419,14 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(self.page_stack, 1)
         
-        NativeSplash.draw_progress(0.2, "正在初始化框架...")
+        NativeSplashWindow.update_progress(0.2, "正在初始化框架...")
     
     def _deferred_init(self):
-        NativeSplash.draw_progress(0.3, "正在加载配置...")
+        NativeSplashWindow.update_progress(0.3, "正在加载配置...")
         
         self.config = ConfigManager(self.base_dir)
         
-        NativeSplash.draw_progress(0.4, "正在检测浏览器...")
+        NativeSplashWindow.update_progress(0.4, "正在检测浏览器...")
         
         self.browsers = self._detect_browsers()
         self.selected_browser = self.config.get("browser.default", "system")
@@ -1404,7 +1435,7 @@ class MainWindow(QMainWindow):
             self.browsers["自定义浏览器"] = self.custom_browser_path
         self.selected_download_source = self.config.get("download.source", "auto")
         
-        NativeSplash.draw_progress(0.5, "正在构建主界面...")
+        NativeSplashWindow.update_progress(0.5, "正在构建主界面...")
         
         while self.home_layout.count():
             item = self.home_layout.takeAt(0)
@@ -1413,7 +1444,7 @@ class MainWindow(QMainWindow):
         
         self._populate_home_page()
         
-        NativeSplash.draw_progress(0.75, "正在启动监控...")
+        NativeSplashWindow.update_progress(0.75, "正在启动监控...")
         
         self._setup_monitor()
         self._setup_tray()
@@ -1423,7 +1454,7 @@ class MainWindow(QMainWindow):
         
         self._home_loaded = True
         
-        NativeSplash.draw_progress(1.0, "加载完成！")
+        NativeSplashWindow.update_progress(1.0, "加载完成！")
     
     def _populate_home_page(self):
         """填充首页内容到已有的home_layout"""
@@ -4963,7 +4994,13 @@ def extract_scripts():
 def main():
     extract_scripts()
     
-    NativeSplash.draw_progress(0.05, "正在启动应用...")
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
+    
+    NativeSplashWindow.show()
     
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
@@ -4980,12 +5017,12 @@ def main():
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
-    NativeSplash.draw_progress(0.1, "正在创建主窗口...")
+    NativeSplashWindow.update_progress(0.1, "正在创建主窗口...")
     
     window = MainWindow()
     window.show()
     
-    NativeSplash.close()
+    NativeSplashWindow.close()
     
     sys.exit(app.exec())
 
