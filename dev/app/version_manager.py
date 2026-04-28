@@ -197,7 +197,7 @@ class HybridVersionManagerDialog(QDialog):
             }
         """)
 
-        self.current_mode = "exe"
+        self.current_mode = "git"
         self._versions_loaded = False
         self._git_repo_checked = False
         self.has_git_repo = False
@@ -222,8 +222,8 @@ class HybridVersionManagerDialog(QDialog):
         self.has_git_repo = self._check_git_repo()
         if hasattr(self, 'mode_buttons_widget'):
             self.mode_buttons_widget.setVisible(True)
-            self.btn_mode_exe.setChecked(True)
-            self.btn_mode_git.setChecked(False)
+            self.btn_mode_exe.setChecked(False)
+            self.btn_mode_git.setChecked(True)
 
     def _load_local_version_history(self):
         self.version_history = {}
@@ -280,7 +280,7 @@ class HybridVersionManagerDialog(QDialog):
 
         self.btn_mode_exe = QPushButton("EXE 稳定版")
         self.btn_mode_exe.setCheckable(True)
-        self.btn_mode_exe.setChecked(True)
+        self.btn_mode_exe.setChecked(False)
         self.btn_mode_exe.setFixedHeight(32)
         self.btn_mode_exe.setStyleSheet("""
             QPushButton {
@@ -314,7 +314,7 @@ class HybridVersionManagerDialog(QDialog):
 
         self.btn_mode_git = QPushButton("Git 开发版")
         self.btn_mode_git.setCheckable(True)
-        self.btn_mode_git.setChecked(False)
+        self.btn_mode_git.setChecked(True)
         self.btn_mode_git.setFixedHeight(32)
         self.btn_mode_git.setStyleSheet("""
             QPushButton {
@@ -630,10 +630,6 @@ class HybridVersionManagerDialog(QDialog):
         self._all_expanded = True
         self.toggle_all_btn.setText("全部收起")
 
-        scroll_area = self.versions_container.parent()
-        if scroll_area:
-            scroll_area.setVisible(False)
-
         while self.versions_layout.count():
             item = self.versions_layout.takeAt(0)
             if item.widget():
@@ -643,9 +639,6 @@ class HybridVersionManagerDialog(QDialog):
             self._load_exe_versions()
         else:
             self._load_git_versions()
-
-        if scroll_area:
-            scroll_area.setVisible(True)
 
     def _load_exe_versions(self):
         self.current_mode_label.setText("EXE 稳定版")
