@@ -634,6 +634,177 @@ class CollapsiblePanel(QWidget):
         self.overlay_widget = None
         self._setup_ui()
     
+    def _setup_ui_skeleton(self):
+        """设置最小UI框架 - 导航栏+空页面堆叠"""
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #0D0D0D;
+            }
+            QWidget {
+                background-color: #0D0D0D;
+                color: #F0F0F0;
+            }
+            QPushButton {
+                background-color: #E53935;
+                color: white;
+                border: 1px solid #E53935;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: bold;
+                font-family: 'Microsoft YaHei', sans-serif;
+            }
+            QPushButton:disabled {
+                background-color: #333333;
+                border-color: #333333;
+                color: #757575;
+            }
+            QLabel {
+                color: #F0F0F0;
+                font-family: 'Microsoft YaHei', sans-serif;
+            }
+            QScrollArea {
+                border: none;
+                background-color: #0D0D0D;
+            }
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 8px;
+            }
+        """)
+        
+        central = QWidget()
+        self.setCentralWidget(central)
+        main_layout = QVBoxLayout(central)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        nav_bar = QFrame()
+        nav_bar.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: none;
+                border-bottom: 2px solid #333333;
+                border-radius: 0px;
+            }
+        """)
+        nav_bar_layout = QHBoxLayout(nav_bar)
+        nav_bar_layout.setSpacing(15)
+        nav_bar_layout.setContentsMargins(15, 12, 15, 12)
+        
+        menu_button_style = """
+            QPushButton {
+                background-color: #252525;
+                color: #FFFFFF;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                padding: 10px 16px;
+                font-size: 12px;
+                font-weight: normal;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+                border-color: #444444;
+            }
+            QPushButton:checked {
+                background-color: #1565C0;
+                border-color: #1976D2;
+                color: #FFFFFF;
+            }
+            QPushButton:checked:hover {
+                background-color: #1976D2;
+                border-color: #1976D2;
+            }
+        """
+        
+        self.btn_home = QPushButton("🚀 运行服务")
+        self.btn_home.setCheckable(True)
+        self.btn_home.setChecked(True)
+        self.btn_home.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_home.setStyleSheet(menu_button_style)
+        self.btn_home.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_home.clicked.connect(lambda: self._switch_page(0))
+        nav_bar_layout.addWidget(self.btn_home)
+        
+        self.btn_version_nav = QPushButton("🔄 软件更新")
+        self.btn_version_nav.setCheckable(True)
+        self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_version_nav.setStyleSheet(menu_button_style)
+        self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
+        nav_bar_layout.addWidget(self.btn_version_nav)
+        
+        self.btn_model_nav = QPushButton("📦 模型管理")
+        self.btn_model_nav.setCheckable(True)
+        self.btn_model_nav.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_model_nav.setStyleSheet(menu_button_style)
+        self.btn_model_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_model_nav.clicked.connect(lambda: self._switch_page(1))
+        nav_bar_layout.addWidget(self.btn_model_nav)
+        
+        main_layout.addWidget(nav_bar)
+        
+        self.page_stack = QStackedWidget()
+        
+        self.home_page = QWidget()
+        self.home_layout = QVBoxLayout(self.home_page)
+        self.home_layout.setSpacing(8)
+        self.home_layout.setContentsMargins(12, 12, 12, 12)
+        loading_label = QLabel("⏳ 正在加载...")
+        loading_label.setStyleSheet("color: #888888; font-size: 16px; padding: 40px;")
+        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.home_layout.addWidget(loading_label)
+        self.page_stack.addWidget(self.home_page)
+        
+        self.page_stack.addWidget(QWidget())
+        self.page_stack.addWidget(QWidget())
+        
+        main_layout.addWidget(self.page_stack, 1)
+    
+    def _deferred_init(self):
+        """延迟初始化 - 在窗口显示后执行"""
+        try:
+            import pyi_splash
+            pyi_splash.update_text("正在加载配置...")
+        except Exception:
+            pass
+        
+        self.config = ConfigManager(self.base_dir)
+        
+        self.browsers = self._detect_browsers()
+        self.selected_browser = self.config.get("browser.default", "system")
+        self.custom_browser_path = self.config.get("browser.custom_path", "")
+        if self.custom_browser_path and os.path.exists(self.custom_browser_path):
+            self.browsers["自定义浏览器"] = self.custom_browser_path
+        self.selected_download_source = self.config.get("download.source", "auto")
+        
+        try:
+            import pyi_splash
+            pyi_splash.update_text("正在加载主界面...")
+        except Exception:
+            pass
+        
+        while self.home_layout.count():
+            item = self.home_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        self._populate_home_page()
+        self._setup_monitor()
+        self._setup_tray()
+        
+        size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
+        self.resize(size["width"], size["height"])
+        
+        self._home_loaded = True
+        
+        try:
+            import pyi_splash
+            pyi_splash.close()
+        except Exception:
+            pass
+    
     def _setup_ui(self):
         """设置UI"""
         layout = QVBoxLayout(self)
@@ -1030,7 +1201,6 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        # 系统顶栏包含版本号
         self.setWindowTitle(f"云集智能音乐创意台 v{VERSION}")
         self.setStyleSheet("""
             QMainWindow {
@@ -1045,7 +1215,7 @@ class MainWindow(QMainWindow):
                 icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
             if os.path.exists(icon_path):
                 self.setWindowIcon(QIcon(icon_path))
-        except Exception as e:
+        except Exception:
             pass
         
         if hasattr(sys, '_MEIPASS'):
@@ -1061,288 +1231,47 @@ class MainWindow(QMainWindow):
                     break
                 self.base_dir = parent_dir
         
-        self.config = ConfigManager(self.base_dir)
-        
         self.service_processes: Dict[str, ServiceProcess] = {}
         self.service_cards: Dict[str, ServiceCard] = {}
-        
         self.is_starting = False
-        
         self.current_project = "qinglong"
-        
-        # 浏览器设置
-        self.browsers = self._detect_browsers()
-        self.selected_browser = self.config.get("browser.default", "system")
-        self.custom_browser_path = self.config.get("browser.custom_path", "")
-        
-        # 如果有自定义浏览器路径，添加到浏览器列表
-        if self.custom_browser_path and os.path.exists(self.custom_browser_path):
-            self.browsers["自定义浏览器"] = self.custom_browser_path
-        
-        # 模型下载源设置
+        self.browsers = {"系统默认": "system"}
+        self.selected_browser = "system"
+        self.custom_browser_path = ""
         self.download_sources = {
             "auto": "自动检测",
             "huggingface": "HuggingFace",
             "modelscope": "ModelScope",
             "huggingface-cn": "HuggingFace (国内镜像)"
         }
-        self.selected_download_source = self.config.get("download.source", "auto")
-        
-        # 模型管理相关
+        self.selected_download_source = "auto"
         self.model_list = []
         self._model_list_loaded = False
-        
-        # 模型下载线程
         self.model_download_thread = None
         self.is_downloading = False
-        
-        # 模型删除线程
         self.model_delete_thread = None
         self.is_deleting = False
-        
-        # 模型验证线程
         self.model_verify_thread = None
         self.is_verifying = False
-        
-        # 当前正在操作的模型
         self.current_operation_model = None
+        self.model_page = None
+        self.model_manager_widget = None
+        self.version_page = None
+        self.version_manager_widget = None
+        self._home_loaded = False
         
-        self._setup_ui()
-        self._setup_monitor()
-        self._setup_tray()
+        self._setup_ui_skeleton()
         
-        # 连接日志信号
         self.log_signal.connect(self._append_log_to_ui)
         self.enable_buttons_signal.connect(self._enable_buttons)
         
-        size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
-        self.resize(size["width"], size["height"])
+        self.resize(1200, 1100)
+        
+        QTimer.singleShot(0, self._deferred_init)
     
-    def _setup_ui(self):
-        """设置UI"""
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #0D0D0D;
-            }
-            QWidget {
-                background-color: #0D0D0D;
-                color: #F0F0F0;
-            }
-            
-            QPushButton {
-                background-color: #E53935;
-                color: white;
-                border: 1px solid #E53935;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: bold;
-                font-family: 'Microsoft YaHei', sans-serif;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                box-shadow: 0 2px 4px rgba(229, 57, 53, 0.2);
-            }
-            QPushButton:hover {
-                background-color: #C62828;
-                border-color: #C62828;
-                box-shadow: 0 4px 8px rgba(229, 57, 53, 0.3);
-                transform: translateY(-2px);
-            }
-            QPushButton:disabled {
-                background-color: #333333;
-                border-color: #333333;
-                color: #757575;
-                box-shadow: none;
-                transform: none;
-            }
-            QPushButton:pressed {
-                background-color: #B71C1C;
-                border-color: #B71C1C;
-                transform: translateY(0);
-            }
-            
-            QTextEdit {
-                background-color: #1A1A1A;
-                color: #FFFFFF;
-                border: 1px solid #333333;
-                border-radius: 8px;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 12px;
-                padding: 12px;
-                selection-background-color: #E53935;
-                selection-color: white;
-            }
-            QTextEdit:focus {
-                border-color: #E53935;
-                outline: none;
-                box-shadow: 0 0 0 2px rgba(229, 57, 53, 0.2);
-            }
-            
-            QGroupBox {
-                background-color: #1A1A1A;
-                border: 1px solid #333333;
-                border-radius: 8px;
-                margin-top: 15px;
-                padding: 15px;
-                font-weight: bold;
-                font-family: 'Microsoft YaHei', sans-serif;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 15px;
-                padding: 0 8px;
-                color: #F0F0F0;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            
-            QLabel {
-                color: #F0F0F0;
-                font-family: 'Microsoft YaHei', sans-serif;
-            }
-            
-            QScrollArea {
-                border: none;
-                background-color: #0D0D0D;
-            }
-            QScrollBar:vertical {
-                background-color: #1A1A1A;
-                width: 10px;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #424242;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #E53935;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0;
-            }
-            QScrollBar:horizontal {
-                background-color: #1A1A1A;
-                height: 10px;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:horizontal {
-                background-color: #424242;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:horizontal:hover {
-                background-color: #E53935;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                width: 0;
-            }
-            
-            QFrame {
-                background-color: #1A1A1A;
-                border: 1px solid #333333;
-                border-radius: 8px;
-            }
-        """)
-        
-        central = QWidget()
-        self.setCentralWidget(central)
-        main_layout = QVBoxLayout(central)
-        main_layout.setSpacing(0)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # 1. 导航栏 - 整体菜单栏设计
-        nav_bar = QFrame()
-        nav_bar.setStyleSheet("""
-            QFrame {
-                background-color: #1A1A1A;
-                border: none;
-                border-bottom: 2px solid #333333;
-                border-radius: 0px;
-            }
-        """)
-        nav_bar_layout = QHBoxLayout(nav_bar)
-        nav_bar_layout.setSpacing(15)
-        nav_bar_layout.setContentsMargins(15, 12, 15, 12)
-        
-        # 菜单栏按钮样式 - 更简约的设计
-        menu_button_style = """
-            QPushButton {
-                background-color: #252525;
-                color: #FFFFFF;
-                border: 1px solid #333333;
-                border-radius: 4px;
-                padding: 10px 16px;
-                font-size: 12px;
-                font-weight: normal;
-            }
-            QPushButton:hover {
-                background-color: #333333;
-                border-color: #444444;
-            }
-            QPushButton:checked {
-                background-color: #1565C0;
-                border-color: #1976D2;
-                color: #FFFFFF;
-            }
-            QPushButton:checked:hover {
-                background-color: #1976D2;
-                border-color: #1976D2;
-            }
-        """
-        
-        # 运行服务按钮
-        self.btn_home = QPushButton("🚀 运行服务")
-        self.btn_home.setCheckable(True)
-        self.btn_home.setChecked(True)
-        self.btn_home.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_home.setStyleSheet(menu_button_style)
-        self.btn_home.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_home.clicked.connect(lambda: self._switch_page(0))
-        nav_bar_layout.addWidget(self.btn_home)
-        
-        # 软件更新按钮
-        self.btn_version_nav = QPushButton("🔄 软件更新")
-        self.btn_version_nav.setCheckable(True)
-        self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_version_nav.setStyleSheet(menu_button_style)
-        self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
-        nav_bar_layout.addWidget(self.btn_version_nav)
-        
-        # 模型管理按钮
-        self.btn_model_nav = QPushButton("📦 模型管理")
-        self.btn_model_nav.setCheckable(True)
-        self.btn_model_nav.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_model_nav.setStyleSheet(menu_button_style)
-        self.btn_model_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_model_nav.clicked.connect(lambda: self._switch_page(1))
-        nav_bar_layout.addWidget(self.btn_model_nav)
-        
-        main_layout.addWidget(nav_bar)
-        
-        # 3. 页面堆叠窗口
-        self.page_stack = QStackedWidget()
-        
-        # 页面0：首页
-        self.home_page = self._create_home_page()
-        self.page_stack.addWidget(self.home_page)
-        
-        # 页面1：模型管理器（延迟创建）
-        self.model_page = None
-        self.model_manager_widget = None
-        self.page_stack.addWidget(QWidget())
-        
-        # 页面2：版本管理器（延迟创建）
-        self.version_page = None
-        self.version_manager_widget = None
-        self.page_stack.addWidget(QWidget())
-        
-        main_layout.addWidget(self.page_stack, 1)
     
-    def _create_home_page(self):
-        """创建首页"""
-        page = QWidget()
-        self.home_layout = QVBoxLayout(page)
-        self.home_layout.setSpacing(8)
-        self.home_layout.setContentsMargins(12, 12, 12, 12)
+    def _populate_home_page(self):
+        """填充首页内容到已有的home_layout"""
         
         # 日志区域（高度紧凑结构：系统信息+日志融合）
         self.log_group = QFrame()
@@ -1752,8 +1681,6 @@ class MainWindow(QMainWindow):
         self.services_layout.addLayout(start_btn_layout)
         
         self.home_layout.addWidget(self.services_container)
-        
-        return page
     
     def _on_auto_scroll_toggled(self, checked):
         """自动滚动开关切换"""
@@ -4895,12 +4822,6 @@ def main():
     
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
-    
-    try:
-        import pyi_splash
-        pyi_splash.update_text("正在加载主界面...")
-    except Exception:
-        pass
     
     window = MainWindow()
     window.show()
