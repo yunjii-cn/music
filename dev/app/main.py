@@ -137,11 +137,10 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTextEdit, QFrame, QGridLayout, QScrollArea,
     QGroupBox, QMessageBox, QProgressBar, QSplitter, QSystemTrayIcon,
-    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog,
-    QSplashScreen
+    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QRect
-from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPixmap, QPainter
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess
+from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence
 
 # Version manager - lazy imported
 
@@ -4897,34 +4896,20 @@ def main():
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
-    splash = QSplashScreen()
-    splash_pixmap = QPixmap(480, 320)
-    splash_pixmap.fill(QColor("#0D0D0D"))
-    painter = QPainter(splash_pixmap)
-    painter.setPen(QColor("#F0F0F0"))
-    title_font = QFont("Microsoft YaHei", 18, QFont.Weight.Bold)
-    painter.setFont(title_font)
-    painter.drawText(splash_pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "云集智能音乐创意台")
-    sub_font = QFont("Microsoft YaHei", 10)
-    painter.setFont(sub_font)
-    painter.setPen(QColor("#888888"))
-    sub_rect = QRect(0, splash_pixmap.height() // 2 + 30, splash_pixmap.width(), 30)
-    painter.drawText(sub_rect, Qt.AlignmentFlag.AlignCenter, "正在加载，请稍候...")
-    bar_rect = QRect(90, splash_pixmap.height() - 60, 300, 6)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(QColor("#333333"))
-    painter.drawRoundedRect(bar_rect, 3, 3)
-    progress_rect = QRect(90, splash_pixmap.height() - 60, 60, 6)
-    painter.setBrush(QColor("#1565C0"))
-    painter.drawRoundedRect(progress_rect, 3, 3)
-    painter.end()
-    splash.setPixmap(splash_pixmap)
-    splash.show()
-    app.processEvents()
+    try:
+        import pyi_splash
+        pyi_splash.update_text("正在加载主界面...")
+    except Exception:
+        pass
     
     window = MainWindow()
     window.show()
-    splash.finish(window)
+    
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
     
     sys.exit(app.exec())
 
