@@ -1025,11 +1025,16 @@ class ServiceCard(QFrame):
 
 class NativeSplash:
     _hwnd = None
-    _progress = 0.0
+    _display_progress = 0.0
+    _target_progress = 0.0
+    _message = ""
     _bar_x = 60
     _bar_y = 240
     _bar_w = 400
     _bar_h = 10
+    _anim_thread = None
+    _anim_stop = False
+    _pct_rect = None
 
     @classmethod
     def find_splash_hwnd(cls):
@@ -1057,28 +1062,41 @@ class NativeSplash:
         return cls._hwnd
 
     @classmethod
-    def draw_progress(cls, progress, message=""):
-        hwnd = cls.find_splash_hwnd()
+    def _start_anim(cls):
+        if cls._anim_thread and cls._anim_thread.is_alive():
+            return
+        import threading
+        cls._anim_stop = False
+        cls._anim_thread = threading.Thread(target=cls._anim_loop, daemon=True)
+        cls._anim_thread.start()
+
+    @classmethod
+    def _anim_loop(cls):
+        import time
+        while not cls._anim_stop:
+            diff = cls._target_progress - cls._display_progress
+            if abs(diff) < 0.005:
+                cls._display_progress = cls._target_progress
+                cls._repaint_bar()
+                break
+            step = diff * 0.15
+            if abs(step) < 0.003:
+                step = 0.003 if diff > 0 else -0.003
+            cls._display_progress += step
+            cls._display_progress = max(0.0, min(1.0, cls._display_progress))
+            cls._repaint_bar()
+            time.sleep(0.033)
+
+    @classmethod
+    def _repaint_bar(cls):
+        hwnd = cls._hwnd
         if not hwnd:
-            try:
-                import pyi_splash
-                if message:
-                    pyi_splash.update_text(message)
-            except Exception:
-                pass
             return
         try:
             import ctypes
             import ctypes.wintypes
             user32 = ctypes.windll.user32
             gdi32 = ctypes.windll.gdi32
-
-            if message:
-                try:
-                    import pyi_splash
-                    pyi_splash.update_text(message)
-                except Exception:
-                    pass
 
             rect = ctypes.wintypes.RECT()
             user32.GetClientRect(hwnd, ctypes.byref(rect))
@@ -1094,49 +1112,66 @@ class NativeSplash:
             bar_w = int(cw * cls._bar_w / 520)
             bar_h = int(ch * cls._bar_h / 360)
 
-            bg_rect = ctypes.wintypes.RECT()
-            bg_rect.left = bar_x
-            bg_rect.top = bar_y
-            bg_rect.right = bar_x + bar_w
-            bg_rect.bottom = bar_y + bar_h
             bg_brush = gdi32.CreateSolidBrush(0x00222222)
             gdi32.SelectObject(hdc, bg_brush)
             gdi32.RoundRect(hdc, bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, 5, 5)
+            gdi32.DeleteObject(bg_brush)
 
-            fill_w = int(bar_w * min(progress, 1.0))
+            fill_w = int(bar_w * min(cls._display_progress, 1.0))
             if fill_w > 0:
-                fill_rect = ctypes.wintypes.RECT()
-                fill_rect.left = bar_x
-                fill_rect.top = bar_y
-                fill_rect.right = bar_x + fill_w
-                fill_rect.bottom = bar_y + bar_h
                 fill_brush = gdi32.CreateSolidBrush(0x00A54215)
                 gdi32.SelectObject(hdc, fill_brush)
                 gdi32.RoundRect(hdc, bar_x, bar_y, bar_x + fill_w, bar_y + bar_h, 5, 5)
                 gdi32.DeleteObject(fill_brush)
 
-            gdi32.DeleteObject(bg_brush)
+            if cls._pct_rect:
+                pr = cls._pct_rect
+                bg2 = gdi32.CreateSolidBrush(0x000D0D0D)
+                gdi32.SelectObject(hdc, bg2)
+                gdi32.FillRect(hdc, ctypes.byref(pr), bg2)
+                gdi32.DeleteObject(bg2)
 
-            if progress > 0.01:
-                pct_text = f"{int(min(progress, 1.0) * 100)}%"
+            if cls._display_progress > 0.01:
+                pct_text = f"{int(min(cls._display_progress, 1.0) * 100)}%"
                 font = gdi32.CreateFontW(14, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, "Microsoft YaHei")
                 old_font = gdi32.SelectObject(hdc, font)
                 gdi32.SetTextColor(hdc, 0x00F5A542)
                 gdi32.SetBkMode(hdc, 1)
-                pct_w = 50
-                pct_x = bar_x + (bar_w - pct_w) // 2
+                pct_x = bar_x + (bar_w - 50) // 2
                 pct_y = bar_y + bar_h + 6
                 gdi32.TextOutW(hdc, pct_x, pct_y, pct_text, len(pct_text))
                 gdi32.SelectObject(hdc, old_font)
                 gdi32.DeleteObject(font)
+                cls._pct_rect = ctypes.wintypes.RECT(pct_x, pct_y, pct_x + 50, pct_y + 20)
 
             user32.ReleaseDC(hwnd, hdc)
-            cls._progress = progress
         except Exception:
             pass
 
     @classmethod
+    def draw_progress(cls, progress, message=""):
+        hwnd = cls.find_splash_hwnd()
+        if not hwnd:
+            try:
+                import pyi_splash
+                if message:
+                    pyi_splash.update_text(message)
+            except Exception:
+                pass
+            return
+        if message:
+            cls._message = message
+            try:
+                import pyi_splash
+                pyi_splash.update_text(message)
+            except Exception:
+                pass
+        cls._target_progress = progress
+        cls._start_anim()
+
+    @classmethod
     def close(cls):
+        cls._anim_stop = True
         try:
             import pyi_splash
             pyi_splash.close()
