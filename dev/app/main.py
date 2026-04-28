@@ -137,11 +137,10 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTextEdit, QFrame, QGridLayout, QScrollArea,
     QGroupBox, QMessageBox, QProgressBar, QSplitter, QSystemTrayIcon,
-    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog,
-    QSplashScreen
+    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QPropertyAnimation, QRectF, pyqtProperty
-from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPainter, QPixmap, QLinearGradient
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess
+from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence
 
 # Version manager - lazy imported
 
@@ -1024,95 +1023,132 @@ class ServiceCard(QFrame):
             """)
 
 
-class SplashScreen(QSplashScreen):
-    def __init__(self):
-        pixmap = QPixmap(520, 360)
-        pixmap.fill(QColor("#0D0D0D"))
-        super().__init__(pixmap)
-        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
-        self._progress = 0.0
-        self._message = "正在初始化..."
-        self._icon_pixmap = None
+class NativeSplash:
+    _hwnd = None
+    _progress = 0.0
+    _bar_x = 60
+    _bar_y = 240
+    _bar_w = 400
+    _bar_h = 10
+
+    @classmethod
+    def find_splash_hwnd(cls):
+        if cls._hwnd:
+            return cls._hwnd
         try:
-            if hasattr(sys, '_MEIPASS'):
-                icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
-            else:
-                icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
-            if os.path.exists(icon_path):
-                self._icon_pixmap = QPixmap(icon_path)
+            import ctypes
+            import ctypes.wintypes
+            user32 = ctypes.windll.user32
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+            found = []
+            @WNDENUMPROC
+            def _enum(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    cls_buf = ctypes.create_unicode_buffer(256)
+                    user32.GetClassNameW(hwnd, cls_buf, 256)
+                    if 'Tk' in cls_buf.value or 'Splash' in cls_buf.value:
+                        found.append(hwnd)
+                return True
+            user32.EnumWindows(_enum, 0)
+            if found:
+                cls._hwnd = found[0]
+        except Exception:
+            pass
+        return cls._hwnd
+
+    @classmethod
+    def draw_progress(cls, progress, message=""):
+        hwnd = cls.find_splash_hwnd()
+        if not hwnd:
+            try:
+                import pyi_splash
+                if message:
+                    pyi_splash.update_text(message)
+            except Exception:
+                pass
+            return
+        try:
+            import ctypes
+            import ctypes.wintypes
+            user32 = ctypes.windll.user32
+            gdi32 = ctypes.windll.gdi32
+
+            if message:
+                try:
+                    import pyi_splash
+                    pyi_splash.update_text(message)
+                except Exception:
+                    pass
+
+            rect = ctypes.wintypes.RECT()
+            user32.GetClientRect(hwnd, ctypes.byref(rect))
+            cw = rect.right - rect.left
+            ch = rect.bottom - rect.top
+
+            hdc = user32.GetDC(hwnd)
+            if not hdc:
+                return
+
+            bar_x = int(cw * cls._bar_x / 520)
+            bar_y = int(ch * cls._bar_y / 360)
+            bar_w = int(cw * cls._bar_w / 520)
+            bar_h = int(ch * cls._bar_h / 360)
+
+            bg_rect = ctypes.wintypes.RECT()
+            bg_rect.left = bar_x
+            bg_rect.top = bar_y
+            bg_rect.right = bar_x + bar_w
+            bg_rect.bottom = bar_y + bar_h
+            bg_brush = gdi32.CreateSolidBrush(0x00222222)
+            gdi32.SelectObject(hdc, bg_brush)
+            gdi32.RoundRect(hdc, bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, 5, 5)
+
+            fill_w = int(bar_w * min(progress, 1.0))
+            if fill_w > 0:
+                fill_rect = ctypes.wintypes.RECT()
+                fill_rect.left = bar_x
+                fill_rect.top = bar_y
+                fill_rect.right = bar_x + fill_w
+                fill_rect.bottom = bar_y + bar_h
+                fill_brush = gdi32.CreateSolidBrush(0x00A54215)
+                gdi32.SelectObject(hdc, fill_brush)
+                gdi32.RoundRect(hdc, bar_x, bar_y, bar_x + fill_w, bar_y + bar_h, 5, 5)
+                gdi32.DeleteObject(fill_brush)
+
+            gdi32.DeleteObject(bg_brush)
+
+            if progress > 0.01:
+                pct_text = f"{int(min(progress, 1.0) * 100)}%"
+                font = gdi32.CreateFontW(14, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, "Microsoft YaHei")
+                old_font = gdi32.SelectObject(hdc, font)
+                gdi32.SetTextColor(hdc, 0x00F5A542)
+                gdi32.SetBkMode(hdc, 1)
+                pct_w = 50
+                pct_x = bar_x + (bar_w - pct_w) // 2
+                pct_y = bar_y + bar_h + 6
+                gdi32.TextOutW(hdc, pct_x, pct_y, pct_text, len(pct_text))
+                gdi32.SelectObject(hdc, old_font)
+                gdi32.DeleteObject(font)
+
+            user32.ReleaseDC(hwnd, hdc)
+            cls._progress = progress
         except Exception:
             pass
 
-    def _get_progress(self):
-        return self._progress
-
-    def _set_progress(self, val):
-        self._progress = val
-        self.repaint()
-
-    progress = pyqtProperty(float, _get_progress, _set_progress)
-
-    def set_progress(self, value, message=""):
-        if message:
-            self._message = message
-        anim = QPropertyAnimation(self, b"progress")
-        anim.setDuration(300)
-        anim.setStartValue(self._progress)
-        anim.setEndValue(value)
-        anim.start()
-        self._anim = anim
-        if message:
-            self._message = message
-            self.repaint()
-
-    def drawContents(self, painter):
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        w, h = self.width(), self.height()
-        painter.fillRect(0, 0, w, h, QColor("#0D0D0D"))
-
-        if self._icon_pixmap:
-            icon_size = 80
-            scaled = self._icon_pixmap.scaled(icon_size, icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            ix = (w - scaled.width()) // 2
-            painter.drawPixmap(ix, 60, scaled)
-
-        painter.setPen(QColor("#F0F0F0"))
-        title_font = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
-        painter.setFont(title_font)
-        title = "云集智能音乐创意台"
-        fm = painter.fontMetrics()
-        tw = fm.horizontalAdvance(title)
-        painter.drawText((w - tw) // 2, 180, title)
-
-        bar_x, bar_y, bar_w, bar_h = 60, 240, w - 120, 10
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#222222"))
-        painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h), 5, 5)
-
-        fill_w = bar_w * min(self._progress, 1.0)
-        if fill_w > 0:
-            grad = QLinearGradient(bar_x, bar_y, bar_x + fill_w, bar_y)
-            grad.setColorAt(0, QColor("#1565C0"))
-            grad.setColorAt(1, QColor("#42A5F5"))
-            painter.setBrush(grad)
-            painter.drawRoundedRect(QRectF(bar_x, bar_y, fill_w, bar_h), 5, 5)
-
-        painter.setPen(QColor("#888888"))
-        msg_font = QFont("Microsoft YaHei", 10)
-        painter.setFont(msg_font)
-        msg = self._message
-        fm2 = painter.fontMetrics()
-        mw = fm2.horizontalAdvance(msg)
-        painter.drawText((w - mw) // 2, 268, msg)
-
-        if self._progress > 0.01:
-            pct = f"{int(min(self._progress, 1.0) * 100)}%"
-            painter.setPen(QColor("#42A5F5"))
-            pct_font = QFont("Microsoft YaHei", 9)
-            painter.setFont(pct_font)
-            fm3 = painter.fontMetrics()
-            pw = fm3.horizontalAdvance(pct)
-            painter.drawText((w - pw) // 2, 300, pct)
+    @classmethod
+    def close(cls):
+        try:
+            import pyi_splash
+            pyi_splash.close()
+        except Exception:
+            pass
+        if cls._hwnd:
+            try:
+                import ctypes
+                ctypes.windll.user32.PostMessageW(cls._hwnd, 0x0010, 0, 0)
+            except Exception:
+                pass
+            cls._hwnd = None
 
 
 class MainWindow(QMainWindow):
@@ -1120,9 +1156,8 @@ class MainWindow(QMainWindow):
     log_signal = pyqtSignal(str, str)
     enable_buttons_signal = pyqtSignal()
     
-    def __init__(self, splash=None):
+    def __init__(self):
         super().__init__()
-        self._splash = splash
         self.setWindowTitle(f"云集智能音乐创意台 v{VERSION}")
         self.setStyleSheet("""
             QMainWindow {
@@ -1318,17 +1353,14 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(self.page_stack, 1)
         
-        if self._splash:
-            self._splash.set_progress(0.2, "正在初始化框架...")
+        NativeSplash.draw_progress(0.2, "正在初始化框架...")
     
     def _deferred_init(self):
-        if self._splash:
-            self._splash.set_progress(0.3, "正在加载配置...")
+        NativeSplash.draw_progress(0.3, "正在加载配置...")
         
         self.config = ConfigManager(self.base_dir)
         
-        if self._splash:
-            self._splash.set_progress(0.4, "正在检测浏览器...")
+        NativeSplash.draw_progress(0.4, "正在检测浏览器...")
         
         self.browsers = self._detect_browsers()
         self.selected_browser = self.config.get("browser.default", "system")
@@ -1337,8 +1369,7 @@ class MainWindow(QMainWindow):
             self.browsers["自定义浏览器"] = self.custom_browser_path
         self.selected_download_source = self.config.get("download.source", "auto")
         
-        if self._splash:
-            self._splash.set_progress(0.5, "正在构建主界面...")
+        NativeSplash.draw_progress(0.5, "正在构建主界面...")
         
         while self.home_layout.count():
             item = self.home_layout.takeAt(0)
@@ -1347,8 +1378,7 @@ class MainWindow(QMainWindow):
         
         self._populate_home_page()
         
-        if self._splash:
-            self._splash.set_progress(0.75, "正在启动监控...")
+        NativeSplash.draw_progress(0.75, "正在启动监控...")
         
         self._setup_monitor()
         self._setup_tray()
@@ -1358,8 +1388,7 @@ class MainWindow(QMainWindow):
         
         self._home_loaded = True
         
-        if self._splash:
-            self._splash.set_progress(1.0, "加载完成！")
+        NativeSplash.draw_progress(1.0, "加载完成！")
     
     def _populate_home_page(self):
         """填充首页内容到已有的home_layout"""
@@ -4899,11 +4928,7 @@ def extract_scripts():
 def main():
     extract_scripts()
     
-    try:
-        import pyi_splash
-        pyi_splash.update_text("正在启动应用...")
-    except Exception:
-        pass
+    NativeSplash.draw_progress(0.05, "正在启动应用...")
     
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
@@ -4920,49 +4945,12 @@ def main():
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
-    pyi_pos = None
-    try:
-        import ctypes
-        import ctypes.wintypes
-        user32 = ctypes.windll.user32
-        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-        found = []
-        @WNDENUMPROC
-        def _enum(hwnd, lparam):
-            if user32.IsWindowVisible(hwnd):
-                cls = ctypes.create_unicode_buffer(256)
-                user32.GetClassNameW(hwnd, cls, 256)
-                if 'Tk' in cls.value:
-                    rect = ctypes.wintypes.RECT()
-                    user32.GetWindowRect(hwnd, ctypes.byref(rect))
-                    found.append((rect.left, rect.top, rect.right, rect.bottom))
-            return True
-        user32.EnumWindows(_enum, 0)
-        if found:
-            pyi_pos = found[0]
-    except Exception:
-        pass
+    NativeSplash.draw_progress(0.1, "正在创建主窗口...")
     
-    splash = SplashScreen()
-    if pyi_pos:
-        splash.move(pyi_pos[0], pyi_pos[1])
-    splash.show()
-    splash.repaint()
-    app.processEvents()
-    
-    try:
-        import pyi_splash
-        pyi_splash.close()
-    except Exception:
-        pass
-    
-    splash.set_progress(0.05, "正在创建主窗口...")
-    app.processEvents()
-    
-    window = MainWindow(splash=splash)
+    window = MainWindow()
     window.show()
     
-    splash.finish(window)
+    NativeSplash.close()
     
     sys.exit(app.exec())
 
