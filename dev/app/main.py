@@ -1103,15 +1103,16 @@ class SplashScreen(QSplashScreen):
         msg = self._message
         fm2 = painter.fontMetrics()
         mw = fm2.horizontalAdvance(msg)
-        painter.drawText((w - mw) // 2, 275, msg)
+        painter.drawText((w - mw) // 2, 268, msg)
 
-        pct = f"{int(min(self._progress, 1.0) * 100)}%"
-        painter.setPen(QColor("#42A5F5"))
-        pct_font = QFont("Microsoft YaHei", 9)
-        painter.setFont(pct_font)
-        fm3 = painter.fontMetrics()
-        pw = fm3.horizontalAdvance(pct)
-        painter.drawText((w - pw) // 2, 300, pct)
+        if self._progress > 0.01:
+            pct = f"{int(min(self._progress, 1.0) * 100)}%"
+            painter.setPen(QColor("#42A5F5"))
+            pct_font = QFont("Microsoft YaHei", 9)
+            painter.setFont(pct_font)
+            fm3 = painter.fontMetrics()
+            pw = fm3.horizontalAdvance(pct)
+            painter.drawText((w - pw) // 2, 300, pct)
 
 
 class MainWindow(QMainWindow):
@@ -4919,15 +4920,41 @@ def main():
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
+    pyi_pos = None
+    try:
+        import ctypes
+        import ctypes.wintypes
+        user32 = ctypes.windll.user32
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+        found = []
+        @WNDENUMPROC
+        def _enum(hwnd, lparam):
+            if user32.IsWindowVisible(hwnd):
+                cls = ctypes.create_unicode_buffer(256)
+                user32.GetClassNameW(hwnd, cls, 256)
+                if 'Tk' in cls.value:
+                    rect = ctypes.wintypes.RECT()
+                    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                    found.append((rect.left, rect.top, rect.right, rect.bottom))
+            return True
+        user32.EnumWindows(_enum, 0)
+        if found:
+            pyi_pos = found[0]
+    except Exception:
+        pass
+    
+    splash = SplashScreen()
+    if pyi_pos:
+        splash.move(pyi_pos[0], pyi_pos[1])
+    splash.show()
+    splash.repaint()
+    app.processEvents()
+    
     try:
         import pyi_splash
         pyi_splash.close()
     except Exception:
         pass
-    
-    splash = SplashScreen()
-    splash.show()
-    app.processEvents()
     
     splash.set_progress(0.05, "正在创建主窗口...")
     app.processEvents()
