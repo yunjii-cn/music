@@ -228,14 +228,16 @@ class ServiceMonitor(QThread):
         self.check_interval = check_interval
         self.running = True
         self._status_cache = {}
+        self._paused = False
     
     def run(self):
         while self.running:
-            for service_id, service in SERVICES.items():
-                is_running = self._check_port(service["port"])
-                if self._status_cache.get(service_id) != is_running:
-                    self._status_cache[service_id] = is_running
-                    self.status_changed.emit(service_id, is_running)
+            if not self._paused:
+                for service_id, service in SERVICES.items():
+                    is_running = self._check_port(service["port"])
+                    if self._status_cache.get(service_id) != is_running:
+                        self._status_cache[service_id] = is_running
+                        self.status_changed.emit(service_id, is_running)
             time.sleep(self.check_interval)
     
     def _check_port(self, port: int) -> bool:
@@ -248,6 +250,13 @@ class ServiceMonitor(QThread):
             return result == 0
         except:
             return False
+    
+    def pause(self):
+        self._paused = True
+    
+    def resume(self):
+        self._paused = False
+        self._status_cache.clear()
     
     def stop(self):
         self.running = False
@@ -3907,27 +3916,14 @@ try {
         self._log("正在停止所有服务...")
         self._log("========================================")
         
-        import psutil
+        self.monitor.pause()
         
         if hasattr(self, 'api_process') and self.api_process:
             try:
-                pid = self.api_process.pid
-                parent = psutil.Process(pid)
-                children = parent.children(recursive=True)
-                for child in children:
-                    try:
-                        child.kill()
-                        self._log(f"已终止 API 子进程 (PID: {child.pid})")
-                    except:
-                        pass
-                parent.kill()
-                self._log(f"已终止 API 主进程 (PID: {pid})")
+                self.api_process.kill()
+                self._log("已终止 API 进程")
             except:
-                try:
-                    self.api_process.kill()
-                    self._log("已终止 API 进程")
-                except:
-                    pass
+                pass
             self.api_process = None
         
         for service_id, process in list(self.service_processes.items()):
@@ -3938,26 +3934,18 @@ try {
                 pass
         self.service_processes.clear()
         
+        import psutil
         service_ports = {s["port"]: s["name"] for s in SERVICES.values()}
-        killed_pids = set()
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'connections']):
+        for proc in psutil.process_iter(['pid', 'name']):
             try:
-                name = (proc.info['name'] or '').lower()
-                if name not in ('python.exe', 'python', 'node.exe', 'node', 'powershell.exe', 'pwsh.exe', 'uvicorn.exe'):
-                    continue
-                cmdline = ' '.join(proc.info['cmdline'] or []).lower()
-                if 'acestep' not in cmdline and 'qinglong' not in cmdline and 'run_server' not in cmdline and 'run_gradio' not in cmdline and 'run_qinglong' not in cmdline and 'run_npmgui' not in cmdline:
-                    continue
-                conns = proc.connections(kind='inet')
-                for conn in conns:
+                for conn in proc.connections(kind='inet'):
                     if conn.status == 'LISTEN' and conn.laddr.port in service_ports:
-                        if proc.pid not in killed_pids:
-                            try:
-                                proc.kill()
-                                killed_pids.add(proc.pid)
-                                self._log(f"已终止 {service_ports[conn.laddr.port]} 进程 (PID: {proc.pid})")
-                            except:
-                                pass
+                        try:
+                            proc.kill()
+                            self._log(f"已终止 {service_ports[conn.laddr.port]} 进程 (PID: {proc.pid})")
+                        except:
+                            pass
+                        break
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
         
@@ -3969,10 +3957,11 @@ try {
             else:
                 self._log(f"[警告] {name} 端口 {port} 仍被占用", "#FF9800")
         
-        self.monitor._status_cache.clear()
         for service_id in SERVICES:
             if service_id in self.service_cards:
                 self.service_cards[service_id].update_status(False)
+        
+        self.monitor.resume()
         
         self._log("")
         self._log("========================================")
@@ -3981,9 +3970,10 @@ try {
     
     def _stop_service(self, service_id: str):
         """停止单个服务"""
-        import psutil
         service = SERVICES[service_id]
         self._log(f"正在停止 {service['name']}...")
+        
+        self.monitor.pause()
         
         if service_id in self.service_processes:
             process = self.service_processes[service_id]
@@ -3995,17 +3985,18 @@ try {
                     pass
             del self.service_processes[service_id]
         
+        import psutil
         port = service["port"]
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'connections']):
+        for proc in psutil.process_iter(['pid', 'name']):
             try:
-                conns = proc.connections(kind='inet')
-                for conn in conns:
+                for conn in proc.connections(kind='inet'):
                     if conn.status == 'LISTEN' and conn.laddr.port == port:
                         try:
                             proc.kill()
                             self._log(f"已终止占用端口 {port} 的进程 (PID: {proc.pid})")
                         except:
                             pass
+                        break
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
         
@@ -4016,7 +4007,8 @@ try {
         
         if service_id in self.service_cards:
             self.service_cards[service_id].update_status(False)
-        self.monitor._status_cache.pop(service_id, None)
+        
+        self.monitor.resume()
     
     def _restart_service(self, service_id: str):
         """重启服务"""

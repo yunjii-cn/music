@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0630",
+    "date": "2026-04-29 06:32",
+    "message": "修复退出服务闪退+状态恢复：1.ServiceMonitor添加pause/resume 2.停止时暂停监控防止状态被覆盖 3.简化psutil遍历避免crash",
+    "changes": [
+      "修复退出服务闪退+状态恢复：1.ServiceMonitor添加pause/resume 2.停止时暂停监控防止状态被覆盖 3.简化psutil遍历避免crash"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0630.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0619",
     "date": "2026-04-29 06:21",
     "message": "用psutil重写停止服务逻辑：1.杀api_process进程树 2.按端口查找并杀进程 3.等待端口释放后更新UI",
