@@ -744,5 +744,13 @@
     ],
     "build_time": "2026-04-29T04:41:42.697664",
     "version_number": "2026.04.29.0440"
+  },
+  "云集智能音乐创意台-v2026.04.29.0453": {
+    "version": "云集智能音乐创意台-v2026.04.29.0453",
+    "changes": [
+      "去掉PyInstaller Tk splash，改用Qt QSplashScreen+QTimer动态进度条"
+    ],
+    "build_time": "2026-04-29T04:55:12.573199",
+    "version_number": "2026.04.29.0453"
   }
 }

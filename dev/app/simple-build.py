@@ -220,11 +220,6 @@ def build_exe():
         pyinstaller_args.extend(["--runtime-hook", str(rthook)])
         print(f"  已添加runtime hook: {rthook}")
     
-    splash_path = ROOT_DIR / "splash.png"
-    if splash_path.exists():
-        pyinstaller_args.extend(["--splash", str(splash_path)])
-        print(f"  已添加启动画面: {splash_path}")
-    
     # 添加 .gitee_token 文件
     token_file = ROOT_DIR / ".gitee_token"
     if token_file.exists():

@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0453",
+    "date": "2026-04-29 04:55",
+    "message": "去掉PyInstaller Tk splash，改用Qt QSplashScreen+QTimer动态进度条",
+    "changes": [
+      "去掉PyInstaller Tk splash，改用Qt QSplashScreen+QTimer动态进度条"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0453.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0440",
     "date": "2026-04-29 04:41",
     "message": "纯Win32原生splash窗口：自建窗口+消息循环+WM_PAINT绘制，彻底解决Tk覆盖问题",
