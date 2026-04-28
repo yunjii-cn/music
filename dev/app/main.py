@@ -3907,23 +3907,67 @@ try {
         self._log("正在停止所有服务...")
         self._log("========================================")
         
+        import psutil
+        
         if hasattr(self, 'api_process') and self.api_process:
             try:
-                self.api_process.terminate()
-                self.api_process.wait(timeout=5)
-                self._log("✓ API 服务进程已终止")
+                pid = self.api_process.pid
+                parent = psutil.Process(pid)
+                children = parent.children(recursive=True)
+                for child in children:
+                    try:
+                        child.kill()
+                        self._log(f"已终止 API 子进程 (PID: {child.pid})")
+                    except:
+                        pass
+                parent.kill()
+                self._log(f"已终止 API 主进程 (PID: {pid})")
             except:
                 try:
-                    import signal
-                    os.kill(self.api_process.pid, signal.SIGTERM)
+                    self.api_process.kill()
+                    self._log("已终止 API 进程")
                 except:
                     pass
             self.api_process = None
         
-        for project_id, project in PROJECTS.items():
-            for service_id in project["services"]:
-                full_service_id = f"{project_id}_{service_id}"
-                self._stop_service(full_service_id)
+        for service_id, process in list(self.service_processes.items()):
+            try:
+                if process.state() != 0:
+                    process.terminate()
+            except:
+                pass
+        self.service_processes.clear()
+        
+        service_ports = {s["port"]: s["name"] for s in SERVICES.values()}
+        killed_pids = set()
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'connections']):
+            try:
+                name = (proc.info['name'] or '').lower()
+                if name not in ('python.exe', 'python', 'node.exe', 'node', 'powershell.exe', 'pwsh.exe', 'uvicorn.exe'):
+                    continue
+                cmdline = ' '.join(proc.info['cmdline'] or []).lower()
+                if 'acestep' not in cmdline and 'qinglong' not in cmdline and 'run_server' not in cmdline and 'run_gradio' not in cmdline and 'run_qinglong' not in cmdline and 'run_npmgui' not in cmdline:
+                    continue
+                conns = proc.connections(kind='inet')
+                for conn in conns:
+                    if conn.status == 'LISTEN' and conn.laddr.port in service_ports:
+                        if proc.pid not in killed_pids:
+                            try:
+                                proc.kill()
+                                killed_pids.add(proc.pid)
+                                self._log(f"已终止 {service_ports[conn.laddr.port]} 进程 (PID: {proc.pid})")
+                            except:
+                                pass
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        
+        for port, name in service_ports.items():
+            for _ in range(10):
+                if not self.monitor._check_port(port):
+                    break
+                time.sleep(0.5)
+            else:
+                self._log(f"[警告] {name} 端口 {port} 仍被占用", "#FF9800")
         
         self.monitor._status_cache.clear()
         for service_id in SERVICES:
@@ -3937,6 +3981,7 @@ try {
     
     def _stop_service(self, service_id: str):
         """停止单个服务"""
+        import psutil
         service = SERVICES[service_id]
         self._log(f"正在停止 {service['name']}...")
         
@@ -3948,38 +3993,30 @@ try {
                     self._log(f"✓ {service['name']} 进程已终止")
                 except:
                     pass
+            del self.service_processes[service_id]
         
         port = service["port"]
-        try:
-            import subprocess
-
-            
-            result = hidden_run(
-                ["netstat", "-ano", "-p", "TCP"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=5
-            )
-            
-            if result.returncode == 0:
-                for line in result.stdout.splitlines():
-                    if f":{port}" in line and "LISTENING" in line:
-                        parts = line.split()
-                        if len(parts) >= 5:
-                            pid = parts[-1]
-                            try:
-                                hidden_run(
-                                    ["taskkill", "/F", "/T", "/PID", pid],
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
-                                    timeout=5
-                                )
-                                self._log(f"已终止占用端口 {port} 的进程 (PID: {pid})")
-                            except:
-                                pass
-        except:
-            pass
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'connections']):
+            try:
+                conns = proc.connections(kind='inet')
+                for conn in conns:
+                    if conn.status == 'LISTEN' and conn.laddr.port == port:
+                        try:
+                            proc.kill()
+                            self._log(f"已终止占用端口 {port} 的进程 (PID: {proc.pid})")
+                        except:
+                            pass
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        
+        for _ in range(10):
+            if not self.monitor._check_port(port):
+                break
+            time.sleep(0.5)
+        
+        if service_id in self.service_cards:
+            self.service_cards[service_id].update_status(False)
+        self.monitor._status_cache.pop(service_id, None)
     
     def _restart_service(self, service_id: str):
         """重启服务"""
