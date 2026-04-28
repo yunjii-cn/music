@@ -13,8 +13,6 @@ import json
 from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
-import ctypes
-import ctypes.wintypes
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -107,76 +105,6 @@ DARK_BTN_DANGER = """
     }
 """
 
-_WND_LOG_PATH = None
-
-def _get_wnd_log_path():
-    global _WND_LOG_PATH
-    if _WND_LOG_PATH is not None:
-        return _WND_LOG_PATH
-    try:
-        if hasattr(sys, '_MEIPASS'):
-            base = os.path.dirname(sys.executable)
-        else:
-            base = os.path.dirname(os.path.abspath(__file__))
-        _WND_LOG_PATH = os.path.join(base, "window_debug.log")
-    except Exception:
-        _WND_LOG_PATH = os.path.join(os.environ.get('TEMP', '.'), "window_debug.log")
-    return _WND_LOG_PATH
-
-def _snapshot_all_windows(tag):
-    if sys.platform != 'win32':
-        return
-    try:
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        current_pid = kernel32.GetCurrentProcessId()
-        my_windows = []
-        other_windows = []
-        def enum_cb(hwnd, _):
-            pid = ctypes.wintypes.DWORD()
-            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            length = user32.GetWindowTextLengthW(hwnd)
-            buf = ctypes.create_unicode_buffer(length + 1)
-            user32.GetWindowTextW(hwnd, buf, length + 1)
-            cls_buf = ctypes.create_unicode_buffer(256)
-            user32.GetClassNameW(hwnd, cls_buf, 256)
-            visible = user32.IsWindowVisible(hwnd)
-            rect = ctypes.wintypes.RECT()
-            user32.GetWindowRect(hwnd, ctypes.byref(rect))
-            info = {
-                'hwnd': hwnd,
-                'pid': pid.value,
-                'class': cls_buf.value,
-                'title': buf.value,
-                'visible': visible,
-                'rect': f"({rect.left},{rect.top},{rect.right},{rect.bottom})"
-            }
-            if pid.value == current_pid:
-                my_windows.append(info)
-            elif visible and rect.right - rect.left > 10 and rect.bottom - rect.top > 10:
-                other_windows.append(info)
-            return True
-        cb_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-        user32.EnumWindows(cb_type(enum_cb), 0)
-        with open(_get_wnd_log_path(), 'a', encoding='utf-8') as f:
-            f.write(f"\n{'='*60}\n[{tag}] MY_PID={current_pid} 我的窗口={len(my_windows)} 其他可见窗口={len(other_windows)}\n")
-            f.write(f"  --- 我的窗口 ---\n")
-            for w in my_windows:
-                vis = "VIS" if w['visible'] else "hid"
-                f.write(f"  {vis} hwnd={w['hwnd']} class={w['class']} title={w['title']}\n")
-            if other_windows:
-                f.write(f"  --- 其他可见窗口(可能相关) ---\n")
-                for w in other_windows:
-                    f.write(f"  VIS pid={w['pid']} class={w['class']} title={w['title']} rect={w['rect']}\n")
-    except Exception as e:
-        try:
-            with open(_get_wnd_log_path(), 'a', encoding='utf-8') as f:
-                f.write(f"[{tag}] ERROR: {e}\n")
-        except Exception:
-            pass
-
-_snapshot_windows = _snapshot_all_windows
-
 def _get_gitee_token():
     if hasattr(sys, '_MEIPASS'):
         token_file = Path(sys._MEIPASS) / ".gitee_token"
@@ -208,25 +136,46 @@ class _ExeFetchWorker(QThread):
 
     def run(self):
         try:
-            _snapshot_windows("EXE_WORKER_BEFORE_CURRENT")
             current = self.dialog._get_current_exe_version()
             if self._cancelled:
                 return
-            _snapshot_windows("EXE_WORKER_BEFORE_REMOTE")
             remote = self.dialog._fetch_remote_versions()
             if self._cancelled:
                 return
-            _snapshot_windows("EXE_WORKER_BEFORE_LOCAL")
             local = self.dialog._get_local_exe_versions()
             if self._cancelled:
                 return
-            _snapshot_windows("EXE_WORKER_BEFORE_EMIT")
             self.data_ready.emit(current, remote, local)
-            _snapshot_windows("EXE_WORKER_AFTER_EMIT")
         except Exception as e:
             print(f"EXE版本数据获取失败: {e}")
             if not self._cancelled:
                 self.data_ready.emit(None, [], {})
+
+
+class _GitFetchWorker(QThread):
+    data_ready = pyqtSignal(str, list)
+
+    def __init__(self, dialog):
+        super().__init__()
+        self.dialog = dialog
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+
+    def run(self):
+        try:
+            local_ver = self.dialog._get_local_version_string()
+            if self._cancelled:
+                return
+            commits = self.dialog._fetch_git_commits()
+            if self._cancelled:
+                return
+            self.data_ready.emit(local_ver or '', commits)
+        except Exception as e:
+            print(f"Git版本数据获取失败: {e}")
+            if not self._cancelled:
+                self.data_ready.emit('', [])
 
 
 class HybridVersionManagerDialog(QDialog):
@@ -256,6 +205,7 @@ class HybridVersionManagerDialog(QDialog):
         self._detail_widgets = []
         self._all_expanded = True
         self._exe_worker = None
+        self._git_worker = None
 
         self._setup_ui()
         self._load_local_version_history()
@@ -502,6 +452,10 @@ class HybridVersionManagerDialog(QDialog):
                 self._exe_worker.cancel()
                 self._exe_worker.wait(2000)
                 self._exe_worker = None
+            if self._git_worker and self._git_worker.isRunning():
+                self._git_worker.cancel()
+                self._git_worker.wait(2000)
+                self._git_worker = None
             self.current_mode = new_mode
             if new_mode == "exe":
                 self.btn_mode_exe.setChecked(True)
@@ -660,13 +614,16 @@ class HybridVersionManagerDialog(QDialog):
             return None
 
     def _load_versions(self, force=False):
-        _snapshot_windows("LOAD_VERSIONS_START")
         if self._versions_loaded and not force:
             return
         if self._exe_worker and self._exe_worker.isRunning():
             self._exe_worker.cancel()
             self._exe_worker.wait(2000)
             self._exe_worker = None
+        if self._git_worker and self._git_worker.isRunning():
+            self._git_worker.cancel()
+            self._git_worker.wait(2000)
+            self._git_worker = None
         self._versions_loaded = True
         self._remote_versions_cache = None
         self._detail_widgets = []
@@ -691,7 +648,6 @@ class HybridVersionManagerDialog(QDialog):
             scroll_area.setVisible(True)
 
     def _load_exe_versions(self):
-        _snapshot_windows("EXE_LOAD_START")
         self.current_mode_label.setText("EXE 稳定版")
         self.current_info_label.setText("⏳ 正在加载版本信息...")
 
@@ -703,10 +659,8 @@ class HybridVersionManagerDialog(QDialog):
         self._exe_worker = _ExeFetchWorker(self)
         self._exe_worker.data_ready.connect(self._on_exe_data_ready)
         self._exe_worker.start()
-        _snapshot_windows("EXE_LOAD_AFTER_START_WORKER")
 
     def _on_exe_data_ready(self, current, remote_versions, local_versions):
-        _snapshot_windows("EXE_DATA_READY_START")
         if self.current_mode != "exe":
             return
 
@@ -769,8 +723,6 @@ class HybridVersionManagerDialog(QDialog):
         for version in all_versions:
             is_current = version['version'] == current_version
             self._create_exe_version_item(version, is_current)
-
-        _snapshot_windows("EXE_DATA_READY_END")
 
     def _create_exe_version_item(self, version, is_current):
         changes = version.get('changes', [])
@@ -866,9 +818,9 @@ class HybridVersionManagerDialog(QDialog):
                 switch_btn.setStyleSheet(DARK_BTN_PRIMARY)
                 header.addWidget(switch_btn)
             else:
-                status_label = QLabel("已提供")
+                status_label = QLabel("未提供")
                 status_label.setFont(QFont("Microsoft YaHei", 9))
-                status_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
+                status_label.setStyleSheet("color: #666666; border: none; background: transparent;")
                 header.addWidget(status_label)
 
             toggle_btn = QPushButton("详情" if not is_expanded else "收起")
@@ -976,18 +928,31 @@ class HybridVersionManagerDialog(QDialog):
                 QMessageBox.critical(self, "错误", f"启动版本失败:\n{str(e)}")
 
     def _load_git_versions(self):
-        _snapshot_windows("GIT_LOAD_START")
         self.current_mode_label.setText("Git 开发版")
+        self.current_info_label.setText("⏳ 正在加载版本信息...")
 
-        local_ver = self._get_local_version_string()
+        loading_label = QLabel("⏳ 正在获取Git提交历史...")
+        loading_label.setStyleSheet("color: #888888; padding: 20px;")
+        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.versions_layout.addWidget(loading_label)
+
+        self._git_worker = _GitFetchWorker(self)
+        self._git_worker.data_ready.connect(self._on_git_data_ready)
+        self._git_worker.start()
+
+    def _on_git_data_ready(self, local_ver, commits):
+        if self.current_mode != "git":
+            return
+
+        while self.versions_layout.count():
+            item = self.versions_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
         if local_ver:
             self.current_info_label.setText(f"当前版本: v{local_ver}")
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
-
-        _snapshot_windows("GIT_LOAD_BEFORE_FETCH")
-        commits = self._fetch_git_commits()
-        _snapshot_windows("GIT_LOAD_AFTER_FETCH")
 
         if not commits:
             no_version_label = QLabel("未获取到远程提交历史\n\n请检查网络连接")

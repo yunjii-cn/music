@@ -36,34 +36,7 @@
 """
 
 import sys
-import os as _os_for_log
 import subprocess as _subprocess
-import traceback as _traceback
-
-def _main_log_path():
-    try:
-        if hasattr(sys, '_MEIPASS'):
-            base = _os_for_log.path.dirname(sys.executable)
-        else:
-            base = _os_for_log.path.dirname(_os_for_log.path.abspath(__file__))
-        return _os_for_log.path.join(base, "subprocess_debug.log")
-    except Exception:
-        return _os_for_log.path.join(_os_for_log.environ.get('TEMP', '.'), "subprocess_debug.log")
-
-def _log_subprocess_call_main(method, args, kwargs):
-    try:
-        cmd = ""
-        if args:
-            cmd = str(args[0])[:200]
-        elif 'args' in kwargs:
-            cmd = str(kwargs['args'])[:200]
-        stack = ''.join(_traceback.format_stack()[-6:-1])
-        with open(_main_log_path(), 'a', encoding='utf-8') as f:
-            f.write(f"\n{'='*60}\n")
-            f.write(f"[main.{method}] CMD: {cmd}\n")
-            f.write(f"CALL STACK:\n{stack}\n")
-    except Exception:
-        pass
 
 if sys.platform == 'win32':
     def _ensure_hidden(kwargs):
@@ -84,35 +57,30 @@ if sys.platform == 'win32':
 
     _orig_popen_init = _subprocess.Popen.__init__
     def _patched_popen_init(self, *args, **kwargs):
-        _log_subprocess_call_main('Popen.__init__', args, kwargs)
         kwargs = _ensure_hidden(kwargs)
         _orig_popen_init(self, *args, **kwargs)
     _subprocess.Popen.__init__ = _patched_popen_init
 
     _orig_run = _subprocess.run
     def _patched_run(*args, **kwargs):
-        _log_subprocess_call_main('subprocess.run', args, kwargs)
         kwargs = _ensure_hidden(kwargs)
         return _orig_run(*args, **kwargs)
     _subprocess.run = _patched_run
 
     _orig_call = _subprocess.call
     def _patched_call(*args, **kwargs):
-        _log_subprocess_call_main('subprocess.call', args, kwargs)
         kwargs = _ensure_hidden(kwargs)
         return _orig_call(*args, **kwargs)
     _subprocess.call = _patched_call
 
     _orig_check_call = _subprocess.check_call
     def _patched_check_call(*args, **kwargs):
-        _log_subprocess_call_main('subprocess.check_call', args, kwargs)
         kwargs = _ensure_hidden(kwargs)
         return _orig_check_call(*args, **kwargs)
     _subprocess.check_call = _patched_check_call
 
     _orig_check_output = _subprocess.check_output
     def _patched_check_output(*args, **kwargs):
-        _log_subprocess_call_main('subprocess.check_output', args, kwargs)
         kwargs = _ensure_hidden(kwargs)
         return _orig_check_output(*args, **kwargs)
     _subprocess.check_output = _patched_check_output
@@ -1855,11 +1823,6 @@ class MainWindow(QMainWindow):
     
     def _switch_page(self, index):
         """切换页面"""
-        try:
-            from version_manager import _snapshot_windows
-            _snapshot_windows(f"SWITCH_PAGE_{index}")
-        except Exception:
-            pass
         self.btn_home.setChecked(index == 0)
         self.btn_model_nav.setChecked(index == 1)
         self.btn_version_nav.setChecked(index == 2)
@@ -1875,11 +1838,6 @@ class MainWindow(QMainWindow):
     
     def _delayed_load_versions(self):
         """延迟加载版本列表"""
-        try:
-            from version_manager import _snapshot_windows
-            _snapshot_windows("DELAYED_LOAD_VERSIONS_START")
-        except Exception:
-            pass
         if hasattr(self, 'version_manager_widget'):
             vm = self.version_manager_widget
             if not vm._git_repo_checked:
