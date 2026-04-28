@@ -1855,6 +1855,11 @@ class MainWindow(QMainWindow):
     
     def _switch_page(self, index):
         """切换页面"""
+        try:
+            from version_manager import _snapshot_windows
+            _snapshot_windows(f"SWITCH_PAGE_{index}")
+        except Exception:
+            pass
         self.btn_home.setChecked(index == 0)
         self.btn_model_nav.setChecked(index == 1)
         self.btn_version_nav.setChecked(index == 2)
@@ -1870,6 +1875,11 @@ class MainWindow(QMainWindow):
     
     def _delayed_load_versions(self):
         """延迟加载版本列表"""
+        try:
+            from version_manager import _snapshot_windows
+            _snapshot_windows("DELAYED_LOAD_VERSIONS_START")
+        except Exception:
+            pass
         if hasattr(self, 'version_manager_widget'):
             vm = self.version_manager_widget
             if not vm._git_repo_checked:

@@ -123,47 +123,59 @@ def _get_wnd_log_path():
         _WND_LOG_PATH = os.path.join(os.environ.get('TEMP', '.'), "window_debug.log")
     return _WND_LOG_PATH
 
-def _snapshot_windows(tag):
+def _snapshot_all_windows(tag):
     if sys.platform != 'win32':
         return
     try:
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
         current_pid = kernel32.GetCurrentProcessId()
-        windows = []
+        my_windows = []
+        other_windows = []
         def enum_cb(hwnd, _):
             pid = ctypes.wintypes.DWORD()
             user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            length = user32.GetWindowTextLengthW(hwnd)
+            buf = ctypes.create_unicode_buffer(length + 1)
+            user32.GetWindowTextW(hwnd, buf, length + 1)
+            cls_buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, cls_buf, 256)
+            visible = user32.IsWindowVisible(hwnd)
+            rect = ctypes.wintypes.RECT()
+            user32.GetWindowRect(hwnd, ctypes.byref(rect))
+            info = {
+                'hwnd': hwnd,
+                'pid': pid.value,
+                'class': cls_buf.value,
+                'title': buf.value,
+                'visible': visible,
+                'rect': f"({rect.left},{rect.top},{rect.right},{rect.bottom})"
+            }
             if pid.value == current_pid:
-                length = user32.GetWindowTextLengthW(hwnd)
-                buf = ctypes.create_unicode_buffer(length + 1)
-                user32.GetWindowTextW(hwnd, buf, length + 1)
-                cls_buf = ctypes.create_unicode_buffer(256)
-                user32.GetClassNameW(hwnd, cls_buf, 256)
-                visible = user32.IsWindowVisible(hwnd)
-                rect = ctypes.wintypes.RECT()
-                user32.GetWindowRect(hwnd, ctypes.byref(rect))
-                windows.append({
-                    'hwnd': hwnd,
-                    'class': cls_buf.value,
-                    'title': buf.value,
-                    'visible': visible,
-                    'rect': f"({rect.left},{rect.top},{rect.right},{rect.bottom})"
-                })
+                my_windows.append(info)
+            elif visible and rect.right - rect.left > 10 and rect.bottom - rect.top > 10:
+                other_windows.append(info)
             return True
         cb_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
         user32.EnumWindows(cb_type(enum_cb), 0)
         with open(_get_wnd_log_path(), 'a', encoding='utf-8') as f:
-            f.write(f"\n{'='*60}\n[{tag}] PID={current_pid} 窗口数={len(windows)}\n")
-            for w in windows:
+            f.write(f"\n{'='*60}\n[{tag}] MY_PID={current_pid} 我的窗口={len(my_windows)} 其他可见窗口={len(other_windows)}\n")
+            f.write(f"  --- 我的窗口 ---\n")
+            for w in my_windows:
                 vis = "VIS" if w['visible'] else "hid"
-                f.write(f"  {vis} hwnd={w['hwnd']} class={w['class']} title={w['title']} rect={w['rect']}\n")
+                f.write(f"  {vis} hwnd={w['hwnd']} class={w['class']} title={w['title']}\n")
+            if other_windows:
+                f.write(f"  --- 其他可见窗口(可能相关) ---\n")
+                for w in other_windows:
+                    f.write(f"  VIS pid={w['pid']} class={w['class']} title={w['title']} rect={w['rect']}\n")
     except Exception as e:
         try:
             with open(_get_wnd_log_path(), 'a', encoding='utf-8') as f:
                 f.write(f"[{tag}] ERROR: {e}\n")
         except Exception:
             pass
+
+_snapshot_windows = _snapshot_all_windows
 
 def _get_gitee_token():
     if hasattr(sys, '_MEIPASS'):
