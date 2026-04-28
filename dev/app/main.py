@@ -1157,6 +1157,7 @@ class MainWindow(QMainWindow):
         
         self.service_processes: Dict[str, ServiceProcess] = {}
         self.service_cards: Dict[str, ServiceCard] = {}
+        self.api_process = None
         self.is_starting = False
         self.current_project = "qinglong"
         self.browsers = {"系统默认": "system"}
@@ -3906,10 +3907,28 @@ try {
         self._log("正在停止所有服务...")
         self._log("========================================")
         
+        if hasattr(self, 'api_process') and self.api_process:
+            try:
+                self.api_process.terminate()
+                self.api_process.wait(timeout=5)
+                self._log("✓ API 服务进程已终止")
+            except:
+                try:
+                    import signal
+                    os.kill(self.api_process.pid, signal.SIGTERM)
+                except:
+                    pass
+            self.api_process = None
+        
         for project_id, project in PROJECTS.items():
             for service_id in project["services"]:
                 full_service_id = f"{project_id}_{service_id}"
                 self._stop_service(full_service_id)
+        
+        self.monitor._status_cache.clear()
+        for service_id in SERVICES:
+            if service_id in self.service_cards:
+                self.service_cards[service_id].update_status(False)
         
         self._log("")
         self._log("========================================")
@@ -3951,7 +3970,7 @@ try {
                             pid = parts[-1]
                             try:
                                 hidden_run(
-                                    ["taskkill", "/F", "/PID", pid],
+                                    ["taskkill", "/F", "/T", "/PID", pid],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     timeout=5

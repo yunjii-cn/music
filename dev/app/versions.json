@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0610",
+    "date": "2026-04-29 06:11",
+    "message": "修复退出服务后API状态仍显示运行中：1.终止api_process 2.taskkill加/T杀进程树 3.清除监控缓存并强制更新UI状态",
+    "changes": [
+      "修复退出服务后API状态仍显示运行中：1.终止api_process 2.taskkill加/T杀进程树 3.清除监控缓存并强制更新UI状态"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0610.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0600",
     "date": "2026-04-29 06:02",
     "message": "高清icon.png替换icon.ico解决图标模糊+打包icon.png",
