@@ -4913,12 +4913,6 @@ def main():
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
     
-    try:
-        import pyi_splash
-        pyi_splash.close()
-    except Exception:
-        pass
-    
     splash = SplashScreen()
     splash.show()
     app.processEvents()
