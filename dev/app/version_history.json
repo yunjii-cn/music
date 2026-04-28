@@ -824,5 +824,13 @@
     ],
     "build_time": "2026-04-29T07:06:40.504864",
     "version_number": "2026.04.29.0705"
+  },
+  "云集智能音乐创意台-v2026.04.29.0726": {
+    "version": "云集智能音乐创意台-v2026.04.29.0726",
+    "changes": [
+      "修复依赖安装：1.uv sync加--index-strategy unsafe-best-match解决torchao冲突 2.用uv pip install --python直接指定目标Python 3.PyTorch从cu128索引优先安装 4.安装后验证结果"
+    ],
+    "build_time": "2026-04-29T07:28:39.717759",
+    "version_number": "2026.04.29.0726"
   }
 }

@@ -2438,13 +2438,12 @@ class MainWindow(QMainWindow):
         self._log(f"[信息] 共 {len(missing)} 个依赖缺失，开始安装...")
         
         pyproject_toml = os.path.join(scripts_dir, "pyproject.toml")
-        install_env_ps1 = os.path.join(scripts_dir, "install-env.ps1")
         
         if os.path.exists(pyproject_toml):
             self._log("[信息] 使用 uv sync 安装完整依赖...")
             try:
                 process = hidden_popen(
-                    [uv_path, "sync"],
+                    [uv_path, "sync", "--index-strategy", "unsafe-best-match"],
                     cwd=scripts_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -2467,51 +2466,84 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self._log(f"[警告] uv sync 失败: {e}", "#FF9800")
         
-        if os.path.exists(install_env_ps1):
-            self._log("[信息] 使用 install-env.ps1 安装依赖...")
-            try:
-                process = hidden_popen(
-                    ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_env_ps1],
-                    cwd=scripts_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True
-                )
-                stdout, _ = process.communicate(timeout=1800)
-                if stdout:
-                    for line in stdout.splitlines():
-                        if line.strip():
-                            self._log(f"[install-env] {line.strip()}")
-                if process.returncode == 0:
-                    self._log("✓ 依赖安装完成")
-                    return
-                else:
-                    self._log(f"[警告] install-env.ps1 返回码: {process.returncode}", "#FF9800")
-            except subprocess.TimeoutExpired:
-                process.kill()
-                self._log("[警告] install-env.ps1 超时", "#FF9800")
-            except Exception as e:
-                self._log(f"[警告] install-env.ps1 失败: {e}", "#FF9800")
+        self._log("[信息] 使用 uv pip install 直接安装缺失依赖...")
         
-        self._log("[信息] 逐个安装缺失依赖...")
-        for dep in missing:
+        basic_deps = [d for d in missing if d not in ("torch", "torchaudio", "torchvision")]
+        torch_deps = [d for d in missing if d in ("torch", "torchaudio", "torchvision")]
+        
+        if basic_deps:
+            self._log(f"[信息] 安装基础依赖: {', '.join(basic_deps)}")
             try:
-                self._log(f"[信息] 正在安装: {dep}")
+                cmd = [uv_path, "pip", "install", "--python", venv_python, "--index-strategy", "unsafe-best-match"] + basic_deps
                 process = hidden_popen(
-                    [uv_path, "pip", "install", dep],
+                    cmd,
                     cwd=scripts_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
                     env=env
                 )
-                stdout, _ = process.communicate(timeout=300)
+                stdout, _ = process.communicate(timeout=600)
+                if stdout:
+                    for line in stdout.splitlines():
+                        if line.strip():
+                            self._log(f"[安装] {line.strip()}")
                 if process.returncode == 0:
-                    self._log(f"✓ {dep} 安装完成")
+                    self._log(f"✓ 基础依赖安装完成")
                 else:
-                    self._log(f"[警告] {dep} 安装失败", "#FF9800")
+                    self._log(f"[警告] 基础依赖安装返回码: {process.returncode}", "#FF9800")
             except Exception as e:
-                self._log(f"[警告] 安装 {dep} 失败: {e}", "#FF9800")
+                self._log(f"[警告] 基础依赖安装失败: {e}", "#FF9800")
+        
+        if torch_deps:
+            self._log(f"[信息] 安装 PyTorch 依赖: {', '.join(torch_deps)}")
+            torch_env = env.copy()
+            torch_env["UV_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
+            torch_env["UV_EXTRA_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+            try:
+                cmd = [uv_path, "pip", "install", "--python", venv_python, "--index-strategy", "unsafe-best-match"] + torch_deps
+                process = hidden_popen(
+                    cmd,
+                    cwd=scripts_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    env=torch_env
+                )
+                stdout, _ = process.communicate(timeout=1200)
+                if stdout:
+                    for line in stdout.splitlines():
+                        if line.strip():
+                            self._log(f"[安装PyTorch] {line.strip()}")
+                if process.returncode == 0:
+                    self._log("✓ PyTorch 依赖安装完成")
+                else:
+                    self._log(f"[警告] PyTorch 依赖安装返回码: {process.returncode}", "#FF9800")
+            except Exception as e:
+                self._log(f"[警告] PyTorch 依赖安装失败: {e}", "#FF9800")
+        
+        self._log("[信息] 验证安装结果...")
+        still_missing = []
+        for dep, desc in required_deps:
+            try:
+                process = hidden_popen(
+                    [venv_python, "-c", f"import {dep}"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                stdout, stderr = process.communicate(timeout=10)
+                if process.returncode != 0:
+                    still_missing.append(dep)
+            except Exception:
+                still_missing.append(dep)
+        
+        if still_missing:
+            self._log(f"[警告] 以下依赖仍缺失: {', '.join(still_missing)}", "#FF9800")
+            self._log("[建议] 请手动运行 scripts/install-env.ps1 安装", "#FF9800")
+        else:
+            self._log("✓ 所有缺失依赖已安装完成")
     
     def _install_minimal_dependencies(self, venv_python, uv_path, scripts_dir, env):
         """安装最小化的关键依赖（备用方案）"""
