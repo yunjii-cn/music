@@ -214,6 +214,12 @@ def build_exe():
         pyinstaller_args.append(f"{str(icon_path)};.")
         print(f"  已添加图标: {icon_path}")
     
+    icon_png = ROOT_DIR / "icon.png"
+    if icon_png.exists():
+        pyinstaller_args.append("--add-data")
+        pyinstaller_args.append(f"{str(icon_png)};.")
+        print(f"  已添加图标PNG: {icon_png}")
+    
     # 添加runtime hook来全局隐藏subprocess窗口（在launcher.py之前执行）
     rthook = ROOT_DIR / "pyi_rth_subprocess.py"
     if rthook.exists():

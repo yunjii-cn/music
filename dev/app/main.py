@@ -1035,11 +1035,14 @@ class SplashScreen(QSplashScreen):
         self._icon_pixmap = None
         try:
             if hasattr(sys, '_MEIPASS'):
-                icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
+                base = sys._MEIPASS
             else:
-                icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
-            if os.path.exists(icon_path):
-                self._icon_pixmap = QPixmap(icon_path)
+                base = os.path.dirname(os.path.abspath(__file__))
+            for name in ('icon.png', 'icon.ico'):
+                p = os.path.join(base, name)
+                if os.path.exists(p):
+                    self._icon_pixmap = QPixmap(p)
+                    break
         except Exception:
             pass
 

@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0600",
+    "date": "2026-04-29 06:02",
+    "message": "高清icon.png替换icon.ico解决图标模糊+打包icon.png",
+    "changes": [
+      "高清icon.png替换icon.ico解决图标模糊+打包icon.png"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0600.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0547",
     "date": "2026-04-29 05:49",
     "message": "修复splash位置：Qt splash居中显示匹配Tk splash位置",
