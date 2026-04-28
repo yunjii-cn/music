@@ -172,6 +172,7 @@ def build_exe():
         sys.executable, "-m", "PyInstaller",
         "--name", f"云集智能音乐创意台-v{VERSION}",
         "--onefile", "--windowed",
+        "--hide-console", "hide-early",
         "--clean", "--noconfirm",
         "--distpath", str(DEV_DIR),
         "--workpath", str(build_dir),
@@ -181,6 +182,10 @@ def build_exe():
         "--hidden-import", "PyQt6.QtGui",
         "--hidden-import", "PyQt6.QtWidgets",
         "--hidden-import", "psutil",
+        "--hidden-import", "psutil._psutil_windows",
+        "--hidden-import", "psutil._pswindows",
+        "--hidden-import", "psutil._common",
+        "--hidden-import", "psutil._ntuples",
         "--exclude-module", "matplotlib",
         "--exclude-module", "scipy",
         "--exclude-module", "numpy",
@@ -193,7 +198,11 @@ def build_exe():
         "--exclude-module", "acestep",
         "--exclude-module", "git",
         "--exclude-module", "gitdb",
-        "--exclude-module", "gitpython"
+        "--exclude-module", "gitpython",
+        "--exclude-module", "psutil._pslinux",
+        "--exclude-module", "psutil._psosx",
+        "--exclude-module", "psutil._psbsd",
+        "--exclude-module", "psutil._pssunos"
     ]
     
     # 检查是否有icon.ico

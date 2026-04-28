@@ -124,6 +124,35 @@ def _build_api_url(base_url):
     return base_url
 
 
+class _ExeFetchWorker(QThread):
+    data_ready = pyqtSignal(object, list, dict)
+
+    def __init__(self, dialog):
+        super().__init__()
+        self.dialog = dialog
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+
+    def run(self):
+        try:
+            current = self.dialog._get_current_exe_version()
+            if self._cancelled:
+                return
+            remote = self.dialog._fetch_remote_versions()
+            if self._cancelled:
+                return
+            local = self.dialog._get_local_exe_versions()
+            if self._cancelled:
+                return
+            self.data_ready.emit(current, remote, local)
+        except Exception as e:
+            print(f"EXE版本数据获取失败: {e}")
+            if not self._cancelled:
+                self.data_ready.emit(None, [], {})
+
+
 class HybridVersionManagerDialog(QDialog):
     """混合模式版本管理器 - 支持Git和EXE两种模式"""
 
@@ -150,6 +179,7 @@ class HybridVersionManagerDialog(QDialog):
         self._remote_versions_cache = None
         self._detail_widgets = []
         self._all_expanded = True
+        self._exe_worker = None
 
         self._setup_ui()
         self._load_local_version_history()
@@ -392,6 +422,10 @@ class HybridVersionManagerDialog(QDialog):
         try:
             if new_mode == self.current_mode:
                 return
+            if self._exe_worker and self._exe_worker.isRunning():
+                self._exe_worker.cancel()
+                self._exe_worker.wait(2000)
+                self._exe_worker = None
             self.current_mode = new_mode
             if new_mode == "exe":
                 self.btn_mode_exe.setChecked(True)
@@ -552,6 +586,10 @@ class HybridVersionManagerDialog(QDialog):
     def _load_versions(self, force=False):
         if self._versions_loaded and not force:
             return
+        if self._exe_worker and self._exe_worker.isRunning():
+            self._exe_worker.cancel()
+            self._exe_worker.wait(2000)
+            self._exe_worker = None
         self._versions_loaded = True
         self._remote_versions_cache = None
         self._detail_widgets = []
@@ -577,8 +615,26 @@ class HybridVersionManagerDialog(QDialog):
 
     def _load_exe_versions(self):
         self.current_mode_label.setText("EXE 稳定版")
+        self.current_info_label.setText("⏳ 正在加载版本信息...")
 
-        current = self._get_current_exe_version()
+        loading_label = QLabel("⏳ 正在获取版本信息...")
+        loading_label.setStyleSheet("color: #888888; padding: 20px;")
+        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.versions_layout.addWidget(loading_label)
+
+        self._exe_worker = _ExeFetchWorker(self)
+        self._exe_worker.data_ready.connect(self._on_exe_data_ready)
+        self._exe_worker.start()
+
+    def _on_exe_data_ready(self, current, remote_versions, local_versions):
+        if self.current_mode != "exe":
+            return
+
+        while self.versions_layout.count():
+            item = self.versions_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
         if current:
             self.current_info_label.setText(
                 f"版本: v{current['version']} | 文件: {current['name']} | 大小: {current['size']}"
@@ -586,8 +642,6 @@ class HybridVersionManagerDialog(QDialog):
         else:
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
-        remote_versions = self._fetch_remote_versions()
-        local_versions = self._get_local_exe_versions()
         current_version = current['version'] if current else None
 
         if not remote_versions and not local_versions:
