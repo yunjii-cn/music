@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0753",
+    "date": "2026-04-29 07:54",
+    "message": "修复venv损坏导致依赖无法安装：1.安装前检测venv Python能否运行 2.损坏时自动删除重建venv 3.uv sync加--python指定目标 4.重建后重新安装所有依赖",
+    "changes": [
+      "修复venv损坏导致依赖无法安装：1.安装前检测venv Python能否运行 2.损坏时自动删除重建venv 3.uv sync加--python指定目标 4.重建后重新安装所有依赖"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0753.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0726",
     "date": "2026-04-29 07:28",
     "message": "修复依赖安装：1.uv sync加--index-strategy unsafe-best-match解决torchao冲突 2.用uv pip install --python直接指定目标Python 3.PyTorch从cu128索引优先安装 4.安装后验证结果",

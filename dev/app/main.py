@@ -2400,6 +2400,65 @@ class MainWindow(QMainWindow):
             self._log("[错误] uv 未安装，无法自动修复依赖", "#F44336")
             return
         
+        venv_broken = False
+        if os.path.exists(venv_python):
+            try:
+                process = hidden_popen(
+                    [venv_python, "-c", "print('ok')"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                stdout, stderr = process.communicate(timeout=10)
+                if process.returncode != 0 or "ok" not in stdout:
+                    venv_broken = True
+                    self._log("[警告] 虚拟环境 Python 无法正常运行，需要重建", "#FF9800")
+                    if stderr:
+                        for line in stderr.splitlines()[:3]:
+                            if line.strip():
+                                self._log(f"  {line.strip()}", "#FF9800")
+            except Exception:
+                venv_broken = True
+                self._log("[警告] 虚拟环境 Python 无法启动，需要重建", "#FF9800")
+        else:
+            venv_broken = True
+            self._log("[警告] 虚拟环境 Python 不存在，需要重建", "#FF9800")
+        
+        if venv_broken:
+            venv_dir = os.path.join(scripts_dir, ".venv")
+            self._log("[信息] 正在删除损坏的虚拟环境...")
+            try:
+                import shutil
+                shutil.rmtree(venv_dir, ignore_errors=True)
+                self._log("✓ 损坏的虚拟环境已删除")
+            except Exception as e:
+                self._log(f"[警告] 删除虚拟环境失败: {e}", "#FF9800")
+            
+            self._log("[信息] 正在重新创建虚拟环境...")
+            try:
+                process = hidden_popen(
+                    [uv_path, "venv", "-p", "3.12", "--seed"],
+                    cwd=scripts_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+                stdout, _ = process.communicate(timeout=60)
+                if stdout:
+                    for line in stdout.splitlines():
+                        if line.strip():
+                            self._log(f"[创建venv] {line.strip()}")
+                if process.returncode == 0:
+                    self._log("✓ 虚拟环境重建完成")
+                    venv_python = os.path.join(scripts_dir, ".venv", "Scripts", "python.exe")
+                else:
+                    self._log("[错误] 虚拟环境重建失败", "#F44336")
+                    return
+            except Exception as e:
+                self._log(f"[错误] 虚拟环境重建失败: {e}", "#F44336")
+                return
+        
         env = os.environ.copy()
         env["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
         env["UV_EXTRA_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
@@ -2443,7 +2502,7 @@ class MainWindow(QMainWindow):
             self._log("[信息] 使用 uv sync 安装完整依赖...")
             try:
                 process = hidden_popen(
-                    [uv_path, "sync", "--index-strategy", "unsafe-best-match"],
+                    [uv_path, "sync", "--python", venv_python, "--index-strategy", "unsafe-best-match"],
                     cwd=scripts_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
