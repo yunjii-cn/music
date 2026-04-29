@@ -2655,6 +2655,40 @@ class MainWindow(QMainWindow):
                     return
                 else:
                     self._log(f"[警告] uv pip install -r pyproject.toml 返回码: {process.returncode}", "#FF9800")
+                    if "Failed to read" in stdout and "dist-info" in stdout:
+                        import re
+                        broken = re.findall(r"Failed to read `(\S+)==(\S+)`", stdout)
+                        if broken:
+                            for pkg, ver in broken:
+                                self._log(f"[信息] 修复损坏的包: {pkg}=={ver}", "#FF9800")
+                                fix_process = hidden_popen(
+                                    [uv_path, "pip", "install", "--python", venv_python, "--force-reinstall", f"{pkg}=={ver}"],
+                                    cwd=scripts_dir,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT,
+                                    text=True,
+                                    env=env
+                                )
+                                fix_process.communicate(timeout=120)
+                            self._log("[信息] 损坏包已修复，重新安装完整依赖...")
+                            retry_process = hidden_popen(
+                                [uv_path, "pip", "install", "--python", venv_python, "-r", "pyproject.toml", "--index-strategy", "unsafe-best-match"],
+                                cwd=scripts_dir,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                env=env
+                            )
+                            retry_stdout, _ = retry_process.communicate(timeout=1800)
+                            if retry_stdout:
+                                for line in retry_stdout.splitlines():
+                                    if line.strip():
+                                        self._log(f"[安装依赖] {line.strip()}")
+                            if retry_process.returncode == 0:
+                                self._log("✓ 完整依赖安装完成")
+                                return
+                            else:
+                                self._log("[警告] 重试安装仍然失败", "#FF9800")
             except subprocess.TimeoutExpired:
                 process.kill()
                 self._log("[警告] uv pip install -r pyproject.toml 超时", "#FF9800")
