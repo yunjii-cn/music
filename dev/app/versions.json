@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0846",
+    "date": "2026-04-29 08:49",
+    "message": "修复弹窗问题：恢复main.py开头的全局subprocess补丁(和v0359一致)，用_pyi_hidden_patched防止重复补丁和递归",
+    "changes": [
+      "修复弹窗问题：恢复main.py开头的全局subprocess补丁(和v0359一致)，用_pyi_hidden_patched防止重复补丁和递归"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0846.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0824",
     "date": "2026-04-29 08:26",
     "message": "统一Python健康检查：1.提取_ensure_uv_python_healthy方法 2.智能修复和依赖安装都先检查Python 3.创建venv前先确保Python可用 4.修复uv venv缺少-p参数",
