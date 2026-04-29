@@ -2393,6 +2393,74 @@ class MainWindow(QMainWindow):
         self._log("环境检测完成！", "#E53935")
         self._log("========================================")
     
+    def _ensure_uv_python_healthy(self, uv_path, scripts_dir):
+        """确保 uv 管理的 Python 可用，损坏则修复。返回 (python_ok, venv_python_path)"""
+        python_ok = False
+        found_python = None
+        
+        try:
+            process = hidden_popen(
+                [uv_path, "python", "find", "3.12"],
+                cwd=scripts_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, _ = process.communicate(timeout=10)
+            if process.returncode == 0 and stdout.strip():
+                found_python = stdout.strip().split('\n')[0].strip()
+                self._log(f"[信息] 找到 Python: {found_python}")
+                process2 = hidden_popen(
+                    [found_python, "-c", "print('ok')"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                stdout2, _ = process2.communicate(timeout=10)
+                if process2.returncode == 0 and "ok" in stdout2:
+                    python_ok = True
+                else:
+                    self._log("[警告] uv 管理的 Python 无法运行，需要重新安装", "#FF9800")
+        except Exception:
+            self._log("[警告] 无法查找 uv 管理的 Python", "#FF9800")
+        
+        if not python_ok:
+            if found_python and os.path.exists(found_python):
+                broken_dir = os.path.dirname(found_python)
+                self._log(f"[信息] 删除损坏的 Python: {broken_dir}")
+                try:
+                    import shutil
+                    shutil.rmtree(broken_dir, ignore_errors=True)
+                except Exception:
+                    pass
+            
+            self._log("[信息] 正在重新安装 Python 3.12...")
+            try:
+                process = hidden_popen(
+                    [uv_path, "python", "install", "3.12"],
+                    cwd=scripts_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True
+                )
+                stdout, _ = process.communicate(timeout=300)
+                if stdout:
+                    for line in stdout.splitlines():
+                        if line.strip():
+                            self._log(f"[安装Python] {line.strip()}")
+                if process.returncode == 0:
+                    self._log("✓ Python 3.12 安装完成")
+                    python_ok = True
+                else:
+                    self._log("[错误] Python 3.12 安装失败", "#F44336")
+                    return False, None
+            except Exception as e:
+                self._log(f"[错误] Python 3.12 安装失败: {e}", "#F44336")
+                return False, None
+        
+        return python_ok, found_python
+
     def _install_missing_dependencies(self, venv_python, scripts_dir):
         """检测并安装缺失的依赖"""
         uv_path = os.path.expanduser("~/.local/bin/uv.exe")
@@ -2435,68 +2503,9 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self._log(f"[警告] 删除虚拟环境失败: {e}", "#FF9800")
             
-            self._log("[信息] 检查 uv 管理的 Python 是否可用...")
-            python_ok = False
-            found_python = None
-            try:
-                process = hidden_popen(
-                    [uv_path, "python", "find", "3.12"],
-                    cwd=scripts_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                stdout, _ = process.communicate(timeout=10)
-                if process.returncode == 0 and stdout.strip():
-                    found_python = stdout.strip().split('\n')[0].strip()
-                    self._log(f"[信息] 找到 Python: {found_python}")
-                    process2 = hidden_popen(
-                        [found_python, "-c", "print('ok')"],
-                        cwd=self.base_dir,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True
-                    )
-                    stdout2, _ = process2.communicate(timeout=10)
-                    if process2.returncode == 0 and "ok" in stdout2:
-                        python_ok = True
-                    else:
-                        self._log("[警告] uv 管理的 Python 无法运行，需要重新安装", "#FF9800")
-            except Exception:
-                self._log("[警告] 无法查找 uv 管理的 Python", "#FF9800")
-            
+            python_ok, _ = self._ensure_uv_python_healthy(uv_path, scripts_dir)
             if not python_ok:
-                if found_python and os.path.exists(found_python):
-                    broken_python_dir = os.path.dirname(found_python)
-                    self._log(f"[信息] 删除损坏的 Python: {broken_python_dir}")
-                    try:
-                        import shutil
-                        shutil.rmtree(broken_python_dir, ignore_errors=True)
-                    except Exception:
-                        pass
-                
-                self._log("[信息] 正在重新安装 Python 3.12...")
-                try:
-                    process = hidden_popen(
-                        [uv_path, "python", "install", "3.12"],
-                        cwd=scripts_dir,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True
-                    )
-                    stdout, _ = process.communicate(timeout=300)
-                    if stdout:
-                        for line in stdout.splitlines():
-                            if line.strip():
-                                self._log(f"[安装Python] {line.strip()}")
-                    if process.returncode == 0:
-                        self._log("✓ Python 3.12 安装完成")
-                    else:
-                        self._log("[错误] Python 3.12 安装失败", "#F44336")
-                        return
-                except Exception as e:
-                    self._log(f"[错误] Python 3.12 安装失败: {e}", "#F44336")
-                    return
+                return
             
             self._log("[信息] 正在重新创建虚拟环境...")
             try:
@@ -3089,13 +3098,15 @@ class MainWindow(QMainWindow):
             venv_path = os.path.join(scripts_dir, ".venv")
             
             if not os.path.exists(venv_path):
+                python_ok, _ = self._ensure_uv_python_healthy(uv_path, scripts_dir)
+                if not python_ok:
+                    self._log("[错误] Python 环境不可用，无法创建虚拟环境", "#F44336")
+                    return
+                
                 self._log("[信息] 虚拟环境不存在，正在创建...")
                 try:
-                    # 使用 uv 创建虚拟环境
-
-                    
                     process = hidden_popen(
-                        [uv_path, "venv"],
+                        [uv_path, "venv", "-p", "3.12", "--seed"],
                         cwd=scripts_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
