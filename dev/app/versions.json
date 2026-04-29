@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0812",
+    "date": "2026-04-29 08:14",
+    "message": "修复Python重装失败：1.重装前先删除损坏的Python目录 2.初始化found_python变量 3.确保uv python install能干净安装",
+    "changes": [
+      "修复Python重装失败：1.重装前先删除损坏的Python目录 2.初始化found_python变量 3.确保uv python install能干净安装"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0812.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0803",
     "date": "2026-04-29 08:06",
     "message": "修复Python安装损坏：1.venv重建前先检查uv管理的Python能否运行 2.Python损坏时用uv python install重新安装 3.重建venv后再安装依赖",

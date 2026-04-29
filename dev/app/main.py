@@ -2437,6 +2437,7 @@ class MainWindow(QMainWindow):
             
             self._log("[信息] 检查 uv 管理的 Python 是否可用...")
             python_ok = False
+            found_python = None
             try:
                 process = hidden_popen(
                     [uv_path, "python", "find", "3.12"],
@@ -2465,6 +2466,15 @@ class MainWindow(QMainWindow):
                 self._log("[警告] 无法查找 uv 管理的 Python", "#FF9800")
             
             if not python_ok:
+                if found_python and os.path.exists(found_python):
+                    broken_python_dir = os.path.dirname(found_python)
+                    self._log(f"[信息] 删除损坏的 Python: {broken_python_dir}")
+                    try:
+                        import shutil
+                        shutil.rmtree(broken_python_dir, ignore_errors=True)
+                    except Exception:
+                        pass
+                
                 self._log("[信息] 正在重新安装 Python 3.12...")
                 try:
                     process = hidden_popen(
