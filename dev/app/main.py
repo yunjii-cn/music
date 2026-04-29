@@ -2059,8 +2059,10 @@ class MainWindow(QMainWindow):
                             installed_ver = stdout.strip() if stdout.strip() else "unknown"
                             self._log(f"[错误] transformers 版本不兼容: {installed_ver} (需要 <5.0)", "#F44336")
                             self._log("[信息] 正在自动修复: 降级 transformers 到兼容版本...", "#FF9800")
+                            uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+                            fix_cmd = [uv_path, "pip", "install", "--python", python_exe, "transformers>=4.51.0,<4.58.0"] if os.path.exists(uv_path) else [python_exe, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"]
                             fix_process = hidden_popen(
-                                [python_exe, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"],
+                                fix_cmd,
                                 cwd=self.base_dir,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -2820,7 +2822,7 @@ class MainWindow(QMainWindow):
                     stderr=subprocess.PIPE,
                     text=True
                 )
-                stdout, stderr = process.communicate(timeout=10)
+                stdout, stderr = process.communicate(timeout=30)
                 if process.returncode == 0:
                     self._log(f"✓ {dep} ({desc}) 已安装")
                 else:
@@ -2842,6 +2844,24 @@ class MainWindow(QMainWindow):
             if process.returncode != 0:
                 installed_ver = stdout.strip() if stdout.strip() else "unknown"
                 self._log(f"✗ transformers 版本不兼容: {installed_ver} (需要 <5.0，5.x 会导致模型加载失败)", "#F44336")
+                self._log("[信息] 正在自动修复: 降级 transformers...", "#FF9800")
+                try:
+                    uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+                    fix_cmd = [uv_path, "pip", "install", "--python", venv_python, "transformers>=4.51.0,<4.58.0"] if os.path.exists(uv_path) else [venv_python, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"]
+                    fix_process = hidden_popen(
+                        fix_cmd,
+                        cwd=self.base_dir,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    fix_process.communicate(timeout=120)
+                    if fix_process.returncode == 0:
+                        self._log("✓ transformers 已降级到兼容版本", "#4CAF50")
+                    else:
+                        self._log("[警告] transformers 降级失败", "#FF9800")
+                except Exception as e:
+                    self._log(f"[警告] transformers 降级失败: {e}", "#FF9800")
                 all_ok = False
             else:
                 self._log(f"✓ transformers 版本兼容: {stdout.strip()}")

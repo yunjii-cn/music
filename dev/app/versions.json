@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0910",
+    "date": "2026-04-29 09:13",
+    "message": "修复依赖验证：1.peft等依赖超时从10秒增加到30秒 2.transformers 5.x自动降级到4.x兼容版本 3.启动时和快速验证都自动修复transformers版本",
+    "changes": [
+      "修复依赖验证：1.peft等依赖超时从10秒增加到30秒 2.transformers 5.x自动降级到4.x兼容版本 3.启动时和快速验证都自动修复transformers版本"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0910.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0846",
     "date": "2026-04-29 08:49",
     "message": "修复弹窗问题：恢复main.py开头的全局subprocess补丁(和v0359一致)，用_pyi_hidden_patched防止重复补丁和递归",
