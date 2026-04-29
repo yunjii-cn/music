@@ -2590,6 +2590,7 @@ class MainWindow(QMainWindow):
         env = os.environ.copy()
         env["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
         env["UV_EXTRA_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
+        env["UV_LINK_MODE"] = "copy"
         
         required_deps = [
             ("loguru", "日志库"),
@@ -2600,6 +2601,13 @@ class MainWindow(QMainWindow):
             ("diffusers", "扩散模型"),
             ("peft", "LoRA/训练"),
             ("lycoris", "LoKr 训练"),
+            ("fastapi", "API 框架"),
+            ("uvicorn", "ASGI 服务器"),
+            ("gradio", "Web UI"),
+            ("accelerate", "加速库"),
+            ("scipy", "科学计算"),
+            ("soundfile", "音频文件"),
+            ("einops", "张量操作"),
         ]
         
         missing = []
@@ -2627,35 +2635,51 @@ class MainWindow(QMainWindow):
         pyproject_toml = os.path.join(scripts_dir, "pyproject.toml")
         
         if os.path.exists(pyproject_toml):
-            self._log("[信息] 使用 uv sync 安装完整依赖...")
+            self._log("[信息] 使用 uv pip install 从 pyproject.toml 安装完整依赖...")
             try:
                 process = hidden_popen(
-                    [uv_path, "sync", "--python", venv_python, "--index-strategy", "unsafe-best-match"],
+                    [uv_path, "pip", "install", "--python", venv_python, "-r", "pyproject.toml", "--index-strategy", "unsafe-best-match"],
                     cwd=scripts_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
                     env=env
                 )
-                stdout, _ = process.communicate(timeout=1200)
+                stdout, _ = process.communicate(timeout=1800)
                 if stdout:
                     for line in stdout.splitlines():
                         if line.strip():
                             self._log(f"[安装依赖] {line.strip()}")
                 if process.returncode == 0:
-                    self._log("✓ 依赖安装完成")
+                    self._log("✓ 完整依赖安装完成")
                     return
                 else:
-                    self._log(f"[警告] uv sync 返回码: {process.returncode}", "#FF9800")
+                    self._log(f"[警告] uv pip install -r pyproject.toml 返回码: {process.returncode}", "#FF9800")
             except subprocess.TimeoutExpired:
                 process.kill()
-                self._log("[警告] uv sync 超时", "#FF9800")
+                self._log("[警告] uv pip install -r pyproject.toml 超时", "#FF9800")
             except Exception as e:
-                self._log(f"[警告] uv sync 失败: {e}", "#FF9800")
+                self._log(f"[警告] uv pip install -r pyproject.toml 失败: {e}", "#FF9800")
         
         self._log("[信息] 使用 uv pip install 直接安装缺失依赖...")
         
-        basic_deps = [d for d in missing if d not in ("torch", "torchaudio", "torchvision")]
+        version_constraints = {
+            "transformers": "transformers>=4.51.0,<4.58.0",
+            "peft": "peft>=0.18.0",
+            "diffusers": "diffusers",
+            "loguru": "loguru>=0.7.3",
+            "psutil": "psutil",
+            "lycoris": "lycoris-lora",
+            "fastapi": "fastapi>=0.110.0",
+            "uvicorn": "uvicorn[standard]>=0.27.0",
+            "gradio": "gradio==6.2.0",
+            "accelerate": "accelerate>=1.12.0",
+            "scipy": "scipy>=1.10.1",
+            "soundfile": "soundfile>=0.13.1",
+            "einops": "einops>=0.8.1",
+        }
+        
+        basic_deps = [version_constraints.get(d, d) for d in missing if d not in ("torch", "torchaudio", "torchvision")]
         torch_deps = [d for d in missing if d in ("torch", "torchaudio", "torchvision")]
         
         if basic_deps:
@@ -2768,7 +2792,7 @@ class MainWindow(QMainWindow):
         """快速检查关键依赖是否已安装 - 返回True表示所有依赖都OK"""
 
         
-        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft"]
+        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "fastapi", "uvicorn", "accelerate"]
         all_ok = True
         
         for dep in deps_to_check:
@@ -2804,6 +2828,13 @@ class MainWindow(QMainWindow):
             ("diffusers", "扩散模型"),
             ("peft", "LoRA/训练"),
             ("lycoris", "LoKr 训练"),
+            ("fastapi", "API 框架"),
+            ("uvicorn", "ASGI 服务器"),
+            ("gradio", "Web UI"),
+            ("accelerate", "加速库"),
+            ("scipy", "科学计算"),
+            ("soundfile", "音频文件"),
+            ("einops", "张量操作"),
         ]
         # 可选加速 - 缺失只影响性能，不影响功能
         optional_deps = [

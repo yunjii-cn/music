@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.30.0707",
+    "date": "2026-04-30 07:09",
+    "message": "修复依赖安装：1.用uv pip install -r pyproject.toml替代uv sync安装完整依赖 2.所有依赖包带版本约束 3.扩展依赖检查列表包含fastapi/uvicorn/gradio等 4.设置UV_LINK_MODE=copy避免硬链接问题",
+    "changes": [
+      "修复依赖安装：1.用uv pip install -r pyproject.toml替代uv sync安装完整依赖 2.所有依赖包带版本约束 3.扩展依赖检查列表包含fastapi/uvicorn/gradio等 4.设置UV_LINK_MODE=copy避免硬链接问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.0707.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0910",
     "date": "2026-04-29 09:13",
     "message": "修复依赖验证：1.peft等依赖超时从10秒增加到30秒 2.transformers 5.x自动降级到4.x兼容版本 3.启动时和快速验证都自动修复transformers版本",

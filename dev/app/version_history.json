@@ -880,5 +880,13 @@
     ],
     "build_time": "2026-04-29T09:13:02.940476",
     "version_number": "2026.04.29.0910"
+  },
+  "云集智能音乐创意台-v2026.04.30.0707": {
+    "version": "云集智能音乐创意台-v2026.04.30.0707",
+    "changes": [
+      "修复依赖安装：1.用uv pip install -r pyproject.toml替代uv sync安装完整依赖 2.所有依赖包带版本约束 3.扩展依赖检查列表包含fastapi/uvicorn/gradio等 4.设置UV_LINK_MODE=copy避免硬链接问题"
+    ],
+    "build_time": "2026-04-30T07:09:57.799414",
+    "version_number": "2026.04.30.0707"
   }
 }
