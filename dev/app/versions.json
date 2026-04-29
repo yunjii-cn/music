@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.29.0803",
+    "date": "2026-04-29 08:06",
+    "message": "修复Python安装损坏：1.venv重建前先检查uv管理的Python能否运行 2.Python损坏时用uv python install重新安装 3.重建venv后再安装依赖",
+    "changes": [
+      "修复Python安装损坏：1.venv重建前先检查uv管理的Python能否运行 2.Python损坏时用uv python install重新安装 3.重建venv后再安装依赖"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0803.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.29.0753",
     "date": "2026-04-29 07:54",
     "message": "修复venv损坏导致依赖无法安装：1.安装前检测venv Python能否运行 2.损坏时自动删除重建venv 3.uv sync加--python指定目标 4.重建后重新安装所有依赖",
