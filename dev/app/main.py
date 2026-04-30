@@ -141,10 +141,11 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QTextEdit, QFrame, QGridLayout, QScrollArea,
     QGroupBox, QMessageBox, QProgressBar, QSplitter, QSystemTrayIcon,
-    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog
+    QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog,
+    QSplashScreen
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QRectF
-from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPainter, QPixmap
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QPropertyAnimation, QRectF, pyqtProperty
+from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPainter, QPixmap, QLinearGradient
 
 # Version manager - lazy imported
 
@@ -1036,13 +1037,107 @@ class ServiceCard(QFrame):
             """)
 
 
+class SplashScreen(QSplashScreen):
+    def __init__(self):
+        pixmap = QPixmap(520, 360)
+        pixmap.fill(QColor("#0D0D0D"))
+        super().__init__(pixmap)
+        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
+        self._progress = 0.0
+        self._message = "正在初始化..."
+        self._icon_pixmap = None
+        try:
+            if hasattr(sys, '_MEIPASS'):
+                base = sys._MEIPASS
+            else:
+                base = os.path.dirname(os.path.abspath(__file__))
+            for name in ('icon.png', 'icon.ico'):
+                p = os.path.join(base, name)
+                if os.path.exists(p):
+                    self._icon_pixmap = QPixmap(p)
+                    break
+        except Exception:
+            pass
+
+    def _get_progress(self):
+        return self._progress
+
+    def _set_progress(self, val):
+        self._progress = val
+        self.repaint()
+
+    progress = pyqtProperty(float, _get_progress, _set_progress)
+
+    def set_progress(self, value, message=""):
+        if message:
+            self._message = message
+        anim = QPropertyAnimation(self, b"progress")
+        anim.setDuration(300)
+        anim.setStartValue(self._progress)
+        anim.setEndValue(value)
+        anim.start()
+        self._anim = anim
+        if message:
+            self._message = message
+            self.repaint()
+
+    def drawContents(self, painter):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        painter.fillRect(0, 0, w, h, QColor("#0D0D0D"))
+
+        if self._icon_pixmap:
+            icon_size = 80
+            scaled = self._icon_pixmap.scaled(icon_size, icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            ix = (w - scaled.width()) // 2
+            painter.drawPixmap(ix, 60, scaled)
+
+        painter.setPen(QColor("#F0F0F0"))
+        title_font = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
+        painter.setFont(title_font)
+        title = "云集智能音乐创意台"
+        fm = painter.fontMetrics()
+        tw = fm.horizontalAdvance(title)
+        painter.drawText((w - tw) // 2, 180, title)
+
+        bar_x, bar_y, bar_w, bar_h = 60, 240, w - 120, 10
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#222222"))
+        painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h), 5, 5)
+
+        fill_w = bar_w * min(self._progress, 1.0)
+        if fill_w > 0:
+            grad = QLinearGradient(bar_x, bar_y, bar_x + fill_w, bar_y)
+            grad.setColorAt(0, QColor("#1565C0"))
+            grad.setColorAt(1, QColor("#42A5F5"))
+            painter.setBrush(grad)
+            painter.drawRoundedRect(QRectF(bar_x, bar_y, fill_w, bar_h), 5, 5)
+
+        painter.setPen(QColor("#888888"))
+        msg_font = QFont("Microsoft YaHei", 10)
+        painter.setFont(msg_font)
+        msg = self._message
+        fm2 = painter.fontMetrics()
+        mw = fm2.horizontalAdvance(msg)
+        painter.drawText((w - mw) // 2, 275, msg)
+
+        pct = f"{int(min(self._progress, 1.0) * 100)}%"
+        painter.setPen(QColor("#42A5F5"))
+        pct_font = QFont("Microsoft YaHei", 9)
+        painter.setFont(pct_font)
+        fm3 = painter.fontMetrics()
+        pw = fm3.horizontalAdvance(pct)
+        painter.drawText((w - pw) // 2, 300, pct)
+
+
 class MainWindow(QMainWindow):
     """主窗口"""
     log_signal = pyqtSignal(str, str)
     enable_buttons_signal = pyqtSignal()
     
-    def __init__(self):
+    def __init__(self, splash=None):
         super().__init__()
+        self._splash = splash
         self.setWindowTitle(f"云集智能音乐创意台 v{VERSION}")
         self.setStyleSheet("""
             QMainWindow {
@@ -1073,28 +1168,21 @@ class MainWindow(QMainWindow):
                     break
                 self.base_dir = parent_dir
         
-        self.config = ConfigManager(self.base_dir)
-        
         self.service_processes: Dict[str, ServiceProcess] = {}
         self.service_cards: Dict[str, ServiceCard] = {}
         self.api_process = None
         self.is_starting = False
         self.current_project = "qinglong"
-        
-        self.browsers = self._detect_browsers()
-        self.selected_browser = self.config.get("browser.default", "system")
-        self.custom_browser_path = self.config.get("browser.custom_path", "")
-        if self.custom_browser_path and os.path.exists(self.custom_browser_path):
-            self.browsers["自定义浏览器"] = self.custom_browser_path
-        
+        self.browsers = {"系统默认": "system"}
+        self.selected_browser = "system"
+        self.custom_browser_path = ""
         self.download_sources = {
             "auto": "自动检测",
             "huggingface": "HuggingFace",
             "modelscope": "ModelScope",
             "huggingface-cn": "HuggingFace (国内镜像)"
         }
-        self.selected_download_source = self.config.get("download.source", "auto")
-        
+        self.selected_download_source = "auto"
         self.model_list = []
         self._model_list_loaded = False
         self.model_download_thread = None
@@ -1108,19 +1196,18 @@ class MainWindow(QMainWindow):
         self.model_manager_widget = None
         self.version_page = None
         self.version_manager_widget = None
-        self._home_loaded = True
+        self._home_loaded = False
         
-        self._setup_ui()
-        self._setup_monitor()
-        self._setup_tray()
+        self._setup_ui_skeleton()
         
         self.log_signal.connect(self._append_log_to_ui)
         self.enable_buttons_signal.connect(self._enable_buttons)
         
-        size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
-        self.resize(size["width"], size["height"])
+        self.resize(1200, 1100)
+        
+        QTimer.singleShot(0, self._deferred_init)
     
-    def _setup_ui(self):
+    def _setup_ui_skeleton(self):
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #0D0D0D;
@@ -1236,13 +1323,59 @@ class MainWindow(QMainWindow):
         self.home_layout = QVBoxLayout(self.home_page)
         self.home_layout.setSpacing(8)
         self.home_layout.setContentsMargins(12, 12, 12, 12)
-        self._populate_home_page()
+        loading_label = QLabel("⏳ 正在加载...")
+        loading_label.setStyleSheet("color: #888888; font-size: 16px; padding: 40px;")
+        loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.home_layout.addWidget(loading_label)
         self.page_stack.addWidget(self.home_page)
         
         self.page_stack.addWidget(QWidget())
         self.page_stack.addWidget(QWidget())
         
         main_layout.addWidget(self.page_stack, 1)
+        
+        if self._splash:
+            self._splash.set_progress(0.2, "正在初始化框架...")
+    
+    def _deferred_init(self):
+        if self._splash:
+            self._splash.set_progress(0.3, "正在加载配置...")
+        
+        self.config = ConfigManager(self.base_dir)
+        
+        if self._splash:
+            self._splash.set_progress(0.4, "正在检测浏览器...")
+        
+        self.browsers = self._detect_browsers()
+        self.selected_browser = self.config.get("browser.default", "system")
+        self.custom_browser_path = self.config.get("browser.custom_path", "")
+        if self.custom_browser_path and os.path.exists(self.custom_browser_path):
+            self.browsers["自定义浏览器"] = self.custom_browser_path
+        self.selected_download_source = self.config.get("download.source", "auto")
+        
+        if self._splash:
+            self._splash.set_progress(0.5, "正在构建主界面...")
+        
+        while self.home_layout.count():
+            item = self.home_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        self._populate_home_page()
+        
+        if self._splash:
+            self._splash.set_progress(0.75, "正在启动监控...")
+        
+        self._setup_monitor()
+        self._setup_tray()
+        
+        size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
+        self.resize(size["width"], size["height"])
+        
+        self._home_loaded = True
+        
+        if self._splash:
+            self._splash.set_progress(1.0, "加载完成！")
     
     def _populate_home_page(self):
         """填充首页内容到已有的home_layout"""
@@ -5211,26 +5344,49 @@ def extract_scripts():
                     pass
 
 
-def main():
+def main(app=None, splash=None):
     extract_scripts()
     
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
+    if app is None:
+        app = QApplication(sys.argv)
+        app.setStyle('Fusion')
+        
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("#0D0D0D"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#F0F0F0"))
+        palette.setColor(QPalette.ColorRole.Base, QColor("#1A1A1A"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#F0F0F0"))
+        palette.setColor(QPalette.ColorRole.Button, QColor("#1A1A1A"))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F0F0F0"))
+        app.setPalette(palette)
+        
+        font = QFont("Microsoft YaHei", 10)
+        app.setFont(font)
     
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor("#0D0D0D"))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor("#F0F0F0"))
-    palette.setColor(QPalette.ColorRole.Base, QColor("#1A1A1A"))
-    palette.setColor(QPalette.ColorRole.Text, QColor("#F0F0F0"))
-    palette.setColor(QPalette.ColorRole.Button, QColor("#1A1A1A"))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F0F0F0"))
-    app.setPalette(palette)
+    if splash is None:
+        splash = SplashScreen()
     
-    font = QFont("Microsoft YaHei", 10)
-    app.setFont(font)
+    screen = app.primaryScreen().geometry()
+    x = (screen.width() - splash.width()) // 2
+    y = (screen.height() - splash.height()) // 2
+    splash.move(x, y)
+    splash.show()
+    splash.repaint()
+    app.processEvents()
     
-    window = MainWindow()
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
+    
+    splash.set_progress(0.1, "正在创建主窗口...")
+    app.processEvents()
+    
+    window = MainWindow(splash=splash)
     window.show()
+    
+    splash.finish(window)
     
     sys.exit(app.exec())
 

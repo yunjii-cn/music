@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.30.2114",
+    "date": "2026-04-30 21:15",
+    "message": "修复青龙训练器启动问题：删除pyi_rth_subprocess.py中的SetWinEventHook全局钩子（该钩子会拦截PowerShell子进程的控制台窗口创建，导致服务无法正常启动），恢复v0359的简洁subprocess patch方式",
+    "changes": [
+      "修复青龙训练器启动问题：删除pyi_rth_subprocess.py中的SetWinEventHook全局钩子（该钩子会拦截PowerShell子进程的控制台窗口创建，导致服务无法正常启动），恢复v0359的简洁subprocess patch方式"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.2114.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.30.0854",
     "date": "2026-04-30 08:55",
     "message": "恢复v0359简洁启动流程：1.去掉SplashScreen和QPropertyAnimation 2.去掉_deferred_init延迟初始化 3.恢复_setup_ui一步到位 4.恢复main()简洁签名 5.去掉launcher.py中pyi_splash.update_text",
