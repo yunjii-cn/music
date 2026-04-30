@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.04.30.0806",
+    "date": "2026-04-30 08:07",
+    "message": "修复破坏性修改：1.依赖缺失时优先重跑install-env.ps1而非只装8个包 2.venv损坏时优先重跑install-env.ps1 3._stop_all_services恢复v0359简洁逻辑 4._stop_service恢复netstat+taskkill方式 5.保留有用改进(monitor pause/resume,api_process终止,taskkill /T)",
+    "changes": [
+      "修复破坏性修改：1.依赖缺失时优先重跑install-env.ps1而非只装8个包 2.venv损坏时优先重跑install-env.ps1 3._stop_all_services恢复v0359简洁逻辑 4._stop_service恢复netstat+taskkill方式 5.保留有用改进(monitor pause/resume,api_process终止,taskkill /T)"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.0806.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.30.0733",
     "date": "2026-04-30 07:34",
     "message": "完善部署维护自动化：1.自动修复损坏的dist-info包后重试安装 2.扩展依赖检查到15个关键包 3.所有包带版本约束 4.用uv pip install -r pyproject.toml替代uv sync",

@@ -2550,6 +2550,27 @@ class MainWindow(QMainWindow):
             self._log("[警告] 虚拟环境 Python 不存在，需要重建", "#FF9800")
         
         if venv_broken:
+            self._log("[信息] 虚拟环境损坏，重新运行安装脚本...")
+            install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
+            if os.path.exists(install_script):
+                try:
+                    result = hidden_run(
+                        ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                        cwd=self.base_dir,
+                        capture_output=False,
+                        text=True,
+                        timeout=1800
+                    )
+                    if result.returncode == 0:
+                        self._log("✅ 环境重建完成", "#4CAF50")
+                        return
+                    else:
+                        self._log(f"[警告] 安装脚本返回码: {result.returncode}，尝试手动修复...", "#FF9800")
+                except Exception as e:
+                    self._log(f"[警告] 安装脚本执行失败: {e}，尝试手动修复...", "#FF9800")
+            else:
+                self._log("[警告] 安装脚本不存在，尝试手动修复...", "#FF9800")
+            
             venv_dir = os.path.join(scripts_dir, ".venv")
             self._log("[信息] 正在删除损坏的虚拟环境...")
             try:
@@ -3028,7 +3049,27 @@ class MainWindow(QMainWindow):
             deps_ok = self._quick_check_dependencies(venv_python)
             if not deps_ok:
                 self._log("[警告] 检测到关键依赖缺失，自动修复...", "#FF9800")
-                self._install_missing_dependencies(venv_python, scripts_dir)
+                install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
+                if os.path.exists(install_script):
+                    self._log("[信息] 重新运行安装脚本修复依赖...")
+                    try:
+                        result = hidden_run(
+                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                            cwd=self.base_dir,
+                            capture_output=False,
+                            text=True,
+                            timeout=1800
+                        )
+                        if result.returncode == 0:
+                            self._log("✅ 依赖修复完成", "#4CAF50")
+                        else:
+                            self._log(f"[警告] 安装脚本返回码: {result.returncode}，尝试备用修复...", "#FF9800")
+                            self._install_missing_dependencies(venv_python, scripts_dir)
+                    except Exception as e:
+                        self._log(f"[警告] 安装脚本执行失败: {e}，尝试备用修复...", "#FF9800")
+                        self._install_missing_dependencies(venv_python, scripts_dir)
+                else:
+                    self._install_missing_dependencies(venv_python, scripts_dir)
             self._verify_dependencies(venv_python)
             
             # 6. 检查 git 子模块
@@ -4304,40 +4345,8 @@ try {
                 pass
             self.api_process = None
         
-        for service_id, process in list(self.service_processes.items()):
-            try:
-                if process.state() != 0:
-                    process.terminate()
-            except:
-                pass
-        self.service_processes.clear()
-        
-        import psutil
-        service_ports = {s["port"]: s["name"] for s in SERVICES.values()}
-        for proc in psutil.process_iter(['pid', 'name']):
-            try:
-                for conn in proc.connections(kind='inet'):
-                    if conn.status == 'LISTEN' and conn.laddr.port in service_ports:
-                        try:
-                            proc.kill()
-                            self._log(f"已终止 {service_ports[conn.laddr.port]} 进程 (PID: {proc.pid})")
-                        except:
-                            pass
-                        break
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
-        
-        for port, name in service_ports.items():
-            for _ in range(10):
-                if not self.monitor._check_port(port):
-                    break
-                time.sleep(0.5)
-            else:
-                self._log(f"[警告] {name} 端口 {port} 仍被占用", "#FF9800")
-        
         for service_id in SERVICES:
-            if service_id in self.service_cards:
-                self.service_cards[service_id].update_status(False)
+            self._stop_service(service_id, skip_pause=True)
         
         self.monitor.resume()
         
@@ -4346,12 +4355,13 @@ try {
         self._log("所有服务已停止")
         self._log("========================================")
     
-    def _stop_service(self, service_id: str):
+    def _stop_service(self, service_id: str, skip_pause=False):
         """停止单个服务"""
         service = SERVICES[service_id]
         self._log(f"正在停止 {service['name']}...")
         
-        self.monitor.pause()
+        if not skip_pause:
+            self.monitor.pause()
         
         if service_id in self.service_processes:
             process = self.service_processes[service_id]
@@ -4363,30 +4373,40 @@ try {
                     pass
             del self.service_processes[service_id]
         
-        import psutil
         port = service["port"]
-        for proc in psutil.process_iter(['pid', 'name']):
-            try:
-                for conn in proc.connections(kind='inet'):
-                    if conn.status == 'LISTEN' and conn.laddr.port == port:
-                        try:
-                            proc.kill()
-                            self._log(f"已终止占用端口 {port} 的进程 (PID: {proc.pid})")
-                        except:
-                            pass
-                        break
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
-        
-        for _ in range(10):
-            if not self.monitor._check_port(port):
-                break
-            time.sleep(0.5)
+        try:
+            result = hidden_run(
+                ["netstat", "-ano", "-p", "TCP"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    if f":{port}" in line and "LISTENING" in line:
+                        parts = line.split()
+                        if len(parts) >= 5:
+                            pid = parts[-1]
+                            try:
+                                hidden_run(
+                                    ["taskkill", "/F", "/T", "/PID", pid],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    timeout=5
+                                )
+                                self._log(f"已终止占用端口 {port} 的进程 (PID: {pid})")
+                            except:
+                                pass
+        except:
+            pass
         
         if service_id in self.service_cards:
             self.service_cards[service_id].update_status(False)
         
-        self.monitor.resume()
+        if not skip_pause:
+            self.monitor.resume()
     
     def _restart_service(self, service_id: str):
         """重启服务"""
