@@ -61,11 +61,5 @@ if sys.platform == 'win32':
 
         _subprocess._pyi_hidden_patched = True
 
-try:
-    import pyi_splash
-    pyi_splash.update_text("正在加载模块...")
-except Exception:
-    pass
-
 import main
 main.main()
