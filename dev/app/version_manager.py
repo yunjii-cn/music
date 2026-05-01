@@ -893,10 +893,6 @@ class HybridVersionManagerDialog(QDialog):
                 si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 si.wShowWindow = 0
                 creation_flags = subprocess.CREATE_NO_WINDOW
-                if hasattr(subprocess, 'DETACHED_PROCESS'):
-                    creation_flags |= subprocess.DETACHED_PROCESS
-                if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
-                    creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
                 subprocess.Popen(
                     [version['local_path']],
                     cwd=os.path.dirname(version['local_path']),
@@ -1120,10 +1116,6 @@ class HybridVersionManagerDialog(QDialog):
                 si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 si.wShowWindow = 0
                 creation_flags = subprocess.CREATE_NO_WINDOW
-                if hasattr(subprocess, 'DETACHED_PROCESS'):
-                    creation_flags |= subprocess.DETACHED_PROCESS
-                if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
-                    creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
 
                 result = subprocess.run(
                     ["git", "checkout", full_sha],

@@ -51,10 +51,6 @@ if sys.platform == 'win32':
             si.wShowWindow = 0
             kwargs['startupinfo'] = si
             flags = _subprocess.CREATE_NO_WINDOW
-            if hasattr(_subprocess, 'DETACHED_PROCESS'):
-                flags |= _subprocess.DETACHED_PROCESS
-            if hasattr(_subprocess, 'CREATE_NEW_PROCESS_GROUP'):
-                flags |= _subprocess.CREATE_NEW_PROCESS_GROUP
             if 'creationflags' in kwargs:
                 kwargs['creationflags'] = kwargs['creationflags'] | flags
             else:
@@ -102,7 +98,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable
 
 if sys.platform == 'win32':
-    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+    _HIDDEN_FLAGS = subprocess.CREATE_NO_WINDOW
 else:
     _HIDDEN_FLAGS = 0
 
@@ -317,8 +313,7 @@ class ServiceProcess(QThread):
                 "powershell.exe",
                 "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
-                "-NoProfile",
-                "-Command", f"& '{self.script_path}' 2>&1"
+                "-File", self.script_path
             ]
             
             self.process = hidden_popen(
@@ -4603,7 +4598,7 @@ try {
         """使用选择的浏览器打开URL"""
         if (self.selected_browser == "custom" or self.selected_browser == "自定义浏览器") and self.custom_browser_path and os.path.exists(self.custom_browser_path):
             try:
-                hidden_popen([self.custom_browser_path, url]),
+                hidden_popen([self.custom_browser_path, url])
                 self._log(f"使用自定义浏览器打开: {url}")
             except Exception as e:
                 self._log(f"打开自定义浏览器失败: {e}", "#F44336")
@@ -4618,7 +4613,7 @@ try {
                 browser_path = self.browsers.get(selected_browser)
                 if browser_path:
                     try:
-                        hidden_popen([browser_path, url]),
+                        hidden_popen([browser_path, url])
                         self._log(f"使用 {selected_browser} 打开: {url}")
                     except Exception as e:
                         self._log(f"打开浏览器失败: {e}", "#F44336")
@@ -5274,19 +5269,22 @@ try {
         
         self._stop_all_services()
         
-        import psutil
-        process_names = ["python.exe", "python", "node.exe", "node", "powershell.exe", "pwsh.exe"]
-        
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-            try:
-                if proc.info['name'] in process_names:
-                    cmdline = ' '.join(proc.info['cmdline'] or [])
-                    if 'acestep' in cmdline.lower() or 'qinglong' in cmdline.lower():
-                        self._log(f"终止进程: {proc.info['name']} (PID: {proc.info['pid']})")
-                        proc.terminate()
-                        proc.wait(timeout=3)
-            except:
-                pass
+        try:
+            import psutil
+            process_names = ["python.exe", "python", "node.exe", "node", "powershell.exe", "pwsh.exe"]
+            
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    if proc.info['name'] in process_names:
+                        cmdline = ' '.join(proc.info['cmdline'] or [])
+                        if 'acestep' in cmdline.lower() or 'qinglong' in cmdline.lower():
+                            self._log(f"终止进程: {proc.info['name']} (PID: {proc.info['pid']})")
+                            proc.terminate()
+                            proc.wait(timeout=3)
+                except:
+                    pass
+        except ImportError:
+            self._log("[警告] psutil 未安装，跳过进程清理", "#FF9800")
         
         self._log("✓ 所有进程已退出")
         

@@ -920,5 +920,14 @@
     ],
     "build_time": "2026-04-30T21:15:51.042383",
     "version_number": "2026.04.30.2114"
+  },
+  "云集智能音乐创意台-v2026.05.02.0551": {
+    "version": "云集智能音乐创意台-v2026.05.02.0551",
+    "changes": [
+      "--desc",
+      "修复青龙训练器启动问题：移除DETACHED_PROCESS和CREATE_NEW_PROCESS_GROUP标志，ServiceProcess改用-File参数，修复hidden_popen多余逗号bug，psutil添加try/except保护"
+    ],
+    "build_time": "2026-05-02T05:53:03.680142",
+    "version_number": "2026.05.02.0551"
   }
 }

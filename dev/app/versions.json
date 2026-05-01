@@ -1,5 +1,16 @@
 [
   {
+    "version": "2026.05.02.0551",
+    "date": "2026-05-02 05:53",
+    "message": "--desc",
+    "changes": [
+      "--desc",
+      "修复青龙训练器启动问题：移除DETACHED_PROCESS和CREATE_NEW_PROCESS_GROUP标志，ServiceProcess改用-File参数，修复hidden_popen多余逗号bug，psutil添加try/except保护"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.02.0551.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.04.30.2114",
     "date": "2026-04-30 21:15",
     "message": "修复青龙训练器启动问题：删除pyi_rth_subprocess.py中的SetWinEventHook全局钩子（该钩子会拦截PowerShell子进程的控制台窗口创建，导致服务无法正常启动），恢复v0359的简洁subprocess patch方式",

@@ -19,10 +19,6 @@ if sys.platform == 'win32':
             si.wShowWindow = 0
             kwargs['startupinfo'] = si
             flags = _subprocess.CREATE_NO_WINDOW
-            if hasattr(_subprocess, 'DETACHED_PROCESS'):
-                flags |= _subprocess.DETACHED_PROCESS
-            if hasattr(_subprocess, 'CREATE_NEW_PROCESS_GROUP'):
-                flags |= _subprocess.CREATE_NEW_PROCESS_GROUP
             if 'creationflags' in kwargs:
                 kwargs['creationflags'] = kwargs['creationflags'] | flags
             else:
