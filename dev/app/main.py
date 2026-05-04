@@ -4803,55 +4803,74 @@ try {
             self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
             return
         
-        self.is_downloading = True
-        self.current_operation_model = model_name
-        
-        # 刷新UI以显示暂停按钮
-        self._update_model_management_ui()
-        
-        # 显示进度条
-        if self.model_manager_widget is not None:
-            self.model_manager_widget.show_progress(f"正在下载: {model_name}")
-        
-        # 创建下载线程
-        self.model_download_thread = ModelDownloadThread(
-            model_name, 
-            self.base_dir, 
-            self.selected_download_source
-        )
-        
-        # 连接信号
-        self.model_download_thread.log_received.connect(self._log)
-        self.model_download_thread.download_finished.connect(self._on_download_finished)
-        self.model_download_thread.progress_updated.connect(self._on_download_progress_updated)
-        
-        # 禁用所有模型按钮
-        self._set_model_buttons_enabled(False)
-        
-        # 启动下载线程
-        self.model_download_thread.start()
+        try:
+            self.is_downloading = True
+            self.current_operation_model = model_name
+            
+            self._update_model_management_ui()
+            
+            if self.model_manager_widget is not None:
+                self.model_manager_widget.show_progress(f"正在下载: {model_name}")
+            
+            self.model_download_thread = ModelDownloadThread(
+                model_name, 
+                self.base_dir, 
+                self.selected_download_source
+            )
+            
+            self.model_download_thread.log_received.connect(self._log)
+            self.model_download_thread.download_finished.connect(self._on_download_finished)
+            self.model_download_thread.progress_updated.connect(self._on_download_progress_updated)
+            
+            self._set_model_buttons_enabled(False)
+            
+            self.model_download_thread.start()
+        except Exception as e:
+            self.is_downloading = False
+            self.current_operation_model = None
+            self._log(f"[错误] 启动下载失败: {str(e)}", "#F44336")
+            if self.model_manager_widget is not None:
+                try:
+                    self.model_manager_widget.hide_progress()
+                except Exception:
+                    pass
+            self._set_model_buttons_enabled(True)
     
     def _on_download_progress_updated(self, value: int, desc: str):
         """下载进度更新回调"""
-        if self.model_manager_widget is not None:
-            self.model_manager_widget.update_progress(value, desc)
+        try:
+            if hasattr(self, '_model_progress_bars') and self.current_operation_model in self._model_progress_bars:
+                bar, label = self._model_progress_bars[self.current_operation_model]
+                bar.setValue(value)
+                if desc:
+                    label.setText(desc)
+            if self.model_manager_widget is not None:
+                self.model_manager_widget.update_progress(value, desc)
+        except Exception:
+            pass
     
     def _on_download_finished(self, success: bool, model_name: str):
         """下载完成回调"""
         self.is_downloading = False
         self.current_operation_model = None
         
-        # 隐藏进度条
-        if self.model_manager_widget is not None:
-            self.model_manager_widget.hide_progress()
+        try:
+            if self.model_manager_widget is not None:
+                self.model_manager_widget.hide_progress()
+        except Exception:
+            pass
         
         if success:
-            # 更新模型状态
             self.model_list = []
-            self._load_model_list()
-        self._update_model_management_ui()
+            try:
+                self._load_model_list()
+            except Exception as e:
+                self._log(f"[警告] 刷新模型列表失败: {str(e)}", "#FF9800")
+        try:
+            self._update_model_management_ui()
+        except Exception as e:
+            self._log(f"[警告] 更新模型UI失败: {str(e)}", "#FF9800")
         
-        # 重新启用所有按钮
         self._set_model_buttons_enabled(True)
     
     def _delete_model(self, model_name):
@@ -5239,7 +5258,37 @@ try {
                 
                 model_item_layout.addLayout(row1)
                 
-                # 第二行：描述
+                if is_downloading:
+                    progress_row = QHBoxLayout()
+                    progress_bar = QProgressBar()
+                    progress_bar.setMinimum(0)
+                    progress_bar.setMaximum(100)
+                    progress_bar.setValue(0)
+                    progress_bar.setFixedHeight(16)
+                    progress_bar.setStyleSheet("""
+                        QProgressBar {
+                            background-color: #1A1A1A;
+                            border: 1px solid #333333;
+                            border-radius: 3px;
+                            text-align: center;
+                            color: #FFFFFF;
+                            font-size: 10px;
+                        }
+                        QProgressBar::chunk {
+                            background-color: #1976D2;
+                            border-radius: 2px;
+                        }
+                    """)
+                    progress_row.addWidget(progress_bar, 1)
+                    progress_label = QLabel("准备下载...")
+                    progress_label.setStyleSheet("color: #AAAAAA; font-size: 10px; min-width: 80px;")
+                    progress_row.addWidget(progress_label)
+                    model_item_layout.addLayout(progress_row)
+                    
+                    if not hasattr(self, '_model_progress_bars'):
+                        self._model_progress_bars = {}
+                    self._model_progress_bars[model["name"]] = (progress_bar, progress_label)
+                
                 desc_label = QLabel(model["description"])
                 desc_label.setStyleSheet("font-size: 11px; color: #AAAAAA;")
                 model_item_layout.addWidget(desc_label)

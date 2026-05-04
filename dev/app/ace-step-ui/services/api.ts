@@ -906,3 +906,112 @@ export const trainingApi = {
     source: string;
   }> => api('/api/training/export', { method: 'POST', body: params, token }),
 };
+
+// Presets API
+export interface Preset {
+  id: string;
+  name: string;
+  description?: string;
+  is_builtin: boolean;
+  category: string;
+  params: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const presetsApi = {
+  getPresets: (token: string): Promise<{ presets: Preset[] }> =>
+    api('/api/presets', { token }),
+
+  createPreset: (params: {
+    name: string;
+    description?: string;
+    category?: string;
+    params: Record<string, any>;
+  }, token: string): Promise<{ preset: Preset }> =>
+    api('/api/presets', { method: 'POST', body: params, token }),
+
+  updatePreset: (id: string, updates: {
+    name?: string;
+    description?: string;
+    category?: string;
+    params?: Record<string, any>;
+  }, token: string): Promise<{ preset: Preset }> =>
+    api(`/api/presets/${id}`, { method: 'PATCH', body: updates, token }),
+
+  deletePreset: (id: string, token: string): Promise<{ success: boolean }> =>
+    api(`/api/presets/${id}`, { method: 'DELETE', token }),
+};
+
+// Projects API
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  params: Record<string, any>;
+  is_active: boolean;
+  auto_save_enabled: boolean;
+  auto_save_interval: number;
+  auto_save_max_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProjectSnapshot {
+  id: string;
+  project_id: string;
+  label?: string;
+  params: Record<string, any>;
+  is_auto: boolean;
+  created_at?: string;
+}
+
+export const projectsApi = {
+  getProjects: (token: string): Promise<{ projects: Project[] }> =>
+    api('/api/projects', { token }),
+
+  getProject: (id: string, token: string): Promise<{ project: Project }> =>
+    api(`/api/projects/${id}`, { token }),
+
+  createProject: (params: {
+    name: string;
+    description?: string;
+    params: Record<string, any>;
+    auto_save_enabled?: boolean;
+    auto_save_interval?: number;
+    auto_save_max_count?: number;
+  }, token: string): Promise<{ project: Project }> =>
+    api('/api/projects', { method: 'POST', body: params, token }),
+
+  updateProject: (id: string, updates: {
+    name?: string;
+    description?: string;
+    params?: Record<string, any>;
+    auto_save_enabled?: boolean;
+    auto_save_interval?: number;
+    auto_save_max_count?: number;
+  }, token: string): Promise<{ project: Project }> =>
+    api(`/api/projects/${id}`, { method: 'PATCH', body: updates, token }),
+
+  deleteProject: (id: string, token: string): Promise<{ success: boolean }> =>
+    api(`/api/projects/${id}`, { method: 'DELETE', token }),
+
+  activateProject: (id: string, token: string): Promise<{ project: Project }> =>
+    api(`/api/projects/${id}/activate`, { method: 'POST', token }),
+
+  getSnapshots: (projectId: string, token: string): Promise<{ snapshots: ProjectSnapshot[] }> =>
+    api(`/api/projects/${projectId}/snapshots`, { token }),
+
+  createSnapshot: (projectId: string, params: {
+    label?: string;
+    params: Record<string, any>;
+    is_auto?: boolean;
+  }, token: string): Promise<{ snapshot: ProjectSnapshot }> =>
+    api(`/api/projects/${projectId}/snapshots`, { method: 'POST', body: params, token }),
+
+  restoreSnapshot: (projectId: string, snapshotId: string, token: string): Promise<{ project: Project }> =>
+    api(`/api/projects/${projectId}/snapshots/${snapshotId}/restore`, { method: 'POST', token }),
+
+  deleteSnapshot: (projectId: string, snapshotId: string, token: string): Promise<{ success: boolean }> =>
+    api(`/api/projects/${projectId}/snapshots/${snapshotId}`, { method: 'DELETE', token }),
+};

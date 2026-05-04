@@ -25,6 +25,8 @@ import contactRoutes from './routes/contact.js';
 import referenceTrackRoutes from './routes/referenceTrack.js';
 import trainingRoutes from './routes/training.js';
 import loraRoutes from './routes/lora.js';
+import presetsRoutes from './routes/presets.js';
+import projectsRoutes from './routes/projects.js';
 import { pool } from './db/pool.js';
 import './db/migrate.js';
 
@@ -624,6 +626,8 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/reference-tracks', referenceTrackRoutes);
 app.use('/api/training', trainingRoutes);
 app.use('/api/lora', loraRoutes);
+app.use('/api/presets', presetsRoutes);
+app.use('/api/projects', projectsRoutes);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

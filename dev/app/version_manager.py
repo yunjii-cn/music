@@ -17,7 +17,7 @@ from urllib.error import URLError, HTTPError
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
-    QComboBox, QTabWidget
+    QComboBox, QTabWidget, QProgressBar
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -1289,6 +1289,30 @@ class ModelManagerDialog(QDialog):
         scroll_area.setWidget(self.models_container)
         layout.addWidget(scroll_area, stretch=1)
 
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                height: 20px;
+                text-align: center;
+                color: #FFFFFF;
+                font-size: 11px;
+            }
+            QProgressBar::chunk {
+                background-color: #1976D2;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.progress_bar)
+
+        self.progress_label = QLabel("")
+        self.progress_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+        self.progress_label.setVisible(False)
+        layout.addWidget(self.progress_label)
+
     def _on_download_source_changed(self, index):
         if self.main_window:
             source_key = self.download_source_combo.itemData(index)
@@ -1372,21 +1396,24 @@ class ModelManagerDialog(QDialog):
                     }
                 """)
 
-                model_item_layout = QHBoxLayout(model_item)
+                model_item_layout = QVBoxLayout(model_item)
                 model_item_layout.setContentsMargins(8, 6, 8, 6)
-                model_item_layout.setSpacing(10)
+                model_item_layout.setSpacing(4)
+
+                row_layout = QHBoxLayout()
+                row_layout.setSpacing(10)
 
                 name_label = QLabel(model["display_name"])
                 name_label.setStyleSheet("color: #FFFFFF; font-size: 12px; min-width: 200px;")
-                model_item_layout.addWidget(name_label)
+                row_layout.addWidget(name_label)
 
                 status_label = QLabel("✓ 已安装" if model["exists"] else "✗ 未安装")
                 status_label.setStyleSheet(f"color: {'#4CAF50' if model['exists'] else '#F44336'}; font-size: 11px; min-width: 80px;")
-                model_item_layout.addWidget(status_label)
+                row_layout.addWidget(status_label)
 
                 desc_label = QLabel(model["description"])
                 desc_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
-                model_item_layout.addWidget(desc_label, 1)
+                row_layout.addWidget(desc_label, 1)
 
                 btn_layout = QHBoxLayout()
                 btn_layout.setSpacing(4)
@@ -1421,7 +1448,40 @@ class ModelManagerDialog(QDialog):
                     download_btn.clicked.connect(lambda checked, m=model["name"]: self._download_model(m))
                     btn_layout.addWidget(download_btn)
 
-                model_item_layout.addLayout(btn_layout)
+                row_layout.addLayout(btn_layout)
+                model_item_layout.addLayout(row_layout)
+
+                if is_downloading:
+                    progress_row = QHBoxLayout()
+                    progress_bar = QProgressBar()
+                    progress_bar.setMinimum(0)
+                    progress_bar.setMaximum(100)
+                    progress_bar.setValue(0)
+                    progress_bar.setFixedHeight(16)
+                    progress_bar.setStyleSheet("""
+                        QProgressBar {
+                            background-color: #1A1A1A;
+                            border: 1px solid #333333;
+                            border-radius: 3px;
+                            text-align: center;
+                            color: #FFFFFF;
+                            font-size: 10px;
+                        }
+                        QProgressBar::chunk {
+                            background-color: #1976D2;
+                            border-radius: 2px;
+                        }
+                    """)
+                    progress_row.addWidget(progress_bar, 1)
+                    progress_label = QLabel("准备下载...")
+                    progress_label.setStyleSheet("color: #AAAAAA; font-size: 10px; min-width: 80px;")
+                    progress_row.addWidget(progress_label)
+                    model_item_layout.addLayout(progress_row)
+
+                    if not hasattr(self, '_model_progress_bars'):
+                        self._model_progress_bars = {}
+                    self._model_progress_bars[model["name"]] = (progress_bar, progress_label)
+
                 self.models_layout.addWidget(model_item)
 
             if cat_id != list(categories.keys())[-1]:
@@ -1438,6 +1498,42 @@ class ModelManagerDialog(QDialog):
         if self.main_window and hasattr(self.main_window, '_delete_model'):
             self.main_window._delete_model(model_name)
             QTimer.singleShot(100, self._update_ui)
+
+    def show_progress(self, text: str = ""):
+        model_name = ""
+        if self.main_window and hasattr(self.main_window, 'current_operation_model'):
+            model_name = self.main_window.current_operation_model or ""
+        if model_name and hasattr(self, '_model_progress_bars') and model_name in self._model_progress_bars:
+            bar, label = self._model_progress_bars[model_name]
+            bar.setValue(0)
+            label.setText(text or "准备下载...")
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        self.progress_label.setVisible(True)
+        self.progress_label.setText(text)
+
+    def update_progress(self, value: int, desc: str = ""):
+        model_name = ""
+        if self.main_window and hasattr(self.main_window, 'current_operation_model'):
+            model_name = self.main_window.current_operation_model or ""
+        if model_name and hasattr(self, '_model_progress_bars') and model_name in self._model_progress_bars:
+            bar, label = self._model_progress_bars[model_name]
+            bar.setValue(value)
+            if desc:
+                label.setText(desc)
+        self.progress_bar.setValue(value)
+        if desc:
+            self.progress_label.setText(desc)
+
+    def hide_progress(self):
+        if hasattr(self, '_model_progress_bars'):
+            for bar, label in self._model_progress_bars.values():
+                bar.setValue(0)
+                label.setText("")
+            self._model_progress_bars.clear()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setValue(0)
+        self.progress_label.setVisible(False)
 
 
 VersionManagerDialog = HybridVersionManagerDialog

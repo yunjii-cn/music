@@ -188,6 +188,87 @@ function migrate(): void {
       console.error('Failed to add model column:', error);
     }
   }
+
+  // Create presets table for saving/loading generation parameter presets
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS presets (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_builtin INTEGER DEFAULT 0,
+        category TEXT DEFAULT 'custom',
+        params TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_presets_user_id ON presets(user_id);
+      CREATE INDEX IF NOT EXISTS idx_presets_category ON presets(category);
+      CREATE INDEX IF NOT EXISTS idx_presets_is_builtin ON presets(is_builtin);
+    `);
+    console.log('Presets table created successfully');
+  } catch (error) {
+    const errorMsg = String(error);
+    if (errorMsg.includes('already exists')) {
+      console.log('Presets table already exists');
+    } else {
+      console.error('Failed to create presets table:', error);
+    }
+  }
+
+  // Create projects table for full settings save with auto-save and rollback
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT,
+        params TEXT NOT NULL DEFAULT '{}',
+        is_active INTEGER DEFAULT 0,
+        auto_save_enabled INTEGER DEFAULT 1,
+        auto_save_interval INTEGER DEFAULT 60,
+        auto_save_max_count INTEGER DEFAULT 50,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
+      CREATE INDEX IF NOT EXISTS idx_projects_is_active ON projects(is_active);
+    `);
+    console.log('Projects table created successfully');
+  } catch (error) {
+    const errorMsg = String(error);
+    if (errorMsg.includes('already exists')) {
+      console.log('Projects table already exists');
+    } else {
+      console.error('Failed to create projects table:', error);
+    }
+  }
+
+  // Create project_snapshots table for auto-save history and rollback
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project_snapshots (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        label TEXT,
+        params TEXT NOT NULL DEFAULT '{}',
+        is_auto INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_snapshots_project_id ON project_snapshots(project_id);
+      CREATE INDEX IF NOT EXISTS idx_snapshots_created_at ON project_snapshots(created_at);
+    `);
+    console.log('Project snapshots table created successfully');
+  } catch (error) {
+    const errorMsg = String(error);
+    if (errorMsg.includes('already exists')) {
+      console.log('Project snapshots table already exists');
+    } else {
+      console.error('Failed to create project snapshots table:', error);
+    }
+  }
 }
 
 // Run migrations

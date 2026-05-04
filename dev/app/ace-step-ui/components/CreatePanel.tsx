@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Sparkles, ChevronDown, ChevronUp, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2 } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2, Bookmark, Save, X, FolderOpen, FolderPlus, History } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { generateApi } from '../services/api';
+import { generateApi, presetsApi, Preset, projectsApi, Project, ProjectSnapshot } from '../services/api';
 import { MAIN_STYLES, SUB_STYLES, getStyleMeta } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 
@@ -390,6 +390,27 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     };
   }[]>([]);
 
+  // Presets state
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [showSavePresetModal, setShowSavePresetModal] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [presetDescription, setPresetDescription] = useState('');
+  const [presetCategory, setPresetCategory] = useState('custom');
+  const [presetLoading, setPresetLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'presets' | 'projects'>('presets');
+
+  // Projects state
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProject, setActiveProject] = useState<Project | null>(null);
+  const [snapshots, setSnapshots] = useState<ProjectSnapshot[]>([]);
+  const [showSaveProjectModal, setShowSaveProjectModal] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [projectLoading, setProjectLoading] = useState(false);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
     // 总是显示所有模型，不依赖后端返回
@@ -541,6 +562,191 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showLoraMenu]);
+
+  useEffect(() => {
+    if (token) {
+      presetsApi.getPresets(token).then(result => {
+        setPresets(result.presets);
+      }).catch(() => {});
+      projectsApi.getProjects(token).then(result => {
+        setProjects(result.projects);
+        const active = result.projects.find((p: Project) => p.is_active);
+        if (active) setActiveProject(active);
+      }).catch(() => {});
+    }
+  }, [token]);
+
+  const getCurrentParams = useCallback(() => {
+    return {
+      customMode,
+      songDescription,
+      lyrics,
+      style,
+      title,
+      instrumental,
+      vocalLanguage,
+      vocalGender,
+      bpm,
+      keyScale,
+      timeSignature,
+      duration,
+      inferenceSteps,
+      guidanceScale,
+      batchSize,
+      randomSeed,
+      seed,
+      thinking,
+      audioFormat,
+      inferMethod,
+      lmBackend,
+      lmModel,
+      shift,
+      lmTemperature,
+      lmCfgScale,
+      lmTopK,
+      lmTopP,
+      lmNegativePrompt,
+      taskType,
+      audioCoverStrength,
+      useAdg,
+      cfgIntervalStart,
+      cfgIntervalEnd,
+      customTimesteps,
+      useCotMetas,
+      useCotCaption,
+      useCotLanguage,
+      autogen,
+      allowLmBatch,
+      getScores,
+      getLrc,
+      scoreScale,
+      lmBatchChunkSize,
+      isFormatCaption,
+      ditModel: selectedModel,
+      loraEnabled: loraLoaded,
+      loraPath,
+      loraScale,
+    };
+  }, [customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender, bpm, keyScale, timeSignature, duration, inferenceSteps, guidanceScale, batchSize, randomSeed, seed, thinking, audioFormat, inferMethod, lmBackend, lmModel, shift, lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, taskType, audioCoverStrength, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption, useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize, isFormatCaption, selectedModel, loraLoaded, loraPath, loraScale]);
+
+  const applyPreset = useCallback((preset: Preset) => {
+    const p = preset.params;
+    if (p.customMode !== undefined) { setCustomMode(p.customMode); localStorage.setItem('ace-customMode', String(p.customMode)); }
+    if (p.instrumental !== undefined) { setInstrumental(p.instrumental); localStorage.setItem('ace-instrumental', String(p.instrumental)); }
+    if (p.vocalLanguage !== undefined) { setVocalLanguage(p.vocalLanguage); localStorage.setItem('ace-vocalLanguage', p.vocalLanguage); }
+    if (p.vocalGender !== undefined) { setVocalGender(p.vocalGender); localStorage.setItem('ace-vocalGender', p.vocalGender); }
+    if (p.bpm !== undefined) { setBpm(p.bpm); localStorage.setItem('ace-bpm', String(p.bpm)); }
+    if (p.duration !== undefined) { setDuration(p.duration); localStorage.setItem('ace-duration', String(p.duration)); }
+    if (p.inferenceSteps !== undefined) { setInferenceSteps(p.inferenceSteps); localStorage.setItem('ace-inferenceSteps', String(p.inferenceSteps)); }
+    if (p.guidanceScale !== undefined) { setGuidanceScale(p.guidanceScale); localStorage.setItem('ace-guidanceScale', String(p.guidanceScale)); }
+    if (p.randomSeed !== undefined) { setRandomSeed(p.randomSeed); localStorage.setItem('ace-randomSeed', String(p.randomSeed)); }
+    if (p.audioFormat !== undefined) { setAudioFormat(p.audioFormat); localStorage.setItem('ace-audioFormat', p.audioFormat); }
+    if (p.inferMethod !== undefined) { setInferMethod(p.inferMethod); localStorage.setItem('ace-inferMethod', p.inferMethod); }
+    if (p.shift !== undefined) { setShift(p.shift); localStorage.setItem('ace-shift', String(p.shift)); }
+    if (p.useAdg !== undefined) { setUseAdg(p.useAdg); localStorage.setItem('ace-useAdg', String(p.useAdg)); }
+    if (p.taskType !== undefined) { setTaskType(p.taskType); }
+    if (p.audioCoverStrength !== undefined) { setAudioCoverStrength(p.audioCoverStrength); localStorage.setItem('ace-audioCoverStrength', String(p.audioCoverStrength)); }
+    if (p.ditModel !== undefined) { setSelectedModel(p.ditModel); localStorage.setItem('ace-model', p.ditModel); }
+    if (p.lmModel !== undefined) { setLmModel(p.lmModel); localStorage.setItem('ace-lmModel', p.lmModel); }
+    if (p.lmBackend !== undefined) { setLmBackend(p.lmBackend); localStorage.setItem('ace-lmBackend', p.lmBackend); }
+    if (p.lmTemperature !== undefined) { setLmTemperature(p.lmTemperature); localStorage.setItem('ace-lmTemperature', String(p.lmTemperature)); }
+    if (p.lmCfgScale !== undefined) { setLmCfgScale(p.lmCfgScale); localStorage.setItem('ace-lmCfgScale', String(p.lmCfgScale)); }
+    if (p.lmTopK !== undefined) { setLmTopK(p.lmTopK); localStorage.setItem('ace-lmTopK', String(p.lmTopK)); }
+    if (p.lmTopP !== undefined) { setLmTopP(p.lmTopP); localStorage.setItem('ace-lmTopP', String(p.lmTopP)); }
+    if (p.lmNegativePrompt !== undefined) { setLmNegativePrompt(p.lmNegativePrompt); localStorage.setItem('ace-lmNegativePrompt', p.lmNegativePrompt); }
+    if (p.loraEnabled !== undefined) { setShowLoraPanel(p.loraEnabled); localStorage.setItem('ace-loraEnabled', String(p.loraEnabled)); }
+    if (p.loraScale !== undefined) { setLoraScale(p.loraScale); localStorage.setItem('ace-loraScale', String(p.loraScale)); }
+    if (p.cfgIntervalStart !== undefined) { setCfgIntervalStart(p.cfgIntervalStart); localStorage.setItem('ace-cfgIntervalStart', String(p.cfgIntervalStart)); }
+    if (p.cfgIntervalEnd !== undefined) { setCfgIntervalEnd(p.cfgIntervalEnd); localStorage.setItem('ace-cfgIntervalEnd', String(p.cfgIntervalEnd)); }
+    if (p.customTimesteps !== undefined) { setCustomTimesteps(p.customTimesteps); localStorage.setItem('ace-customTimesteps', p.customTimesteps); }
+    if (p.useCotMetas !== undefined) { setUseCotMetas(p.useCotMetas); localStorage.setItem('ace-useCotMetas', String(p.useCotMetas)); }
+    if (p.useCotCaption !== undefined) { setUseCotCaption(p.useCotCaption); localStorage.setItem('ace-useCotCaption', String(p.useCotCaption)); }
+    if (p.useCotLanguage !== undefined) { setUseCotLanguage(p.useCotLanguage); localStorage.setItem('ace-useCotLanguage', String(p.useCotLanguage)); }
+    if (p.autogen !== undefined) { setAutogen(p.autogen); localStorage.setItem('ace-autogen', String(p.autogen)); }
+    if (p.allowLmBatch !== undefined) { setAllowLmBatch(p.allowLmBatch); localStorage.setItem('ace-allowLmBatch', String(p.allowLmBatch)); }
+    if (p.getScores !== undefined) { setGetScores(p.getScores); localStorage.setItem('ace-getScores', String(p.getScores)); }
+    if (p.getLrc !== undefined) { setGetLrc(p.getLrc); localStorage.setItem('ace-getLrc', String(p.getLrc)); }
+    if (p.scoreScale !== undefined) { setScoreScale(p.scoreScale); localStorage.setItem('ace-scoreScale', String(p.scoreScale)); }
+    if (p.lmBatchChunkSize !== undefined) { setLmBatchChunkSize(p.lmBatchChunkSize); localStorage.setItem('ace-lmBatchChunkSize', String(p.lmBatchChunkSize)); }
+    if (p.isFormatCaption !== undefined) { setIsFormatCaption(p.isFormatCaption); localStorage.setItem('ace-isFormatCaption', String(p.isFormatCaption)); }
+    setShowPresetMenu(false);
+  }, []);
+
+  const applyProject = useCallback((project: Project) => {
+    const p = project.params;
+    if (p.customMode !== undefined) { setCustomMode(p.customMode); localStorage.setItem('ace-customMode', String(p.customMode)); }
+    if (p.songDescription !== undefined) { setSongDescription(p.songDescription); localStorage.setItem('ace-songDescription', p.songDescription); }
+    if (p.lyrics !== undefined) { setLyrics(p.lyrics); localStorage.setItem('ace-lyrics', p.lyrics); }
+    if (p.style !== undefined) { setStyle(p.style); localStorage.setItem('ace-style', p.style); }
+    if (p.title !== undefined) { setTitle(p.title); localStorage.setItem('ace-title', p.title); }
+    if (p.instrumental !== undefined) { setInstrumental(p.instrumental); localStorage.setItem('ace-instrumental', String(p.instrumental)); }
+    if (p.vocalLanguage !== undefined) { setVocalLanguage(p.vocalLanguage); localStorage.setItem('ace-vocalLanguage', p.vocalLanguage); }
+    if (p.vocalGender !== undefined) { setVocalGender(p.vocalGender); localStorage.setItem('ace-vocalGender', p.vocalGender); }
+    if (p.bpm !== undefined) { setBpm(p.bpm); localStorage.setItem('ace-bpm', String(p.bpm)); }
+    if (p.keyScale !== undefined) { setKeyScale(p.keyScale); localStorage.setItem('ace-keyScale', p.keyScale); }
+    if (p.timeSignature !== undefined) { setTimeSignature(p.timeSignature); localStorage.setItem('ace-timeSignature', p.timeSignature); }
+    if (p.duration !== undefined) { setDuration(p.duration); localStorage.setItem('ace-duration', String(p.duration)); }
+    if (p.inferenceSteps !== undefined) { setInferenceSteps(p.inferenceSteps); localStorage.setItem('ace-inferenceSteps', String(p.inferenceSteps)); }
+    if (p.guidanceScale !== undefined) { setGuidanceScale(p.guidanceScale); localStorage.setItem('ace-guidanceScale', String(p.guidanceScale)); }
+    if (p.batchSize !== undefined) { setBatchSize(p.batchSize); localStorage.setItem('ace-batchSize', String(p.batchSize)); }
+    if (p.randomSeed !== undefined) { setRandomSeed(p.randomSeed); localStorage.setItem('ace-randomSeed', String(p.randomSeed)); }
+    if (p.seed !== undefined) { setSeed(p.seed); localStorage.setItem('ace-seed', String(p.seed)); }
+    if (p.thinking !== undefined) { setThinking(p.thinking); localStorage.setItem('ace-thinking', String(p.thinking)); }
+    if (p.audioFormat !== undefined) { setAudioFormat(p.audioFormat); localStorage.setItem('ace-audioFormat', p.audioFormat); }
+    if (p.inferMethod !== undefined) { setInferMethod(p.inferMethod); localStorage.setItem('ace-inferMethod', p.inferMethod); }
+    if (p.lmBackend !== undefined) { setLmBackend(p.lmBackend); localStorage.setItem('ace-lmBackend', p.lmBackend); }
+    if (p.lmModel !== undefined) { setLmModel(p.lmModel); localStorage.setItem('ace-lmModel', p.lmModel); }
+    if (p.shift !== undefined) { setShift(p.shift); localStorage.setItem('ace-shift', String(p.shift)); }
+    if (p.lmTemperature !== undefined) { setLmTemperature(p.lmTemperature); localStorage.setItem('ace-lmTemperature', String(p.lmTemperature)); }
+    if (p.lmCfgScale !== undefined) { setLmCfgScale(p.lmCfgScale); localStorage.setItem('ace-lmCfgScale', String(p.lmCfgScale)); }
+    if (p.lmTopK !== undefined) { setLmTopK(p.lmTopK); localStorage.setItem('ace-lmTopK', String(p.lmTopK)); }
+    if (p.lmTopP !== undefined) { setLmTopP(p.lmTopP); localStorage.setItem('ace-lmTopP', String(p.lmTopP)); }
+    if (p.lmNegativePrompt !== undefined) { setLmNegativePrompt(p.lmNegativePrompt); localStorage.setItem('ace-lmNegativePrompt', p.lmNegativePrompt); }
+    if (p.taskType !== undefined) { setTaskType(p.taskType); }
+    if (p.audioCoverStrength !== undefined) { setAudioCoverStrength(p.audioCoverStrength); localStorage.setItem('ace-audioCoverStrength', String(p.audioCoverStrength)); }
+    if (p.useAdg !== undefined) { setUseAdg(p.useAdg); localStorage.setItem('ace-useAdg', String(p.useAdg)); }
+    if (p.cfgIntervalStart !== undefined) { setCfgIntervalStart(p.cfgIntervalStart); localStorage.setItem('ace-cfgIntervalStart', String(p.cfgIntervalStart)); }
+    if (p.cfgIntervalEnd !== undefined) { setCfgIntervalEnd(p.cfgIntervalEnd); localStorage.setItem('ace-cfgIntervalEnd', String(p.cfgIntervalEnd)); }
+    if (p.customTimesteps !== undefined) { setCustomTimesteps(p.customTimesteps); localStorage.setItem('ace-customTimesteps', p.customTimesteps); }
+    if (p.useCotMetas !== undefined) { setUseCotMetas(p.useCotMetas); localStorage.setItem('ace-useCotMetas', String(p.useCotMetas)); }
+    if (p.useCotCaption !== undefined) { setUseCotCaption(p.useCotCaption); localStorage.setItem('ace-useCotCaption', String(p.useCotCaption)); }
+    if (p.useCotLanguage !== undefined) { setUseCotLanguage(p.useCotLanguage); localStorage.setItem('ace-useCotLanguage', String(p.useCotLanguage)); }
+    if (p.autogen !== undefined) { setAutogen(p.autogen); localStorage.setItem('ace-autogen', String(p.autogen)); }
+    if (p.allowLmBatch !== undefined) { setAllowLmBatch(p.allowLmBatch); localStorage.setItem('ace-allowLmBatch', String(p.allowLmBatch)); }
+    if (p.getScores !== undefined) { setGetScores(p.getScores); localStorage.setItem('ace-getScores', String(p.getScores)); }
+    if (p.getLrc !== undefined) { setGetLrc(p.getLrc); localStorage.setItem('ace-getLrc', String(p.getLrc)); }
+    if (p.scoreScale !== undefined) { setScoreScale(p.scoreScale); localStorage.setItem('ace-scoreScale', String(p.scoreScale)); }
+    if (p.lmBatchChunkSize !== undefined) { setLmBatchChunkSize(p.lmBatchChunkSize); localStorage.setItem('ace-lmBatchChunkSize', String(p.lmBatchChunkSize)); }
+    if (p.isFormatCaption !== undefined) { setIsFormatCaption(p.isFormatCaption); localStorage.setItem('ace-isFormatCaption', String(p.isFormatCaption)); }
+    if (p.ditModel !== undefined) { setSelectedModel(p.ditModel); localStorage.setItem('ace-model', p.ditModel); }
+    if (p.loraPath !== undefined) { setLoraPath(p.loraPath); localStorage.setItem('ace-loraPath', p.loraPath); }
+    if (p.loraScale !== undefined) { setLoraScale(p.loraScale); localStorage.setItem('ace-loraScale', String(p.loraScale)); }
+    if (p.loraEnabled !== undefined) { setShowLoraPanel(p.loraEnabled); localStorage.setItem('ace-loraEnabled', String(p.loraEnabled)); }
+    setShowPresetMenu(false);
+  }, []);
+
+  useEffect(() => {
+    if (activeProject && token && activeProject.auto_save_enabled) {
+      if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current);
+      const intervalMs = (activeProject.auto_save_interval || 60) * 1000;
+      autoSaveTimerRef.current = setInterval(async () => {
+        try {
+          await projectsApi.createSnapshot(activeProject.id, {
+            params: getCurrentParams(),
+            is_auto: true,
+          }, token);
+        } catch {}
+      }, intervalMs);
+      return () => {
+        if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current);
+      };
+    } else {
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    }
+  }, [activeProject, token, getCurrentParams]);
 
   useEffect(() => {
     const fetchLoraPaths = async () => {
@@ -1518,7 +1724,286 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </div>
               )}
             </div>
+
           </div>
+        </div>
+
+        {/* Preset & Project Panel - Collapsible */}
+        <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+          <button
+            onClick={() => setShowPresetMenu(!showPresetMenu)}
+            className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Bookmark size={12} className="text-zinc-400 dark:text-zinc-500" />
+              <span className="text-xs font-bold tracking-wide text-zinc-500 dark:text-zinc-400">
+                {t('presets')} / {t('projects')}
+              </span>
+              {activeProject && (
+                <span className="px-1.5 py-0.5 text-[8px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
+                  {activeProject.name}
+                </span>
+              )}
+            </div>
+            {showPresetMenu ? <ChevronUp size={14} className="text-zinc-400" /> : <ChevronDown size={14} className="text-zinc-400" />}
+          </button>
+
+          {showPresetMenu && (
+            <div className="border-t border-zinc-100 dark:border-white/5">
+              {/* Tab Header */}
+              <div className="flex border-b border-zinc-100 dark:border-zinc-800">
+                <button
+                  onClick={() => setActiveTab('presets')}
+                  className={`flex-1 px-3 py-2 text-[11px] font-bold tracking-wide transition-colors ${
+                    activeTab === 'presets'
+                      ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-zinc-50 dark:bg-zinc-800/50'
+                      : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  {t('presets')}
+                </button>
+                <button
+                  onClick={() => setActiveTab('projects')}
+                  className={`flex-1 px-3 py-2 text-[11px] font-bold tracking-wide transition-colors ${
+                    activeTab === 'projects'
+                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-zinc-50 dark:bg-zinc-800/50'
+                      : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  {t('projects')}
+                </button>
+              </div>
+
+              {/* Presets Tab */}
+              {activeTab === 'presets' && (
+                <>
+                  <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{t('presetHint')}</span>
+                    <button
+                      onClick={() => {
+                        setPresetName('');
+                        setPresetDescription('');
+                        setPresetCategory(taskType || 'custom');
+                        setShowSavePresetModal(true);
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-pink-600 text-white rounded-md hover:bg-pink-700 transition-colors"
+                    >
+                      <Save size={10} />
+                      {t('savePreset')}
+                    </button>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                    {presets.length === 0 ? (
+                      <div className="px-3 py-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
+                        {t('noPresets')}
+                      </div>
+                    ) : (
+                      (() => {
+                        const builtinPresets = presets.filter(p => p.is_builtin);
+                        const customPresets = presets.filter(p => !p.is_builtin);
+                        const categoryLabels: Record<string, string> = {
+                          text2music: t('textToMusic'),
+                          cover: t('coverTask'),
+                          audio2audio: t('audio2audio'),
+                          instrumental: t('instrumental'),
+                          long: t('longAudio'),
+                          custom: t('custom'),
+                        };
+                        const categoryOrder = ['text2music', 'cover', 'audio2audio', 'instrumental', 'long', 'custom'];
+                        const groupedBuiltin = categoryOrder.reduce((acc, cat) => {
+                          const items = builtinPresets.filter(p => p.category === cat);
+                          if (items.length > 0) acc.push({ category: cat, label: categoryLabels[cat] || cat, items });
+                          return acc;
+                        }, [] as { category: string; label: string; items: Preset[] }[]);
+
+                        return (
+                          <>
+                            {groupedBuiltin.map(group => (
+                              <div key={group.category}>
+                                <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                                  <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider">{group.label}</span>
+                                </div>
+                                {group.items.map(preset => (
+                                  <button
+                                    key={preset.id}
+                                    onClick={() => applyPreset(preset)}
+                                    className="w-full text-left px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Bookmark size={12} className="text-pink-500 flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{preset.name}</p>
+                                        {preset.description && (
+                                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-1">{preset.description}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            ))}
+                            {customPresets.length > 0 && (
+                              <div>
+                                <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                                  <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider">{t('customPresets')}</span>
+                                </div>
+                                {customPresets.map(preset => (
+                                  <div
+                                    key={preset.id}
+                                    className="flex items-center px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 group"
+                                  >
+                                    <button
+                                      onClick={() => applyPreset(preset)}
+                                      className="flex-1 text-left flex items-center gap-2 min-w-0"
+                                    >
+                                      <Bookmark size={12} className="text-blue-500 flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{preset.name}</p>
+                                        {preset.description && (
+                                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-1">{preset.description}</p>
+                                        )}
+                                      </div>
+                                    </button>
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!token) return;
+                                        try {
+                                          await presetsApi.deletePreset(preset.id, token);
+                                          setPresets(prev => prev.filter(p => p.id !== preset.id));
+                                        } catch {}
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-red-500 transition-all"
+                                      title={t('delete')}
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Projects Tab */}
+              {activeTab === 'projects' && (
+                <>
+                  <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{t('projectHint')}</span>
+                    <button
+                      onClick={() => {
+                        setProjectName('');
+                        setProjectDescription('');
+                        setShowSaveProjectModal(true);
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      <FolderPlus size={10} />
+                      {t('newProject')}
+                    </button>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                    {projects.length === 0 ? (
+                      <div className="px-3 py-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
+                        {t('noProjects')}
+                      </div>
+                    ) : (
+                      projects.map(project => (
+                        <div
+                          key={project.id}
+                          className="flex items-center px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 group"
+                        >
+                          <button
+                            onClick={async () => {
+                              if (!token) return;
+                              try {
+                                if (project.id !== activeProject?.id) {
+                                  const result = await projectsApi.activateProject(project.id, token);
+                                  setActiveProject(result.project);
+                                  applyProject(result.project);
+                                  setProjects(prev => prev.map(p => ({ ...p, is_active: p.id === result.project.id })));
+                                } else {
+                                  applyProject(project);
+                                }
+                              } catch {}
+                            }}
+                            className="flex-1 text-left flex items-center gap-2 min-w-0"
+                          >
+                            <FolderOpen size={12} className={project.is_active ? 'text-blue-500 flex-shrink-0' : 'text-zinc-400 dark:text-zinc-500 flex-shrink-0'} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{project.name}</p>
+                                {project.is_active && (
+                                  <span className="px-1.5 py-0.5 text-[8px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">{t('active')}</span>
+                                )}
+                              </div>
+                              {project.description && (
+                                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-1">{project.description}</p>
+                              )}
+                            </div>
+                          </button>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!token) return;
+                                try {
+                                  await projectsApi.updateProject(project.id, { params: getCurrentParams() }, token);
+                                  if (project.id === activeProject?.id) {
+                                    setActiveProject({ ...activeProject, params: getCurrentParams() });
+                                  }
+                                } catch {}
+                              }}
+                              className="p-1 text-zinc-400 hover:text-blue-500 transition-colors"
+                              title={t('saveProject')}
+                            >
+                              <Save size={12} />
+                            </button>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!token) return;
+                                try {
+                                  const result = await projectsApi.getSnapshots(project.id, token);
+                                  setSnapshots(result.snapshots);
+                                  setActiveProject(project);
+                                  setShowSnapshots(true);
+                                } catch {}
+                              }}
+                              className="p-1 text-zinc-400 hover:text-green-500 transition-colors"
+                              title={t('history')}
+                            >
+                              <History size={12} />
+                            </button>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!token) return;
+                                try {
+                                  await projectsApi.deleteProject(project.id, token);
+                                  setProjects(prev => prev.filter(p => p.id !== project.id));
+                                  if (project.id === activeProject?.id) setActiveProject(null);
+                                } catch {}
+                              }}
+                              className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                              title={t('delete')}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* SIMPLE MODE */}
@@ -3324,6 +3809,259 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           </span>
         </button>
       </div>
+
+      {/* Save Preset Modal */}
+      {showSavePresetModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowSavePresetModal(false)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('savePreset')}</h3>
+              <button onClick={() => setShowSavePresetModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('presetName')}</label>
+                <input
+                  type="text"
+                  value={presetName}
+                  onChange={e => setPresetName(e.target.value)}
+                  placeholder={t('presetNamePlaceholder')}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('presetDescription')}</label>
+                <textarea
+                  value={presetDescription}
+                  onChange={e => setPresetDescription(e.target.value)}
+                  placeholder={t('presetDescriptionPlaceholder')}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 resize-none h-20"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('presetCategory')}</label>
+                <select
+                  value={presetCategory}
+                  onChange={e => setPresetCategory(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none"
+                >
+                  <option value="text2music">{t('textToMusic')}</option>
+                  <option value="cover">{t('coverTask')}</option>
+                  <option value="audio2audio">{t('audio2audio')}</option>
+                  <option value="instrumental">{t('instrumental')}</option>
+                  <option value="long">{t('longAudio')}</option>
+                  <option value="custom">{t('custom')}</option>
+                </select>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowSavePresetModal(false)}
+                className="px-4 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!presetName.trim() || !token) return;
+                  setPresetLoading(true);
+                  try {
+                    const result = await presetsApi.createPreset({
+                      name: presetName.trim(),
+                      description: presetDescription.trim() || undefined,
+                      category: presetCategory,
+                      params: getCurrentParams(),
+                    }, token);
+                    setPresets(prev => [...prev, result.preset]);
+                    setShowSavePresetModal(false);
+                    setPresetName('');
+                    setPresetDescription('');
+                  } catch (err) {
+                    console.error('Failed to save preset:', err);
+                  } finally {
+                    setPresetLoading(false);
+                  }
+                }}
+                disabled={!presetName.trim() || presetLoading}
+                className="px-4 py-2 text-xs font-medium bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {presetLoading ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                {t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Project Modal */}
+      {showSaveProjectModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowSaveProjectModal(false)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('newProject')}</h3>
+              <button onClick={() => setShowSaveProjectModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('projectName')}</label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={e => setProjectName(e.target.value)}
+                  placeholder={t('projectNamePlaceholder')}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('presetDescription')}</label>
+                <textarea
+                  value={projectDescription}
+                  onChange={e => setProjectDescription(e.target.value)}
+                  placeholder={t('presetDescriptionPlaceholder')}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 resize-none h-20"
+                />
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-blue-600 dark:text-blue-400">{t('projectSaveHint')}</p>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowSaveProjectModal(false)}
+                className="px-4 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!projectName.trim() || !token) return;
+                  setProjectLoading(true);
+                  try {
+                    const result = await projectsApi.createProject({
+                      name: projectName.trim(),
+                      description: projectDescription.trim() || undefined,
+                      params: getCurrentParams(),
+                    }, token);
+                    setActiveProject(result.project);
+                    setProjects(prev => [result.project, ...prev.map(p => ({ ...p, is_active: false }))]);
+                    setShowSaveProjectModal(false);
+                    setProjectName('');
+                    setProjectDescription('');
+                  } catch (err) {
+                    console.error('Failed to create project:', err);
+                  } finally {
+                    setProjectLoading(false);
+                  }
+                }}
+                disabled={!projectName.trim() || projectLoading}
+                className="px-4 py-2 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {projectLoading ? <Loader2 size={12} className="animate-spin" /> : <FolderPlus size={12} />}
+                {t('create')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Snapshots History Modal */}
+      {showSnapshots && activeProject && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowSnapshots(false)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('history')} - {activeProject.name}</h3>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">{t('snapshotHint')}</p>
+              </div>
+              <button onClick={() => setShowSnapshots(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="max-h-96 overflow-y-auto custom-scrollbar">
+              {snapshots.length === 0 ? (
+                <div className="px-5 py-8 text-center text-xs text-zinc-400 dark:text-zinc-500">
+                  {t('noSnapshots')}
+                </div>
+              ) : (
+                snapshots.map(snapshot => (
+                  <div
+                    key={snapshot.id}
+                    className="flex items-center px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 group"
+                  >
+                    <button
+                      onClick={async () => {
+                        if (!token) return;
+                        try {
+                          const result = await projectsApi.restoreSnapshot(activeProject.id, snapshot.id, token);
+                          applyProject(result.project);
+                          setActiveProject(result.project);
+                          setShowSnapshots(false);
+                        } catch {}
+                      }}
+                      className="flex-1 text-left flex items-center gap-3 min-w-0"
+                    >
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${snapshot.is_auto ? 'bg-green-400' : 'bg-blue-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">
+                          {snapshot.label || (snapshot.is_auto ? t('autoSave') : t('manualSave'))}
+                        </p>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                          {snapshot.created_at ? new Date(snapshot.created_at).toLocaleString() : ''}
+                        </p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!token) return;
+                        try {
+                          await projectsApi.deleteSnapshot(activeProject.id, snapshot.id, token);
+                          setSnapshots(prev => prev.filter(s => s.id !== snapshot.id));
+                        } catch {}
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-red-500 transition-all"
+                      title={t('delete')}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <button
+                onClick={async () => {
+                  if (!token || !activeProject) return;
+                  try {
+                    const result = await projectsApi.createSnapshot(activeProject.id, {
+                      label: t('manualSave'),
+                      params: getCurrentParams(),
+                      is_auto: false,
+                    }, token);
+                    setSnapshots(prev => [result.snapshot, ...prev]);
+                  } catch {}
+                }}
+                className="px-3 py-1.5 text-[10px] font-medium bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-1"
+              >
+                <Save size={10} />
+                {t('manualSave')}
+              </button>
+              <button
+                onClick={() => setShowSnapshots(false)}
+                className="px-4 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                {t('close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
