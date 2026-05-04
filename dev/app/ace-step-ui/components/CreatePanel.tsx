@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Sparkles, ChevronDown, ChevronUp, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2, Bookmark, Save, X, FolderOpen, FolderPlus, History } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2, Bookmark, Save, X, FolderOpen, FolderPlus, History, Undo2, Redo2, FileText, Pencil } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { generateApi, presetsApi, Preset, projectsApi, Project, ProjectSnapshot } from '../services/api';
+import { generateApi, presetsApi, Preset, projectsApi, Project, ProjectSnapshot, ProjectChangelog } from '../services/api';
 import { MAIN_STYLES, SUB_STYLES, getStyleMeta } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
+import { useUndoRedo } from '../hooks/useUndoRedo';
 
 function HelpTip({ text }: { text: string }) {
   const [show, setShow] = useState(false);
@@ -372,6 +373,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
   const previousModelRef = useRef<string>(selectedModel);
   
   // Available models fetched from backend
@@ -392,13 +394,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Presets state
   const [presets, setPresets] = useState<Preset[]>([]);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [showSavePresetModal, setShowSavePresetModal] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [presetDescription, setPresetDescription] = useState('');
   const [presetCategory, setPresetCategory] = useState('custom');
   const [presetLoading, setPresetLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'presets' | 'projects'>('presets');
 
   // Projects state
   const [projects, setProjects] = useState<Project[]>([]);
@@ -410,6 +413,21 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [projectLoading, setProjectLoading] = useState(false);
   const [showSnapshots, setShowSnapshots] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Undo/Redo state
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [undoAction, setUndoAction] = useState<string | null>(null);
+  const [redoAction, setRedoAction] = useState<string | null>(null);
+
+  // Changelog state
+  const [changelogs, setChangelogs] = useState<ProjectChangelog[]>([]);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [changelogTotal, setChangelogTotal] = useState(0);
+
+  // Project rename state
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
@@ -564,6 +582,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   }, [showLoraMenu]);
 
   useEffect(() => {
+    if (showProjectDropdown) {
+      const handleClickOutside = (e: MouseEvent) => {
+        if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target as Node)) {
+          setShowProjectDropdown(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showProjectDropdown]);
+
+  useEffect(() => {
     if (token) {
       presetsApi.getPresets(token).then(result => {
         setPresets(result.presets);
@@ -571,7 +601,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       projectsApi.getProjects(token).then(result => {
         setProjects(result.projects);
         const active = result.projects.find((p: Project) => p.is_active);
-        if (active) setActiveProject(active);
+        if (active) {
+          setActiveProject(active);
+        } else if (result.default_project) {
+          setActiveProject(result.default_project);
+          projectsApi.updateProject(result.default_project.id, {
+            params: getCurrentParamsRef.current(),
+            changelog_label: 'init',
+          }, token).then(updateResult => {
+            setActiveProject(updateResult.project);
+            setProjects(prev => prev.map(p => p.id === updateResult.project.id ? updateResult.project : p));
+          }).catch(() => {});
+        }
       }).catch(() => {});
     }
   }, [token]);
@@ -629,7 +670,43 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     };
   }, [customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender, bpm, keyScale, timeSignature, duration, inferenceSteps, guidanceScale, batchSize, randomSeed, seed, thinking, audioFormat, inferMethod, lmBackend, lmModel, shift, lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, taskType, audioCoverStrength, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption, useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize, isFormatCaption, selectedModel, loraLoaded, loraPath, loraScale]);
 
+  const getCurrentParamsRef = useRef(getCurrentParams);
+  getCurrentParamsRef.current = getCurrentParams;
+
+  useEffect(() => {
+    if (!selectedPresetId || presets.length === 0) return;
+    const selectedPreset = presets.find(p => p.id === selectedPresetId);
+    if (!selectedPreset) { setSelectedPresetId(null); return; }
+    const current = getCurrentParams();
+    const presetParams = selectedPreset.params;
+    const presetKeys = Object.keys(presetParams);
+    const changed = presetKeys.some(key => {
+      if (key === 'loraEnabled' || key === 'loraPath') return false;
+      return JSON.stringify(current[key as keyof typeof current]) !== JSON.stringify(presetParams[key]);
+    });
+    if (changed) setSelectedPresetId(null);
+  }, [getCurrentParams, selectedPresetId, presets]);
+
+  const refreshUndoRedoState = useCallback(async () => {
+    if (!activeProject?.id || !token) {
+      setCanUndo(false);
+      setCanRedo(false);
+      setUndoAction(null);
+      setRedoAction(null);
+      return;
+    }
+    try {
+      const result = await projectsApi.getChangelogs(activeProject.id, token, { limit: 1, offset: 0 });
+      setCanUndo(result.total > 0);
+      setUndoAction(result.changelogs.length > 0 ? result.changelogs[0].action : null);
+    } catch {
+      setCanUndo(false);
+      setUndoAction(null);
+    }
+  }, [activeProject?.id, token]);
+
   const applyPreset = useCallback((preset: Preset) => {
+    isApplyingProjectRef.current = true;
     const p = preset.params;
     if (p.customMode !== undefined) { setCustomMode(p.customMode); localStorage.setItem('ace-customMode', String(p.customMode)); }
     if (p.instrumental !== undefined) { setInstrumental(p.instrumental); localStorage.setItem('ace-instrumental', String(p.instrumental)); }
@@ -654,8 +731,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     if (p.lmTopK !== undefined) { setLmTopK(p.lmTopK); localStorage.setItem('ace-lmTopK', String(p.lmTopK)); }
     if (p.lmTopP !== undefined) { setLmTopP(p.lmTopP); localStorage.setItem('ace-lmTopP', String(p.lmTopP)); }
     if (p.lmNegativePrompt !== undefined) { setLmNegativePrompt(p.lmNegativePrompt); localStorage.setItem('ace-lmNegativePrompt', p.lmNegativePrompt); }
-    if (p.loraEnabled !== undefined) { setShowLoraPanel(p.loraEnabled); localStorage.setItem('ace-loraEnabled', String(p.loraEnabled)); }
-    if (p.loraScale !== undefined) { setLoraScale(p.loraScale); localStorage.setItem('ace-loraScale', String(p.loraScale)); }
     if (p.cfgIntervalStart !== undefined) { setCfgIntervalStart(p.cfgIntervalStart); localStorage.setItem('ace-cfgIntervalStart', String(p.cfgIntervalStart)); }
     if (p.cfgIntervalEnd !== undefined) { setCfgIntervalEnd(p.cfgIntervalEnd); localStorage.setItem('ace-cfgIntervalEnd', String(p.cfgIntervalEnd)); }
     if (p.customTimesteps !== undefined) { setCustomTimesteps(p.customTimesteps); localStorage.setItem('ace-customTimesteps', p.customTimesteps); }
@@ -669,10 +744,55 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     if (p.scoreScale !== undefined) { setScoreScale(p.scoreScale); localStorage.setItem('ace-scoreScale', String(p.scoreScale)); }
     if (p.lmBatchChunkSize !== undefined) { setLmBatchChunkSize(p.lmBatchChunkSize); localStorage.setItem('ace-lmBatchChunkSize', String(p.lmBatchChunkSize)); }
     if (p.isFormatCaption !== undefined) { setIsFormatCaption(p.isFormatCaption); localStorage.setItem('ace-isFormatCaption', String(p.isFormatCaption)); }
+    if (p.loraEnabled === true) {
+      setShowLoraPanel(true);
+      localStorage.setItem('ace-loraEnabled', 'true');
+      if (loraAdapterInMemory) {
+        setLoraLoaded(true);
+        generateApi.toggleLora({ use_lora: true }, token || '').catch(() => {});
+      } else if (loraPath.trim()) {
+        setIsLoraLoading(true);
+        generateApi.loadLora({ lora_path: loraPath }, token || '').then(() => {
+          setLoraLoaded(true);
+          setLoraAdapterInMemory(true);
+        }).catch((err) => {
+          const message = err instanceof Error ? err.message : 'LoRA load failed';
+          setLoraError(message);
+        }).finally(() => {
+          setIsLoraLoading(false);
+        });
+      }
+    } else if (p.loraEnabled === false) {
+      setLoraLoaded(false);
+      setShowLoraPanel(false);
+      localStorage.setItem('ace-loraEnabled', 'false');
+      if (loraAdapterInMemory) {
+        generateApi.toggleLora({ use_lora: false }, token || '').catch(() => {});
+      }
+    }
+    if (p.loraScale !== undefined) { setLoraScale(p.loraScale); localStorage.setItem('ace-loraScale', String(p.loraScale)); }
+    setSelectedPresetId(preset.id);
     setShowPresetMenu(false);
-  }, []);
+
+    setTimeout(() => { isApplyingProjectRef.current = false; }, 100);
+
+    setTimeout(() => {
+      if (activeProject?.id && token) {
+        projectsApi.updateProject(activeProject.id, {
+          params: getCurrentParamsRef.current(),
+          changelog_label: `preset:${preset.name}`,
+        }, token).then(result => {
+          setActiveProject(result.project);
+          refreshUndoRedoState();
+        }).catch(() => {});
+      }
+    }, 100);
+  }, [activeProject?.id, token, refreshUndoRedoState, loraAdapterInMemory, loraPath]);
+
+  const isApplyingProjectRef = useRef(false);
 
   const applyProject = useCallback((project: Project) => {
+    isApplyingProjectRef.current = true;
     const p = project.params;
     if (p.customMode !== undefined) { setCustomMode(p.customMode); localStorage.setItem('ace-customMode', String(p.customMode)); }
     if (p.songDescription !== undefined) { setSongDescription(p.songDescription); localStorage.setItem('ace-songDescription', p.songDescription); }
@@ -723,7 +843,80 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     if (p.loraScale !== undefined) { setLoraScale(p.loraScale); localStorage.setItem('ace-loraScale', String(p.loraScale)); }
     if (p.loraEnabled !== undefined) { setShowLoraPanel(p.loraEnabled); localStorage.setItem('ace-loraEnabled', String(p.loraEnabled)); }
     setShowPresetMenu(false);
+    setTimeout(() => { isApplyingProjectRef.current = false; }, 0);
   }, []);
+
+  const handleUndo = useCallback(async () => {
+    if (!activeProject?.id || !token || !canUndo) return;
+    try {
+      const result = await projectsApi.undoProject(activeProject.id, token);
+      applyProject(result.project);
+      setActiveProject(result.project);
+      await refreshUndoRedoState();
+    } catch (error) {
+      console.error('Undo failed:', error);
+    }
+  }, [activeProject?.id, token, canUndo, applyProject, refreshUndoRedoState]);
+
+  const redoStackRef = useRef<{ params: Record<string, any>; action: string }[]>([]);
+
+  const handleRedo = useCallback(async () => {
+    if (!activeProject?.id || !token || redoStackRef.current.length === 0) return;
+    const redoItem = redoStackRef.current.pop()!;
+    try {
+      const result = await projectsApi.updateProject(activeProject.id, {
+        params: redoItem.params,
+        changelog_label: 'redo',
+      }, token);
+      applyProject(result.project);
+      setActiveProject(result.project);
+      setCanRedo(redoStackRef.current.length > 0);
+      setRedoAction(redoStackRef.current.length > 0 ? redoStackRef.current[redoStackRef.current.length - 1].action : null);
+      await refreshUndoRedoState();
+    } catch (error) {
+      console.error('Redo failed:', error);
+      redoStackRef.current.push(redoItem);
+    }
+  }, [activeProject?.id, token, applyProject, refreshUndoRedoState]);
+
+  const saveProjectParams = useCallback(async (label?: string) => {
+    if (!activeProject?.id || !token) return;
+    try {
+      const result = await projectsApi.updateProject(activeProject.id, {
+        params: getCurrentParamsRef.current(),
+        changelog_label: label,
+      }, token);
+      setActiveProject(result.project);
+      redoStackRef.current = [];
+      setCanRedo(false);
+      setRedoAction(null);
+      await refreshUndoRedoState();
+    } catch (error) {
+      console.error('Save project params failed:', error);
+    }
+  }, [activeProject?.id, token, refreshUndoRedoState]);
+
+  const saveProjectParamsRef = useRef(saveProjectParams);
+  saveProjectParamsRef.current = saveProjectParams;
+
+  useEffect(() => {
+    refreshUndoRedoState();
+  }, [refreshUndoRedoState]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   useEffect(() => {
     if (activeProject && token && activeProject.auto_save_enabled) {
@@ -731,10 +924,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       const intervalMs = (activeProject.auto_save_interval || 60) * 1000;
       autoSaveTimerRef.current = setInterval(async () => {
         try {
-          await projectsApi.createSnapshot(activeProject.id, {
-            params: getCurrentParams(),
-            is_auto: true,
-          }, token);
+          await saveProjectParamsRef.current('auto-save');
         } catch {}
       }, intervalMs);
       return () => {
@@ -746,7 +936,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         autoSaveTimerRef.current = null;
       }
     }
-  }, [activeProject, token, getCurrentParams]);
+  }, [activeProject?.id, activeProject?.auto_save_enabled, activeProject?.auto_save_interval, token]);
 
   useEffect(() => {
     const fetchLoraPaths = async () => {
@@ -813,7 +1003,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Auto-unload LoRA when model changes
   useEffect(() => {
-    if (previousModelRef.current !== selectedModel && loraLoaded) {
+    if (previousModelRef.current !== selectedModel && loraLoaded && !isApplyingProjectRef.current) {
       generateApi.toggleLora({ use_lora: false }, token || '').catch(() => {});
       setLoraLoaded(false);
       setLoraAdapterInMemory(false);
@@ -1728,282 +1918,310 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           </div>
         </div>
 
-        {/* Preset & Project Panel - Collapsible */}
+        {/* Project & Presets Panel */}
         <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-          <button
-            onClick={() => setShowPresetMenu(!showPresetMenu)}
-            className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
-          >
+          <div className="px-3 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Bookmark size={12} className="text-zinc-400 dark:text-zinc-500" />
-              <span className="text-xs font-bold tracking-wide text-zinc-500 dark:text-zinc-400">
-                {t('presets')} / {t('projects')}
-              </span>
+              <FolderOpen size={12} className="text-blue-500" />
               {activeProject && (
-                <span className="px-1.5 py-0.5 text-[8px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
-                  {activeProject.name}
-                </span>
+                <button
+                  onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+                  className="flex items-center gap-1.5 hover:bg-zinc-100 dark:hover:bg-white/5 rounded px-1.5 py-0.5 transition-colors"
+                >
+                  <span className="text-xs font-medium text-zinc-900 dark:text-white truncate max-w-[120px]">{activeProject.name}</span>
+                  {activeProject.is_default && <span className="text-[9px] text-yellow-500">●</span>}
+                  <ChevronDown size={10} className="text-zinc-400" />
+                </button>
               )}
             </div>
-            {showPresetMenu ? <ChevronUp size={14} className="text-zinc-400" /> : <ChevronDown size={14} className="text-zinc-400" />}
-          </button>
-
-          {showPresetMenu && (
-            <div className="border-t border-zinc-100 dark:border-white/5">
-              {/* Tab Header */}
-              <div className="flex border-b border-zinc-100 dark:border-zinc-800">
-                <button
-                  onClick={() => setActiveTab('presets')}
-                  className={`flex-1 px-3 py-2 text-[11px] font-bold tracking-wide transition-colors ${
-                    activeTab === 'presets'
-                      ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-zinc-50 dark:bg-zinc-800/50'
-                      : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
-                  }`}
-                >
-                  {t('presets')}
-                </button>
-                <button
-                  onClick={() => setActiveTab('projects')}
-                  className={`flex-1 px-3 py-2 text-[11px] font-bold tracking-wide transition-colors ${
-                    activeTab === 'projects'
-                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-zinc-50 dark:bg-zinc-800/50'
-                      : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'
-                  }`}
-                >
-                  {t('projects')}
-                </button>
-              </div>
-
-              {/* Presets Tab */}
-              {activeTab === 'presets' && (
+            <div className="flex items-center gap-1">
+              {activeProject && (
                 <>
-                  <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{t('presetHint')}</span>
-                    <button
-                      onClick={() => {
-                        setPresetName('');
-                        setPresetDescription('');
-                        setPresetCategory(taskType || 'custom');
-                        setShowSavePresetModal(true);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-pink-600 text-white rounded-md hover:bg-pink-700 transition-colors"
-                    >
-                      <Save size={10} />
-                      {t('savePreset')}
-                    </button>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                    {presets.length === 0 ? (
-                      <div className="px-3 py-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
-                        {t('noPresets')}
-                      </div>
-                    ) : (
-                      (() => {
-                        const builtinPresets = presets.filter(p => p.is_builtin);
-                        const customPresets = presets.filter(p => !p.is_builtin);
-                        const categoryLabels: Record<string, string> = {
-                          text2music: t('textToMusic'),
-                          cover: t('coverTask'),
-                          audio2audio: t('audio2audio'),
-                          instrumental: t('instrumental'),
-                          long: t('longAudio'),
-                          custom: t('custom'),
-                        };
-                        const categoryOrder = ['text2music', 'cover', 'audio2audio', 'instrumental', 'long', 'custom'];
-                        const groupedBuiltin = categoryOrder.reduce((acc, cat) => {
-                          const items = builtinPresets.filter(p => p.category === cat);
-                          if (items.length > 0) acc.push({ category: cat, label: categoryLabels[cat] || cat, items });
-                          return acc;
-                        }, [] as { category: string; label: string; items: Preset[] }[]);
-
-                        return (
-                          <>
-                            {groupedBuiltin.map(group => (
-                              <div key={group.category}>
-                                <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
-                                  <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider">{group.label}</span>
-                                </div>
-                                {group.items.map(preset => (
-                                  <button
-                                    key={preset.id}
-                                    onClick={() => applyPreset(preset)}
-                                    className="w-full text-left px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <Bookmark size={12} className="text-pink-500 flex-shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{preset.name}</p>
-                                        {preset.description && (
-                                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-1">{preset.description}</p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            ))}
-                            {customPresets.length > 0 && (
-                              <div>
-                                <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
-                                  <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider">{t('customPresets')}</span>
-                                </div>
-                                {customPresets.map(preset => (
-                                  <div
-                                    key={preset.id}
-                                    className="flex items-center px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 group"
-                                  >
-                                    <button
-                                      onClick={() => applyPreset(preset)}
-                                      className="flex-1 text-left flex items-center gap-2 min-w-0"
-                                    >
-                                      <Bookmark size={12} className="text-blue-500 flex-shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{preset.name}</p>
-                                        {preset.description && (
-                                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-1">{preset.description}</p>
-                                        )}
-                                      </div>
-                                    </button>
-                                    <button
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        if (!token) return;
-                                        try {
-                                          await presetsApi.deletePreset(preset.id, token);
-                                          setPresets(prev => prev.filter(p => p.id !== preset.id));
-                                        } catch {}
-                                      }}
-                                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-red-500 transition-all"
-                                      title={t('delete')}
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()
-                    )}
-                  </div>
+                  <button
+                    onClick={() => handleUndo()}
+                    disabled={!canUndo}
+                    className={`p-1 rounded transition-colors ${canUndo ? 'text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20' : 'text-zinc-300 dark:text-zinc-600 cursor-not-allowed'}`}
+                    title={canUndo ? `撤销: ${undoAction}` : '无可撤销操作 (Ctrl+Z)'}
+                  >
+                    <Undo2 size={12} />
+                  </button>
+                  <button
+                    onClick={() => handleRedo()}
+                    disabled={!canRedo}
+                    className={`p-1 rounded transition-colors ${canRedo ? 'text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20' : 'text-zinc-300 dark:text-zinc-600 cursor-not-allowed'}`}
+                    title={canRedo ? `重做: ${redoAction}` : '无可重做操作 (Ctrl+Y)'}
+                  >
+                    <Redo2 size={12} />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!token || !activeProject) return;
+                      try {
+                        const result = await projectsApi.getChangelogs(activeProject.id, token, { limit: 50, offset: 0 });
+                        setChangelogs(result.changelogs);
+                        setChangelogTotal(result.total);
+                        setShowChangelog(true);
+                      } catch {}
+                    }}
+                    className="p-1 text-zinc-400 hover:text-green-500 rounded transition-colors"
+                    title={t('history')}
+                  >
+                    <History size={12} />
+                  </button>
+                  <button
+                    onClick={async () => { try { await saveProjectParams(); } catch {} }}
+                    className="p-1 text-zinc-400 hover:text-blue-500 rounded transition-colors"
+                    title={t('saveProject')}
+                  >
+                    <Save size={12} />
+                  </button>
                 </>
               )}
+              <button
+                onClick={() => {
+                  setProjectName('');
+                  setProjectDescription('');
+                  setShowSaveProjectModal(true);
+                }}
+                className="p-1 text-zinc-400 hover:text-blue-500 rounded transition-colors"
+                title={t('newProject')}
+              >
+                <FolderPlus size={12} />
+              </button>
+            </div>
+          </div>
 
-              {/* Projects Tab */}
-              {activeTab === 'projects' && (
-                <>
-                  <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{t('projectHint')}</span>
-                    <button
-                      onClick={() => {
-                        setProjectName('');
-                        setProjectDescription('');
-                        setShowSaveProjectModal(true);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                    >
-                      <FolderPlus size={10} />
-                      {t('newProject')}
-                    </button>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                    {projects.length === 0 ? (
-                      <div className="px-3 py-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
-                        {t('noProjects')}
+          {/* Project Dropdown */}
+          {showProjectDropdown && (
+            <div className="border-t border-zinc-100 dark:border-white/5 max-h-48 overflow-y-auto custom-scrollbar" ref={projectDropdownRef}>
+              {projects.map(project => (
+                <div
+                  key={project.id}
+                  className={`flex items-center px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 group ${project.is_default ? 'bg-yellow-50/50 dark:bg-yellow-900/10' : ''}`}
+                >
+                  <button
+                    onClick={async () => {
+                      if (!token) return;
+                      try {
+                        if (project.id !== activeProject?.id) {
+                          const result = await projectsApi.activateProject(project.id, token);
+                          setActiveProject(result.project);
+                          applyProject(result.project);
+                          setProjects(prev => prev.map(p => ({ ...p, is_active: p.id === result.project.id })));
+                          await refreshUndoRedoState();
+                        } else {
+                          applyProject(project);
+                        }
+                      } catch {}
+                      setShowProjectDropdown(false);
+                    }}
+                    className="flex-1 text-left flex items-center gap-2 min-w-0"
+                  >
+                    <FolderOpen size={12} className={project.is_active ? 'text-blue-500 flex-shrink-0' : 'text-zinc-400 dark:text-zinc-500 flex-shrink-0'} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {project.is_default && <span className="text-[9px] text-yellow-500">●</span>}
+                        <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{project.name}</p>
+                        {project.is_active && (
+                          <span className="px-1.5 py-0.5 text-[8px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">{t('active')}</span>
+                        )}
                       </div>
-                    ) : (
-                      projects.map(project => (
-                        <div
-                          key={project.id}
-                          className="flex items-center px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 group"
-                        >
-                          <button
-                            onClick={async () => {
-                              if (!token) return;
-                              try {
-                                if (project.id !== activeProject?.id) {
-                                  const result = await projectsApi.activateProject(project.id, token);
-                                  setActiveProject(result.project);
-                                  applyProject(result.project);
-                                  setProjects(prev => prev.map(p => ({ ...p, is_active: p.id === result.project.id })));
-                                } else {
-                                  applyProject(project);
-                                }
-                              } catch {}
-                            }}
-                            className="flex-1 text-left flex items-center gap-2 min-w-0"
-                          >
-                            <FolderOpen size={12} className={project.is_active ? 'text-blue-500 flex-shrink-0' : 'text-zinc-400 dark:text-zinc-500 flex-shrink-0'} />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{project.name}</p>
-                                {project.is_active && (
-                                  <span className="px-1.5 py-0.5 text-[8px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">{t('active')}</span>
-                                )}
-                              </div>
-                              {project.description && (
-                                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-1">{project.description}</p>
-                              )}
-                            </div>
-                          </button>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (!token) return;
-                                try {
-                                  await projectsApi.updateProject(project.id, { params: getCurrentParams() }, token);
-                                  if (project.id === activeProject?.id) {
-                                    setActiveProject({ ...activeProject, params: getCurrentParams() });
-                                  }
-                                } catch {}
-                              }}
-                              className="p-1 text-zinc-400 hover:text-blue-500 transition-colors"
-                              title={t('saveProject')}
-                            >
-                              <Save size={12} />
-                            </button>
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (!token) return;
-                                try {
-                                  const result = await projectsApi.getSnapshots(project.id, token);
-                                  setSnapshots(result.snapshots);
-                                  setActiveProject(project);
-                                  setShowSnapshots(true);
-                                } catch {}
-                              }}
-                              className="p-1 text-zinc-400 hover:text-green-500 transition-colors"
-                              title={t('history')}
-                            >
-                              <History size={12} />
-                            </button>
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (!token) return;
-                                try {
-                                  await projectsApi.deleteProject(project.id, token);
-                                  setProjects(prev => prev.filter(p => p.id !== project.id));
-                                  if (project.id === activeProject?.id) setActiveProject(null);
-                                } catch {}
-                              }}
-                              className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
-                              title={t('delete')}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    {project.is_default && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setRenameValue(project.name);
+                          setShowRenameModal(true);
+                        }}
+                        className="p-1 text-zinc-400 hover:text-yellow-500 transition-colors"
+                        title="命名项目"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
+                    {!project.is_default && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!token) return;
+                          try {
+                            await projectsApi.deleteProject(project.id, token);
+                            setProjects(prev => prev.filter(p => p.id !== project.id));
+                            if (project.id === activeProject?.id) {
+                              const projectsResult = await projectsApi.getProjects(token);
+                              setProjects(projectsResult.projects);
+                              const newActive = projectsResult.projects.find((p: Project) => p.is_active) || projectsResult.default_project;
+                              if (newActive) {
+                                setActiveProject(newActive);
+                                applyProject(newActive);
+                              }
+                            }
+                          } catch {}
+                        }}
+                        className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                        title={t('delete')}
+                      >
+                        <Trash2 size={12} />
+                      </button>
                     )}
                   </div>
-                </>
-              )}
+                </div>
+              ))}
             </div>
           )}
+
+          {/* Presets - Collapsible Dropdown */}
+          <div className="border-t border-zinc-100 dark:border-white/5">
+            <button
+              onClick={() => setShowPresetMenu(!showPresetMenu)}
+              className="w-full px-3 py-2 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-1.5">
+                <Bookmark size={12} className="text-pink-500" />
+                <span className="text-[11px] font-bold tracking-wide text-zinc-500 dark:text-zinc-400">{t('presets')}</span>
+                {selectedPresetId && (() => {
+                  const sp = presets.find(p => p.id === selectedPresetId);
+                  return sp ? (
+                    <span className="px-1.5 py-0.5 text-[8px] font-bold bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded">{sp.name}</span>
+                  ) : null;
+                })()}
+              </div>
+              {showPresetMenu ? <ChevronUp size={12} className="text-zinc-400" /> : <ChevronDown size={12} className="text-zinc-400" />}
+            </button>
+
+            {showPresetMenu && (
+              <div className="border-t border-zinc-100 dark:border-white/5">
+                <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{t('presetHint')}</span>
+                  <button
+                    onClick={() => {
+                      setPresetName('');
+                      setPresetDescription('');
+                      setPresetCategory(taskType || 'custom');
+                      setShowSavePresetModal(true);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-pink-600 text-white rounded-md hover:bg-pink-700 transition-colors"
+                  >
+                    <Save size={10} />
+                    {t('savePreset')}
+                  </button>
+                </div>
+                <div className="max-h-52 overflow-y-auto custom-scrollbar">
+                  {presets.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
+                      {t('noPresets')}
+                    </div>
+                  ) : (
+                    (() => {
+                      const builtinPresets = presets.filter(p => p.is_builtin);
+                      const customPresets = presets.filter(p => !p.is_builtin);
+                      const categoryLabels: Record<string, string> = {
+                        text2music: t('textToMusic'),
+                        cover: t('coverTask'),
+                        audio2audio: t('audio2audio'),
+                        instrumental: t('instrumental'),
+                        long: t('longAudio'),
+                        custom: t('custom'),
+                      };
+                      const categoryOrder = ['text2music', 'cover', 'audio2audio', 'instrumental', 'long', 'custom'];
+                      const groupedBuiltin = categoryOrder.reduce((acc, cat) => {
+                        const items = builtinPresets.filter(p => p.category === cat);
+                        if (items.length > 0) acc.push({ category: cat, label: categoryLabels[cat] || cat, items });
+                        return acc;
+                      }, [] as { category: string; label: string; items: Preset[] }[]);
+
+                      return (
+                        <>
+                          {groupedBuiltin.map(group => (
+                            <div key={group.category}>
+                              <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                                <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider">{group.label}</span>
+                              </div>
+                              {group.items.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => { applyPreset(preset); setShowPresetMenu(false); }}
+                                  className={`w-full text-left px-3 py-2.5 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 ${
+                                    selectedPresetId === preset.id
+                                      ? 'bg-pink-50 dark:bg-pink-900/20 border-l-2 border-l-pink-500'
+                                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Bookmark size={12} className={selectedPresetId === preset.id ? 'text-pink-600 dark:text-pink-400 fill-pink-600 dark:fill-pink-400' : 'text-pink-500'} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-xs font-medium truncate ${selectedPresetId === preset.id ? 'text-pink-700 dark:text-pink-300' : 'text-zinc-900 dark:text-white'}`}>{preset.name}</p>
+                                      {preset.description && (
+                                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-2">{preset.description}</p>
+                                      )}
+                                    </div>
+                                    {selectedPresetId === preset.id && (
+                                      <span className="text-[8px] font-bold px-1.5 py-0.5 bg-pink-600 text-white rounded-full flex-shrink-0">✓</span>
+                                    )}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          ))}
+                          {customPresets.length > 0 && (
+                            <div>
+                              <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                                <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider">{t('customPresets')}</span>
+                              </div>
+                              {customPresets.map(preset => (
+                                <div
+                                  key={preset.id}
+                                  className={`flex items-center px-3 py-2.5 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 group ${
+                                    selectedPresetId === preset.id
+                                      ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500'
+                                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                                  }`}
+                                >
+                                  <button
+                                    onClick={() => { applyPreset(preset); setShowPresetMenu(false); }}
+                                    className="flex-1 text-left flex items-center gap-2 min-w-0"
+                                  >
+                                    <Bookmark size={12} className={selectedPresetId === preset.id ? 'text-blue-600 dark:text-blue-400 fill-blue-600 dark:fill-blue-400' : 'text-blue-500 flex-shrink-0'} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-xs font-medium truncate ${selectedPresetId === preset.id ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-900 dark:text-white'}`}>{preset.name}</p>
+                                      {preset.description && (
+                                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 line-clamp-2">{preset.description}</p>
+                                      )}
+                                    </div>
+                                    {selectedPresetId === preset.id && (
+                                      <span className="text-[8px] font-bold px-1.5 py-0.5 bg-blue-600 text-white rounded-full flex-shrink-0">✓</span>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!token) return;
+                                      try {
+                                        await presetsApi.deletePreset(preset.id, token);
+                                        setPresets(prev => prev.filter(p => p.id !== preset.id));
+                                        if (selectedPresetId === preset.id) setSelectedPresetId(null);
+                                      } catch {}
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-red-500 transition-all"
+                                    title={t('delete')}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* SIMPLE MODE */}
@@ -3927,9 +4145,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500 resize-none h-20"
                 />
               </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2">
-                <p className="text-[10px] text-blue-600 dark:text-blue-400">{t('projectSaveHint')}</p>
-              </div>
+              {activeProject?.is_default && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-yellow-600 dark:text-yellow-400">将当前默认项目的参数保存到新项目中，默认项目会自动重置</p>
+                </div>
+              )}
+              {!activeProject?.is_default && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400">{t('projectSaveHint')}</p>
+                </div>
+              )}
             </div>
             <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
               <button
@@ -3947,12 +4172,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                       name: projectName.trim(),
                       description: projectDescription.trim() || undefined,
                       params: getCurrentParams(),
+                      from_default: activeProject?.is_default ? true : undefined,
                     }, token);
                     setActiveProject(result.project);
-                    setProjects(prev => [result.project, ...prev.map(p => ({ ...p, is_active: false }))]);
+                    if (token) {
+                      const projectsResult = await projectsApi.getProjects(token);
+                      setProjects(projectsResult.projects);
+                    }
                     setShowSaveProjectModal(false);
                     setProjectName('');
                     setProjectDescription('');
+                    await refreshUndoRedoState();
                   } catch (err) {
                     console.error('Failed to create project:', err);
                   } finally {
@@ -4057,6 +4287,161 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 className="px-4 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 {t('close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Changelog Modal */}
+      {showChangelog && activeProject && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowChangelog(false)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white">修改日志 - {activeProject.name}</h3>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">共 {changelogTotal} 条记录，类似 Git 提交历史</p>
+              </div>
+              <button onClick={() => setShowChangelog(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="max-h-96 overflow-y-auto custom-scrollbar">
+              {changelogs.length === 0 ? (
+                <div className="px-5 py-8 text-center text-xs text-zinc-400 dark:text-zinc-500">
+                  暂无修改记录
+                </div>
+              ) : (
+                changelogs.map((log, index) => (
+                  <div
+                    key={log.id}
+                    className="px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-50 dark:border-zinc-800/50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col items-center mt-1">
+                        <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-200 dark:border-blue-800 flex-shrink-0" />
+                        {index < changelogs.length - 1 && (
+                          <div className="w-0.5 h-full min-h-[20px] bg-zinc-200 dark:bg-zinc-700 mt-1" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{log.action}</p>
+                          {log.label && (
+                            <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${
+                              log.label === 'auto-save' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+                              log.label === 'redo' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' :
+                              log.label === 'restore' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' :
+                              'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                            }`}>
+                              {log.label}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                          {log.created_at ? new Date(log.created_at).toLocaleString() : ''}
+                        </p>
+                        <div className="mt-1 space-y-0.5">
+                          {Object.entries(log.changes).slice(0, 5).map(([key, change]) => (
+                            <p key={key} className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
+                              <span className="text-red-400">- {key}: {JSON.stringify((change as { old: unknown; new: unknown }).old)}</span>
+                              <span className="mx-1">→</span>
+                              <span className="text-green-400">{JSON.stringify((change as { old: unknown; new: unknown }).new)}</span>
+                            </p>
+                          ))}
+                          {Object.keys(log.changes).length > 5 && (
+                            <p className="text-[10px] text-zinc-400">...还有 {Object.keys(log.changes).length - 5} 个参数变更</p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!token) return;
+                          try {
+                            const result = await projectsApi.updateProject(activeProject.id, {
+                              params: log.snapshot_params,
+                              changelog_label: 'restore',
+                            }, token);
+                            applyProject(result.project);
+                            setActiveProject(result.project);
+                            setShowChangelog(false);
+                            await refreshUndoRedoState();
+                          } catch {}
+                        }}
+                        className="px-2 py-1 text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex-shrink-0"
+                      >
+                        恢复
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end">
+              <button
+                onClick={() => setShowChangelog(false)}
+                className="px-4 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                {t('close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Project Modal */}
+      {showRenameModal && activeProject && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowRenameModal(false)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">命名项目</h3>
+              <button onClick={() => setShowRenameModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('projectName')}</label>
+                <input
+                  type="text"
+                  value={renameValue}
+                  onChange={e => setRenameValue(e.target.value)}
+                  placeholder="输入项目名称"
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-yellow-600 dark:text-yellow-400">命名后，默认项目将变为正式项目，系统会自动创建新的默认项目</p>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowRenameModal(false)}
+                className="px-4 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!renameValue.trim() || !token || !activeProject) return;
+                  try {
+                    const result = await projectsApi.renameProject(activeProject.id, renameValue.trim(), token);
+                    setActiveProject(result.project);
+                    if (token) {
+                      const projectsResult = await projectsApi.getProjects(token);
+                      setProjects(projectsResult.projects);
+                    }
+                    setShowRenameModal(false);
+                  } catch (err) {
+                    console.error('Failed to rename project:', err);
+                  }
+                }}
+                disabled={!renameValue.trim()}
+                className="px-4 py-2 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                <Pencil size={12} />
+                确认命名
               </button>
             </div>
           </div>

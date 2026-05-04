@@ -399,7 +399,9 @@ class ModelDownloadThread(QThread):
             self.progress_updated.emit(self.current_progress, "检查环境...")
             
             cmd_args = [venv_python, "-m", "acestep.model_downloader"]
-            if self.model_name != "main":
+            if self.model_name in ("main", "acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
+                pass
+            else:
                 cmd_args.extend(["--model", self.model_name])
             if self.download_source != "auto":
                 cmd_args.extend(["--source", self.download_source])
@@ -4669,82 +4671,137 @@ try {
             if hasattr(self, 'qinglong_group'):
                 self.qinglong_group.show()
     
+    def _get_model_verify_info(self, model_name):
+        """获取模型验证信息 - 与青龙训练器前端 /api/generate/models 保持一致"""
+        try:
+            import sys
+            sys.path.insert(0, self.base_dir)
+            from acestep.model_downloader import check_model_exists, verify_model, get_checkpoints_dir
+            checkpoints_dir = get_checkpoints_dir()
+            is_installed = check_model_exists(model_name, checkpoints_dir)
+            if is_installed:
+                return {"integrity_status": "complete", "integrity_details": None}
+            model_path = checkpoints_dir / model_name if hasattr(checkpoints_dir, '__truediv__') else None
+            if model_path and model_path.exists():
+                _, _, details = verify_model(model_name, checkpoints_dir)
+                integrity_details = {
+                    "files_found": details.get("files_found", []),
+                    "files_missing": details.get("files_missing", []),
+                    "total_size_mb": round(details.get("total_size", 0) / 1e6, 2),
+                    "expected_size_mb": round(details.get("expected_size", 0) / 1e6, 2),
+                    "size_ok": details.get("size_ok", False),
+                }
+                return {"integrity_status": "incomplete", "integrity_details": integrity_details}
+            return {"integrity_status": "missing", "integrity_details": None}
+        except Exception as e:
+            return {"integrity_status": "missing", "integrity_details": None}
+
     def _load_model_list(self):
-        """加载模型列表"""
-        # 主模型
+        """加载模型列表 - 与青龙训练器前端模型描述保持同步"""
+        MODEL_SHORT_NAMES = {
+            "acestep-v15-base": "1.5B",
+            "acestep-v15-sft": "1.5S",
+            "acestep-v15-turbo": "1.5T",
+            "acestep-v15-turbo-shift1": "1.5TS1",
+            "acestep-v15-turbo-shift3": "1.5TS3",
+            "acestep-v15-turbo-continuous": "1.5TC",
+            "acestep-5Hz-lm-0.6B": "LM 0.6B",
+            "acestep-5Hz-lm-1.7B": "LM 1.7B",
+            "acestep-5Hz-lm-4B": "LM 4B",
+        }
+
         self.model_list.append({
             "name": "main",
             "display_name": "Main Model",
+            "short_name": "主模型",
             "repo": "ACE-Step/Ace-Step1.5",
             "category": "main",
-            "description": "完整基础模型包",
+            "description": "完整基础模型包，包含核心组件",
             "info": "包含VAE、Qwen3-Embedding-0.6B、acestep-v15-turbo、acestep-5Hz-lm-1.7B等核心组件。适合初次使用的用户，提供一站式完整解决方案。",
-            "exists": self._check_main_model_exists()
+            "exists": self._check_main_model_exists(),
+            "integrity_status": "complete" if self._check_main_model_exists() else "missing",
+            "integrity_details": None,
         })
-        
-        # LM 模型
+
         lm_models = {
             "acestep-5Hz-lm-0.6B": {
                 "repo": "ACE-Step/acestep-5Hz-lm-0.6B",
-                "description": "轻量级语言模型",
-                "info": "0.6B参数的语言模型，速度极快，资源占用低，适合快速原型开发和资源有限的环境。"
+                "description": "最轻量语言模型（~0.5 GB VRAM）",
+                "info": "0.6B参数的语言模型，速度极快，资源占用低，适合快速原型开发和资源有限的环境。未安装时自动下载。",
+            },
+            "acestep-5Hz-lm-1.7B": {
+                "repo": "ACE-Step/acestep-5Hz-lm-1.7B",
+                "description": "平衡语言模型（~1.5 GB VRAM）",
+                "info": "1.7B参数的语言模型，平衡速度与质量，是默认LM模型，随主模型一起安装。",
             },
             "acestep-5Hz-lm-4B": {
                 "repo": "ACE-Step/acestep-5Hz-lm-4B",
-                "description": "大型语言模型",
-                "info": "4B参数的语言模型，生成质量更高，能理解更复杂的音乐结构和风格，适合专业音乐创作。"
-            }
+                "description": "最高品质语言模型（~4 GB VRAM）",
+                "info": "4B参数的语言模型，生成质量最高，能理解更复杂的音乐结构和风格，适合专业音乐创作。未安装时自动下载。",
+            },
         }
-        
+
         for model_name, model_info in lm_models.items():
+            verify_info = self._get_model_verify_info(model_name)
             self.model_list.append({
                 "name": model_name,
                 "display_name": model_name,
+                "short_name": MODEL_SHORT_NAMES.get(model_name, model_name),
                 "repo": model_info["repo"],
                 "category": "lm",
                 "description": model_info["description"],
                 "info": model_info["info"],
-                "exists": self._check_model_exists(model_name)
+                "exists": self._check_model_exists(model_name),
+                "integrity_status": verify_info["integrity_status"],
+                "integrity_details": verify_info["integrity_details"],
             })
-        
-        # DiT 模型
+
         dit_models = {
             "acestep-v15-base": {
                 "repo": "ACE-Step/acestep-v15-base",
-                "description": "基础DiT模型",
-                "info": "v1.5版本的基础模型，适合从零开始创作，能生成风格多样的音乐，是最灵活的选择。"
+                "description": "基础模型，适合从零开始创作，生成风格多样的音乐。",
+                "info": "v1.5版本的基础模型，适合从零开始创作，能生成风格多样的音乐，是最灵活的选择。非Turbo模型，默认20步推理+ADG。",
             },
             "acestep-v15-sft": {
                 "repo": "ACE-Step/acestep-v15-sft",
-                "description": "监督微调模型",
-                "info": "经过监督微调的模型，更适合风格延续和参考创作，旋律还原度较高，生成更加稳定可控。"
+                "description": "SFT微调模型，更适合风格延续和参考创作，旋律还原度较高。",
+                "info": "经过监督微调的模型，更适合风格延续和参考创作，旋律还原度较高，生成更加稳定可控。非Turbo模型，默认20步推理+ADG。",
+            },
+            "acestep-v15-turbo": {
+                "repo": "ACE-Step/Ace-Step1.5",
+                "description": "Turbo快速模型，生成速度快，适合快速迭代和测试想法。",
+                "info": "Turbo系列默认模型，随主模型一起安装，生成速度快，适合快速迭代和测试想法。",
             },
             "acestep-v15-turbo-shift1": {
                 "repo": "ACE-Step/acestep-v15-turbo-shift1",
-                "description": "Turbo加速模型 (Shift 1)",
-                "info": "Turbo系列，Shift 1采样，生成速度快，质量也不错，适合快速迭代和测试想法。"
+                "description": "Turbo Shift 1模型，平衡速度与质量，是日常创作的首选。",
+                "info": "Turbo系列，Shift 1采样，平衡速度与质量，适合日常创作和快速迭代。",
             },
             "acestep-v15-turbo-shift3": {
                 "repo": "ACE-Step/acestep-v15-turbo-shift3",
-                "description": "Turbo加速模型 (Shift 3)",
-                "info": "Turbo系列，Shift 3采样，平衡质量和速度，质量更好的快速模型，推荐用于正式创作。"
+                "description": "Turbo Shift 3模型，质量更好的快速模型，推荐用于正式创作。",
+                "info": "Turbo系列，Shift 3采样，质量更好的快速模型，推荐用于正式创作。是默认推荐的DiT模型。",
             },
             "acestep-v15-turbo-continuous": {
                 "repo": "ACE-Step/acestep-v15-turbo-continuous",
-                "description": "Turbo连续生成模型",
-                "info": "支持连续生成，适合长音频创作，稳定性极佳，能生成连贯的完整音乐作品。"
-            }
+                "description": "Turbo Continuous模型，适合长音频生成，稳定性极佳。",
+                "info": "Turbo系列，支持连续生成，适合长音频创作，稳定性极佳，能生成连贯的完整音乐作品。",
+            },
         }
-        
+
         for model_name, model_info in dit_models.items():
+            verify_info = self._get_model_verify_info(model_name)
             self.model_list.append({
                 "name": model_name,
                 "display_name": model_name,
+                "short_name": MODEL_SHORT_NAMES.get(model_name, model_name),
                 "repo": model_info["repo"],
                 "category": "dit",
                 "description": model_info["description"],
                 "info": model_info["info"],
-                "exists": self._check_model_exists(model_name)
+                "exists": self._check_model_exists(model_name),
+                "integrity_status": verify_info["integrity_status"],
+                "integrity_details": verify_info["integrity_details"],
             })
     
     def _check_main_model_exists(self):
@@ -5166,15 +5223,32 @@ try {
                 # 第一行：名称 + 状态 + 按钮
                 row1 = QHBoxLayout()
                 
-                name_label = QLabel(model["display_name"])
+                short_name = model.get("short_name", model["display_name"])
+                name_label = QLabel(f"{short_name}")
                 name_label.setStyleSheet("font-weight: bold; color: #FFFFFF; font-size: 12px;")
                 row1.addWidget(name_label)
                 
+                model_id_label = QLabel(model["display_name"])
+                model_id_label.setStyleSheet("font-size: 10px; color: #888888;")
+                row1.addWidget(model_id_label)
+                
                 row1.addStretch()
                 
-                # 状态
-                status_label = QLabel("✓ 已安装" if model["exists"] else "✗ 未安装")
-                status_label.setStyleSheet(f"font-size: 11px; color: {'#4CAF50' if model['exists'] else '#F44336'};")
+                integrity_status = model.get("integrity_status", "missing")
+                integrity_details = model.get("integrity_details")
+                
+                if model["exists"] and integrity_status == "complete":
+                    status_text = "● 已安装"
+                    status_color = "#4CAF50"
+                elif integrity_status == "incomplete":
+                    status_text = "● 不完整"
+                    status_color = "#FF9800"
+                else:
+                    status_text = "● 未安装"
+                    status_color = "#F44336"
+                
+                status_label = QLabel(status_text)
+                status_label.setStyleSheet(f"font-size: 11px; color: {status_color}; font-weight: bold;")
                 row1.addWidget(status_label)
                 
                 # 按钮区域
@@ -5208,7 +5282,7 @@ try {
                     pause_btn.clicked.connect(self._pause_download)
                     btn_layout.addWidget(pause_btn)
                 elif model["exists"]:
-                    # 已安装的模型：只保留删除按钮
+                    is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
                     delete_btn = QPushButton("删除")
                     delete_btn.setStyleSheet("""
                         QPushButton {
@@ -5228,6 +5302,9 @@ try {
                             color: #666666;
                         }
                     """)
+                    if is_main_component:
+                        delete_btn.setEnabled(False)
+                        delete_btn.setToolTip("主模型组件，请删除主模型")
                     delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
                     btn_layout.addWidget(delete_btn)
                 else:
@@ -5291,14 +5368,33 @@ try {
                 
                 desc_label = QLabel(model["description"])
                 desc_label.setStyleSheet("font-size: 11px; color: #AAAAAA;")
+                desc_label.setWordWrap(True)
                 model_item_layout.addWidget(desc_label)
                 
-                # 第三行：详细介绍
                 if "info" in model:
                     info_label = QLabel(model["info"])
                     info_label.setStyleSheet("font-size: 10px; color: #888888;")
                     info_label.setWordWrap(True)
                     model_item_layout.addWidget(info_label)
+                
+                if integrity_status == "incomplete" and integrity_details:
+                    missing_files = integrity_details.get("files_missing", [])
+                    total_size_mb = integrity_details.get("total_size_mb", 0)
+                    expected_size_mb = integrity_details.get("expected_size_mb", 0)
+                    size_ok = integrity_details.get("size_ok", False)
+                    
+                    warn_parts = []
+                    if missing_files:
+                        warn_parts.append(f"缺少文件: {', '.join(missing_files)}")
+                    if not size_ok and expected_size_mb > 0:
+                        warn_parts.append(f"大小不足: {total_size_mb}MB / 预期 {expected_size_mb}MB")
+                    
+                    if warn_parts:
+                        warn_text = "⚠ " + "，".join(warn_parts) + "，建议重新下载"
+                        warn_label = QLabel(warn_text)
+                        warn_label.setStyleSheet("font-size: 10px; color: #FF9800; font-weight: bold;")
+                        warn_label.setWordWrap(True)
+                        model_item_layout.addWidget(warn_label)
                 
                 if hasattr(self, 'model_list_layout'):
                     self.model_list_layout.addWidget(model_item)

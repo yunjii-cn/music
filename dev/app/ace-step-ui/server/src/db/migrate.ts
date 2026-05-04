@@ -269,6 +269,44 @@ function migrate(): void {
       console.error('Failed to create project snapshots table:', error);
     }
   }
+
+  // Create project_changelogs table for tracking parameter changes (git-like)
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project_changelogs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        action TEXT NOT NULL,
+        label TEXT,
+        changes TEXT NOT NULL DEFAULT '{}',
+        snapshot_params TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_changelogs_project_id ON project_changelogs(project_id);
+      CREATE INDEX IF NOT EXISTS idx_changelogs_created_at ON project_changelogs(created_at);
+    `);
+    console.log('Project changelogs table created successfully');
+  } catch (error) {
+    const errorMsg = String(error);
+    if (errorMsg.includes('already exists')) {
+      console.log('Project changelogs table already exists');
+    } else {
+      console.error('Failed to create project changelogs table:', error);
+    }
+  }
+
+  // Add is_default column to projects table
+  try {
+    db.exec(`ALTER TABLE projects ADD COLUMN is_default INTEGER DEFAULT 0`);
+    console.log('Added is_default column to projects table');
+  } catch (error) {
+    const errorMsg = String(error);
+    if (errorMsg.includes('duplicate column name')) {
+      console.log('Column is_default already exists in projects table');
+    } else {
+      console.error('Failed to add is_default column:', error);
+    }
+  }
 }
 
 // Run migrations

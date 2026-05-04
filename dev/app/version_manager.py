@@ -1365,9 +1365,13 @@ class ModelManagerDialog(QDialog):
             header_layout.setContentsMargins(8, 4, 8, 4)
             header_layout.setSpacing(10)
 
-            name_header = QLabel("模型名称")
-            name_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; min-width: 200px;")
+            name_header = QLabel("短名称")
+            name_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; min-width: 80px;")
             header_layout.addWidget(name_header)
+
+            id_header = QLabel("模型ID")
+            id_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; min-width: 160px;")
+            header_layout.addWidget(id_header)
 
             status_header = QLabel("状态")
             status_header.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; min-width: 80px;")
@@ -1403,16 +1407,35 @@ class ModelManagerDialog(QDialog):
                 row_layout = QHBoxLayout()
                 row_layout.setSpacing(10)
 
-                name_label = QLabel(model["display_name"])
-                name_label.setStyleSheet("color: #FFFFFF; font-size: 12px; min-width: 200px;")
+                short_name = model.get("short_name", model["display_name"])
+                name_label = QLabel(f"{short_name}")
+                name_label.setStyleSheet("color: #FFFFFF; font-size: 12px; font-weight: bold; min-width: 80px;")
                 row_layout.addWidget(name_label)
 
-                status_label = QLabel("✓ 已安装" if model["exists"] else "✗ 未安装")
-                status_label.setStyleSheet(f"color: {'#4CAF50' if model['exists'] else '#F44336'}; font-size: 11px; min-width: 80px;")
+                model_id_label = QLabel(model["display_name"])
+                model_id_label.setStyleSheet("color: #888888; font-size: 10px; min-width: 160px;")
+                row_layout.addWidget(model_id_label)
+
+                integrity_status = model.get("integrity_status", "missing")
+                integrity_details = model.get("integrity_details")
+
+                if model["exists"] and integrity_status == "complete":
+                    status_text = "● 已安装"
+                    status_color = "#4CAF50"
+                elif integrity_status == "incomplete":
+                    status_text = "● 不完整"
+                    status_color = "#FF9800"
+                else:
+                    status_text = "● 未安装"
+                    status_color = "#F44336"
+
+                status_label = QLabel(status_text)
+                status_label.setStyleSheet(f"color: {status_color}; font-size: 11px; font-weight: bold; min-width: 80px;")
                 row_layout.addWidget(status_label)
 
                 desc_label = QLabel(model["description"])
                 desc_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+                desc_label.setWordWrap(True)
                 row_layout.addWidget(desc_label, 1)
 
                 btn_layout = QHBoxLayout()
@@ -1438,8 +1461,12 @@ class ModelManagerDialog(QDialog):
                     pause_btn.clicked.connect(self.main_window._pause_download)
                     btn_layout.addWidget(pause_btn)
                 elif model["exists"]:
+                    is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
                     delete_btn = QPushButton("删除")
                     delete_btn.setStyleSheet(DARK_BTN_DANGER)
+                    if is_main_component:
+                        delete_btn.setEnabled(False)
+                        delete_btn.setToolTip("主模型组件，请删除主模型")
                     delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
                     btn_layout.addWidget(delete_btn)
                 else:
@@ -1450,6 +1477,25 @@ class ModelManagerDialog(QDialog):
 
                 row_layout.addLayout(btn_layout)
                 model_item_layout.addLayout(row_layout)
+
+                if integrity_status == "incomplete" and integrity_details:
+                    missing_files = integrity_details.get("files_missing", [])
+                    total_size_mb = integrity_details.get("total_size_mb", 0)
+                    expected_size_mb = integrity_details.get("expected_size_mb", 0)
+                    size_ok = integrity_details.get("size_ok", False)
+                    
+                    warn_parts = []
+                    if missing_files:
+                        warn_parts.append(f"缺少文件: {', '.join(missing_files)}")
+                    if not size_ok and expected_size_mb > 0:
+                        warn_parts.append(f"大小不足: {total_size_mb}MB / 预期 {expected_size_mb}MB")
+                    
+                    if warn_parts:
+                        warn_text = "⚠ " + "，".join(warn_parts) + "，建议重新下载"
+                        warn_label = QLabel(warn_text)
+                        warn_label.setStyleSheet("font-size: 10px; color: #FF9800; font-weight: bold;")
+                        warn_label.setWordWrap(True)
+                        model_item_layout.addWidget(warn_label)
 
                 if is_downloading:
                     progress_row = QHBoxLayout()

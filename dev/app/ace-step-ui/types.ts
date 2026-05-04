@@ -125,6 +125,7 @@ export interface GenerationParams {
   trackName?: string;
   completeTrackClasses?: string[];
   isFormatCaption?: boolean;
+  loraLoaded?: boolean;
 }
 
 export interface PlayerState {

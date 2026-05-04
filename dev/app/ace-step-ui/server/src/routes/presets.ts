@@ -248,6 +248,17 @@ async function ensureBuiltinPresets(userId: string): Promise<void> {
           JSON.stringify(preset.params),
         ]
       );
+    } else {
+      await pool.query(
+        `UPDATE presets SET name = ?, description = ?, params = ?, category = ? WHERE id = ?`,
+        [
+          preset.name,
+          preset.description,
+          JSON.stringify(preset.params),
+          preset.category,
+          preset.id,
+        ]
+      );
     }
   }
 }

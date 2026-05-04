@@ -950,6 +950,7 @@ export interface Project {
   description?: string;
   params: Record<string, any>;
   is_active: boolean;
+  is_default: boolean;
   auto_save_enabled: boolean;
   auto_save_interval: number;
   auto_save_max_count: number;
@@ -966,9 +967,22 @@ export interface ProjectSnapshot {
   created_at?: string;
 }
 
+export interface ProjectChangelog {
+  id: string;
+  project_id: string;
+  action: string;
+  label?: string;
+  changes: Record<string, { old: any; new: any }>;
+  snapshot_params: Record<string, any>;
+  created_at?: string;
+}
+
 export const projectsApi = {
-  getProjects: (token: string): Promise<{ projects: Project[] }> =>
+  getProjects: (token: string): Promise<{ projects: Project[]; default_project: Project }> =>
     api('/api/projects', { token }),
+
+  getDefaultProject: (token: string): Promise<{ project: Project }> =>
+    api('/api/projects/default', { token }),
 
   getProject: (id: string, token: string): Promise<{ project: Project }> =>
     api(`/api/projects/${id}`, { token }),
@@ -977,6 +991,7 @@ export const projectsApi = {
     name: string;
     description?: string;
     params: Record<string, any>;
+    from_default?: boolean;
     auto_save_enabled?: boolean;
     auto_save_interval?: number;
     auto_save_max_count?: number;
@@ -987,17 +1002,35 @@ export const projectsApi = {
     name?: string;
     description?: string;
     params?: Record<string, any>;
+    changelog_label?: string;
     auto_save_enabled?: boolean;
     auto_save_interval?: number;
     auto_save_max_count?: number;
   }, token: string): Promise<{ project: Project }> =>
     api(`/api/projects/${id}`, { method: 'PATCH', body: updates, token }),
 
+  renameProject: (id: string, name: string, token: string): Promise<{ project: Project }> =>
+    api(`/api/projects/${id}/rename`, { method: 'POST', body: { name }, token }),
+
   deleteProject: (id: string, token: string): Promise<{ success: boolean }> =>
     api(`/api/projects/${id}`, { method: 'DELETE', token }),
 
   activateProject: (id: string, token: string): Promise<{ project: Project }> =>
     api(`/api/projects/${id}/activate`, { method: 'POST', token }),
+
+  undoProject: (id: string, token: string): Promise<{ project: Project; undone_changes: Record<string, { old: any; new: any }>; undone_action: string }> =>
+    api(`/api/projects/${id}/undo`, { method: 'POST', token }),
+
+  getChangelogs: (projectId: string, token: string, params?: { limit?: number; offset?: number }): Promise<{ changelogs: ProjectChangelog[]; total: number }> =>
+    api(`/api/projects/${projectId}/changelogs${params ? `?limit=${params.limit || 100}&offset=${params.offset || 0}` : ''}`, { token }),
+
+  createChangelog: (projectId: string, params: {
+    action: string;
+    label?: string;
+    changes: Record<string, { old: any; new: any }>;
+    snapshot_params: Record<string, any>;
+  }, token: string): Promise<{ changelog: ProjectChangelog }> =>
+    api(`/api/projects/${projectId}/changelogs`, { method: 'POST', body: params, token }),
 
   getSnapshots: (projectId: string, token: string): Promise<{ snapshots: ProjectSnapshot[] }> =>
     api(`/api/projects/${projectId}/snapshots`, { token }),

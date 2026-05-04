@@ -911,6 +911,7 @@ function AppContent() {
         trackName: params.trackName,
         completeTrackClasses: params.completeTrackClasses,
         isFormatCaption: params.isFormatCaption,
+        loraLoaded: params.loraLoaded,
       }, token);
 
       const tempId = `job_${job.jobId}`;
