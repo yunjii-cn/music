@@ -1673,6 +1673,46 @@ class MainWindow(QMainWindow):
         self.expand_switch.clicked.connect(self._on_expand_toggled)
         header_layout.addWidget(self.expand_switch)
         
+        self.btn_save_log = QPushButton("💾 保存日志")
+        self.btn_save_log.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_log.setStyleSheet("""
+            QPushButton {
+                background-color: #1565C0;
+                color: white;
+                border: 1px solid #1976D2;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+                border-color: #1E88E5;
+            }
+        """)
+        self.btn_save_log.clicked.connect(self._save_runtime_log)
+        header_layout.addWidget(self.btn_save_log)
+        
+        self.btn_clear_log = QPushButton("🗑 清空")
+        self.btn_clear_log.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear_log.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                color: #E0E0E0;
+                border: 1px solid #616161;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #616161;
+                border-color: #757575;
+            }
+        """)
+        self.btn_clear_log.clicked.connect(self._clear_runtime_log)
+        header_layout.addWidget(self.btn_clear_log)
+        
         log_layout.addWidget(header_container)
         
         # 分隔线（更细）
@@ -2034,6 +2074,38 @@ class MainWindow(QMainWindow):
             self.services_container.show()
             self.expand_switch.setText("📐 展开窗口")
     
+    def _save_runtime_log(self):
+        """保存运行日志到文件"""
+        if not hasattr(self, 'log_output') or self.log_output is None:
+            return
+        
+        from PyQt6.QtWidgets import QFileDialog
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_name = f"runtime_log_{timestamp}.txt"
+        
+        output_dir = self.config.get("output.directory", "") if hasattr(self, 'config') else ""
+        if not output_dir or not os.path.exists(output_dir):
+            output_dir = os.path.join(self.base_dir, "output")
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "保存运行日志", os.path.join(output_dir, default_name),
+            "文本文件 (*.txt);;所有文件 (*)"
+        )
+        
+        if file_path:
+            try:
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(self.log_output.toPlainText())
+                self._log(f"✓ 日志已保存: {file_path}", "#4CAF50")
+            except Exception as e:
+                self._log(f"[错误] 保存日志失败: {e}", "#F44336")
+    
+    def _clear_runtime_log(self):
+        """清空运行日志"""
+        if hasattr(self, 'log_output') and self.log_output is not None:
+            self.log_output.clear()
+    
     def _create_version_page(self):
         """创建版本管理器页面"""
         from version_manager import HybridVersionManagerDialog
@@ -2076,15 +2148,15 @@ class MainWindow(QMainWindow):
         title_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
         layout.addWidget(title_label)
         
-        env_group = QFrame()
-        env_group.setStyleSheet("""
+        self.deploy_env_group = QFrame()
+        self.deploy_env_group.setStyleSheet("""
             QFrame {
                 background-color: #1A1A1A;
                 border: 1px solid #333333;
                 border-radius: 8px;
             }
         """)
-        env_layout = QVBoxLayout(env_group)
+        env_layout = QVBoxLayout(self.deploy_env_group)
         env_layout.setSpacing(8)
         env_layout.setContentsMargins(14, 12, 14, 12)
         
@@ -2198,17 +2270,17 @@ class MainWindow(QMainWindow):
         
         env_layout.addLayout(steps_grid)
         
-        layout.addWidget(env_group)
+        layout.addWidget(self.deploy_env_group)
         
-        output_group = QFrame()
-        output_group.setStyleSheet("""
+        self.deploy_output_group = QFrame()
+        self.deploy_output_group.setStyleSheet("""
             QFrame {
                 background-color: #1A1A1A;
                 border: 1px solid #333333;
                 border-radius: 8px;
             }
         """)
-        output_layout = QVBoxLayout(output_group)
+        output_layout = QVBoxLayout(self.deploy_output_group)
         output_layout.setSpacing(8)
         output_layout.setContentsMargins(14, 12, 14, 12)
         
@@ -2311,7 +2383,7 @@ class MainWindow(QMainWindow):
         
         output_layout.addLayout(output_dir_row)
         
-        layout.addWidget(output_group)
+        layout.addWidget(self.deploy_output_group)
         
         log_group = QFrame()
         log_group.setStyleSheet("""
@@ -2326,7 +2398,7 @@ class MainWindow(QMainWindow):
         log_layout.setContentsMargins(14, 12, 14, 12)
         
         log_header = QHBoxLayout()
-        log_header.setSpacing(10)
+        log_header.setSpacing(8)
         
         log_title = QLabel("📋 维护日志")
         log_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
@@ -2335,7 +2407,71 @@ class MainWindow(QMainWindow):
         
         log_header.addStretch()
         
-        self.btn_clear_deploy_log = QPushButton("🗑 清空日志")
+        self.deploy_auto_scroll_switch = QPushButton("🔄 自动滚动")
+        self.deploy_auto_scroll_switch.setCheckable(True)
+        self.deploy_auto_scroll_switch.setChecked(True)
+        self.deploy_auto_scroll_switch.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.deploy_auto_scroll_switch.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: white;
+                border: 1px solid #388E3C;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:!checked {
+                background-color: #3D3D3D;
+                color: #BBBBBB;
+                border-color: #555555;
+            }
+        """)
+        self.deploy_auto_scroll_switch.clicked.connect(self._on_deploy_auto_scroll_toggled)
+        log_header.addWidget(self.deploy_auto_scroll_switch)
+        
+        self.deploy_expand_switch = QPushButton("📐 展开窗口")
+        self.deploy_expand_switch.setCheckable(True)
+        self.deploy_expand_switch.setChecked(False)
+        self.deploy_expand_switch.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.deploy_expand_switch.setStyleSheet("""
+            QPushButton {
+                background-color: #2D2D2D;
+                color: #AAAAAA;
+                border: 1px solid #444444;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: #C62828;
+                border-color: #D32F2F;
+            }
+        """)
+        self.deploy_expand_switch.clicked.connect(self._on_deploy_expand_toggled)
+        log_header.addWidget(self.deploy_expand_switch)
+        
+        self.btn_save_deploy_log = QPushButton("💾 保存日志")
+        self.btn_save_deploy_log.setStyleSheet("""
+            QPushButton {
+                background-color: #1565C0;
+                color: white;
+                border: 1px solid #1976D2;
+                border-radius: 4px;
+                padding: 4px 12px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+                border-color: #1E88E5;
+            }
+        """)
+        self.btn_save_deploy_log.clicked.connect(self._save_deploy_log)
+        log_header.addWidget(self.btn_save_deploy_log)
+        
+        self.btn_clear_deploy_log = QPushButton("🗑 清空")
         self.btn_clear_deploy_log.setStyleSheet("""
             QPushButton {
                 background-color: #424242;
@@ -2484,8 +2620,9 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, 'deploy_log_output') and self.deploy_log_output is not None:
             self.deploy_log_output.append(html)
-            scrollbar2 = self.deploy_log_output.verticalScrollBar()
-            scrollbar2.setValue(scrollbar2.maximum())
+            if hasattr(self, 'deploy_auto_scroll_switch') and self.deploy_auto_scroll_switch.isChecked():
+                scrollbar2 = self.deploy_log_output.verticalScrollBar()
+                scrollbar2.setValue(scrollbar2.maximum())
     
     def _append_deploy_log(self, message: str, color: str = "#00FF00"):
         """添加日志到部署维护页面（线程安全）"""
@@ -2495,6 +2632,71 @@ class MainWindow(QMainWindow):
         """清空部署维护日志"""
         if hasattr(self, 'deploy_log_output') and self.deploy_log_output is not None:
             self.deploy_log_output.clear()
+    
+    def _save_deploy_log(self):
+        """保存部署维护日志到文件"""
+        if not hasattr(self, 'deploy_log_output') or self.deploy_log_output is None:
+            return
+        
+        from PyQt6.QtWidgets import QFileDialog
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_name = f"deploy_log_{timestamp}.txt"
+        
+        output_dir = self.config.get("output.directory", "")
+        if not output_dir or not os.path.exists(output_dir):
+            output_dir = os.path.join(self.base_dir, "output")
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "保存维护日志", os.path.join(output_dir, default_name),
+            "文本文件 (*.txt);;所有文件 (*)"
+        )
+        
+        if file_path:
+            try:
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(self.deploy_log_output.toPlainText())
+                self._log(f"✓ 日志已保存: {file_path}", "#4CAF50")
+            except Exception as e:
+                self._log(f"[错误] 保存日志失败: {e}", "#F44336")
+    
+    def _on_deploy_auto_scroll_toggled(self, checked):
+        """部署维护自动滚动开关切换"""
+        if checked:
+            self.deploy_auto_scroll_switch.setStyleSheet("""
+                QPushButton {
+                    background-color: #2E7D32;
+                    color: white;
+                    border: 1px solid #388E3C;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            self.deploy_auto_scroll_switch.setStyleSheet("""
+                QPushButton {
+                    background-color: #3D3D3D;
+                    color: #BBBBBB;
+                    border: 1px solid #555555;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+            """)
+    
+    def _on_deploy_expand_toggled(self, checked):
+        """部署维护展开窗口切换"""
+        if checked:
+            self.deploy_env_group.hide()
+            self.deploy_output_group.hide()
+            self.deploy_expand_switch.setText("📐 收起窗口")
+        else:
+            self.deploy_env_group.show()
+            self.deploy_output_group.show()
+            self.deploy_expand_switch.setText("📐 展开窗口")
     
     def _open_output_directory(self):
         """打开输出目录"""
@@ -4458,23 +4660,32 @@ try {
         checks = {}
         
         try:
-            powershell_paths = [
-                "powershell.exe",
-                "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-            ]
             ps_ok = False
-            for ps in powershell_paths:
+            try:
+                process = hidden_popen(
+                    ["powershell.exe", "-Command", "$PSVersionTable.PSVersion.ToString()"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                stdout, stderr = process.communicate(timeout=10)
+                if process.returncode == 0 and stdout.strip():
+                    ps_ok = True
+            except:
+                pass
+            if not ps_ok:
+                ps_path = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+                if os.path.exists(ps_path):
+                    ps_ok = True
+            if not ps_ok:
                 try:
                     process = hidden_popen(
-                        [ps, "-Version"],
+                        ["where", "powershell"],
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                     )
                     stdout, stderr = process.communicate(timeout=5)
-                    if process.returncode == 0:
+                    if process.returncode == 0 and stdout.strip():
                         ps_ok = True
-                        break
                 except:
-                    continue
+                    pass
             checks["powershell"] = ps_ok
         except:
             checks["powershell"] = False
@@ -4519,12 +4730,28 @@ try {
         try:
             venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
             if os.path.exists(venv_python):
-                deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "fastapi", "uvicorn", "accelerate"]
+                REQUIRED_DEPS = {
+                    "loguru": "loguru",
+                    "psutil": "psutil",
+                    "torch": "torch>=2.9.0",
+                    "torchaudio": "torchaudio>=2.9.0",
+                    "transformers": "transformers>=4.51.0,<5.0",
+                    "diffusers": "diffusers",
+                    "gradio": "gradio",
+                    "peft": "peft",
+                    "lycoris": "lycoris-lora",
+                    "fastapi": "fastapi",
+                    "uvicorn": "uvicorn",
+                    "accelerate": "accelerate",
+                    "scipy": "scipy",
+                    "soundfile": "soundfile",
+                    "einops": "einops",
+                }
                 all_ok = True
-                for dep in deps_to_check:
+                for dep_module, dep_name in REQUIRED_DEPS.items():
                     try:
                         process = hidden_popen(
-                            [venv_python, "-c", f"import {dep}"],
+                            [venv_python, "-c", f"import {dep_module}"],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                         )
@@ -4830,7 +5057,7 @@ try {
             return False
     
     def _install_python_deps(self):
-        """安装 Python 依赖包"""
+        """安装 Python 依赖包（带版本控制）"""
         try:
             venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
             if not os.path.exists(venv_python):
@@ -4839,9 +5066,10 @@ try {
             
             install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
             if os.path.exists(install_script):
+                self._log("[信息] 使用安装脚本安装依赖（含版本控制）...")
                 result = hidden_run(
                     ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
-                    cwd=self.base_dir,
+                    cwd=os.path.join(self.base_dir, "scripts"),
                     capture_output=True,
                     text=True,
                     timeout=1800
@@ -4850,16 +5078,87 @@ try {
             
             uv_path = os.path.expanduser("~/.local/bin/uv.exe")
             if os.path.exists(uv_path):
+                self._log("[信息] 使用 uv 安装依赖（带版本约束）...")
+                
+                self._log("[信息] 安装基础依赖...")
+                base_deps = ["wheel_stub", "psutil", "hatchling", "editables"]
                 process = hidden_popen(
-                    [uv_path, "pip", "install", "--python", venv_python,
-                     "loguru", "psutil", "torch", "torchaudio", "transformers",
-                     "diffusers", "gradio", "peft", "fastapi", "uvicorn", "accelerate",
-                     "scipy", "soundfile", "einops", "lycoris"],
+                    [uv_path, "pip", "install", "--python", venv_python, "--upgrade"] + base_deps,
                     cwd=self.base_dir,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                 )
+                process.communicate(timeout=300)
+                
+                self._log("[信息] 安装 PyTorch 2.9.0 + torchaudio 2.9.0 (CUDA 12.8)...")
+                pytorch_deps = [
+                    "torch==2.9.0",
+                    "torchvision==0.24.0",
+                    "torchaudio==2.9.0",
+                ]
+                env = os.environ.copy()
+                env["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+                env["UV_EXTRA_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
+                process = hidden_popen(
+                    [uv_path, "pip", "install", "--python", venv_python] + pytorch_deps,
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                    env=env
+                )
                 process.communicate(timeout=600)
-                return process.returncode == 0
+                if process.returncode != 0:
+                    self._log("[警告] PyTorch 安装可能失败，尝试不带版本约束...", "#FF9800")
+                    process = hidden_popen(
+                        [uv_path, "pip", "install", "--python", venv_python, "torch", "torchaudio"],
+                        cwd=self.base_dir,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                        env=env
+                    )
+                    process.communicate(timeout=600)
+                
+                self._log("[信息] 安装项目核心依赖...")
+                project_deps = [
+                    "transformers>=4.51.0,<5.0",
+                    "diffusers",
+                    "gradio",
+                    "matplotlib",
+                    "scipy",
+                    "soundfile",
+                    "loguru",
+                    "einops",
+                    "accelerate",
+                    "fastapi",
+                    "diskcache",
+                    "uvicorn",
+                    "numba",
+                    "vector-quantize-pytorch",
+                    "toml",
+                    "peft",
+                    "lycoris-lora",
+                ]
+                process = hidden_popen(
+                    [uv_path, "pip", "install", "--python", venv_python] + project_deps,
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                    env=env
+                )
+                process.communicate(timeout=600)
+                
+                flash_attn_wheel = os.path.join(self.base_dir, "scripts", "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl")
+                if os.path.exists(flash_attn_wheel):
+                    self._log("[信息] 安装 flash_attn 加速库...")
+                    process = hidden_popen(
+                        [uv_path, "pip", "install", "--python", venv_python, flash_attn_wheel],
+                        cwd=self.base_dir,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                        env=env
+                    )
+                    process.communicate(timeout=300)
+                    if process.returncode == 0:
+                        self._log("✓ flash_attn 安装完成", "#4CAF50")
+                    else:
+                        self._log("[警告] flash_attn 安装失败（不影响核心功能）", "#FF9800")
+                
+                return True
             
             self._log("[错误] 无法安装 Python 依赖，缺少安装脚本和 uv", "#F44336")
             return False
