@@ -260,7 +260,6 @@ PYTHON_VERSION = "3.12"
 
 ACE_PIP_DEPS = [
     "torch==2.9.0",
-    "torchvision==0.24.0",
     "torchaudio==2.9.0",
     "transformers>=4.51.0,<5.0",
     "diffusers",
@@ -278,15 +277,12 @@ ACE_PIP_DEPS = [
     "matplotlib",
     "diskcache",
     "numba",
-    "vector-quantize-pytorch",
     "toml",
     "huggingface_hub",
     "safetensors",
-    "sentencepiece",
     "lightning",
     "tensorboard",
     "modelscope",
-    "typer-slim",
 ]
 
 ACE_PIP_VERSION_LOCKS = {
@@ -1428,6 +1424,7 @@ class MainWindow(QMainWindow):
             }
             QFrame#cardFrame QLabel {
                 border: none;
+                background: transparent;
             }
         """)
         
@@ -2321,11 +2318,11 @@ class MainWindow(QMainWindow):
         env_header.addWidget(env_title)
         env_header.addStretch()
         
-        refresh_env_btn = QPushButton("🔄")
-        refresh_env_btn.setFixedSize(22, 22)
+        refresh_env_btn = QPushButton("重新检测")
+        refresh_env_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         refresh_env_btn.setStyleSheet("""
-            QPushButton { background-color: #2A2A2A; color: #888888; border: 1px solid #3A3A3A; border-radius: 3px; font-size: 9px; }
-            QPushButton:hover { background-color: #3A3A3A; color: #CCCCCC; }
+            QPushButton { background-color: #1A3A5C; color: #8BB8E8; border: 1px solid #1E4D7A; border-radius: 4px; padding: 3px 10px; font-size: 10px; }
+            QPushButton:hover { background-color: #1E4D7A; color: #FFFFFF; }
         """)
         refresh_env_btn.clicked.connect(self._refresh_deploy_env_status)
         env_header.addWidget(refresh_env_btn)
@@ -2377,11 +2374,11 @@ class MainWindow(QMainWindow):
         deps_header.addWidget(deps_title)
         deps_header.addStretch()
         
-        refresh_deps_btn = QPushButton("🔄")
-        refresh_deps_btn.setFixedSize(22, 22)
+        refresh_deps_btn = QPushButton("刷新版本")
+        refresh_deps_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         refresh_deps_btn.setStyleSheet("""
-            QPushButton { background-color: #2A2A2A; color: #888888; border: 1px solid #3A3A3A; border-radius: 3px; font-size: 9px; }
-            QPushButton:hover { background-color: #3A3A3A; color: #CCCCCC; }
+            QPushButton { background-color: #1A3A5C; color: #8BB8E8; border: 1px solid #1E4D7A; border-radius: 4px; padding: 3px 10px; font-size: 10px; }
+            QPushButton:hover { background-color: #1E4D7A; color: #FFFFFF; }
         """)
         refresh_deps_btn.clicked.connect(self._refresh_deps_list)
         deps_header.addWidget(refresh_deps_btn)
@@ -4816,6 +4813,13 @@ try {
                     "scipy": "scipy",
                     "soundfile": "soundfile",
                     "einops": "einops",
+                    "matplotlib": "matplotlib",
+                    "diskcache": "diskcache",
+                    "numba": "numba",
+                    "lightning": "lightning",
+                    "modelscope": "modelscope",
+                    "huggingface_hub": "huggingface_hub",
+                    "safetensors": "safetensors",
                 }
                 all_ok = True
                 for dep_module, dep_name in REQUIRED_DEPS.items():
@@ -5290,10 +5294,14 @@ for d in deps:
                     "diskcache",
                     "uvicorn",
                     "numba",
-                    "vector-quantize-pytorch",
                     "toml",
                     "peft",
                     "lycoris-lora",
+                    "lightning",
+                    "tensorboard",
+                    "modelscope",
+                    "huggingface_hub",
+                    "safetensors",
                 ]
                 process = hidden_popen(
                     [uv_path, "pip", "install", "--python", venv_python] + project_deps,

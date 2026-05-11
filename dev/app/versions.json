@@ -1,5 +1,18 @@
 [
   {
+    "version": "2026.05.12.0558",
+    "date": "2026-05-12 06:00",
+    "message": "修复非按钮标题文字边框",
+    "changes": [
+      "修复非按钮标题文字边框",
+      "刷新按钮改为文字按钮",
+      "移除4个无用依赖(torchvision/vector-quantize-pytorch/sentencepiece/typer-slim)",
+      "同步REQUIRED_DEPS与ACE_PIP_DEPS"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0558.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.05.12.0415",
     "date": "2026-05-12 04:16",
     "message": "修复Python环境检测venv路径问题",
