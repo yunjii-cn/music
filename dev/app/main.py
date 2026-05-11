@@ -283,6 +283,10 @@ ACE_PIP_DEPS = [
     "huggingface_hub",
     "safetensors",
     "sentencepiece",
+    "lightning",
+    "tensorboard",
+    "modelscope",
+    "typer-slim",
 ]
 
 ACE_PIP_VERSION_LOCKS = {
@@ -4779,7 +4783,17 @@ try {
         
         try:
             venv_path = os.path.join(self.base_dir, "scripts", ".venv")
-            checks["venv"] = os.path.exists(venv_path)
+            venv_python = os.path.join(venv_path, "Scripts", "python.exe")
+            if not os.path.exists(venv_python):
+                for candidate in [
+                    os.path.join(self.base_dir, ".venv", "Scripts", "python.exe"),
+                    os.path.join(self.base_dir, "app", "scripts", ".venv", "Scripts", "python.exe"),
+                ]:
+                    if os.path.exists(candidate):
+                        venv_python = candidate
+                        venv_path = os.path.dirname(os.path.dirname(candidate))
+                        break
+            checks["venv"] = os.path.exists(venv_python)
         except:
             checks["venv"] = False
         
@@ -5000,9 +5014,10 @@ for d in deps:
                          .replace("huggingface_hub", "hf_hub")
                          .replace("python-multipart", "multipart")
                          .replace("lycoris-lora", "lycoris")
-                         .replace("vector-quantize-pytorch", "vq-pytorch"))
+                         .replace("vector-quantize-pytorch", "vq-pytorch")
+                         .replace("typer-slim", "typer"))
                 name_lbl = QLabel(short)
-                name_lbl.setFixedWidth(52)
+                name_lbl.setFixedWidth(82)
                 if status == "OK":
                     name_lbl.setStyleSheet("font-size: 9px; color: #888888; background: transparent;")
                     ver_lbl = QLabel(f"✅ {ver}")

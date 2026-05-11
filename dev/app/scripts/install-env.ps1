@@ -157,7 +157,7 @@ Write-Output "✅ PyTorch 生态系统安装完成"
 Write-Output ""
 Write-Output "📦 安装项目依赖..."
 Write-Output "   正在安装 transformers, diffusers, gradio 等核心依赖..."
-~/.local/bin/uv pip install transformers diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba vector-quantize-pytorch toml peft lycoris-lora lightning tensorboard modelscope typer-slim
+~/.local/bin/uv pip install transformers diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba vector-quantize-pytorch toml peft lycoris-lora lightning tensorboard modelscope typer-slim sentencepiece huggingface_hub safetensors
 if ($LASTEXITCODE -eq 0) {
     Write-Output "✅ 项目依赖安装完成"
 }
