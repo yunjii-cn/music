@@ -943,143 +943,18 @@ def apply_saved_ports():
 apply_saved_ports()
 
 
-class PortEditDialog(QDialog):
-    """端口修改对话框"""
-    
-    def __init__(self, service_id: str, parent=None):
-        super().__init__(parent)
-        self.service_id = service_id
-        self.service_info = SERVICES[service_id]
-        self.new_port = None
-        self._setup_ui()
-    
-    def _setup_ui(self):
-        self.setWindowTitle(f"修改端口 - {self.service_info['name']}")
-        self.setFixedSize(360, 200)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1E1E1E;
-            }
-            QLabel {
-                color: #FFFFFF;
-            }
-            QLineEdit {
-                background-color: #2D2D2D;
-                color: #FFFFFF;
-                border: 1px solid #555555;
-                border-radius: 4px;
-                padding: 6px 10px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border-color: #1976D2;
-            }
-        """)
-        
-        layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
-        
-        info_label = QLabel(f"服务: {self.service_info['name']}")
-        info_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        layout.addWidget(info_label)
-        
-        current_label = QLabel(f"当前端口: {self.service_info['port']}")
-        current_label.setStyleSheet("font-size: 12px; color: #AAAAAA;")
-        layout.addWidget(current_label)
-        
-        input_layout = QHBoxLayout()
-        new_label = QLabel("新端口:")
-        new_label.setStyleSheet("font-size: 13px;")
-        input_layout.addWidget(new_label)
-        
-        self.port_input = QLineEdit(str(self.service_info['port']))
-        self.port_input.setPlaceholderText("1-65535")
-        self.port_input.selectAll()
-        input_layout.addWidget(self.port_input)
-        
-        layout.addLayout(input_layout)
-        
-        hint_label = QLabel("⚠ 修改端口后需重启服务才能生效")
-        hint_label.setStyleSheet("font-size: 11px; color: #FFA726;")
-        layout.addWidget(hint_label)
-        
-        layout.addStretch()
-        
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        
-        cancel_btn = QPushButton("取消")
-        cancel_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #424242;
-                color: #FFFFFF;
-                border: 1px solid #616161;
-                border-radius: 6px;
-                padding: 8px 24px;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #616161;
-            }
-        """)
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
-        
-        save_btn = QPushButton("保存")
-        save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1565C0;
-                color: #FFFFFF;
-                border: 1px solid #1976D2;
-                border-radius: 6px;
-                padding: 8px 24px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-        """)
-        save_btn.clicked.connect(self._on_save)
-        btn_layout.addWidget(save_btn)
-        
-        layout.addLayout(btn_layout)
-    
-    def _on_save(self):
-        try:
-            port = int(self.port_input.text().strip())
-            if not (1 <= port <= 65535):
-                QMessageBox.warning(self, "无效端口", "端口号必须在 1-65535 之间")
-                return
-            
-            if port == self.service_info['port']:
-                self.reject()
-                return
-            
-            for sid, svc in SERVICES.items():
-                if sid != self.service_id and svc['port'] == port:
-                    QMessageBox.warning(self, "端口冲突", f"端口 {port} 已被服务「{svc['name']}」使用")
-                    return
-            
-            self.new_port = port
-            self.accept()
-        except ValueError:
-            QMessageBox.warning(self, "无效输入", "请输入有效的数字")
-
-
 class ServiceCard(QFrame):
     """服务状态卡片"""
     restart_clicked = pyqtSignal(str)
-
     open_clicked = pyqtSignal(str)
-    port_edit_clicked = pyqtSignal(str)
+    port_changed = pyqtSignal(str, int)
     
     def __init__(self, service_id: str, parent=None):
         super().__init__(parent)
         self.service_id = service_id
         self.service_info = SERVICES[service_id]
         self.is_running = False
+        self._editing_port = False
         self._setup_ui()
     
     def _setup_ui(self):
@@ -1096,7 +971,6 @@ class ServiceCard(QFrame):
         layout.setSpacing(12)
         layout.setContentsMargins(15, 15, 15, 15)
         
-        # 第一行：图标、名称、端口、状态都在同一排
         top_row_layout = QHBoxLayout()
         
         self.icon_label = QLabel(self.service_info["icon"])
@@ -1115,9 +989,27 @@ class ServiceCard(QFrame):
         self.port_label.setStyleSheet("font-size: 12px; color: #AAAAAA;")
         top_row_layout.addWidget(self.port_label)
         
-        self.edit_port_btn = QPushButton("✏")
-        self.edit_port_btn.setFixedSize(22, 22)
-        self.edit_port_btn.setToolTip("修改端口")
+        self.port_input = QLineEdit(str(self.service_info['port']))
+        self.port_input.setFixedWidth(55)
+        self.port_input.setMaxLength(5)
+        self.port_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.port_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #2D2D2D;
+                color: #FFFFFF;
+                border: 1px solid #1976D2;
+                border-radius: 3px;
+                padding: 1px 3px;
+                font-size: 12px;
+            }
+        """)
+        self.port_input.returnPressed.connect(self._confirm_port_edit)
+        self.port_input.editingFinished.connect(self._confirm_port_edit)
+        self.port_input.hide()
+        top_row_layout.addWidget(self.port_input)
+        
+        self.edit_port_btn = QPushButton("修改")
+        self.edit_port_btn.setFixedHeight(20)
         self.edit_port_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -1125,7 +1017,7 @@ class ServiceCard(QFrame):
                 border: 1px solid #555555;
                 border-radius: 4px;
                 font-size: 11px;
-                padding: 0px;
+                padding: 1px 6px;
             }
             QPushButton:hover {
                 background-color: #333333;
@@ -1133,12 +1025,11 @@ class ServiceCard(QFrame):
                 border-color: #888888;
             }
         """)
-        self.edit_port_btn.clicked.connect(lambda: self.port_edit_clicked.emit(self.service_id))
+        self.edit_port_btn.clicked.connect(self._start_port_edit)
         top_row_layout.addWidget(self.edit_port_btn)
         
         top_row_layout.addStretch()
         
-        # 状态指示灯+文字
         status_container = QHBoxLayout()
         status_container.setSpacing(6)
         
@@ -1161,7 +1052,6 @@ class ServiceCard(QFrame):
         
         layout.addLayout(top_row_layout)
         
-        # 第二行：操作按钮
         btn_layout = QHBoxLayout()
         
         self.restart_btn = QPushButton("重启")
@@ -1204,8 +1094,45 @@ class ServiceCard(QFrame):
         
         layout.addLayout(btn_layout)
     
+    def _start_port_edit(self):
+        if self._editing_port:
+            return
+        self._editing_port = True
+        self.port_input.setText(str(self.service_info['port']))
+        self.port_label.hide()
+        self.edit_port_btn.hide()
+        self.port_input.show()
+        self.port_input.selectAll()
+        self.port_input.setFocus()
+    
+    def _confirm_port_edit(self):
+        if not self._editing_port:
+            return
+        self._editing_port = False
+        try:
+            new_port = int(self.port_input.text().strip())
+        except ValueError:
+            self._cancel_port_edit()
+            return
+        if not (1 <= new_port <= 65535) or new_port == self.service_info['port']:
+            self._cancel_port_edit()
+            return
+        for sid, svc in SERVICES.items():
+            if sid != self.service_id and svc['port'] == new_port:
+                self._cancel_port_edit()
+                return
+        self.port_input.hide()
+        self.port_label.show()
+        self.edit_port_btn.show()
+        self.port_changed.emit(self.service_id, new_port)
+    
+    def _cancel_port_edit(self):
+        self._editing_port = False
+        self.port_input.hide()
+        self.port_label.show()
+        self.edit_port_btn.show()
+    
     def update_port_display(self):
-        """更新端口显示"""
         self.port_label.setText(f"端口:{self.service_info['port']}")
     
     def update_status(self, is_running: bool):
@@ -1871,7 +1798,7 @@ class MainWindow(QMainWindow):
             card = ServiceCard(full_service_id)
             card.restart_clicked.connect(self._restart_service)
             card.open_clicked.connect(self._open_service)
-            card.port_edit_clicked.connect(self._edit_service_port)
+            card.port_changed.connect(self._on_port_changed)
             music_layout.addWidget(card, 0, col)
             self.service_cards[full_service_id] = card
             col += 1
@@ -1889,7 +1816,7 @@ class MainWindow(QMainWindow):
             card = ServiceCard(full_service_id)
             card.restart_clicked.connect(self._restart_service)
             card.open_clicked.connect(self._open_service)
-            card.port_edit_clicked.connect(self._edit_service_port)
+            card.port_changed.connect(self._on_port_changed)
             qinglong_layout.addWidget(card, 0, col)
             self.service_cards[full_service_id] = card
             col += 1
@@ -4640,33 +4567,33 @@ try {
         url = SERVICES[service_id]["url"]
         self._open_url_in_browser(url)
     
-    def _edit_service_port(self, service_id: str):
-        """修改服务端口"""
-        dialog = PortEditDialog(service_id, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.new_port is not None:
-            old_port = SERVICES[service_id]["port"]
-            new_port = dialog.new_port
-            
-            SERVICES[service_id]["port"] = new_port
-            SERVICES[service_id]["url"] = SERVICES[service_id]["url"].replace(
-                f":{old_port}", f":{new_port}"
-            )
-            
-            project_id = SERVICES[service_id]["project"]
-            short_id = service_id.replace(f"{project_id}_", "", 1)
-            if project_id in PROJECTS and short_id in PROJECTS[project_id]["services"]:
-                PROJECTS[project_id]["services"][short_id]["port"] = new_port
-                PROJECTS[project_id]["services"][short_id]["url"] = SERVICES[service_id]["url"]
-            
-            saved = load_port_config()
-            saved[service_id] = new_port
-            save_port_config(saved)
-            
-            if service_id in self.service_cards:
-                self.service_cards[service_id].update_port_display()
-            
-            self._log(f"✓ {SERVICES[service_id]['name']} 端口已修改: {old_port} → {new_port}", "#4CAF50")
-            self._log("⚠ 请重启服务使新端口生效", "#FFA726")
+    def _on_port_changed(self, service_id: str, new_port: int):
+        old_port = SERVICES[service_id]["port"]
+        
+        SERVICES[service_id]["port"] = new_port
+        SERVICES[service_id]["url"] = SERVICES[service_id]["url"].replace(
+            f":{old_port}", f":{new_port}"
+        )
+        
+        project_id = SERVICES[service_id]["project"]
+        short_id = service_id.replace(f"{project_id}_", "", 1)
+        if project_id in PROJECTS and short_id in PROJECTS[project_id]["services"]:
+            PROJECTS[project_id]["services"][short_id]["port"] = new_port
+            PROJECTS[project_id]["services"][short_id]["url"] = SERVICES[service_id]["url"]
+        
+        saved = load_port_config()
+        saved[service_id] = new_port
+        save_port_config(saved)
+        
+        if service_id in self.service_cards:
+            self.service_cards[service_id].update_port_display()
+        
+        self._log(f"✓ {SERVICES[service_id]['name']} 端口已修改: {old_port} → {new_port}", "#4CAF50")
+        
+        was_running = service_id in self.service_cards and self.service_cards[service_id].is_running
+        if was_running:
+            self._log(f"正在重启 {SERVICES[service_id]['name']} 使新端口生效...", "#FFA726")
+            self._restart_service(service_id)
     
     def _check_and_load_system_info(self):
         """检查是否已初始化，加载系统信息或显示初始化流程"""
