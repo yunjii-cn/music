@@ -1004,29 +1004,70 @@ class ServiceCard(QFrame):
             }
         """)
         self.port_input.returnPressed.connect(self._confirm_port_edit)
-        self.port_input.editingFinished.connect(self._confirm_port_edit)
         self.port_input.hide()
         top_row_layout.addWidget(self.port_input)
         
         self.edit_port_btn = QPushButton("修改")
-        self.edit_port_btn.setFixedHeight(20)
+        self.edit_port_btn.setFixedSize(48, 24)
         self.edit_port_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                color: #888888;
-                border: 1px solid #555555;
+                background-color: #C62828;
+                color: #FFFFFF;
+                border: 1px solid #D32F2F;
                 border-radius: 4px;
-                font-size: 11px;
-                padding: 1px 6px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 2px 8px;
             }
             QPushButton:hover {
-                background-color: #333333;
-                color: #FFFFFF;
-                border-color: #888888;
+                background-color: #E53935;
+                border-color: #E53935;
             }
         """)
         self.edit_port_btn.clicked.connect(self._start_port_edit)
         top_row_layout.addWidget(self.edit_port_btn)
+        
+        self.save_port_btn = QPushButton("保存")
+        self.save_port_btn.setFixedSize(48, 24)
+        self.save_port_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: #FFFFFF;
+                border: 1px solid #388E3C;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 2px 8px;
+            }
+            QPushButton:hover {
+                background-color: #43A047;
+                border-color: #43A047;
+            }
+        """)
+        self.save_port_btn.clicked.connect(self._confirm_port_edit)
+        self.save_port_btn.hide()
+        top_row_layout.addWidget(self.save_port_btn)
+        
+        self.cancel_port_btn = QPushButton("取消")
+        self.cancel_port_btn.setFixedSize(48, 24)
+        self.cancel_port_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                color: #FFFFFF;
+                border: 1px solid #616161;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 2px 8px;
+            }
+            QPushButton:hover {
+                background-color: #616161;
+                border-color: #757575;
+            }
+        """)
+        self.cancel_port_btn.clicked.connect(self._cancel_port_edit)
+        self.cancel_port_btn.hide()
+        top_row_layout.addWidget(self.cancel_port_btn)
         
         top_row_layout.addStretch()
         
@@ -1102,6 +1143,8 @@ class ServiceCard(QFrame):
         self.port_label.hide()
         self.edit_port_btn.hide()
         self.port_input.show()
+        self.save_port_btn.show()
+        self.cancel_port_btn.show()
         self.port_input.selectAll()
         self.port_input.setFocus()
     
@@ -1124,6 +1167,8 @@ class ServiceCard(QFrame):
         self.port_input.hide()
         self.port_label.show()
         self.edit_port_btn.show()
+        self.save_port_btn.hide()
+        self.cancel_port_btn.hide()
         self.port_changed.emit(self.service_id, new_port)
     
     def _cancel_port_edit(self):
@@ -1131,6 +1176,8 @@ class ServiceCard(QFrame):
         self.port_input.hide()
         self.port_label.show()
         self.edit_port_btn.show()
+        self.save_port_btn.hide()
+        self.cancel_port_btn.hide()
     
     def update_port_display(self):
         self.port_label.setText(f"端口:{self.service_info['port']}")
