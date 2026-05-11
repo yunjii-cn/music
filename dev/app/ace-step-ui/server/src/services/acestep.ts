@@ -993,10 +993,23 @@ export function getJobRawResponse(jobId: string): unknown | null {
 }
 
 // Get audio stream from local file or remote URL
-export async function getAudioStream(audioPath: string): Promise<Response> {
-  // If it's already a full URL, fetch directly
+export async function getAudioStream(audioPath: string, timeoutMs = 60000): Promise<Response> {
+  // If it's already a full URL, fetch directly with timeout
   if (audioPath.startsWith('http')) {
-    return fetch(audioPath);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(audioPath, { signal: controller.signal });
+      clearTimeout(timer);
+      return response;
+    } catch (err) {
+      clearTimeout(timer);
+      if ((err as Error).name === 'AbortError') {
+        console.error('Audio fetch timeout:', audioPath);
+        throw new Error('Audio fetch timeout');
+      }
+      throw err;
+    }
   }
 
   // If it's a local /audio/ path, read from filesystem
@@ -1016,10 +1029,24 @@ export async function getAudioStream(audioPath: string): Promise<Response> {
     }
   }
 
-  // Otherwise, use the ACE-Step audio endpoint
+  // Otherwise, use the ACE-Step audio endpoint with timeout
   const url = `${ACESTEP_API}/v1/audio?path=${encodeURIComponent(audioPath)}`;
   console.log('Fetching audio from:', url);
-  return fetch(url);
+  
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return response;
+  } catch (err) {
+    clearTimeout(timer);
+    if ((err as Error).name === 'AbortError') {
+      console.error('Audio fetch timeout:', url);
+      throw new Error('Audio fetch timeout');
+    }
+    throw err;
+  }
 }
 
 // Download audio to local storage

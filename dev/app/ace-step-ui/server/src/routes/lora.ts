@@ -56,12 +56,12 @@ function handleProxy(res: Response, result: ProxyResult, fallbackMsg: string) {
 }
 
 router.post('/load', authMiddleware, async (req, res) => {
-  try { handleProxy(res, await proxyToAceStep('/v1/lora/load', 'POST', req.body), 'LoRA loaded'); }
+  try { handleProxy(res, await proxyToAceStep('/v1/lora/load', 'POST', req.body, 300000), 'LoRA loaded'); }
   catch (e: any) { res.status(503).json({ error: e.message }); }
 });
 
 router.post('/unload', authMiddleware, async (_req, res) => {
-  try { handleProxy(res, await proxyToAceStep('/v1/lora/unload', 'POST'), 'LoRA unloaded'); }
+  try { handleProxy(res, await proxyToAceStep('/v1/lora/unload', 'POST', undefined, 120000), 'LoRA unloaded'); }
   catch (e: any) { res.status(503).json({ error: e.message }); }
 });
 

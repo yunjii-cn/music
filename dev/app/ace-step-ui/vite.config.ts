@@ -4,9 +4,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
-  const backendUrl = env.BACKEND_URL || 'http://127.0.0.1:3001';
-  const devPort = parseInt(env.VITE_PORT || '3000', 10);
-  const devHost = env.VITE_HOST || '0.0.0.0';
+  const backendUrl = env.BACKEND_URL || process.env.BACKEND_URL || 'http://127.0.0.1:3001';
+  const devPort = parseInt(env.VITE_PORT || process.env.VITE_PORT || '3000', 10);
+  const devHost = env.VITE_HOST || process.env.VITE_HOST || '0.0.0.0';
   return {
     server: {
       port: devPort,

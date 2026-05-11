@@ -374,7 +374,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       body: JSON.stringify({
         prompt: params.customMode ? params.style : (params.songDescription || params.style),
         lyrics: params.instrumental ? '' : (params.lyrics || ''),
-        thinking: params.loraLoaded ? false : (params.thinking || false),
+        thinking: params.thinking || false,
         dit_model: params.ditModel,
         bpm: params.bpm,
         key_scale: params.keyScale,
@@ -401,16 +401,17 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
         task_type: params.taskType || 'text2music',
         ...(params.trackName ? { track_name: params.trackName } : {}),
         ...(params.completeTrackClasses?.length ? { track_classes: params.completeTrackClasses } : {}),
-        use_adg: params.loraLoaded ? false : (params.useAdg || false),
+        use_adg: params.useAdg || false,
         cfg_interval_start: params.cfgIntervalStart || 0.0,
         cfg_interval_end: params.cfgIntervalEnd || 1.0,
         infer_method: params.inferMethod || 'ode',
         shift: params.shift,
+        ...(params.customTimesteps ? { custom_timesteps: params.customTimesteps } : {}),
         audio_format: params.audioFormat || 'mp3',
-        use_cot_caption: (!params.loraLoaded && params.thinking) ? (params.useCotCaption !== false) : false,
-        use_cot_language: (!params.loraLoaded && params.thinking) ? (params.useCotLanguage !== false) : false,
+        use_cot_caption: params.thinking ? (params.useCotCaption !== false) : false,
+        use_cot_language: params.thinking ? (params.useCotLanguage !== false) : false,
         use_cot_metas: false,
-        ...(!params.loraLoaded && params.thinking ? {
+        ...(params.thinking ? {
           lm_model_path: params.lmModel || undefined,
           lm_backend: params.lmBackend || 'pt',
           lm_temperature: params.lmTemperature,
@@ -420,7 +421,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
           lm_negative_prompt: params.lmNegativePrompt,
         } : {}),
       }),
-    });
+    }, 300000);
 
     if (!acestepResponse.ok) {
       const error = await acestepResponse.json().catch(() => ({ error: 'Generation failed' }));

@@ -369,7 +369,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem('ace-model') || 'acestep-v15-turbo-shift3';
+    return localStorage.getItem('ace-model') || 'acestep-v15-turbo';
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -673,19 +673,69 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const getCurrentParamsRef = useRef(getCurrentParams);
   getCurrentParamsRef.current = getCurrentParams;
 
+  const presetCheckParams = useCallback(() => {
+    return {
+      customMode,
+      songDescription,
+      lyrics,
+      style,
+      title,
+      instrumental,
+      vocalLanguage,
+      vocalGender,
+      bpm,
+      keyScale,
+      timeSignature,
+      duration,
+      inferenceSteps,
+      guidanceScale,
+      batchSize,
+      randomSeed,
+      seed,
+      thinking,
+      audioFormat,
+      inferMethod,
+      lmBackend,
+      lmModel,
+      shift,
+      lmTemperature,
+      lmCfgScale,
+      lmTopK,
+      lmTopP,
+      lmNegativePrompt,
+      taskType,
+      audioCoverStrength,
+      useAdg,
+      cfgIntervalStart,
+      cfgIntervalEnd,
+      customTimesteps,
+      useCotMetas,
+      useCotCaption,
+      useCotLanguage,
+      autogen,
+      allowLmBatch,
+      getScores,
+      getLrc,
+      scoreScale,
+      lmBatchChunkSize,
+      isFormatCaption,
+      ditModel: selectedModel,
+    };
+  }, [customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender, bpm, keyScale, timeSignature, duration, inferenceSteps, guidanceScale, batchSize, randomSeed, seed, thinking, audioFormat, inferMethod, lmBackend, lmModel, shift, lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, taskType, audioCoverStrength, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption, useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize, isFormatCaption, selectedModel]);
+
   useEffect(() => {
     if (!selectedPresetId || presets.length === 0) return;
     const selectedPreset = presets.find(p => p.id === selectedPresetId);
     if (!selectedPreset) { setSelectedPresetId(null); return; }
-    const current = getCurrentParams();
+    const current = presetCheckParams();
     const presetParams = selectedPreset.params;
     const presetKeys = Object.keys(presetParams);
     const changed = presetKeys.some(key => {
-      if (key === 'loraEnabled' || key === 'loraPath') return false;
+      if (key === 'loraEnabled' || key === 'loraPath' || key === 'loraScale') return false;
       return JSON.stringify(current[key as keyof typeof current]) !== JSON.stringify(presetParams[key]);
     });
     if (changed) setSelectedPresetId(null);
-  }, [getCurrentParams, selectedPresetId, presets]);
+  }, [presetCheckParams, selectedPresetId, presets]);
 
   const refreshUndoRedoState = useCallback(async () => {
     if (!activeProject?.id || !token) {
@@ -753,8 +803,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       } else if (loraPath.trim()) {
         setIsLoraLoading(true);
         generateApi.loadLora({ lora_path: loraPath }, token || '').then(() => {
-          setLoraLoaded(true);
           setLoraAdapterInMemory(true);
+          return generateApi.toggleLora({ use_lora: true }, token || '');
+        }).then(() => {
+          setLoraLoaded(true);
         }).catch((err) => {
           const message = err instanceof Error ? err.message : 'LoRA load failed';
           setLoraError(message);
@@ -969,11 +1021,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   useEffect(() => {
     let failCount = 0;
     let timerId: ReturnType<typeof setTimeout>;
+    let isSyncing = false;
+    
     const syncLoraStatus = async () => {
-      if (isGenerating) {
-        timerId = setTimeout(syncLoraStatus, 5000);
+      if (isGenerating || isSyncing) {
+        if (!timerId) {
+          timerId = setTimeout(syncLoraStatus, 5000);
+        }
         return;
       }
+      
+      isSyncing = true;
       try {
         const status = await generateApi.getLoraStatus(token || '');
         failCount = 0;
@@ -993,33 +1051,24 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         }
       } catch {
         failCount++;
+      } finally {
+        isSyncing = false;
       }
-      const delay = failCount > 3 ? 60000 : 10000;
+      
+      const delay = failCount > 3 ? 60000 : 15000;
       timerId = setTimeout(syncLoraStatus, delay);
     };
+    
     syncLoraStatus();
-    return () => clearTimeout(timerId);
+    return () => {
+      if (timerId) clearTimeout(timerId);
+    };
   }, [token, isGenerating]);
 
-  // Auto-unload LoRA when model changes
+  // Track model changes for reference (no auto-unload)
   useEffect(() => {
-    if (previousModelRef.current !== selectedModel && loraLoaded && !isApplyingProjectRef.current) {
-      generateApi.toggleLora({ use_lora: false }, token || '').catch(() => {});
-      setLoraLoaded(false);
-      setLoraAdapterInMemory(false);
-      setShowLoraPanel(false);
-      localStorage.setItem('ace-loraEnabled', 'false');
-    }
     previousModelRef.current = selectedModel;
-  }, [selectedModel, loraLoaded]);
-
-  // Auto-disable thinking and ADG when LoRA is loaded
-  useEffect(() => {
-    if (loraLoaded) {
-      if (thinking) setThinking(false);
-      if (useAdg) setUseAdg(false);
-    }
-  }, [loraLoaded]);
+  }, [selectedModel]);
 
   // LoRA API handlers
   const handleLoraToggle = async () => {
@@ -1070,8 +1119,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         setLoraError(null);
         try {
           const result = await generateApi.loadLora({ lora_path: loraPath }, token);
-          setLoraLoaded(true);
           setLoraAdapterInMemory(true);
+          await generateApi.toggleLora({ use_lora: true }, token);
+          setLoraLoaded(true);
           setShowLoraPanel(true);
           localStorage.setItem('ace-loraEnabled', 'true');
           console.log('LoRA loaded:', result?.message);
@@ -1877,8 +1927,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                                 {getModelDisplayName(model.id)}
                               </span>
                               {isAvailable ? (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                  {fetchedModel?.is_active ? '● 激活中' : '● 可用'}
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${selectedModel === model.id ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
+                                  {selectedModel === model.id ? '● 激活中' : '● 可用'}
                                 </span>
                               ) : integrityStatus === 'incomplete' ? (
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" title={integrityDetails?.files_missing?.length ? `缺少文件: ${integrityDetails.files_missing.join(', ')}` : '模型不完整，建议重新下载'}>
@@ -3023,8 +3073,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                           setLoraError(null);
                           try {
                             const result = await generateApi.loadLora({ lora_path: loraPath }, token);
-                            setLoraLoaded(true);
                             setLoraAdapterInMemory(true);
+                            await generateApi.toggleLora({ use_lora: true }, token);
+                            setLoraLoaded(true);
                             localStorage.setItem('ace-loraEnabled', 'true');
                             console.log('LoRA loaded:', result?.message);
                           } catch (err) {
@@ -3359,11 +3410,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
             {/* Thinking Toggle */}
             <div className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5">
-              <span className={`text-xs font-medium ${loraLoaded ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-600 dark:text-zinc-400'}`}>{t('thinkingCot')}<HelpTip text={t('thinkingCotHint')} /></span>
+              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('thinkingCot')}<HelpTip text={t('thinkingCotHint')} /></span>
               <button
-                onClick={() => { if (loraLoaded) return; const newVal = !thinking; setThinking(newVal); localStorage.setItem('ace-thinking', newVal.toString()); }}
-                disabled={loraLoaded}
-                className={`w-10 h-5 rounded-full flex items-center transition-colors duration-200 px-0.5 border border-zinc-200 dark:border-white/5 ${thinking ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-black/40'} ${loraLoaded ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                onClick={() => { const newVal = !thinking; setThinking(newVal); localStorage.setItem('ace-thinking', newVal.toString()); }}
+                className={`w-10 h-5 rounded-full flex items-center transition-colors duration-200 px-0.5 border border-zinc-200 dark:border-white/5 ${thinking ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-black/40'} cursor-pointer`}
               >
                 <div className={`w-4 h-4 rounded-full bg-white transform transition-transform duration-200 shadow-sm ${thinking ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>

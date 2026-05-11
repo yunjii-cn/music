@@ -2,5 +2,5 @@
   "lora_path": "lokr_output/final/lokr_weights.safetensors",
   "scale": 1.0,
   "adapter_name": null,
-  "loaded_at": 1776810127.6264012
+  "loaded_at": 1777938022.0735533
 }

@@ -1,6 +1,11 @@
 # Navigate to UI directory and start frontend
 # 进入 UI 目录并启动前端
 # 使用脚本所在目录的父目录（dist 根目录）
+param(
+  [int]$Port = 3000,
+  [int]$BackendPort = 3001
+)
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
 Set-Location "$RootDir\ace-step-ui"
@@ -31,6 +36,12 @@ if ($nodePath) {
 }
 
 Write-Output "Using npm: $npmCmd"
+
+# 设置端口环境变量
+$env:VITE_PORT = "$Port"
+$env:BACKEND_URL = "http://127.0.0.1:$BackendPort"
+Write-Output "Frontend port: $Port"
+Write-Output "Backend URL: $env:BACKEND_URL"
 
 Write-Output "Starting ACE-Step UI Frontend..."
 

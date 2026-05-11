@@ -394,6 +394,18 @@ def generate_music(
         # 2. use_cot_caption=True: enhance/generate caption via CoT
         # 3. use_cot_language=True: detect vocal language via CoT
         # 4. use_cot_metas=True: fill missing metadata via CoT
+        # Auto-enable thinking for text2music tasks when no audio codes are provided,
+        # since DiT alone without audio codes produces noise.
+        # LoRA modifies DiT weights but does not generate audio codes,
+        # so LLM is still needed for text2music even with LoRA.
+        # Cover/repaint tasks use src_audio instead of audio codes, so they don't need LLM.
+        if not params.thinking and not user_provided_audio_codes and params.task_type not in skip_lm_tasks:
+            logger.info(f"[generate_music] Auto-enabling thinking: no audio codes provided, task_type={params.task_type}")
+            params.thinking = True
+            if not params.use_cot_caption:
+                params.use_cot_caption = True
+            if not params.use_cot_language:
+                params.use_cot_language = True
         need_lm_for_cot = params.use_cot_caption or params.use_cot_language or params.use_cot_metas
         use_lm = (params.thinking or need_lm_for_cot) and llm_handler is not None and llm_handler.llm_initialized and params.task_type not in skip_lm_tasks
         lm_status = []

@@ -1,6 +1,11 @@
 # Navigate to UI directory and start backend
 # 进入 UI 目录并启动后端
 # 使用脚本所在目录的父目录（dist 根目录）
+param(
+  [int]$Port = 3001,
+  [int]$ApiPort = 8001
+)
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
 Set-Location "$RootDir\ace-step-ui\server"
@@ -39,6 +44,12 @@ if (Test-Path $venvPython) {
 }
 
 Write-Output "Using npm: $npmCmd"
+
+# 设置端口环境变量
+$env:PORT = "$Port"
+$env:ACESTEP_API_URL = "http://localhost:$ApiPort"
+Write-Output "Backend port: $Port"
+Write-Output "API URL: $env:ACESTEP_API_URL"
 
 Write-Output "Starting ACE-Step UI Backend..."
 

@@ -454,6 +454,7 @@ async def release_task(request: Request, authorization: Optional[str] = Header(N
             task_type=get_param("task_type", default="text2music"),
             caption=caption,
             lyrics=lyrics,
+            instrumental=to_bool(get_param("instrumental"), False),
             bpm=sample_bpm or get_param("bpm"),
             keyscale=sample_keyscale or get_param("key_scale", "keyscale", "key", default=""),
             timesignature=sample_timesignature or get_param("time_signature", "timesignature", default=""),
@@ -463,10 +464,40 @@ async def release_task(request: Request, authorization: Optional[str] = Header(N
             guidance_scale=float(get_param("guidance_scale", default=7.0) or 7.0),
             seed=int(get_param("seed", default=-1) or -1),
             thinking=to_bool(get_param("thinking"), False),
+            use_adg=to_bool(get_param("use_adg"), False),
+            cfg_interval_start=float(get_param("cfg_interval_start", default=0.0) or 0.0),
+            cfg_interval_end=float(get_param("cfg_interval_end", default=1.0) or 1.0),
+            shift=float(get_param("shift", default=1.0) or 1.0),
+            infer_method=get_param("infer_method", default="ode") or "ode",
+            reference_audio=get_param("reference_audio_path", "reference_audio"),
+            src_audio=get_param("src_audio_path", "src_audio"),
+            audio_codes=get_param("audio_code_string", "audio_codes", default="") or "",
+            repainting_start=float(get_param("repainting_start", default=0.0) or 0.0),
+            repainting_end=float(get_param("repainting_end", default=-1.0) or -1.0),
+            audio_cover_strength=float(get_param("audio_cover_strength", default=1.0) or 1.0),
+            cover_noise_strength=float(get_param("cover_noise_strength", default=0.0) or 0.0),
+            instruction=get_param("instruction", default=""),
+            enable_normalization=to_bool(get_param("enable_normalization"), True),
+            normalization_db=float(get_param("normalization_db", default=-1.0) or -1.0),
+            latent_shift=float(get_param("latent_shift", default=0.0) or 0.0),
+            latent_rescale=float(get_param("latent_rescale", default=1.0) or 1.0),
             lm_temperature=lm_temperature,
             lm_cfg_scale=float(get_param("lm_cfg_scale", default=2.0) or 2.0),
+            lm_top_k=int(get_param("lm_top_k", default=0) or 0),
+            lm_top_p=float(get_param("lm_top_p", default=0.9) or 0.9),
             lm_negative_prompt=get_param("lm_negative_prompt", default="NO USER INPUT") or "NO USER INPUT",
+            use_cot_metas=to_bool(get_param("use_cot_metas"), True),
+            use_cot_caption=to_bool(get_param("use_cot_caption"), True),
+            use_cot_language=to_bool(get_param("use_cot_language"), True),
         )
+
+        # Parse custom timesteps if provided
+        custom_timesteps_str = get_param("custom_timesteps", default="")
+        if custom_timesteps_str and isinstance(custom_timesteps_str, str) and custom_timesteps_str.strip():
+            try:
+                params.timesteps = [float(t.strip()) for t in custom_timesteps_str.split(",") if t.strip()]
+            except (ValueError, TypeError):
+                pass
 
         # Resolve seed(s) into List[int] for GenerationConfig.seeds
         use_random_seed = get_param("use_random_seed", default=True)
@@ -491,6 +522,8 @@ async def release_task(request: Request, authorization: Optional[str] = Header(N
             batch_size=get_param("batch_size", default=2),
             use_random_seed=use_random_seed,
             seeds=resolved_seeds,
+            allow_lm_batch=to_bool(get_param("allow_lm_batch"), False),
+            lm_batch_chunk_size=int(get_param("lm_batch_chunk_size", default=8) or 8),
             audio_format=get_param("audio_format", default="flac"),
         )
 
