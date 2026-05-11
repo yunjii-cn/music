@@ -37,6 +37,7 @@
 
 import sys
 import os
+import re
 import json
 import time
 import subprocess as _subprocess
@@ -217,6 +218,86 @@ for project_id, project in PROJECTS.items():
         SERVICES[full_service_id] = service
         SERVICES[full_service_id]["project"] = project_id
         SERVICES[full_service_id]["project_name"] = project["name"]
+
+MIRROR_SOURCES = {
+    "tsinghua": {
+        "pip": "https://pypi.tuna.tsinghua.edu.cn/simple/",
+        "pip_extra": "https://download.pytorch.org/whl/cu128",
+        "uv_urls": [
+            "https://ghfast.top/https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip",
+            "https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip",
+            "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip",
+        ],
+        "hf_endpoint": "https://hf-mirror.com",
+        "test_host": "pypi.tuna.tsinghua.edu.cn",
+        "label": "清华镜像",
+    },
+    "aliyun": {
+        "pip": "https://mirrors.aliyun.com/pypi/simple/",
+        "pip_extra": "https://download.pytorch.org/whl/cu128",
+        "uv_urls": [
+            "https://ghfast.top/https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip",
+            "https://gh-proxy.com/https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip",
+            "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip",
+        ],
+        "hf_endpoint": "https://hf-mirror.com",
+        "test_host": "mirrors.aliyun.com",
+        "label": "阿里云镜像",
+    },
+    "official": {
+        "pip": "https://pypi.org/simple/",
+        "pip_extra": "https://download.pytorch.org/whl/cu128",
+        "uv_urls": [
+            "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip",
+        ],
+        "hf_endpoint": "https://huggingface.co",
+        "test_host": "pypi.org",
+        "label": "官方源",
+    },
+}
+
+PYTHON_VERSION = "3.12"
+
+ACE_PIP_DEPS = [
+    "torch==2.9.0",
+    "torchvision==0.24.0",
+    "torchaudio==2.9.0",
+    "transformers>=4.51.0,<5.0",
+    "diffusers",
+    "gradio",
+    "peft",
+    "lycoris-lora",
+    "accelerate",
+    "fastapi",
+    "uvicorn",
+    "scipy",
+    "soundfile",
+    "einops",
+    "loguru",
+    "psutil",
+    "matplotlib",
+    "diskcache",
+    "numba",
+    "vector-quantize-pytorch",
+    "toml",
+    "huggingface_hub",
+    "safetensors",
+    "sentencepiece",
+]
+
+ACE_PIP_VERSION_LOCKS = {
+    "torch": ">=2.9.0,<3.0",
+    "torchaudio": ">=2.9.0,<3.0",
+    "transformers": ">=4.51.0,<5.0",
+    "diffusers": ">=0.25,<1.0",
+    "accelerate": ">=0.24,<2.0",
+    "peft": ">=0.13,<1.0",
+    "safetensors": ">=0.4,<1.0",
+    "huggingface_hub": ">=0.23,<1.0",
+    "sentencepiece": ">=0.1.99,<1.0",
+    "einops": ">=0.8,<1.0",
+    "scipy": ">=1.14,<2.0",
+}
 
 
 class ServiceMonitor(QThread):
@@ -1336,6 +1417,11 @@ class MainWindow(QMainWindow):
             QMainWindow {
                 background-color: #0D0D0D;
             }
+            QFrame#cardFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #2A2A2A;
+                border-radius: 6px;
+            }
         """)
         
         try:
@@ -2137,275 +2223,264 @@ class MainWindow(QMainWindow):
         return page
     
     def _create_deploy_page(self):
-        """创建部署维护页面"""
+        """创建部署维护页面（参考视频创意站左右分栏布局）"""
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setSpacing(10)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(8)
+        layout.setContentsMargins(12, 12, 12, 12)
         
-        title_label = QLabel("⚙️ 部署维护")
-        title_label.setFont(QFont("Microsoft YaHei", 16, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
-        layout.addWidget(title_label)
+        deploy_frame = QFrame()
+        deploy_frame.setObjectName("cardFrame")
+        deploy_layout = QHBoxLayout(deploy_frame)
+        deploy_layout.setSpacing(10)
+        deploy_layout.setContentsMargins(14, 10, 14, 10)
         
-        self.deploy_env_group = QFrame()
-        self.deploy_env_group.setStyleSheet("""
-            QFrame {
-                background-color: #1A1A1A;
-                border: 1px solid #333333;
-                border-radius: 8px;
+        deploy_title = QLabel("🔧 部署维护")
+        deploy_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
+        deploy_title.setStyleSheet("color: #FFFFFF; background: transparent;")
+        deploy_layout.addWidget(deploy_title)
+        
+        sep1 = QFrame()
+        sep1.setFrameShape(QFrame.Shape.VLine)
+        sep1.setStyleSheet("color: #333333; background: transparent;")
+        deploy_layout.addWidget(sep1)
+        
+        source_label = QLabel("下载源")
+        source_label.setStyleSheet("font-size: 11px; color: #888888; background: transparent;")
+        deploy_layout.addWidget(source_label)
+        
+        self.deploy_source_combo = QComboBox()
+        self.deploy_source_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #252525; color: #FFFFFF;
+                border: 1px solid #333333; border-radius: 4px;
+                padding: 4px 22px 4px 8px; font-size: 11px; min-width: 130px;
+            }
+            QComboBox::drop-down { border: none; width: 18px; }
+            QComboBox::down-arrow {
+                image: none; border-left: 4px solid transparent;
+                border-right: 4px solid transparent; border-top: 4px solid #888888;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #252525; border: 1px solid #333333;
+                selection-background-color: #1976D2;
             }
         """)
-        env_layout = QVBoxLayout(self.deploy_env_group)
-        env_layout.setSpacing(8)
-        env_layout.setContentsMargins(14, 12, 14, 12)
+        self.deploy_source_combo.addItem("自动选择", "auto")
+        self.deploy_source_combo.addItem("清华镜像", "tsinghua")
+        self.deploy_source_combo.addItem("阿里云镜像", "aliyun")
+        self.deploy_source_combo.addItem("官方源", "official")
+        deploy_layout.addWidget(self.deploy_source_combo)
+        
+        deploy_layout.addStretch()
+        
+        self.deploy_progress_label = QLabel("")
+        self.deploy_progress_label.setStyleSheet("font-size: 11px; color: #FFA726; background: transparent;")
+        self.deploy_progress_label.setWordWrap(True)
+        deploy_layout.addWidget(self.deploy_progress_label, 1)
+        
+        self.btn_one_click_deploy = QPushButton("🔧 一键部署维护")
+        self.btn_one_click_deploy.setFixedWidth(120)
+        self.btn_one_click_deploy.setStyleSheet("""
+            QPushButton {
+                background-color: #1B5E20; color: #FFFFFF;
+                border: 1px solid #2E7D32; border-radius: 6px;
+                padding: 6px 12px; font-size: 12px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #2E7D32; }
+            QPushButton:disabled { background-color: #1A1A1A; color: #555555; border-color: #222222; }
+        """)
+        self.btn_one_click_deploy.clicked.connect(self._deploy_maintenance)
+        deploy_layout.addWidget(self.btn_one_click_deploy)
+        
+        layout.addWidget(deploy_frame)
+        
+        content_row = QHBoxLayout()
+        content_row.setSpacing(8)
+        
+        left_col = QVBoxLayout()
+        left_col.setSpacing(8)
+        
+        env_frame = QFrame()
+        env_frame.setObjectName("cardFrame")
+        env_layout = QVBoxLayout(env_frame)
+        env_layout.setSpacing(4)
+        env_layout.setContentsMargins(12, 10, 12, 10)
         
         env_header = QHBoxLayout()
-        env_header.setSpacing(10)
-        
-        env_title = QLabel("📦 安装步骤依赖清单")
-        env_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
-        env_title.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
+        env_title = QLabel("🔍 环境检测")
+        env_title.setFont(QFont("Microsoft YaHei", 11, QFont.Weight.Bold))
+        env_title.setStyleSheet("color: #FFFFFF; background: transparent;")
         env_header.addWidget(env_title)
-        
         env_header.addStretch()
         
-        self.btn_deploy_all = QPushButton("🔄 一键部署")
-        self.btn_deploy_all.setStyleSheet("""
-            QPushButton {
-                background-color: #E53935;
-                color: white;
-                border: 1px solid #E53935;
-                border-radius: 6px;
-                padding: 8px 20px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #C62828;
-                border-color: #C62828;
-            }
-            QPushButton:disabled {
-                background-color: #333333;
-                border-color: #333333;
-                color: #757575;
-            }
+        refresh_env_btn = QPushButton("🔄")
+        refresh_env_btn.setFixedSize(22, 22)
+        refresh_env_btn.setStyleSheet("""
+            QPushButton { background-color: #2A2A2A; color: #888888; border: 1px solid #3A3A3A; border-radius: 3px; font-size: 9px; }
+            QPushButton:hover { background-color: #3A3A3A; color: #CCCCCC; }
         """)
-        self.btn_deploy_all.clicked.connect(self._deploy_maintenance)
-        env_header.addWidget(self.btn_deploy_all)
-        
-        self.btn_refresh_env = QPushButton("🔍 重新检测")
-        self.btn_refresh_env.setStyleSheet("""
-            QPushButton {
-                background-color: #1565C0;
-                color: white;
-                border: 1px solid #1976D2;
-                border-radius: 6px;
-                padding: 8px 20px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1E88E5;
-            }
-            QPushButton:disabled {
-                background-color: #333333;
-                border-color: #333333;
-                color: #757575;
-            }
-        """)
-        self.btn_refresh_env.clicked.connect(self._refresh_deploy_env_status)
-        env_header.addWidget(self.btn_refresh_env)
-        
+        refresh_env_btn.clicked.connect(self._refresh_deploy_env_status)
+        env_header.addWidget(refresh_env_btn)
         env_layout.addLayout(env_header)
         
-        steps_info = [
-            ("powershell", "PowerShell", "#1565C0"),
-            ("nodejs", "Node.js", "#1565C0"),
-            ("uv", "uv 包管理器", "#00695C"),
-            ("venv", "Python 虚拟环境", "#00695C"),
-            ("python_deps", "Python 依赖包", "#E65100"),
-            ("frontend_deps", "前端 npm 依赖", "#6A1B9A"),
-            ("scripts", "启动脚本", "#6A1B9A"),
+        env_grid = QGridLayout()
+        env_grid.setSpacing(3)
+        env_grid.setContentsMargins(0, 4, 0, 0)
+        self._env_labels = {}
+        env_items = [
+            ("powershell", "PowerShell"),
+            ("nodejs", "Node.js"),
+            ("uv", "UV 包管理器"),
+            ("venv", "Python 环境"),
+            ("python_deps", "Python 依赖"),
+            ("frontend_deps", "前端依赖"),
+            ("scripts", "启动脚本"),
+            ("gpu", "GPU / VRAM"),
         ]
+        for i, (key, text) in enumerate(env_items):
+            row_idx = i // 2
+            col_idx = i % 2
+            cell = QHBoxLayout()
+            cell.setSpacing(4)
+            name_lbl = QLabel(text)
+            name_lbl.setFixedWidth(80)
+            name_lbl.setStyleSheet("font-size: 10px; color: #888888; background: transparent;")
+            cell.addWidget(name_lbl)
+            lbl = QLabel("检测中...")
+            lbl.setStyleSheet("font-size: 10px; background: transparent;")
+            lbl.setWordWrap(True)
+            cell.addWidget(lbl, 1)
+            self._env_labels[key] = lbl
+            env_grid.addLayout(cell, row_idx, col_idx)
+        env_layout.addLayout(env_grid)
         
-        steps_grid = QGridLayout()
-        steps_grid.setSpacing(6)
+        left_col.addWidget(env_frame)
         
-        self.deploy_steps = {}
+        deps_frame = QFrame()
+        deps_frame.setObjectName("cardFrame")
+        deps_layout_v = QVBoxLayout(deps_frame)
+        deps_layout_v.setSpacing(3)
+        deps_layout_v.setContentsMargins(12, 8, 12, 8)
         
-        col = 0
-        row = 0
-        max_cols = 4
+        deps_header = QHBoxLayout()
+        deps_title = QLabel("📦 依赖版本")
+        deps_title.setFont(QFont("Microsoft YaHei", 11, QFont.Weight.Bold))
+        deps_title.setStyleSheet("color: #FFFFFF; background: transparent;")
+        deps_header.addWidget(deps_title)
+        deps_header.addStretch()
         
-        for key, label, color in steps_info:
-            step_btn = QPushButton()
-            step_btn.setFixedHeight(32)
-            step_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            step_btn.setText(f"  ○  {label}  待检测  ")
-            step_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: #252525;
-                    color: #888888;
-                    border: 1px solid #444444;
-                    border-radius: 4px;
-                    padding: 4px 8px;
-                    font-size: 11px;
-                    font-weight: bold;
-                    text-align: left;
-                }}
-                QPushButton:hover {{
-                    background-color: #2D2D2D;
-                    border-color: {color};
-                }}
-            """)
-            step_btn.clicked.connect(lambda checked, k=key: self._on_install_single_step(k))
-            steps_grid.addWidget(step_btn, row, col)
-            self.deploy_steps[key] = {"btn": step_btn, "color": color, "label": label}
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1
-        
-        env_layout.addLayout(steps_grid)
-        
-        layout.addWidget(self.deploy_env_group)
-        
-        self.deploy_output_group = QFrame()
-        self.deploy_output_group.setStyleSheet("""
-            QFrame {
-                background-color: #1A1A1A;
-                border: 1px solid #333333;
-                border-radius: 8px;
-            }
+        refresh_deps_btn = QPushButton("🔄")
+        refresh_deps_btn.setFixedSize(22, 22)
+        refresh_deps_btn.setStyleSheet("""
+            QPushButton { background-color: #2A2A2A; color: #888888; border: 1px solid #3A3A3A; border-radius: 3px; font-size: 9px; }
+            QPushButton:hover { background-color: #3A3A3A; color: #CCCCCC; }
         """)
-        output_layout = QVBoxLayout(self.deploy_output_group)
-        output_layout.setSpacing(8)
-        output_layout.setContentsMargins(14, 12, 14, 12)
+        refresh_deps_btn.clicked.connect(self._refresh_deps_list)
+        deps_header.addWidget(refresh_deps_btn)
+        deps_layout_v.addLayout(deps_header)
         
-        output_header = QHBoxLayout()
-        output_header.setSpacing(10)
+        self._deps_grid = QGridLayout()
+        self._deps_grid.setSpacing(2)
+        self._deps_grid.setContentsMargins(0, 2, 0, 0)
+        deps_layout_v.addLayout(self._deps_grid)
         
-        output_title = QLabel("📁 输出目录设置")
-        output_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
-        output_title.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
-        output_header.addWidget(output_title)
+        left_col.addWidget(deps_frame)
         
-        output_header.addStretch()
+        dir_frame = QFrame()
+        dir_frame.setObjectName("cardFrame")
+        dir_layout = QVBoxLayout(dir_frame)
+        dir_layout.setSpacing(6)
+        dir_layout.setContentsMargins(12, 10, 12, 10)
         
-        self.btn_open_output_dir = QPushButton("📂 打开文件夹")
-        self.btn_open_output_dir.setStyleSheet("""
-            QPushButton {
-                background-color: #2E7D32;
-                color: white;
-                border: 1px solid #388E3C;
-                border-radius: 6px;
-                padding: 6px 16px;
-                font-size: 11px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #388E3C;
-                border-color: #43A047;
-            }
-        """)
-        self.btn_open_output_dir.clicked.connect(self._open_output_directory)
-        output_header.addWidget(self.btn_open_output_dir)
+        dir_header = QHBoxLayout()
+        dir_title = QLabel("📁 目录配置")
+        dir_title.setFont(QFont("Microsoft YaHei", 11, QFont.Weight.Bold))
+        dir_title.setStyleSheet("color: #FFFFFF; background: transparent;")
+        dir_header.addWidget(dir_title)
+        dir_header.addStretch()
+        dir_layout.addLayout(dir_header)
         
-        output_layout.addLayout(output_header)
-        
-        output_dir_row = QHBoxLayout()
-        output_dir_row.setSpacing(8)
-        
-        output_dir_label = QLabel("输出路径:")
-        output_dir_label.setStyleSheet("color: #BBBBBB; font-size: 12px; border: none; background: transparent;")
-        output_dir_row.addWidget(output_dir_label)
-        
+        output_row = QHBoxLayout()
+        output_row.setSpacing(6)
+        output_dir_label = QLabel("输出")
+        output_dir_label.setFixedWidth(32)
+        output_dir_label.setStyleSheet("font-size: 10px; color: #888888; background: transparent;")
+        output_row.addWidget(output_dir_label)
         self.output_dir_edit = QLineEdit()
         saved_output_dir = self.config.get("output.directory", "")
         if not saved_output_dir:
             saved_output_dir = os.path.join(self.base_dir, "output")
         self.output_dir_edit.setText(saved_output_dir)
+        self.output_dir_edit.setPlaceholderText("默认：项目目录/output")
         self.output_dir_edit.setStyleSheet("""
             QLineEdit {
-                background-color: #252525;
-                color: #FFFFFF;
-                border: 1px solid #333333;
-                border-radius: 4px;
-                padding: 6px 10px;
-                font-size: 12px;
-                font-family: 'Consolas', 'Monaco', monospace;
+                background-color: #1E1E1E; color: #CCCCCC;
+                border: 1px solid #2A2A2A; border-radius: 4px;
+                padding: 4px 8px; font-size: 10px;
             }
-            QLineEdit:focus {
-                border-color: #1976D2;
-            }
+            QLineEdit:focus { border-color: #1976D2; }
         """)
-        output_dir_row.addWidget(self.output_dir_edit, 1)
+        output_row.addWidget(self.output_dir_edit, 1)
         
-        self.btn_browse_output = QPushButton("浏览...")
-        self.btn_browse_output.setStyleSheet("""
+        output_browse_btn = QPushButton("📂")
+        output_browse_btn.setFixedSize(28, 24)
+        output_browse_btn.setStyleSheet("""
             QPushButton {
-                background-color: #424242;
-                color: #E0E0E0;
-                border: 1px solid #616161;
-                border-radius: 4px;
-                padding: 6px 14px;
-                font-size: 11px;
-                font-weight: bold;
+                background-color: #1A3A5C; color: #8BB8E8;
+                border: 1px solid #1E4D7A; border-radius: 4px;
+                padding: 2px; font-size: 10px;
             }
-            QPushButton:hover {
-                background-color: #616161;
-                border-color: #757575;
-            }
+            QPushButton:hover { background-color: #1E4D7A; color: #FFFFFF; }
         """)
-        self.btn_browse_output.clicked.connect(self._browse_output_directory)
-        output_dir_row.addWidget(self.btn_browse_output)
+        output_browse_btn.clicked.connect(self._browse_output_directory)
+        output_row.addWidget(output_browse_btn)
         
-        self.btn_save_output_dir = QPushButton("保存")
-        self.btn_save_output_dir.setStyleSheet("""
+        output_save_btn = QPushButton("💾")
+        output_save_btn.setFixedSize(28, 24)
+        output_save_btn.setStyleSheet("""
             QPushButton {
-                background-color: #1565C0;
-                color: white;
-                border: 1px solid #1976D2;
-                border-radius: 4px;
-                padding: 6px 14px;
-                font-size: 11px;
-                font-weight: bold;
+                background-color: #1B4332; color: #7BC47F;
+                border: 1px solid #2D6A4F; border-radius: 4px;
+                padding: 2px; font-size: 10px;
             }
-            QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1E88E5;
-            }
+            QPushButton:hover { background-color: #2D6A4F; color: #FFFFFF; }
         """)
-        self.btn_save_output_dir.clicked.connect(self._save_output_directory)
-        output_dir_row.addWidget(self.btn_save_output_dir)
+        output_save_btn.clicked.connect(self._save_output_directory)
+        output_row.addWidget(output_save_btn)
         
-        output_layout.addLayout(output_dir_row)
-        
-        layout.addWidget(self.deploy_output_group)
-        
-        log_group = QFrame()
-        log_group.setStyleSheet("""
-            QFrame {
-                background-color: #1A1A1A;
-                border: 1px solid #333333;
-                border-radius: 8px;
+        open_output_btn = QPushButton("📂 打开")
+        open_output_btn.setFixedWidth(50)
+        open_output_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1A3A5C; color: #8BB8E8;
+                border: 1px solid #1E4D7A; border-radius: 4px;
+                padding: 2px 6px; font-size: 10px;
             }
+            QPushButton:hover { background-color: #1E4D7A; color: #FFFFFF; }
         """)
-        log_layout = QVBoxLayout(log_group)
-        log_layout.setSpacing(6)
-        log_layout.setContentsMargins(14, 12, 14, 12)
+        open_output_btn.clicked.connect(self._open_output_directory)
+        output_row.addWidget(open_output_btn)
         
-        log_header = QHBoxLayout()
-        log_header.setSpacing(8)
+        dir_layout.addLayout(output_row)
         
-        log_title = QLabel("📋 维护日志")
-        log_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
-        log_title.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
-        log_header.addWidget(log_title)
+        left_col.addWidget(dir_frame)
+        left_col.addStretch()
         
-        log_header.addStretch()
+        content_row.addLayout(left_col, 4)
+        
+        deploy_log_frame = QFrame()
+        deploy_log_frame.setObjectName("cardFrame")
+        deploy_log_layout = QVBoxLayout(deploy_log_frame)
+        deploy_log_layout.setSpacing(4)
+        deploy_log_layout.setContentsMargins(12, 10, 12, 10)
+        
+        deploy_log_header = QHBoxLayout()
+        deploy_log_title = QLabel("📋 运行日志")
+        deploy_log_title.setFont(QFont("Microsoft YaHei", 11, QFont.Weight.Bold))
+        deploy_log_title.setStyleSheet("color: #FFFFFF; background: transparent;")
+        deploy_log_header.addWidget(deploy_log_title)
+        deploy_log_header.addStretch()
         
         self.deploy_auto_scroll_switch = QPushButton("🔄 自动滚动")
         self.deploy_auto_scroll_switch.setCheckable(True)
@@ -2413,101 +2488,76 @@ class MainWindow(QMainWindow):
         self.deploy_auto_scroll_switch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.deploy_auto_scroll_switch.setStyleSheet("""
             QPushButton {
-                background-color: #2E7D32;
-                color: white;
-                border: 1px solid #388E3C;
-                border-radius: 4px;
-                padding: 4px 10px;
-                font-size: 11px;
-                font-weight: bold;
+                background-color: #2E7D32; color: white;
+                border: 1px solid #388E3C; border-radius: 4px;
+                padding: 4px 10px; font-size: 11px; font-weight: bold;
             }
             QPushButton:!checked {
-                background-color: #3D3D3D;
-                color: #BBBBBB;
-                border-color: #555555;
+                background-color: #3D3D3D; color: #BBBBBB; border-color: #555555;
             }
         """)
         self.deploy_auto_scroll_switch.clicked.connect(self._on_deploy_auto_scroll_toggled)
-        log_header.addWidget(self.deploy_auto_scroll_switch)
+        deploy_log_header.addWidget(self.deploy_auto_scroll_switch)
         
-        self.deploy_expand_switch = QPushButton("📐 展开窗口")
+        self.deploy_expand_switch = QPushButton("📐 展开")
         self.deploy_expand_switch.setCheckable(True)
         self.deploy_expand_switch.setChecked(False)
         self.deploy_expand_switch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.deploy_expand_switch.setStyleSheet("""
             QPushButton {
-                background-color: #2D2D2D;
-                color: #AAAAAA;
-                border: 1px solid #444444;
-                border-radius: 4px;
-                padding: 4px 10px;
-                font-size: 11px;
-                font-weight: bold;
+                background-color: #2D2D2D; color: #AAAAAA;
+                border: 1px solid #444444; border-radius: 4px;
+                padding: 4px 10px; font-size: 11px; font-weight: bold;
             }
-            QPushButton:checked {
-                background-color: #C62828;
-                border-color: #D32F2F;
-            }
+            QPushButton:checked { background-color: #C62828; border-color: #D32F2F; }
         """)
         self.deploy_expand_switch.clicked.connect(self._on_deploy_expand_toggled)
-        log_header.addWidget(self.deploy_expand_switch)
+        deploy_log_header.addWidget(self.deploy_expand_switch)
         
-        self.btn_save_deploy_log = QPushButton("💾 保存日志")
-        self.btn_save_deploy_log.setStyleSheet("""
+        clear_deploy_log_btn = QPushButton("🗑️ 清空")
+        clear_deploy_log_btn.setStyleSheet("""
             QPushButton {
-                background-color: #1565C0;
-                color: white;
-                border: 1px solid #1976D2;
-                border-radius: 4px;
-                padding: 4px 12px;
-                font-size: 11px;
-                font-weight: bold;
+                background-color: #2A2A2A; color: #888888;
+                border: 1px solid #3A3A3A; border-radius: 4px;
+                padding: 4px 10px; font-size: 11px;
             }
-            QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1E88E5;
-            }
+            QPushButton:hover { background-color: #3A3A3A; color: #CCCCCC; }
         """)
-        self.btn_save_deploy_log.clicked.connect(self._save_deploy_log)
-        log_header.addWidget(self.btn_save_deploy_log)
+        clear_deploy_log_btn.clicked.connect(lambda: self.deploy_log_output.clear())
+        deploy_log_header.addWidget(clear_deploy_log_btn)
         
-        self.btn_clear_deploy_log = QPushButton("🗑 清空")
-        self.btn_clear_deploy_log.setStyleSheet("""
+        save_deploy_log_btn = QPushButton("💾 保存")
+        save_deploy_log_btn.setStyleSheet("""
             QPushButton {
-                background-color: #424242;
-                color: #E0E0E0;
-                border: 1px solid #616161;
-                border-radius: 4px;
-                padding: 4px 12px;
-                font-size: 11px;
-                font-weight: bold;
+                background-color: #1A3A5C; color: #8BB8E8;
+                border: 1px solid #1E4D7A; border-radius: 4px;
+                padding: 4px 10px; font-size: 11px;
             }
-            QPushButton:hover {
-                background-color: #616161;
-                border-color: #757575;
-            }
+            QPushButton:hover { background-color: #1E4D7A; color: #FFFFFF; }
         """)
-        self.btn_clear_deploy_log.clicked.connect(self._clear_deploy_log)
-        log_header.addWidget(self.btn_clear_deploy_log)
+        save_deploy_log_btn.clicked.connect(self._save_deploy_log)
+        deploy_log_header.addWidget(save_deploy_log_btn)
         
-        log_layout.addLayout(log_header)
+        deploy_log_layout.addLayout(deploy_log_header)
         
         self.deploy_log_output = QTextEdit()
         self.deploy_log_output.setReadOnly(True)
         self.deploy_log_output.setStyleSheet("""
             QTextEdit {
-                background-color: #121212;
-                border: 1px solid #2A2A2A;
-                border-radius: 4px;
-                padding: 8px;
-                color: #CCCCCC;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 11px;
+                background-color: #0A0A0A; color: #BBBBBB;
+                border: 1px solid #1A1A1A; border-radius: 4px;
+                font-family: 'Consolas', 'Microsoft YaHei'; font-size: 10px;
+                padding: 4px;
             }
         """)
-        log_layout.addWidget(self.deploy_log_output, 1)
+        deploy_log_layout.addWidget(self.deploy_log_output, 1)
         
-        layout.addWidget(log_group, 1)
+        content_row.addWidget(deploy_log_frame, 6)
+        
+        layout.addLayout(content_row, 1)
+        
+        self.deploy_env_group = env_frame
+        self.deploy_output_group = dir_frame
         
         return page
     
@@ -2547,6 +2597,7 @@ class MainWindow(QMainWindow):
         
         if index == 3:
             QTimer.singleShot(200, self._refresh_deploy_env_status)
+            QTimer.singleShot(500, self._refresh_deps_list)
     
     def _delayed_load_versions(self):
         """延迟加载版本列表"""
@@ -2690,13 +2741,17 @@ class MainWindow(QMainWindow):
     def _on_deploy_expand_toggled(self, checked):
         """部署维护展开窗口切换"""
         if checked:
-            self.deploy_env_group.hide()
-            self.deploy_output_group.hide()
-            self.deploy_expand_switch.setText("📐 收起窗口")
+            if hasattr(self, 'deploy_env_group'):
+                self.deploy_env_group.hide()
+            if hasattr(self, 'deploy_output_group'):
+                self.deploy_output_group.hide()
+            self.deploy_expand_switch.setText("📐 收起")
         else:
-            self.deploy_env_group.show()
-            self.deploy_output_group.show()
-            self.deploy_expand_switch.setText("📐 展开窗口")
+            if hasattr(self, 'deploy_env_group'):
+                self.deploy_env_group.show()
+            if hasattr(self, 'deploy_output_group'):
+                self.deploy_output_group.show()
+            self.deploy_expand_switch.setText("📐 展开")
     
     def _open_output_directory(self):
         """打开输出目录"""
@@ -3088,10 +3143,8 @@ class MainWindow(QMainWindow):
         self.btn_start_qinglong.setEnabled(True)
         self.btn_stop_all.setEnabled(True)
         
-        if hasattr(self, 'btn_deploy_all'):
-            self.btn_deploy_all.setEnabled(True)
-        if hasattr(self, 'btn_refresh_env'):
-            self.btn_refresh_env.setEnabled(True)
+        if hasattr(self, 'btn_one_click_deploy'):
+            self.btn_one_click_deploy.setEnabled(True)
     
     def _check_environment(self):
         """环境检测"""
@@ -4796,7 +4849,7 @@ try {
     
     def _refresh_deploy_env_status(self):
         """刷新部署维护页面的环境状态"""
-        if not hasattr(self, 'deploy_steps') or not self.deploy_steps:
+        if not hasattr(self, '_env_labels') or not self._env_labels:
             return
         
         if self.is_starting:
@@ -4806,77 +4859,170 @@ try {
         
         def _do_check():
             checks = self._check_deploy_env()
-            for key in self.deploy_steps:
-                if checks.get(key, False):
-                    self.deploy_step_signal.emit(key, "done")
-                else:
-                    self.deploy_step_signal.emit(key, "reset")
+            
+            gpu_detected = False
+            try:
+                venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+                if os.path.exists(venv_python):
+                    result = hidden_run(
+                        [venv_python, "-c",
+                         "import torch; name=torch.cuda.get_device_name(0) if torch.cuda.is_available() else ''; mem=torch.cuda.get_device_properties(0).total_mem//1024//1024//1024 if torch.cuda.is_available() else 0; print(name+'|'+str(mem)+'GB') if name else print('NO_CUDA')"
+                         ],
+                        capture_output=True, text=True, timeout=20
+                    )
+                    output = result.stdout.strip() if result.returncode == 0 else ""
+                    if output and output != "NO_CUDA" and "|" in output:
+                        checks["gpu"] = output
+                        gpu_detected = True
+            except:
+                pass
+            
+            if not gpu_detected:
+                try:
+                    result = hidden_run(
+                        ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    if result.returncode == 0 and result.stdout.strip():
+                        line = result.stdout.strip().split("\n")[0]
+                        parts = [p.strip() for p in line.split(",")]
+                        if len(parts) >= 2:
+                            checks["gpu"] = f"{parts[0]} | {parts[1]}GB"
+                            gpu_detected = True
+                except:
+                    pass
+            
+            self.deploy_step_signal.emit("__refresh__", "")
+            for key, value in checks.items():
+                self.deploy_step_signal.emit(key, "done" if value else "fail")
+                if key == "gpu" and isinstance(value, str):
+                    self.deploy_step_signal.emit("gpu_info", value)
+            
             self._log("✓ 环境状态检测完成", "#4CAF50")
         
         t = threading.Thread(target=_do_check, daemon=True)
         t.start()
     
     def _update_deploy_step(self, key: str, status: str):
-        """更新部署步骤按钮状态"""
-        if key not in self.deploy_steps:
+        """更新环境检测标签状态"""
+        if key == "__refresh__":
             return
         
-        step = self.deploy_steps[key]
-        btn = step["btn"]
-        color = step["color"]
-        label = step["label"]
+        if key == "gpu_info":
+            if hasattr(self, '_env_labels') and 'gpu' in self._env_labels:
+                self._env_labels["gpu"].setText(f"✅ {status}")
+                self._env_labels["gpu"].setStyleSheet("font-size: 10px; color: #66BB6A; background: transparent;")
+            return
         
-        status_configs = {
-            "done": {
-                "icon": "✓",
-                "text": "已安装",
-                "fg": "#4CAF50",
-                "bg": "#1B3A1B",
-                "border": "#2E7D32",
-            },
-            "fail": {
-                "icon": "✗",
-                "text": "安装失败",
-                "fg": "#F44336",
-                "bg": "#3A1B1B",
-                "border": "#C62828",
-            },
-            "running": {
-                "icon": "⟳",
-                "text": "安装中...",
-                "fg": "#FF9800",
-                "bg": "#3A2E1B",
-                "border": "#FF9800",
-            },
-            "reset": {
-                "icon": "○",
-                "text": "未安装",
-                "fg": "#888888",
-                "bg": "#252525",
-                "border": "#444444",
-            },
+        if not hasattr(self, '_env_labels') or key not in self._env_labels:
+            return
+        
+        lbl = self._env_labels[key]
+        
+        status_map = {
+            "done": ("✅ 已就绪", "#66BB6A"),
+            "fail": ("❌ 未就绪", "#EF5350"),
+            "running": ("⏳ 检测中...", "#888888"),
+            "partial": ("⚠️ 部分损坏", "#FFA726"),
         }
         
-        cfg = status_configs.get(status, status_configs["reset"])
-        
-        btn.setText(f"  {cfg['icon']}  {label}  {cfg['text']}  ")
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {cfg['bg']};
-                color: {cfg['fg']};
-                border: 1px solid {cfg['border']};
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 11px;
-                font-weight: bold;
-                text-align: left;
-            }}
-            QPushButton:hover {{
-                background-color: #2D2D2D;
-                border-color: {color};
-            }}
-        """)
+        text, color = status_map.get(status, ("❓ 未知", "#888888"))
+        lbl.setText(text)
+        lbl.setStyleSheet(f"font-size: 10px; color: {color}; background: transparent;")
     
+    def _refresh_deps_list(self):
+        """刷新依赖版本列表"""
+        if not hasattr(self, '_deps_grid'):
+            return
+        
+        while self._deps_grid.count():
+            item = self._deps_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    sub = item.layout().takeAt(0)
+                    if sub.widget():
+                        sub.widget().deleteLater()
+        
+        venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+        if not os.path.exists(venv_python):
+            lbl = QLabel("❌ Python 未就绪")
+            lbl.setStyleSheet("font-size: 10px; color: #EF5350; background: transparent;")
+            self._deps_grid.addWidget(lbl, 0, 0)
+            return
+        
+        try:
+            dep_names = [re.split(r'[><=!~\[]', d)[0].strip() for d in ACE_PIP_DEPS]
+            lock_items = list(ACE_PIP_VERSION_LOCKS.items())
+            lock_names = [name for name, _ in lock_items]
+            check_names = list(dict.fromkeys(lock_names + dep_names))
+            
+            check_script = "import importlib.metadata\n"
+            check_script += "deps = " + str(check_names) + "\n"
+            check_script += "locks = " + str({k: v for k, v in lock_items}) + "\n"
+            check_script += """
+for d in deps:
+    try:
+        v = importlib.metadata.version(d)
+        if d in locks:
+            print(f"LOCK|{d}|{v}|{locks[d]}")
+        else:
+            print(f"OK|{d}|{v}|")
+    except:
+        print(f"MISS|{d}|0|")
+"""
+            result = hidden_run(
+                [venv_python, "-c", check_script],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                return
+            
+            row = 0
+            import re as _re
+            for line in result.stdout.strip().split('\n'):
+                if '|' not in line:
+                    continue
+                parts = line.split('|')
+                if len(parts) < 3:
+                    continue
+                status, name, ver = parts[0], parts[1], parts[2]
+                lock_info = parts[3] if len(parts) > 3 else ""
+                col = row % 2
+                display_row = row // 2
+                cell = QHBoxLayout()
+                cell.setSpacing(3)
+                short = (name.replace("opencv-python-headless", "opencv")
+                         .replace("huggingface_hub", "hf_hub")
+                         .replace("python-multipart", "multipart")
+                         .replace("lycoris-lora", "lycoris")
+                         .replace("vector-quantize-pytorch", "vq-pytorch"))
+                name_lbl = QLabel(short)
+                name_lbl.setFixedWidth(52)
+                if status == "OK":
+                    name_lbl.setStyleSheet("font-size: 9px; color: #888888; background: transparent;")
+                    ver_lbl = QLabel(f"✅ {ver}")
+                    ver_lbl.setStyleSheet("font-size: 9px; color: #66BB6A; background: transparent;")
+                elif status == "LOCK":
+                    name_lbl.setStyleSheet("font-size: 9px; color: #888888; background: transparent;")
+                    ver_lbl = QLabel(f"✅ {ver} (需{lock_info})")
+                    ver_lbl.setStyleSheet("font-size: 9px; color: #66BB6A; background: transparent;")
+                elif status == "BAD":
+                    name_lbl.setStyleSheet("font-size: 9px; color: #FF8A80; background: transparent;")
+                    ver_lbl = QLabel(f"⚠️ {ver} (需{lock_info})")
+                    ver_lbl.setStyleSheet("font-size: 9px; color: #FFA726; background: transparent;")
+                else:
+                    name_lbl.setStyleSheet("font-size: 9px; color: #EF5350; background: transparent;")
+                    ver_lbl = QLabel("❌ 未安装")
+                    ver_lbl.setStyleSheet("font-size: 9px; color: #EF5350; background: transparent;")
+                cell.addWidget(name_lbl)
+                cell.addWidget(ver_lbl, 1)
+                self._deps_grid.addLayout(cell, display_row, col)
+                row += 1
+        except Exception:
+            pass
+
     def _on_install_single_step(self, component: str):
         """安装单个步骤组件"""
         if self.is_starting:
@@ -4886,10 +5032,8 @@ try {
         self.is_starting = True
         self.deploy_step_signal.emit(component, "running")
         
-        if hasattr(self, 'btn_deploy_all'):
-            self.btn_deploy_all.setEnabled(False)
-        if hasattr(self, 'btn_refresh_env'):
-            self.btn_refresh_env.setEnabled(False)
+        if hasattr(self, 'btn_one_click_deploy'):
+            self.btn_one_click_deploy.setEnabled(False)
         if hasattr(self, 'btn_deploy_maintain'):
             self.btn_deploy_maintain.setEnabled(False)
         self.btn_start_music.setEnabled(False)
@@ -4944,10 +5088,8 @@ try {
                 self._log(f"[错误] 安装 {component} 失败: {e}", "#F44336")
             finally:
                 self.is_starting = False
-                if hasattr(self, 'btn_deploy_all'):
-                    self.btn_deploy_all.setEnabled(True)
-                if hasattr(self, 'btn_refresh_env'):
-                    self.btn_refresh_env.setEnabled(True)
+                if hasattr(self, 'btn_one_click_deploy'):
+                    self.btn_one_click_deploy.setEnabled(True)
                 if hasattr(self, 'btn_deploy_maintain'):
                     self.btn_deploy_maintain.setEnabled(True)
                 self.btn_start_music.setEnabled(True)
@@ -5218,10 +5360,8 @@ try {
         self.btn_start_qinglong.setEnabled(False)
         self.btn_stop_all.setEnabled(False)
         
-        if hasattr(self, 'btn_deploy_all'):
-            self.btn_deploy_all.setEnabled(False)
-        if hasattr(self, 'btn_refresh_env'):
-            self.btn_refresh_env.setEnabled(False)
+        if hasattr(self, 'btn_one_click_deploy'):
+            self.btn_one_click_deploy.setEnabled(False)
         
         self.deploy_thread = threading.Thread(target=self._deploy_maintenance_thread)
         self.deploy_thread.daemon = True
