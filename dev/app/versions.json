@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.05.12.0409",
+    "date": "2026-05-12 04:10",
+    "message": "修复cardFrame内QLabel边框继承问题",
+    "changes": [
+      "修复cardFrame内QLabel边框继承问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0409.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.05.12.0344",
     "date": "2026-05-12 03:46",
     "message": "参考视频创意站重构部署维护页面",

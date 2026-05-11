@@ -1422,6 +1422,9 @@ class MainWindow(QMainWindow):
                 border: 1px solid #2A2A2A;
                 border-radius: 6px;
             }
+            QFrame#cardFrame QLabel {
+                border: none;
+            }
         """)
         
         try:
