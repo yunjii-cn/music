@@ -279,7 +279,13 @@ class ServiceProcess(QThread):
     def start_service(self, working_dir: str):
         """启动服务"""
         try:
-            script_path = os.path.join(working_dir, self.service_info["script"])
+            if hasattr(sys, '_MEIPASS'):
+                exe_dir = os.path.abspath(os.path.dirname(sys.executable))
+                script_path = os.path.join(exe_dir, "app", self.service_info["script"])
+                real_working_dir = os.path.join(exe_dir, "app")
+            else:
+                script_path = os.path.join(working_dir, self.service_info["script"])
+                real_working_dir = working_dir
             
             if not os.path.exists(script_path) and hasattr(sys, '_MEIPASS'):
                 script_path = os.path.join(sys._MEIPASS, self.service_info["script"])
@@ -289,7 +295,7 @@ class ServiceProcess(QThread):
                 self.output_received.emit(self.service_id, error_msg)
                 return False
             
-            self.working_dir = working_dir
+            self.working_dir = real_working_dir
             self.script_path = script_path
             self.start()
             return True
@@ -5678,22 +5684,18 @@ try {
 
 
 def extract_scripts():
-    """提取打包的脚本文件到工作目录的 scripts/ 文件夹"""
+    """提取打包的脚本文件到 app/scripts/ 文件夹（与开发结构一致）"""
     import sys
     import shutil
     from pathlib import Path
     
     if getattr(sys, 'frozen', False):
-        # 打包后的环境
         base_path = Path(sys._MEIPASS)
         work_dir = Path.cwd()
-        
-        # 检查是否有 app/ 子目录
         app_dir = work_dir / "app"
-        if app_dir.exists():
-            work_dir = app_dir
+        app_dir.mkdir(exist_ok=True)
         
-        scripts_dir = work_dir / "scripts"
+        scripts_dir = app_dir / "scripts"
         scripts_dir.mkdir(exist_ok=True)
         
         scripts_to_extract = ["install-env.ps1", "start.ps1"]
