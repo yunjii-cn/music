@@ -149,15 +149,15 @@ Check "❌ 安装基础依赖失败"
 
 Write-Output ""
 Write-Output "📦 安装 PyTorch 生态系统..."
-Write-Output "   正在安装 torch 2.9.0, torchvision 0.24.0, torchaudio 2.9.0 (CUDA 12.8)..."
-~/.local/bin/uv pip install torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0
+Write-Output "   正在安装 torch 2.9.0, torchaudio 2.9.0 (CUDA 12.8)..."
+~/.local/bin/uv pip install torch==2.9.0 torchaudio==2.9.0
 Check "❌ PyTorch 安装失败"
 Write-Output "✅ PyTorch 生态系统安装完成"
 
 Write-Output ""
 Write-Output "📦 安装项目依赖..."
 Write-Output "   正在安装 transformers, diffusers, gradio 等核心依赖..."
-~/.local/bin/uv pip install transformers diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba toml peft lycoris-lora lightning tensorboard modelscope huggingface_hub safetensors
+~/.local/bin/uv pip install transformers diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba peft lycoris-lora lightning tensorboard modelscope huggingface_hub safetensors
 if ($LASTEXITCODE -eq 0) {
     Write-Output "✅ 项目依赖安装完成"
 }

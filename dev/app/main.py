@@ -277,7 +277,6 @@ ACE_PIP_DEPS = [
     "matplotlib",
     "diskcache",
     "numba",
-    "toml",
     "huggingface_hub",
     "safetensors",
     "lightning",
@@ -294,7 +293,6 @@ ACE_PIP_VERSION_LOCKS = {
     "peft": ">=0.13,<1.0",
     "safetensors": ">=0.4,<1.0",
     "huggingface_hub": ">=0.23,<1.0",
-    "sentencepiece": ">=0.1.99,<1.0",
     "einops": ">=0.8,<1.0",
     "scipy": ">=1.14,<2.0",
 }
@@ -1045,12 +1043,16 @@ class ServiceCard(QFrame):
         self._setup_ui()
     
     def _setup_ui(self):
-        self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        self.setFrameShape(QFrame.Shape.NoFrame)
         self.setStyleSheet(f"""
             ServiceCard {{
                 background-color: #1E1E1E;
                 border-radius: 10px;
                 border: 2px solid #333333;
+            }}
+            ServiceCard QLabel {{
+                border: none;
+                background: transparent;
             }}
         """)
         
@@ -1417,13 +1419,15 @@ class MainWindow(QMainWindow):
             QMainWindow {
                 background-color: #0D0D0D;
             }
+            QLabel {
+                border: none;
+            }
             QFrame#cardFrame {
                 background-color: #1A1A1A;
                 border: 1px solid #2A2A2A;
                 border-radius: 6px;
             }
             QFrame#cardFrame QLabel {
-                border: none;
                 background: transparent;
             }
         """)
@@ -1676,12 +1680,16 @@ class MainWindow(QMainWindow):
         
         # 日志区域（高度紧凑结构：系统信息+日志融合）
         self.log_group = QFrame()
-        self.log_group.setFrameShape(QFrame.Shape.StyledPanel)
+        self.log_group.setFrameShape(QFrame.Shape.NoFrame)
         self.log_group.setStyleSheet("""
             QFrame {
                 background-color: #1A1A1A;
                 border: 1px solid #333333;
                 border-radius: 6px;
+            }
+            QFrame QLabel {
+                border: none;
+                background: transparent;
             }
         """)
         log_layout = QVBoxLayout(self.log_group)
@@ -1854,6 +1862,10 @@ class MainWindow(QMainWindow):
                 border-radius: 8px;
                 padding: 10px;
             }
+            QFrame QLabel {
+                border: none;
+                background: transparent;
+            }
         """)
         browser_layout = QHBoxLayout(browser_panel)
         browser_layout.setSpacing(12)
@@ -1989,7 +2001,18 @@ class MainWindow(QMainWindow):
         
         music_project = PROJECTS["music"]
         self.music_group = QFrame()
-        self.music_group.setFrameShape(QFrame.Shape.StyledPanel)
+        self.music_group.setFrameShape(QFrame.Shape.NoFrame)
+        self.music_group.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #2A2A2A;
+                border-radius: 6px;
+            }
+            QFrame QLabel {
+                border: none;
+                background: transparent;
+            }
+        """)
         music_layout = QGridLayout(self.music_group)
         
         col = 0
@@ -2007,7 +2030,18 @@ class MainWindow(QMainWindow):
         
         qinglong_project = PROJECTS["qinglong"]
         self.qinglong_group = QFrame()
-        self.qinglong_group.setFrameShape(QFrame.Shape.StyledPanel)
+        self.qinglong_group.setFrameShape(QFrame.Shape.NoFrame)
+        self.qinglong_group.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #2A2A2A;
+                border-radius: 6px;
+            }
+            QFrame QLabel {
+                border: none;
+                background: transparent;
+            }
+        """)
         qinglong_layout = QGridLayout(self.qinglong_group)
         
         col = 0
@@ -2318,10 +2352,10 @@ class MainWindow(QMainWindow):
         env_header.addWidget(env_title)
         env_header.addStretch()
         
-        refresh_env_btn = QPushButton("重新检测")
+        refresh_env_btn = QPushButton("🔄 重新检测")
         refresh_env_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         refresh_env_btn.setStyleSheet("""
-            QPushButton { background-color: #1A3A5C; color: #8BB8E8; border: 1px solid #1E4D7A; border-radius: 4px; padding: 3px 10px; font-size: 10px; }
+            QPushButton { background-color: #1A3A5C; color: #8BB8E8; border: 1px solid #1E4D7A; border-radius: 4px; padding: 4px 12px; font-size: 11px; }
             QPushButton:hover { background-color: #1E4D7A; color: #FFFFFF; }
         """)
         refresh_env_btn.clicked.connect(self._refresh_deploy_env_status)
@@ -2374,10 +2408,10 @@ class MainWindow(QMainWindow):
         deps_header.addWidget(deps_title)
         deps_header.addStretch()
         
-        refresh_deps_btn = QPushButton("刷新版本")
+        refresh_deps_btn = QPushButton("🔄 刷新版本")
         refresh_deps_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         refresh_deps_btn.setStyleSheet("""
-            QPushButton { background-color: #1A3A5C; color: #8BB8E8; border: 1px solid #1E4D7A; border-radius: 4px; padding: 3px 10px; font-size: 10px; }
+            QPushButton { background-color: #1A3A5C; color: #8BB8E8; border: 1px solid #1E4D7A; border-radius: 4px; padding: 4px 12px; font-size: 11px; }
             QPushButton:hover { background-color: #1E4D7A; color: #FFFFFF; }
         """)
         refresh_deps_btn.clicked.connect(self._refresh_deps_list)
@@ -3490,6 +3524,14 @@ class MainWindow(QMainWindow):
             ("scipy", "科学计算"),
             ("soundfile", "音频文件"),
             ("einops", "张量操作"),
+            ("matplotlib", "图表绘制"),
+            ("diskcache", "磁盘缓存"),
+            ("numba", "JIT 编译"),
+            ("lightning", "训练框架"),
+            ("tensorboard", "训练日志"),
+            ("modelscope", "模型下载"),
+            ("huggingface_hub", "HF 下载"),
+            ("safetensors", "安全张量"),
         ]
         
         missing = []
@@ -3595,8 +3637,8 @@ class MainWindow(QMainWindow):
             "einops": "einops>=0.8.1",
         }
         
-        basic_deps = [version_constraints.get(d, d) for d in missing if d not in ("torch", "torchaudio", "torchvision")]
-        torch_deps = [d for d in missing if d in ("torch", "torchaudio", "torchvision")]
+        basic_deps = [version_constraints.get(d, d) for d in missing if d not in ("torch", "torchaudio")]
+        torch_deps = [d for d in missing if d in ("torch", "torchaudio")]
         
         if basic_deps:
             self._log(f"[信息] 安装基础依赖: {', '.join(basic_deps)}")
@@ -3682,7 +3724,6 @@ class MainWindow(QMainWindow):
             "psutil",
             "fastapi",
             "uvicorn",
-            "toml"
         ]
         
         for dep in minimal_deps:
@@ -3708,7 +3749,7 @@ class MainWindow(QMainWindow):
         """快速检查关键依赖是否已安装 - 返回True表示所有依赖都OK"""
 
         
-        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "fastapi", "uvicorn", "accelerate"]
+        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "lycoris", "fastapi", "uvicorn", "accelerate", "scipy", "soundfile", "einops", "matplotlib", "diskcache", "numba", "lightning", "tensorboard", "modelscope", "huggingface_hub", "safetensors"]
         all_ok = True
         
         for dep in deps_to_check:
@@ -3751,10 +3792,18 @@ class MainWindow(QMainWindow):
             ("scipy", "科学计算"),
             ("soundfile", "音频文件"),
             ("einops", "张量操作"),
+            ("matplotlib", "图表绘制"),
+            ("diskcache", "磁盘缓存"),
+            ("numba", "JIT 编译"),
+            ("lightning", "训练框架"),
+            ("tensorboard", "训练日志"),
+            ("modelscope", "模型下载"),
+            ("huggingface_hub", "HF 下载"),
+            ("safetensors", "安全张量"),
         ]
-        # 可选加速 - 缺失只影响性能，不影响功能
+        # 可选加速 - 缺失只影响性能，不影响功能（部署维护时会自动安装）
         optional_deps = [
-            ("flash_attn", "Flash Attention 加速推理"),
+            ("flash_attn", "Flash Attention 加速推理（推荐安装）"),
         ]
         
         all_ok = True
@@ -4817,6 +4866,7 @@ try {
                     "diskcache": "diskcache",
                     "numba": "numba",
                     "lightning": "lightning",
+                    "tensorboard": "tensorboard",
                     "modelscope": "modelscope",
                     "huggingface_hub": "huggingface_hub",
                     "safetensors": "safetensors",
@@ -5014,12 +5064,8 @@ for d in deps:
                 display_row = row // 2
                 cell = QHBoxLayout()
                 cell.setSpacing(3)
-                short = (name.replace("opencv-python-headless", "opencv")
-                         .replace("huggingface_hub", "hf_hub")
-                         .replace("python-multipart", "multipart")
-                         .replace("lycoris-lora", "lycoris")
-                         .replace("vector-quantize-pytorch", "vq-pytorch")
-                         .replace("typer-slim", "typer"))
+                short = (name.replace("huggingface_hub", "hf_hub")
+                         .replace("lycoris-lora", "lycoris"))
                 name_lbl = QLabel(short)
                 name_lbl.setFixedWidth(82)
                 if status == "OK":
@@ -5256,7 +5302,6 @@ for d in deps:
                 self._log("[信息] 安装 PyTorch 2.9.0 + torchaudio 2.9.0 (CUDA 12.8)...")
                 pytorch_deps = [
                     "torch==2.9.0",
-                    "torchvision==0.24.0",
                     "torchaudio==2.9.0",
                 ]
                 env = os.environ.copy()
@@ -5294,7 +5339,6 @@ for d in deps:
                     "diskcache",
                     "uvicorn",
                     "numba",
-                    "toml",
                     "peft",
                     "lycoris-lora",
                     "lightning",
@@ -5635,13 +5679,13 @@ for d in deps:
             if os.path.exists(uv_path):
                 self.deploy_step_signal.emit("uv", "done")
             else:
-                self.deploy_step_signal.emit("uv", "reset")
+                self.deploy_step_signal.emit("uv", "fail")
             
             self.deploy_step_signal.emit("venv", "running")
             if os.path.exists(venv_path):
                 self.deploy_step_signal.emit("venv", "done")
             else:
-                self.deploy_step_signal.emit("venv", "reset")
+                self.deploy_step_signal.emit("venv", "fail")
             
             environment_installed = False
             if os.path.exists(uv_path) and os.path.exists(venv_path):
@@ -5703,48 +5747,114 @@ for d in deps:
                 self._log("5. 执行智能修复（安装前端依赖等）...")
                 self._smart_fix_environment()
             
-            # 6. 最终检查
-            self._log("6. 最终检查...")
-            
-            self.deploy_step_signal.emit("scripts", "running")
-            
-            # 检查启动脚本
-            scripts = [
-                "2、run_gradio.ps1",
-                "3、run_server.ps1",
-                "4、run_npmgui.ps1"
-            ]
-            script_missing = False
-            for script in scripts:
-                script_path = os.path.join(self.base_dir, "scripts", script)
-                if os.path.exists(script_path):
-                    self._log(f"✓ {script} 存在")
-                else:
-                    self._log(f"[错误] {script} 不存在", "#F44336")
-                    script_missing = True
-            
-            if script_missing:
-                self._log("[建议] 请确保所有启动脚本都存在", "#FF9800")
-                self.deploy_step_signal.emit("scripts", "fail")
-            else:
-                self.deploy_step_signal.emit("scripts", "done")
-            
-            self.deploy_step_signal.emit("python_deps", "running")
+            # 6. 安装 flash_attn 加速库（如果有 wheel 文件）
             venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
-            if os.path.exists(venv_python):
-                deps_ok = self._quick_check_dependencies(venv_python)
-                if deps_ok:
-                    self.deploy_step_signal.emit("python_deps", "done")
-                else:
-                    self.deploy_step_signal.emit("python_deps", "reset")
+            flash_attn_wheel = os.path.join(self.base_dir, "scripts", "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl")
+            if os.path.exists(venv_python) and os.path.exists(flash_attn_wheel):
+                try:
+                    process = hidden_popen(
+                        [venv_python, "-c", "import flash_attn; print(flash_attn.__version__)"],
+                        cwd=self.base_dir,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                    )
+                    stdout, _ = process.communicate(timeout=10)
+                    if process.returncode == 0:
+                        self._log(f"✓ flash_attn 已安装: v{stdout.strip()}")
+                    else:
+                        self._log("[信息] flash_attn 未安装，正在从本地 wheel 安装...")
+                        uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+                        if os.path.exists(uv_path):
+                            install_process = hidden_popen(
+                                [uv_path, "pip", "install", "--python", venv_python, flash_attn_wheel],
+                                cwd=self.base_dir,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                            )
+                            install_process.communicate(timeout=300)
+                            if install_process.returncode == 0:
+                                self._log("✓ flash_attn 加速库安装完成", "#4CAF50")
+                            else:
+                                self._log("[警告] flash_attn 安装失败（不影响核心功能，将使用 SDPA 回退）", "#FF9800")
+                except Exception as e:
+                    self._log(f"[警告] flash_attn 检测/安装失败: {e}（不影响核心功能）", "#FF9800")
             
-            self.deploy_step_signal.emit("frontend_deps", "running")
-            ace_step_ui_nm = os.path.join(self.base_dir, "ace-step-ui", "node_modules")
-            ace_step_ui_pj = os.path.join(self.base_dir, "ace-step-ui", "package.json")
-            if os.path.exists(ace_step_ui_pj) and os.path.exists(ace_step_ui_nm):
-                self.deploy_step_signal.emit("frontend_deps", "done")
+            # 7. 最终检查 - 重新验证所有环境项，确保全绿
+            self._log("7. 最终检查（重新验证所有环境项）...")
+            
+            final_checks = self._check_deploy_env()
+            
+            all_green = True
+            for key, value in final_checks.items():
+                if key == "gpu":
+                    if isinstance(value, str) and value:
+                        self.deploy_step_signal.emit("gpu", "done")
+                        self.deploy_step_signal.emit("gpu_info", value)
+                    else:
+                        all_green = False
+                        self.deploy_step_signal.emit("gpu", "fail")
+                elif value:
+                    self.deploy_step_signal.emit(key, "done")
+                else:
+                    all_green = False
+                    self.deploy_step_signal.emit(key, "fail")
+            
+            if not all_green:
+                self._log("[警告] 部分环境项未通过，尝试自动修复...", "#FF9800")
+                
+                if not final_checks.get("uv"):
+                    self._log("[修复] 重新安装 uv...")
+                    self._install_uv()
+                
+                if not final_checks.get("venv"):
+                    self._log("[修复] 重新创建虚拟环境...")
+                    self._create_venv()
+                
+                if not final_checks.get("python_deps"):
+                    self._log("[修复] 重新安装 Python 依赖...")
+                    venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+                    if os.path.exists(venv_python):
+                        self._install_missing_dependencies(venv_python, os.path.join(self.base_dir, "scripts"))
+                
+                if not final_checks.get("frontend_deps"):
+                    self._log("[修复] 重新安装前端依赖...")
+                    self._install_frontend_deps()
+                
+                self._log("[信息] 修复完成，重新验证...")
+                retry_checks = self._check_deploy_env()
+                
+                retry_all_green = True
+                for key, value in retry_checks.items():
+                    if key == "gpu":
+                        if isinstance(value, str) and value:
+                            self.deploy_step_signal.emit("gpu", "done")
+                            self.deploy_step_signal.emit("gpu_info", value)
+                        else:
+                            retry_all_green = False
+                            self.deploy_step_signal.emit("gpu", "fail")
+                    elif value:
+                        self.deploy_step_signal.emit(key, "done")
+                    else:
+                        retry_all_green = False
+                        self.deploy_step_signal.emit(key, "fail")
+                
+                if retry_all_green:
+                    all_green = True
+                    self._log("✅ 修复成功，所有环境项已通过验证", "#4CAF50")
+                else:
+                    failed_items = [k for k, v in retry_checks.items() if k != "gpu" and not v]
+                    if not (isinstance(retry_checks.get("gpu"), str) and retry_checks.get("gpu")):
+                        failed_items.append("gpu")
+                    self._log(f"[错误] 以下环境项仍未通过: {', '.join(failed_items)}", "#F44336")
+            
+            if all_green:
+                self._log("")
+                self._log("========================================")
+                self._log("✅ 部署维护完成！所有环境项已就绪", "#4CAF50")
+                self._log("========================================")
             else:
-                self.deploy_step_signal.emit("frontend_deps", "reset")
+                self._log("")
+                self._log("========================================")
+                self._log("❌ 部署维护未完全成功，请查看上方日志", "#F44336")
+                self._log("========================================")
             
         except Exception as e:
             self._log(f"[错误] 部署维护失败: {e}", "#F44336")
