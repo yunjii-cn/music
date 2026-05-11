@@ -1326,6 +1326,7 @@ class MainWindow(QMainWindow):
     """主窗口"""
     log_signal = pyqtSignal(str, str)
     enable_buttons_signal = pyqtSignal()
+    deploy_step_signal = pyqtSignal(str, str)
     
     def __init__(self, splash=None):
         super().__init__()
@@ -1388,12 +1389,14 @@ class MainWindow(QMainWindow):
         self.model_manager_widget = None
         self.version_page = None
         self.version_manager_widget = None
+        self.deploy_page = None
         self._home_loaded = False
         
         self._setup_ui_skeleton()
         
         self.log_signal.connect(self._append_log_to_ui)
         self.enable_buttons_signal.connect(self._enable_buttons)
+        self.deploy_step_signal.connect(self._update_deploy_step)
         
         self.resize(1200, 1100)
         
@@ -1499,6 +1502,14 @@ class MainWindow(QMainWindow):
         self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
         nav_bar_layout.addWidget(self.btn_version_nav)
         
+        self.btn_deploy_nav = QPushButton("⚙️ 部署维护")
+        self.btn_deploy_nav.setCheckable(True)
+        self.btn_deploy_nav.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_deploy_nav.setStyleSheet(menu_button_style)
+        self.btn_deploy_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_deploy_nav.clicked.connect(lambda: self._switch_page(3))
+        nav_bar_layout.addWidget(self.btn_deploy_nav)
+        
         self.btn_model_nav = QPushButton("📦 模型管理")
         self.btn_model_nav.setCheckable(True)
         self.btn_model_nav.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1521,6 +1532,7 @@ class MainWindow(QMainWindow):
         self.home_layout.addWidget(loading_label)
         self.page_stack.addWidget(self.home_page)
         
+        self.page_stack.addWidget(QWidget())
         self.page_stack.addWidget(QWidget())
         self.page_stack.addWidget(QWidget())
         
@@ -1906,7 +1918,7 @@ class MainWindow(QMainWindow):
                 box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
             }
         """)
-        self.btn_deploy_maintain.clicked.connect(self._deploy_maintenance)
+        self.btn_deploy_maintain.clicked.connect(lambda: self._switch_page(3))
         function_buttons.addWidget(self.btn_deploy_maintain)
         
         self.btn_stop_all = QPushButton("⏹ 退出服务")
@@ -2052,11 +2064,323 @@ class MainWindow(QMainWindow):
         
         return page
     
+    def _create_deploy_page(self):
+        """创建部署维护页面"""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
+        
+        title_label = QLabel("⚙️ 部署维护")
+        title_label.setFont(QFont("Microsoft YaHei", 16, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
+        layout.addWidget(title_label)
+        
+        env_group = QFrame()
+        env_group.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 8px;
+            }
+        """)
+        env_layout = QVBoxLayout(env_group)
+        env_layout.setSpacing(8)
+        env_layout.setContentsMargins(14, 12, 14, 12)
+        
+        env_header = QHBoxLayout()
+        env_header.setSpacing(10)
+        
+        env_title = QLabel("📦 安装步骤依赖清单")
+        env_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
+        env_title.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
+        env_header.addWidget(env_title)
+        
+        env_header.addStretch()
+        
+        self.btn_deploy_all = QPushButton("🔄 一键部署")
+        self.btn_deploy_all.setStyleSheet("""
+            QPushButton {
+                background-color: #E53935;
+                color: white;
+                border: 1px solid #E53935;
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #C62828;
+                border-color: #C62828;
+            }
+            QPushButton:disabled {
+                background-color: #333333;
+                border-color: #333333;
+                color: #757575;
+            }
+        """)
+        self.btn_deploy_all.clicked.connect(self._deploy_maintenance)
+        env_header.addWidget(self.btn_deploy_all)
+        
+        self.btn_refresh_env = QPushButton("🔍 重新检测")
+        self.btn_refresh_env.setStyleSheet("""
+            QPushButton {
+                background-color: #1565C0;
+                color: white;
+                border: 1px solid #1976D2;
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+                border-color: #1E88E5;
+            }
+            QPushButton:disabled {
+                background-color: #333333;
+                border-color: #333333;
+                color: #757575;
+            }
+        """)
+        self.btn_refresh_env.clicked.connect(self._refresh_deploy_env_status)
+        env_header.addWidget(self.btn_refresh_env)
+        
+        env_layout.addLayout(env_header)
+        
+        steps_info = [
+            ("powershell", "PowerShell", "#1565C0"),
+            ("nodejs", "Node.js", "#1565C0"),
+            ("uv", "uv 包管理器", "#00695C"),
+            ("venv", "Python 虚拟环境", "#00695C"),
+            ("python_deps", "Python 依赖包", "#E65100"),
+            ("frontend_deps", "前端 npm 依赖", "#6A1B9A"),
+            ("scripts", "启动脚本", "#6A1B9A"),
+        ]
+        
+        steps_grid = QGridLayout()
+        steps_grid.setSpacing(6)
+        
+        self.deploy_steps = {}
+        
+        col = 0
+        row = 0
+        max_cols = 4
+        
+        for key, label, color in steps_info:
+            step_btn = QPushButton()
+            step_btn.setFixedHeight(32)
+            step_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            step_btn.setText(f"  ○  {label}  待检测  ")
+            step_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: #252525;
+                    color: #888888;
+                    border: 1px solid #444444;
+                    border-radius: 4px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    text-align: left;
+                }}
+                QPushButton:hover {{
+                    background-color: #2D2D2D;
+                    border-color: {color};
+                }}
+            """)
+            step_btn.clicked.connect(lambda checked, k=key: self._on_install_single_step(k))
+            steps_grid.addWidget(step_btn, row, col)
+            self.deploy_steps[key] = {"btn": step_btn, "color": color, "label": label}
+            col += 1
+            if col >= max_cols:
+                col = 0
+                row += 1
+        
+        env_layout.addLayout(steps_grid)
+        
+        layout.addWidget(env_group)
+        
+        output_group = QFrame()
+        output_group.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 8px;
+            }
+        """)
+        output_layout = QVBoxLayout(output_group)
+        output_layout.setSpacing(8)
+        output_layout.setContentsMargins(14, 12, 14, 12)
+        
+        output_header = QHBoxLayout()
+        output_header.setSpacing(10)
+        
+        output_title = QLabel("📁 输出目录设置")
+        output_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
+        output_title.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
+        output_header.addWidget(output_title)
+        
+        output_header.addStretch()
+        
+        self.btn_open_output_dir = QPushButton("📂 打开文件夹")
+        self.btn_open_output_dir.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: white;
+                border: 1px solid #388E3C;
+                border-radius: 6px;
+                padding: 6px 16px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #388E3C;
+                border-color: #43A047;
+            }
+        """)
+        self.btn_open_output_dir.clicked.connect(self._open_output_directory)
+        output_header.addWidget(self.btn_open_output_dir)
+        
+        output_layout.addLayout(output_header)
+        
+        output_dir_row = QHBoxLayout()
+        output_dir_row.setSpacing(8)
+        
+        output_dir_label = QLabel("输出路径:")
+        output_dir_label.setStyleSheet("color: #BBBBBB; font-size: 12px; border: none; background: transparent;")
+        output_dir_row.addWidget(output_dir_label)
+        
+        self.output_dir_edit = QLineEdit()
+        saved_output_dir = self.config.get("output.directory", "")
+        if not saved_output_dir:
+            saved_output_dir = os.path.join(self.base_dir, "output")
+        self.output_dir_edit.setText(saved_output_dir)
+        self.output_dir_edit.setStyleSheet("""
+            QLineEdit {
+                background-color: #252525;
+                color: #FFFFFF;
+                border: 1px solid #333333;
+                border-radius: 4px;
+                padding: 6px 10px;
+                font-size: 12px;
+                font-family: 'Consolas', 'Monaco', monospace;
+            }
+            QLineEdit:focus {
+                border-color: #1976D2;
+            }
+        """)
+        output_dir_row.addWidget(self.output_dir_edit, 1)
+        
+        self.btn_browse_output = QPushButton("浏览...")
+        self.btn_browse_output.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                color: #E0E0E0;
+                border: 1px solid #616161;
+                border-radius: 4px;
+                padding: 6px 14px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #616161;
+                border-color: #757575;
+            }
+        """)
+        self.btn_browse_output.clicked.connect(self._browse_output_directory)
+        output_dir_row.addWidget(self.btn_browse_output)
+        
+        self.btn_save_output_dir = QPushButton("保存")
+        self.btn_save_output_dir.setStyleSheet("""
+            QPushButton {
+                background-color: #1565C0;
+                color: white;
+                border: 1px solid #1976D2;
+                border-radius: 4px;
+                padding: 6px 14px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+                border-color: #1E88E5;
+            }
+        """)
+        self.btn_save_output_dir.clicked.connect(self._save_output_directory)
+        output_dir_row.addWidget(self.btn_save_output_dir)
+        
+        output_layout.addLayout(output_dir_row)
+        
+        layout.addWidget(output_group)
+        
+        log_group = QFrame()
+        log_group.setStyleSheet("""
+            QFrame {
+                background-color: #1A1A1A;
+                border: 1px solid #333333;
+                border-radius: 8px;
+            }
+        """)
+        log_layout = QVBoxLayout(log_group)
+        log_layout.setSpacing(6)
+        log_layout.setContentsMargins(14, 12, 14, 12)
+        
+        log_header = QHBoxLayout()
+        log_header.setSpacing(10)
+        
+        log_title = QLabel("📋 维护日志")
+        log_title.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
+        log_title.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
+        log_header.addWidget(log_title)
+        
+        log_header.addStretch()
+        
+        self.btn_clear_deploy_log = QPushButton("🗑 清空日志")
+        self.btn_clear_deploy_log.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                color: #E0E0E0;
+                border: 1px solid #616161;
+                border-radius: 4px;
+                padding: 4px 12px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #616161;
+                border-color: #757575;
+            }
+        """)
+        self.btn_clear_deploy_log.clicked.connect(self._clear_deploy_log)
+        log_header.addWidget(self.btn_clear_deploy_log)
+        
+        log_layout.addLayout(log_header)
+        
+        self.deploy_log_output = QTextEdit()
+        self.deploy_log_output.setReadOnly(True)
+        self.deploy_log_output.setStyleSheet("""
+            QTextEdit {
+                background-color: #121212;
+                border: 1px solid #2A2A2A;
+                border-radius: 4px;
+                padding: 8px;
+                color: #CCCCCC;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 11px;
+            }
+        """)
+        log_layout.addWidget(self.deploy_log_output, 1)
+        
+        layout.addWidget(log_group, 1)
+        
+        return page
+    
     def _switch_page(self, index):
         """切换页面"""
         self.btn_home.setChecked(index == 0)
         self.btn_model_nav.setChecked(index == 1)
         self.btn_version_nav.setChecked(index == 2)
+        self.btn_deploy_nav.setChecked(index == 3)
         
         if index == 1 and self.model_page is None:
             self.model_page = self._create_model_page()
@@ -2067,6 +2391,11 @@ class MainWindow(QMainWindow):
             self.version_page = self._create_version_page()
             self.page_stack.removeWidget(self.page_stack.widget(2))
             self.page_stack.insertWidget(2, self.version_page)
+        
+        if index == 3 and self.deploy_page is None:
+            self.deploy_page = self._create_deploy_page()
+            self.page_stack.removeWidget(self.page_stack.widget(3))
+            self.page_stack.insertWidget(3, self.deploy_page)
         
         self.page_stack.setCurrentIndex(index)
         
@@ -2079,6 +2408,9 @@ class MainWindow(QMainWindow):
         if index == 2 and self.version_manager_widget is not None:
             if not self.version_manager_widget._versions_loaded:
                 QTimer.singleShot(300, self._delayed_load_versions)
+        
+        if index == 3:
+            QTimer.singleShot(200, self._refresh_deploy_env_status)
     
     def _delayed_load_versions(self):
         """延迟加载版本列表"""
@@ -2146,10 +2478,78 @@ class MainWindow(QMainWindow):
         timestamp = datetime.now().strftime("%H:%M:%S")
         html = f'<span style="color: #888888;">[{timestamp}]</span> <span style="color: {color};">{message}</span>'
         self.log_output.append(html)
-        # 只有在自动滚动开关打开时才滚动到底部
         if hasattr(self, 'auto_scroll_switch') and self.auto_scroll_switch.isChecked():
             scrollbar = self.log_output.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
+        
+        if hasattr(self, 'deploy_log_output') and self.deploy_log_output is not None:
+            self.deploy_log_output.append(html)
+            scrollbar2 = self.deploy_log_output.verticalScrollBar()
+            scrollbar2.setValue(scrollbar2.maximum())
+    
+    def _append_deploy_log(self, message: str, color: str = "#00FF00"):
+        """添加日志到部署维护页面（线程安全）"""
+        self.log_signal.emit(message, color)
+    
+    def _clear_deploy_log(self):
+        """清空部署维护日志"""
+        if hasattr(self, 'deploy_log_output') and self.deploy_log_output is not None:
+            self.deploy_log_output.clear()
+    
+    def _open_output_directory(self):
+        """打开输出目录"""
+        output_dir = self.config.get("output.directory", "")
+        if not output_dir:
+            output_dir = os.path.join(self.base_dir, "output")
+        
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+        
+        try:
+            os.startfile(output_dir)
+        except Exception as e:
+            self._log(f"[错误] 打开输出目录失败: {e}", "#F44336")
+    
+    def _browse_output_directory(self):
+        """浏览选择输出目录"""
+        from PyQt6.QtWidgets import QFileDialog
+        current_dir = self.output_dir_edit.text() if hasattr(self, 'output_dir_edit') else ""
+        if not current_dir or not os.path.exists(current_dir):
+            current_dir = os.path.join(self.base_dir, "output")
+        
+        selected_dir = QFileDialog.getExistingDirectory(
+            self, "选择输出目录", current_dir,
+            QFileDialog.Option.ShowDirsOnly
+        )
+        
+        if selected_dir:
+            self.output_dir_edit.setText(selected_dir)
+    
+    def _save_output_directory(self):
+        """保存输出目录设置"""
+        if not hasattr(self, 'output_dir_edit'):
+            return
+        
+        output_dir = self.output_dir_edit.text().strip()
+        if not output_dir:
+            self._log("[警告] 输出目录不能为空", "#FF9800")
+            return
+        
+        if not os.path.isabs(output_dir):
+            self._log("[警告] 请使用绝对路径作为输出目录", "#FF9800")
+            return
+        
+        self.config.set("output.directory", output_dir)
+        
+        if not os.path.exists(output_dir):
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+                self._log(f"✓ 输出目录已创建: {output_dir}", "#4CAF50")
+            except Exception as e:
+                self._log(f"[错误] 创建输出目录失败: {e}", "#F44336")
+                return
+        
+        self._log(f"✓ 输出目录已保存: {output_dir}", "#4CAF50")
     
     def _log(self, message: str, color: str = "#00FF00"):
         """添加日志（线程安全）"""
@@ -2172,7 +2572,7 @@ class MainWindow(QMainWindow):
     
     def _show_version_manager(self):
         """切换到版本管理器页面"""
-        self._switch_page(1)
+        self._switch_page(2)
     
     def _on_show_more_versions(self):
         """处理"查看更多版本"点击事件 - 延迟打开对话框以避免闪烁"""
@@ -2191,7 +2591,7 @@ class MainWindow(QMainWindow):
     
     def _show_model_manager(self):
         """切换到模型管理器页面"""
-        self._switch_page(2)
+        self._switch_page(1)
     
     def _start_project_services(self, project_id: str):
         """启动项目服务"""
@@ -2485,6 +2885,11 @@ class MainWindow(QMainWindow):
         self.btn_start_music.setEnabled(True)
         self.btn_start_qinglong.setEnabled(True)
         self.btn_stop_all.setEnabled(True)
+        
+        if hasattr(self, 'btn_deploy_all'):
+            self.btn_deploy_all.setEnabled(True)
+        if hasattr(self, 'btn_refresh_env'):
+            self.btn_refresh_env.setEnabled(True)
     
     def _check_environment(self):
         """环境检测"""
@@ -3360,6 +3765,7 @@ class MainWindow(QMainWindow):
             
             # 2. 检查 Node.js
             self._log("2. 检查 Node.js...")
+            self.deploy_step_signal.emit("nodejs", "running")
             node_available = False
             
             try:
@@ -4047,6 +4453,455 @@ try {
             else:
                 self._log(f"⚠️ 脚本不存在: {script_name}", "#FF9800")
     
+    def _check_deploy_env(self):
+        """检测部署环境各步骤状态"""
+        checks = {}
+        
+        try:
+            powershell_paths = [
+                "powershell.exe",
+                "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+            ]
+            ps_ok = False
+            for ps in powershell_paths:
+                try:
+                    process = hidden_popen(
+                        [ps, "-Version"],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                    )
+                    stdout, stderr = process.communicate(timeout=5)
+                    if process.returncode == 0:
+                        ps_ok = True
+                        break
+                except:
+                    continue
+            checks["powershell"] = ps_ok
+        except:
+            checks["powershell"] = False
+        
+        try:
+            node_ok = False
+            portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+            portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+            node_paths = [
+                os.path.join(portable_node24_dir, "node.exe"),
+                os.path.join(portable_node22_dir, "node.exe"),
+                "node.exe",
+            ]
+            for node_exe in node_paths:
+                try:
+                    process = hidden_popen(
+                        [node_exe, "--version"],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                    )
+                    stdout, stderr = process.communicate(timeout=5)
+                    if process.returncode == 0 and stdout.strip():
+                        node_ok = True
+                        break
+                except:
+                    continue
+            checks["nodejs"] = node_ok
+        except:
+            checks["nodejs"] = False
+        
+        try:
+            uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+            checks["uv"] = os.path.exists(uv_path)
+        except:
+            checks["uv"] = False
+        
+        try:
+            venv_path = os.path.join(self.base_dir, "scripts", ".venv")
+            checks["venv"] = os.path.exists(venv_path)
+        except:
+            checks["venv"] = False
+        
+        try:
+            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            if os.path.exists(venv_python):
+                deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "fastapi", "uvicorn", "accelerate"]
+                all_ok = True
+                for dep in deps_to_check:
+                    try:
+                        process = hidden_popen(
+                            [venv_python, "-c", f"import {dep}"],
+                            cwd=self.base_dir,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                        )
+                        stdout, stderr = process.communicate(timeout=10)
+                        if process.returncode != 0:
+                            all_ok = False
+                            break
+                    except:
+                        all_ok = False
+                        break
+                checks["python_deps"] = all_ok
+            else:
+                checks["python_deps"] = False
+        except:
+            checks["python_deps"] = False
+        
+        try:
+            ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
+            package_json_path = os.path.join(ace_step_ui_path, "package.json")
+            node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+            checks["frontend_deps"] = os.path.exists(package_json_path) and os.path.exists(node_modules_path)
+        except:
+            checks["frontend_deps"] = False
+        
+        try:
+            scripts = [
+                "2、run_gradio.ps1",
+                "3、run_server.ps1",
+                "4、run_npmgui.ps1"
+            ]
+            scripts_ok = True
+            for script in scripts:
+                script_path = os.path.join(self.base_dir, "scripts", script)
+                if not os.path.exists(script_path):
+                    scripts_ok = False
+                    break
+            checks["scripts"] = scripts_ok
+        except:
+            checks["scripts"] = False
+        
+        return checks
+    
+    def _refresh_deploy_env_status(self):
+        """刷新部署维护页面的环境状态"""
+        if not hasattr(self, 'deploy_steps') or not self.deploy_steps:
+            return
+        
+        if self.is_starting:
+            return
+        
+        self._log("正在检测环境状态...", "#4CAF50")
+        
+        def _do_check():
+            checks = self._check_deploy_env()
+            for key in self.deploy_steps:
+                if checks.get(key, False):
+                    self.deploy_step_signal.emit(key, "done")
+                else:
+                    self.deploy_step_signal.emit(key, "reset")
+            self._log("✓ 环境状态检测完成", "#4CAF50")
+        
+        t = threading.Thread(target=_do_check, daemon=True)
+        t.start()
+    
+    def _update_deploy_step(self, key: str, status: str):
+        """更新部署步骤按钮状态"""
+        if key not in self.deploy_steps:
+            return
+        
+        step = self.deploy_steps[key]
+        btn = step["btn"]
+        color = step["color"]
+        label = step["label"]
+        
+        status_configs = {
+            "done": {
+                "icon": "✓",
+                "text": "已安装",
+                "fg": "#4CAF50",
+                "bg": "#1B3A1B",
+                "border": "#2E7D32",
+            },
+            "fail": {
+                "icon": "✗",
+                "text": "安装失败",
+                "fg": "#F44336",
+                "bg": "#3A1B1B",
+                "border": "#C62828",
+            },
+            "running": {
+                "icon": "⟳",
+                "text": "安装中...",
+                "fg": "#FF9800",
+                "bg": "#3A2E1B",
+                "border": "#FF9800",
+            },
+            "reset": {
+                "icon": "○",
+                "text": "未安装",
+                "fg": "#888888",
+                "bg": "#252525",
+                "border": "#444444",
+            },
+        }
+        
+        cfg = status_configs.get(status, status_configs["reset"])
+        
+        btn.setText(f"  {cfg['icon']}  {label}  {cfg['text']}  ")
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {cfg['bg']};
+                color: {cfg['fg']};
+                border: 1px solid {cfg['border']};
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 11px;
+                font-weight: bold;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: #2D2D2D;
+                border-color: {color};
+            }}
+        """)
+    
+    def _on_install_single_step(self, component: str):
+        """安装单个步骤组件"""
+        if self.is_starting:
+            self._log("正在运行中，请稍候...", "#616161")
+            return
+        
+        self.is_starting = True
+        self.deploy_step_signal.emit(component, "running")
+        
+        if hasattr(self, 'btn_deploy_all'):
+            self.btn_deploy_all.setEnabled(False)
+        if hasattr(self, 'btn_refresh_env'):
+            self.btn_refresh_env.setEnabled(False)
+        if hasattr(self, 'btn_deploy_maintain'):
+            self.btn_deploy_maintain.setEnabled(False)
+        self.btn_start_music.setEnabled(False)
+        self.btn_start_qinglong.setEnabled(False)
+        self.btn_stop_all.setEnabled(False)
+        
+        def _install():
+            try:
+                success = False
+                
+                if component == "powershell":
+                    self._log("[信息] PowerShell 为系统组件，无法自动安装", "#FF9800")
+                    self._log("[建议] 请通过 Windows 设置安装 PowerShell", "#FF9800")
+                    checks = self._check_deploy_env()
+                    success = checks.get("powershell", False)
+                
+                elif component == "nodejs":
+                    self._log("正在安装 Node.js...")
+                    success = self._install_nodejs()
+                
+                elif component == "uv":
+                    self._log("正在安装 uv 包管理器...")
+                    success = self._install_uv()
+                
+                elif component == "venv":
+                    self._log("正在创建 Python 虚拟环境...")
+                    success = self._create_venv()
+                
+                elif component == "python_deps":
+                    self._log("正在安装 Python 依赖包...")
+                    success = self._install_python_deps()
+                
+                elif component == "frontend_deps":
+                    self._log("正在安装前端 npm 依赖...")
+                    success = self._install_frontend_deps()
+                
+                elif component == "scripts":
+                    self._log("正在检查启动脚本...")
+                    self._ensure_scripts_available()
+                    checks = self._check_deploy_env()
+                    success = checks.get("scripts", False)
+                
+                if success:
+                    self.deploy_step_signal.emit(component, "done")
+                    self._log(f"✓ {self.deploy_steps[component]['label']} 安装完成", "#4CAF50")
+                else:
+                    self.deploy_step_signal.emit(component, "fail")
+                    self._log(f"✗ {self.deploy_steps[component]['label']} 安装失败", "#F44336")
+            
+            except Exception as e:
+                self.deploy_step_signal.emit(component, "fail")
+                self._log(f"[错误] 安装 {component} 失败: {e}", "#F44336")
+            finally:
+                self.is_starting = False
+                if hasattr(self, 'btn_deploy_all'):
+                    self.btn_deploy_all.setEnabled(True)
+                if hasattr(self, 'btn_refresh_env'):
+                    self.btn_refresh_env.setEnabled(True)
+                if hasattr(self, 'btn_deploy_maintain'):
+                    self.btn_deploy_maintain.setEnabled(True)
+                self.btn_start_music.setEnabled(True)
+                self.btn_start_qinglong.setEnabled(True)
+                self.btn_stop_all.setEnabled(True)
+        
+        t = threading.Thread(target=_install, daemon=True)
+        t.start()
+    
+    def _install_nodejs(self):
+        """安装 Node.js"""
+        try:
+            portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+            if os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
+                return True
+            
+            tools_dir = os.path.join(self.base_dir, "tools")
+            os.makedirs(tools_dir, exist_ok=True)
+            node24_zip = os.path.join(tools_dir, "node-v24.14.1-win-x64.zip")
+            node24_url = "https://nodejs.org/dist/v24.14.1/node-v24.14.1-win-x64.zip"
+            
+            import urllib.request
+            self._log(f"[信息] 下载 Node.js 24 便携版...")
+            
+            def _progress(block_num, block_size, total_size):
+                pct = min(block_num * block_size * 100 / total_size, 100) if total_size > 0 else 0
+                if block_num % 500 == 0:
+                    self._log(f"[下载] Node.js 24: {pct:.1f}%")
+            
+            urllib.request.urlretrieve(node24_url, node24_zip, _progress)
+            self._log("✓ Node.js 24 下载完成", "#4CAF50")
+            
+            import zipfile
+            with zipfile.ZipFile(node24_zip, 'r') as zf:
+                zf.extractall(tools_dir)
+            self._log("✓ Node.js 便携版解压完成", "#4CAF50")
+            
+            try:
+                os.remove(node24_zip)
+            except:
+                pass
+            
+            return os.path.exists(os.path.join(portable_node24_dir, "node.exe"))
+        except Exception as e:
+            self._log(f"[错误] 安装 Node.js 失败: {e}", "#F44336")
+            return False
+    
+    def _install_uv(self):
+        """安装 uv 包管理器"""
+        try:
+            uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+            if os.path.exists(uv_path):
+                return True
+            
+            install_script = os.path.join(self.base_dir, "scripts", "1、install-uv-qinglong.ps1")
+            if not os.path.exists(install_script):
+                self._log("[错误] uv 安装脚本不存在", "#F44336")
+                return False
+            
+            result = hidden_run(
+                ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                cwd=self.base_dir,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            
+            return os.path.exists(uv_path)
+        except Exception as e:
+            self._log(f"[错误] 安装 uv 失败: {e}", "#F44336")
+            return False
+    
+    def _create_venv(self):
+        """创建 Python 虚拟环境"""
+        try:
+            venv_path = os.path.join(self.base_dir, "scripts", ".venv")
+            if os.path.exists(venv_path):
+                return True
+            
+            install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
+            if os.path.exists(install_script):
+                result = hidden_run(
+                    ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                    cwd=self.base_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=1800
+                )
+                return os.path.exists(venv_path)
+            
+            uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+            if os.path.exists(uv_path):
+                scripts_dir = os.path.join(self.base_dir, "scripts")
+                os.makedirs(scripts_dir, exist_ok=True)
+                process = hidden_popen(
+                    [uv_path, "venv", os.path.join(scripts_dir, ".venv")],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                process.communicate(timeout=120)
+                return os.path.exists(venv_path)
+            
+            self._log("[错误] 无法创建虚拟环境，缺少安装脚本和 uv", "#F44336")
+            return False
+        except Exception as e:
+            self._log(f"[错误] 创建虚拟环境失败: {e}", "#F44336")
+            return False
+    
+    def _install_python_deps(self):
+        """安装 Python 依赖包"""
+        try:
+            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            if not os.path.exists(venv_python):
+                self._log("[错误] Python 虚拟环境不存在，请先创建虚拟环境", "#F44336")
+                return False
+            
+            install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
+            if os.path.exists(install_script):
+                result = hidden_run(
+                    ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                    cwd=self.base_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=1800
+                )
+                return result.returncode == 0
+            
+            uv_path = os.path.expanduser("~/.local/bin/uv.exe")
+            if os.path.exists(uv_path):
+                process = hidden_popen(
+                    [uv_path, "pip", "install", "--python", venv_python,
+                     "loguru", "psutil", "torch", "torchaudio", "transformers",
+                     "diffusers", "gradio", "peft", "fastapi", "uvicorn", "accelerate",
+                     "scipy", "soundfile", "einops", "lycoris"],
+                    cwd=self.base_dir,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                process.communicate(timeout=600)
+                return process.returncode == 0
+            
+            self._log("[错误] 无法安装 Python 依赖，缺少安装脚本和 uv", "#F44336")
+            return False
+        except Exception as e:
+            self._log(f"[错误] 安装 Python 依赖失败: {e}", "#F44336")
+            return False
+    
+    def _install_frontend_deps(self):
+        """安装前端 npm 依赖"""
+        try:
+            ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
+            node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+            
+            if os.path.exists(node_modules_path):
+                return True
+            
+            portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
+            portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
+            
+            npm_path = None
+            for node_dir in [portable_node24_dir, portable_node22_dir]:
+                candidate = os.path.join(node_dir, "npm.cmd")
+                if os.path.exists(candidate):
+                    npm_path = candidate
+                    break
+            
+            if not npm_path:
+                npm_path = "npm"
+            
+            self._log(f"[信息] 正在运行 npm install...")
+            process = hidden_popen(
+                [npm_path, "install"],
+                cwd=ace_step_ui_path,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            process.communicate(timeout=600)
+            
+            return os.path.exists(node_modules_path)
+        except Exception as e:
+            self._log(f"[错误] 安装前端依赖失败: {e}", "#F44336")
+            return False
+    
     def _deploy_maintenance(self):
         """部署维护 - 合并环境检测和智能修复功能
         - 自动检测环境是否安装
@@ -4064,6 +4919,11 @@ try {
         self.btn_start_qinglong.setEnabled(False)
         self.btn_stop_all.setEnabled(False)
         
+        if hasattr(self, 'btn_deploy_all'):
+            self.btn_deploy_all.setEnabled(False)
+        if hasattr(self, 'btn_refresh_env'):
+            self.btn_refresh_env.setEnabled(False)
+        
         self.deploy_thread = threading.Thread(target=self._deploy_maintenance_thread)
         self.deploy_thread.daemon = True
         self.deploy_thread.start()
@@ -4075,12 +4935,12 @@ try {
         self._log("========================================")
         self._log(f"[调试] 当前工作目录: {self.base_dir}")
         
-        # 确保脚本文件存在（再次尝试提取）
         self._ensure_scripts_available()
         
         try:
             # 1. 首先检查PowerShell
             self._log("1. 检查 PowerShell...")
+            self.deploy_step_signal.emit("powershell", "running")
             powershell_available = False
             
             try:
@@ -4127,7 +4987,10 @@ try {
                 if not powershell_available:
                     self._log("[错误] PowerShell 未安装或无法访问", "#F44336")
                     self._log("[建议] 请确保PowerShell已安装并添加到系统PATH", "#FF9800")
+                    self.deploy_step_signal.emit("powershell", "fail")
                     return
+                else:
+                    self.deploy_step_signal.emit("powershell", "done")
             except Exception as e:
                 self._log(f"[错误] 检查 PowerShell 失败: {e}", "#F44336")
                 return
@@ -4290,7 +5153,11 @@ try {
                             return
             except Exception as e:
                 self._log(f"[错误] 检查 Node.js 失败: {e}", "#F44336")
+                self.deploy_step_signal.emit("nodejs", "fail")
                 return
+            
+            if node_available:
+                self.deploy_step_signal.emit("nodejs", "done")
             
             # 3. 检查环境是否已安装
             self._log("3. 检查环境安装状态...")
@@ -4298,6 +5165,18 @@ try {
             uv_path = os.path.expanduser("~/.local/bin/uv.exe")
             venv_path = os.path.join(self.base_dir, "scripts", ".venv")
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
+            
+            self.deploy_step_signal.emit("uv", "running")
+            if os.path.exists(uv_path):
+                self.deploy_step_signal.emit("uv", "done")
+            else:
+                self.deploy_step_signal.emit("uv", "reset")
+            
+            self.deploy_step_signal.emit("venv", "running")
+            if os.path.exists(venv_path):
+                self.deploy_step_signal.emit("venv", "done")
+            else:
+                self.deploy_step_signal.emit("venv", "reset")
             
             environment_installed = False
             if os.path.exists(uv_path) and os.path.exists(venv_path):
@@ -4332,6 +5211,8 @@ try {
                         
                         if result.returncode == 0:
                             self._log("✅ 环境安装完成", "#4CAF50")
+                            self.deploy_step_signal.emit("python_deps", "done")
+                            self.deploy_step_signal.emit("frontend_deps", "done")
                         else:
                             self._log(f"[错误] 环境安装失败，返回码: {result.returncode}", "#F44336")
                             return
@@ -4360,6 +5241,8 @@ try {
             # 6. 最终检查
             self._log("6. 最终检查...")
             
+            self.deploy_step_signal.emit("scripts", "running")
+            
             # 检查启动脚本
             scripts = [
                 "2、run_gradio.ps1",
@@ -4377,6 +5260,26 @@ try {
             
             if script_missing:
                 self._log("[建议] 请确保所有启动脚本都存在", "#FF9800")
+                self.deploy_step_signal.emit("scripts", "fail")
+            else:
+                self.deploy_step_signal.emit("scripts", "done")
+            
+            self.deploy_step_signal.emit("python_deps", "running")
+            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            if os.path.exists(venv_python):
+                deps_ok = self._quick_check_dependencies(venv_python)
+                if deps_ok:
+                    self.deploy_step_signal.emit("python_deps", "done")
+                else:
+                    self.deploy_step_signal.emit("python_deps", "reset")
+            
+            self.deploy_step_signal.emit("frontend_deps", "running")
+            ace_step_ui_nm = os.path.join(self.base_dir, "ace-step-ui", "node_modules")
+            ace_step_ui_pj = os.path.join(self.base_dir, "ace-step-ui", "package.json")
+            if os.path.exists(ace_step_ui_pj) and os.path.exists(ace_step_ui_nm):
+                self.deploy_step_signal.emit("frontend_deps", "done")
+            else:
+                self.deploy_step_signal.emit("frontend_deps", "reset")
             
         except Exception as e:
             self._log(f"[错误] 部署维护失败: {e}", "#F44336")
