@@ -1011,17 +1011,18 @@ class ServiceCard(QFrame):
         self.edit_port_btn.setFixedSize(48, 24)
         self.edit_port_btn.setStyleSheet("""
             QPushButton {
-                background-color: #C62828;
-                color: #FFFFFF;
-                border: 1px solid #D32F2F;
+                background-color: #3D3D3D;
+                color: #BBBBBB;
+                border: 1px solid #555555;
                 border-radius: 4px;
                 font-size: 12px;
                 font-weight: bold;
                 padding: 2px 8px;
             }
             QPushButton:hover {
-                background-color: #E53935;
-                border-color: #E53935;
+                background-color: #4D4D4D;
+                color: #FFFFFF;
+                border-color: #666666;
             }
         """)
         self.edit_port_btn.clicked.connect(self._start_port_edit)
@@ -1099,17 +1100,17 @@ class ServiceCard(QFrame):
         self.restart_btn = QPushButton("重启")
         self.restart_btn.setStyleSheet("""
             QPushButton {
-                background-color: #B71C1C;
+                background-color: #1565C0;
                 color: #FFFFFF;
-                border: 1px solid #C62828;
+                border: 1px solid #1976D2;
                 border-radius: 6px;
                 padding: 6px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #C62828;
-                border-color: #D32F2F;
+                background-color: #1976D2;
+                border-color: #1E88E5;
             }
         """)
         self.restart_btn.clicked.connect(lambda: self.restart_clicked.emit(self.service_id))
@@ -1465,13 +1466,13 @@ class MainWindow(QMainWindow):
                 border-color: #444444;
             }
             QPushButton:checked {
-                background-color: #C62828;
-                border-color: #D32F2F;
+                background-color: #1565C0;
+                border-color: #1976D2;
                 color: #FFFFFF;
             }
             QPushButton:checked:hover {
-                background-color: #D32F2F;
-                border-color: #E53935;
+                background-color: #1976D2;
+                border-color: #1E88E5;
             }
         """
         
@@ -1609,23 +1610,23 @@ class MainWindow(QMainWindow):
         self.auto_scroll_switch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.auto_scroll_switch.setStyleSheet("""
             QPushButton {
-                background-color: #2D2D2D;
-                color: #AAAAAA;
-                border: 1px solid #444444;
+                background-color: #3D3D3D;
+                color: #BBBBBB;
+                border: 1px solid #555555;
                 border-radius: 4px;
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: bold;
             }
             QPushButton:checked {
-                background-color: #C62828;
+                background-color: #2E7D32;
                 color: #FFFFFF;
-                border-color: #D32F2F;
+                border-color: #388E3C;
             }
             QPushButton:!checked {
-                background-color: #2D2D2D;
-                color: #AAAAAA;
-                border-color: #444444;
+                background-color: #3D3D3D;
+                color: #BBBBBB;
+                border-color: #555555;
             }
         """)
         self.auto_scroll_switch.clicked.connect(self._on_auto_scroll_toggled)
@@ -1817,17 +1818,17 @@ class MainWindow(QMainWindow):
         self.btn_select_browser = QPushButton("📂 选择")
         self.btn_select_browser.setStyleSheet("""
             QPushButton {
-                background-color: #B71C1C;
+                background-color: #1565C0;
                 color: #E0E0E0;
-                border: 1px solid #C62828;
+                border: 1px solid #1976D2;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #C62828;
-                border-color: #D32F2F;
+                background-color: #1976D2;
+                border-color: #1E88E5;
             }
         """)
         self.btn_select_browser.clicked.connect(self._select_custom_browser)
@@ -1883,9 +1884,9 @@ class MainWindow(QMainWindow):
         self.btn_deploy_maintain = QPushButton("⚙️ 部署维护")
         self.btn_deploy_maintain.setStyleSheet("""
             QPushButton {
-                background-color: #B71C1C;
+                background-color: #1565C0;
                 color: white;
-                border: 2px solid #C62828;
+                border: 2px solid #1976D2;
                 border-radius: 8px;
                 padding: 12px 20px;
                 font-size: 13px;
@@ -1893,10 +1894,10 @@ class MainWindow(QMainWindow):
                 transition: all 0.3s ease;
             }
             QPushButton:hover {
-                background-color: #C62828;
-                border-color: #D32F2F;
+                background-color: #1976D2;
+                border-color: #1E88E5;
                 transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(198, 40, 40, 0.3);
+                box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
             }
         """)
         self.btn_deploy_maintain.clicked.connect(self._deploy_maintenance)
@@ -1984,9 +1985,9 @@ class MainWindow(QMainWindow):
         if checked:
             self.auto_scroll_switch.setStyleSheet("""
                 QPushButton {
-                    background-color: #C62828;
+                    background-color: #2E7D32;
                     color: white;
-                    border: 1px solid #D32F2F;
+                    border: 1px solid #388E3C;
                     border-radius: 4px;
                     padding: 4px 10px;
                     font-size: 11px;
@@ -1996,9 +1997,9 @@ class MainWindow(QMainWindow):
         else:
             self.auto_scroll_switch.setStyleSheet("""
                 QPushButton {
-                    background-color: #2D2D2D;
-                    color: #AAAAAA;
-                    border: 1px solid #444444;
+                    background-color: #3D3D3D;
+                    color: #BBBBBB;
+                    border: 1px solid #555555;
                     border-radius: 4px;
                     padding: 4px 10px;
                     font-size: 11px;
@@ -5708,7 +5709,57 @@ def extract_scripts():
                     pass
 
 
+def _check_single_instance():
+    """使用 Windows 命名事件实现单实例控制"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+        EVENT_ALL_ACCESS = 0x001F0003
+        SYNCHRONIZE = 0x00100000
+        EVENT_MODIFY_STATE = 0x0002
+
+        event_name = "Global\\云集智能音乐创意台_SingleInstance_Mutex"
+
+        kernel32.CreateEventW.restype = wintypes.HANDLE
+        kernel32.CreateEventW.argtypes = [
+            wintypes.LPVOID,  # LPSECURITY_ATTRIBUTES
+            wintypes.BOOL,     # bManualReset
+            wintypes.BOOL,     # bInitialState
+            wintypes.LPCWSTR,  # lpName
+        ]
+
+        h_event = kernel32.CreateEventW(None, False, True, event_name)
+
+        if not h_event:
+            return True
+
+        last_error = ctypes.get_last_error()
+        if last_error == 183:
+            return False
+
+        return True
+    except Exception:
+        return True
+
+
 def main(app=None, splash=None):
+    if not _check_single_instance():
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                "云集智能音乐创意台已在运行中，请勿重复启动。",
+                "提示",
+                0x40 | 0x0
+            )
+        except Exception:
+            pass
+        sys.exit(0)
+        return
+
     extract_scripts()
     
     if app is None:
