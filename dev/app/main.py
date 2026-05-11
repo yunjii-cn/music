@@ -5709,56 +5709,140 @@ def extract_scripts():
                     pass
 
 
-def _check_single_instance():
-    """使用 Windows 命名事件实现单实例控制"""
+def _create_single_instance_event():
+    """创建命名事件，仅用于标记当前进程为有效实例"""
     try:
         import ctypes
         from ctypes import wintypes
 
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-
-        EVENT_ALL_ACCESS = 0x001F0003
-        SYNCHRONIZE = 0x00100000
-        EVENT_MODIFY_STATE = 0x0002
-
-        event_name = "Global\\云集智能音乐创意台_SingleInstance_Mutex"
-
         kernel32.CreateEventW.restype = wintypes.HANDLE
         kernel32.CreateEventW.argtypes = [
-            wintypes.LPVOID,  # LPSECURITY_ATTRIBUTES
-            wintypes.BOOL,     # bManualReset
-            wintypes.BOOL,     # bInitialState
-            wintypes.LPCWSTR,  # lpName
+            wintypes.LPVOID,
+            wintypes.BOOL,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
         ]
-
+        event_name = "Global\\云集智能音乐创意台_SingleInstance_Mutex"
         h_event = kernel32.CreateEventW(None, False, True, event_name)
-
-        if not h_event:
-            return True
-
-        last_error = ctypes.get_last_error()
-        if last_error == 183:
-            return False
-
-        return True
+        return h_event
     except Exception:
-        return True
+        return None
+
+
+def _kill_old_instances_async():
+    """后台查找并优雅关闭同名的旧进程实例"""
+    try:
+        import threading
+
+        def _kill_worker():
+            import ctypes
+            from ctypes import wintypes
+            import time
+
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            psapi = ctypes.WinDLL("psapi", use_last_error=True)
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+            own_pid = ctypes.windll.kernel32.GetCurrentProcessId()
+
+            psapi.EnumProcesses.restype = wintypes.DWORD
+            psapi.EnumProcesses.argtypes = [
+                ctypes.POINTER(wintypes.DWORD),
+                wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD),
+            ]
+
+            MAX_PROCS = 4096
+            pids = (wintypes.DWORD * MAX_PROCS)()
+            cb = ctypes.sizeof(pids)
+            cb_needed = wintypes.DWORD()
+            psapi.EnumProcesses(pids, cb, ctypes.byref(cb_needed))
+            num_pids = cb_needed.value // 4
+
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            PROCESS_TERMINATE = 0x0001
+
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.TerminateProcess.restype = wintypes.BOOL
+            kernel32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+
+            psapi.GetModuleBaseNameW.restype = wintypes.DWORD
+            psapi.GetModuleBaseNameW.argtypes = [
+                wintypes.HANDLE, wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD
+            ]
+
+            user32.EnumWindows.restype = wintypes.BOOL
+            user32.EnumWindows.argtypes = [
+                ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM),
+                wintypes.LPARAM,
+            ]
+            user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+            user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+            user32.PostMessageW.restype = wintypes.BOOL
+            user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+            user32.IsWindowVisible.restype = wintypes.BOOL
+            user32.IsWindowVisible.argtypes = [wintypes.HWND]
+
+            WM_CLOSE = 0x0010
+
+            old_pids = []
+            for i in range(num_pids):
+                pid = pids[i]
+                if pid == 0 or pid == own_pid:
+                    continue
+
+                h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+                if not h_proc:
+                    continue
+
+                name_buf = ctypes.create_unicode_buffer(260)
+                psapi.GetModuleBaseNameW(h_proc, None, name_buf, 260)
+                proc_name = name_buf.value
+                kernel32.CloseHandle(h_proc)
+
+                if proc_name == "云集智能音乐创意台.exe":
+                    old_pids.append(pid)
+
+            for pid in old_pids:
+                h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+                if not h_proc:
+                    continue
+
+                hwnds = []
+
+                @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+                def enum_callback(hwnd, lParam):
+                    proc_id = wintypes.DWORD()
+                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(proc_id))
+                    if proc_id.value == pid and user32.IsWindowVisible(hwnd):
+                        hwnds.append(hwnd)
+                    return True
+
+                user32.EnumWindows(enum_callback, 0)
+
+                if hwnds:
+                    for hwnd in hwnds:
+                        user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+                    time.sleep(0.5)
+
+                h_proc2 = kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
+                if h_proc2:
+                    kernel32.TerminateProcess(h_proc2, 0)
+                    kernel32.CloseHandle(h_proc2)
+                elif h_proc:
+                    kernel32.CloseHandle(h_proc)
+
+        threading.Thread(target=_kill_worker, daemon=True).start()
+    except Exception:
+        pass
 
 
 def main(app=None, splash=None):
-    if not _check_single_instance():
-        try:
-            import ctypes
-            ctypes.windll.user32.MessageBoxW(
-                0,
-                "云集智能音乐创意台已在运行中，请勿重复启动。",
-                "提示",
-                0x40 | 0x0
-            )
-        except Exception:
-            pass
-        sys.exit(0)
-        return
+    _create_single_instance_event()
+    _kill_old_instances_async()
 
     extract_scripts()
     
