@@ -3746,11 +3746,10 @@ class MainWindow(QMainWindow):
                 self._log(f"[警告] 安装 {dep} 失败: {e}", "#FF9800")
     
     def _quick_check_dependencies(self, venv_python):
-        """快速检查关键依赖是否已安装 - 返回True表示所有依赖都OK"""
-
+        """快速检查关键依赖是否已安装 - 返回缺失依赖列表（空列表表示全部OK）"""
         
         deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "lycoris", "fastapi", "uvicorn", "accelerate", "scipy", "soundfile", "einops", "matplotlib", "diskcache", "numba", "lightning", "tensorboard", "modelscope", "huggingface_hub", "safetensors"]
-        all_ok = True
+        missing = []
         
         for dep in deps_to_check:
             try:
@@ -3763,13 +3762,11 @@ class MainWindow(QMainWindow):
                 )
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode != 0:
-                    all_ok = False
-                    break
+                    missing.append(dep)
             except Exception:
-                all_ok = False
-                break
+                missing.append(dep)
         
-        return all_ok
+        return missing
     
     def _verify_dependencies(self, venv_python):
         """验证关键依赖是否安装，区分必须依赖和可选加速项"""
@@ -3955,10 +3952,10 @@ class MainWindow(QMainWindow):
             
             # 5. 验证关键依赖
             self._log("5. 验证关键依赖...")
-            venv_python = os.path.join(scripts_dir, ".venv", "Scripts", "python.exe")
-            deps_ok = self._quick_check_dependencies(venv_python)
-            if not deps_ok:
-                self._log("[警告] 检测到关键依赖缺失，自动修复...", "#FF9800")
+            venv_python = self._find_venv_python()
+            missing_deps = self._quick_check_dependencies(venv_python)
+            if missing_deps:
+                self._log(f"[警告] 检测到关键依赖缺失: {', '.join(missing_deps)}", "#FF9800")
                 install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
                 if os.path.exists(install_script):
                     self._log("[信息] 重新运行安装脚本修复依赖...")
@@ -4231,13 +4228,12 @@ class MainWindow(QMainWindow):
                 install_env_ps1 = os.path.join(scripts_dir, "install-env.ps1")
                 
                 # 先快速验证关键依赖是否已安装
-                all_deps_ok = self._quick_check_dependencies(venv_python)
+                missing_deps = self._quick_check_dependencies(venv_python)
                 
-                if all_deps_ok:
+                if not missing_deps:
                     self._log("✓ 关键依赖已完整安装，跳过依赖安装步骤")
                 elif os.path.exists(pyproject_toml_path):
-                    # 关键依赖缺失，需要安装
-                    self._log("[信息] 检测到依赖缺失，开始安装...")
+                    self._log(f"[信息] 检测到依赖缺失: {', '.join(missing_deps)}，开始安装...")
                     
                     # 方案1: 尝试使用 uv sync
                     self._log("[信息] 方案1: 使用 uv sync 安装完整依赖...")
@@ -4874,6 +4870,7 @@ try {
                     "safetensors": "safetensors",
                 }
                 all_ok = True
+                failed_deps = []
                 for dep_module, dep_name in REQUIRED_DEPS.items():
                     try:
                         process = hidden_popen(
@@ -4884,10 +4881,14 @@ try {
                         stdout, stderr = process.communicate(timeout=10)
                         if process.returncode != 0:
                             all_ok = False
-                            break
+                            failed_deps.append(dep_module)
                     except:
                         all_ok = False
-                        break
+                        failed_deps.append(dep_module)
+                if failed_deps:
+                    self._failed_deps_cache = failed_deps
+                else:
+                    self._failed_deps_cache = []
                 checks["python_deps"] = all_ok
             else:
                 checks["python_deps"] = False
@@ -5000,7 +5001,15 @@ try {
         }
         
         text, color = status_map.get(status, ("❓ 未知", "#888888"))
-        lbl.setText(text)
+        
+        if key == "python_deps" and status == "fail" and hasattr(self, '_failed_deps_cache') and self._failed_deps_cache:
+            failed = ", ".join(self._failed_deps_cache)
+            text = f"❌ 缺失: {failed}"
+            lbl.setText(text)
+            lbl.setToolTip(f"以下 Python 依赖未安装:\n{chr(10).join(self._failed_deps_cache)}")
+        else:
+            lbl.setText(text)
+        
         lbl.setStyleSheet(f"font-size: 10px; color: {color}; background: transparent;")
     
     def _refresh_deps_list(self):
