@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.05.12.0706",
+    "date": "2026-05-12 07:07",
+    "message": "修复venv_python路径查找统一使用_find_venv_python",
+    "changes": [
+      "修复venv_python路径查找统一使用_find_venv_python"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0706.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.05.12.0645",
     "date": "2026-05-12 06:47",
     "message": "修复非按钮标题文字边框",

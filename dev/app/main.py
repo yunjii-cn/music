@@ -488,7 +488,7 @@ class ModelDownloadThread(QThread):
             self.progress_updated.emit(self.current_progress, "准备下载...")
             
             # 构建下载命令 - 使用虚拟环境中的Python
-            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            venv_python = self._find_venv_python()
             
             # 检查虚拟环境是否存在
             if not os.path.exists(venv_python):
@@ -614,7 +614,7 @@ class ModelDeleteThread(QThread):
         try:
             self.log_received.emit(f"开始删除模型: {self.model_name}")
             
-            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            venv_python = self._find_venv_python()
             
             if not os.path.exists(venv_python):
                 self.log_received.emit("[错误] 虚拟环境不存在")
@@ -4492,7 +4492,7 @@ try {
                                     pass
                             
                             # 设置 Python 环境变量，使用 uv 虚拟环境中的 Python 用于编译 better-sqlite3
-                            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+                            venv_python = self._find_venv_python()
                             if os.path.exists(venv_python):
                                 self._log(f"[信息] 设置 Python 路径: {venv_python}")
                                 os.environ["PYTHON"] = venv_python
@@ -4761,6 +4761,18 @@ try {
             else:
                 self._log(f"⚠️ 脚本不存在: {script_name}", "#FF9800")
     
+    def _find_venv_python(self):
+        """统一查找虚拟环境 Python 路径，兼容多种目录结构"""
+        candidates = [
+            os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe"),
+            os.path.join(self.base_dir, ".venv", "Scripts", "python.exe"),
+            os.path.join(self.base_dir, "app", "scripts", ".venv", "Scripts", "python.exe"),
+        ]
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return candidate
+        return os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+    
     def _check_deploy_env(self):
         """检测部署环境各步骤状态"""
         checks = {}
@@ -4828,23 +4840,13 @@ try {
             checks["uv"] = False
         
         try:
-            venv_path = os.path.join(self.base_dir, "scripts", ".venv")
-            venv_python = os.path.join(venv_path, "Scripts", "python.exe")
-            if not os.path.exists(venv_python):
-                for candidate in [
-                    os.path.join(self.base_dir, ".venv", "Scripts", "python.exe"),
-                    os.path.join(self.base_dir, "app", "scripts", ".venv", "Scripts", "python.exe"),
-                ]:
-                    if os.path.exists(candidate):
-                        venv_python = candidate
-                        venv_path = os.path.dirname(os.path.dirname(candidate))
-                        break
+            venv_python = self._find_venv_python()
             checks["venv"] = os.path.exists(venv_python)
         except:
             checks["venv"] = False
         
         try:
-            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            venv_python = self._find_venv_python()
             if os.path.exists(venv_python):
                 REQUIRED_DEPS = {
                     "loguru": "loguru",
@@ -4933,7 +4935,7 @@ try {
             
             gpu_detected = False
             try:
-                venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+                venv_python = self._find_venv_python()
                 if os.path.exists(venv_python):
                     result = hidden_run(
                         [venv_python, "-c",
@@ -5016,7 +5018,7 @@ try {
                     if sub.widget():
                         sub.widget().deleteLater()
         
-        venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+        venv_python = self._find_venv_python()
         if not os.path.exists(venv_python):
             lbl = QLabel("❌ Python 未就绪")
             lbl.setStyleSheet("font-size: 10px; color: #EF5350; background: transparent;")
@@ -5269,7 +5271,7 @@ for d in deps:
     def _install_python_deps(self):
         """安装 Python 依赖包（带版本控制）"""
         try:
-            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            venv_python = self._find_venv_python()
             if not os.path.exists(venv_python):
                 self._log("[错误] Python 虚拟环境不存在，请先创建虚拟环境", "#F44336")
                 return False
@@ -5748,7 +5750,7 @@ for d in deps:
                 self._smart_fix_environment()
             
             # 6. 安装 flash_attn 加速库（如果有 wheel 文件）
-            venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            venv_python = self._find_venv_python()
             flash_attn_wheel = os.path.join(self.base_dir, "scripts", "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl")
             if os.path.exists(venv_python) and os.path.exists(flash_attn_wheel):
                 try:
@@ -5810,7 +5812,7 @@ for d in deps:
                 
                 if not final_checks.get("python_deps"):
                     self._log("[修复] 重新安装 Python 依赖...")
-                    venv_python = os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+                    venv_python = self._find_venv_python()
                     if os.path.exists(venv_python):
                         self._install_missing_dependencies(venv_python, os.path.join(self.base_dir, "scripts"))
                 
