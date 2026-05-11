@@ -1031,17 +1031,17 @@ class ServiceCard(QFrame):
         self.save_port_btn.setFixedSize(48, 24)
         self.save_port_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2E7D32;
+                background-color: #E53935;
                 color: #FFFFFF;
-                border: 1px solid #388E3C;
+                border: 1px solid #EF5350;
                 border-radius: 4px;
                 font-size: 12px;
                 font-weight: bold;
                 padding: 2px 8px;
             }
             QPushButton:hover {
-                background-color: #43A047;
-                border-color: #43A047;
+                background-color: #EF5350;
+                border-color: #F44336;
             }
         """)
         self.save_port_btn.clicked.connect(self._confirm_port_edit)
@@ -1052,17 +1052,18 @@ class ServiceCard(QFrame):
         self.cancel_port_btn.setFixedSize(48, 24)
         self.cancel_port_btn.setStyleSheet("""
             QPushButton {
-                background-color: #424242;
-                color: #FFFFFF;
-                border: 1px solid #616161;
+                background-color: #2D2D2D;
+                color: #AAAAAA;
+                border: 1px solid #444444;
                 border-radius: 4px;
                 font-size: 12px;
                 font-weight: bold;
                 padding: 2px 8px;
             }
             QPushButton:hover {
-                background-color: #616161;
-                border-color: #757575;
+                background-color: #3D3D3D;
+                color: #FFFFFF;
+                border-color: #555555;
             }
         """)
         self.cancel_port_btn.clicked.connect(self._cancel_port_edit)
@@ -1098,17 +1099,17 @@ class ServiceCard(QFrame):
         self.restart_btn = QPushButton("重启")
         self.restart_btn.setStyleSheet("""
             QPushButton {
-                background-color: #1565C0;
+                background-color: #B71C1C;
                 color: #FFFFFF;
-                border: 1px solid #1976D2;
+                border: 1px solid #C62828;
                 border-radius: 6px;
                 padding: 6px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1976D2;
+                background-color: #C62828;
+                border-color: #D32F2F;
             }
         """)
         self.restart_btn.clicked.connect(lambda: self.restart_clicked.emit(self.service_id))
@@ -1119,15 +1120,15 @@ class ServiceCard(QFrame):
             QPushButton {
                 background-color: #E53935;
                 color: #FFFFFF;
-                border: 1px solid #C62828;
+                border: 1px solid #EF5350;
                 border-radius: 6px;
                 padding: 6px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #C62828;
-                border-color: #C62828;
+                background-color: #EF5350;
+                border-color: #F44336;
             }
         """)
         self.open_btn.clicked.connect(lambda: self.open_clicked.emit(self.service_id))
@@ -1464,13 +1465,13 @@ class MainWindow(QMainWindow):
                 border-color: #444444;
             }
             QPushButton:checked {
-                background-color: #1565C0;
-                border-color: #1976D2;
+                background-color: #C62828;
+                border-color: #D32F2F;
                 color: #FFFFFF;
             }
             QPushButton:checked:hover {
-                background-color: #1976D2;
-                border-color: #1976D2;
+                background-color: #D32F2F;
+                border-color: #E53935;
             }
         """
         
@@ -1608,20 +1609,23 @@ class MainWindow(QMainWindow):
         self.auto_scroll_switch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.auto_scroll_switch.setStyleSheet("""
             QPushButton {
-                background-color: #2E7D32;
-                color: white;
-                border: 1px solid #388E3C;
+                background-color: #2D2D2D;
+                color: #AAAAAA;
+                border: 1px solid #444444;
                 border-radius: 4px;
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: bold;
             }
             QPushButton:checked {
-                background-color: #2E7D32;
+                background-color: #C62828;
+                color: #FFFFFF;
+                border-color: #D32F2F;
             }
             QPushButton:!checked {
-                background-color: #424242;
-                border-color: #616161;
+                background-color: #2D2D2D;
+                color: #AAAAAA;
+                border-color: #444444;
             }
         """)
         self.auto_scroll_switch.clicked.connect(self._on_auto_scroll_toggled)
@@ -1634,17 +1638,17 @@ class MainWindow(QMainWindow):
         self.expand_switch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.expand_switch.setStyleSheet("""
             QPushButton {
-                background-color: #424242;
-                color: white;
-                border: 1px solid #616161;
+                background-color: #2D2D2D;
+                color: #AAAAAA;
+                border: 1px solid #444444;
                 border-radius: 4px;
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: bold;
             }
             QPushButton:checked {
-                background-color: #1565C0;
-                border-color: #1976D2;
+                background-color: #C62828;
+                border-color: #D32F2F;
             }
         """)
         self.expand_switch.clicked.connect(self._on_expand_toggled)
@@ -1745,7 +1749,7 @@ class MainWindow(QMainWindow):
                 border: 1px solid #333333;
                 border-radius: 4px;
                 outline: none;
-                selection-background-color: #1976D2;
+                selection-background-color: #C62828;
                 selection-color: #FFFFFF;
             }
             QComboBox QAbstractItemView::item {
@@ -1813,17 +1817,17 @@ class MainWindow(QMainWindow):
         self.btn_select_browser = QPushButton("📂 选择")
         self.btn_select_browser.setStyleSheet("""
             QPushButton {
-                background-color: #1565C0;
+                background-color: #B71C1C;
                 color: #E0E0E0;
-                border: 1px solid #1976D2;
+                border: 1px solid #C62828;
                 border-radius: 6px;
                 padding: 8px 16px;
                 font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1976D2;
+                background-color: #C62828;
+                border-color: #D32F2F;
             }
         """)
         self.btn_select_browser.clicked.connect(self._select_custom_browser)
@@ -1879,9 +1883,9 @@ class MainWindow(QMainWindow):
         self.btn_deploy_maintain = QPushButton("⚙️ 部署维护")
         self.btn_deploy_maintain.setStyleSheet("""
             QPushButton {
-                background-color: #2E7D32;
+                background-color: #B71C1C;
                 color: white;
-                border: 2px solid #388E3C;
+                border: 2px solid #C62828;
                 border-radius: 8px;
                 padding: 12px 20px;
                 font-size: 13px;
@@ -1889,10 +1893,10 @@ class MainWindow(QMainWindow):
                 transition: all 0.3s ease;
             }
             QPushButton:hover {
-                background-color: #388E3C;
-                border-color: #388E3C;
+                background-color: #C62828;
+                border-color: #D32F2F;
                 transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(46, 125, 50, 0.3);
+                box-shadow: 0 4px 8px rgba(198, 40, 40, 0.3);
             }
         """)
         self.btn_deploy_maintain.clicked.connect(self._deploy_maintenance)
@@ -1901,9 +1905,9 @@ class MainWindow(QMainWindow):
         self.btn_stop_all = QPushButton("⏹ 退出服务")
         self.btn_stop_all.setStyleSheet("""
             QPushButton {
-                background-color: #1565C0;
-                color: white;
-                border: 2px solid #1976D2;
+                background-color: #424242;
+                color: #E0E0E0;
+                border: 2px solid #616161;
                 border-radius: 8px;
                 padding: 12px 20px;
                 font-size: 13px;
@@ -1911,10 +1915,10 @@ class MainWindow(QMainWindow):
                 transition: all 0.3s ease;
             }
             QPushButton:hover {
-                background-color: #1976D2;
-                border-color: #1976D2;
+                background-color: #616161;
+                border-color: #757575;
                 transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
+                box-shadow: 0 4px 8px rgba(97, 97, 97, 0.3);
             }
         """)
         self.btn_stop_all.clicked.connect(self._stop_all_services)
@@ -1980,9 +1984,9 @@ class MainWindow(QMainWindow):
         if checked:
             self.auto_scroll_switch.setStyleSheet("""
                 QPushButton {
-                    background-color: #2E7D32;
+                    background-color: #C62828;
                     color: white;
-                    border: 1px solid #388E3C;
+                    border: 1px solid #D32F2F;
                     border-radius: 4px;
                     padding: 4px 10px;
                     font-size: 11px;
@@ -1992,9 +1996,9 @@ class MainWindow(QMainWindow):
         else:
             self.auto_scroll_switch.setStyleSheet("""
                 QPushButton {
-                    background-color: #424242;
-                    color: white;
-                    border: 1px solid #616161;
+                    background-color: #2D2D2D;
+                    color: #AAAAAA;
+                    border: 1px solid #444444;
                     border-radius: 4px;
                     padding: 4px 10px;
                     font-size: 11px;
@@ -5529,7 +5533,7 @@ try {
                     download_btn = QPushButton("下载")
                     download_btn.setStyleSheet("""
                         QPushButton {
-                            background-color: #1565C0;
+                            background-color: #C62828;
                             color: white;
                             border: none;
                             border-radius: 3px;
@@ -5538,7 +5542,7 @@ try {
                             font-weight: normal;
                         }
                         QPushButton:hover {
-                            background-color: #1976D2;
+                            background-color: #D32F2F;
                         }
                         QPushButton:disabled {
                             background-color: #333333;
@@ -5569,7 +5573,7 @@ try {
                             font-size: 10px;
                         }
                         QProgressBar::chunk {
-                            background-color: #1976D2;
+                            background-color: #C62828;
                             border-radius: 2px;
                         }
                     """)
