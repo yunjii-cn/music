@@ -1098,5 +1098,16 @@
     ],
     "build_time": "2026-05-12T07:19:14.759248",
     "version_number": "2026.05.12.0717"
+  },
+  "云集智能音乐创意台-v2026.05.12.0808": {
+    "version": "云集智能音乐创意台-v2026.05.12.0808",
+    "changes": [
+      "修复pyproject.toml版本冲突(torch2.9.0/移除torchvision/transformers<5.0)",
+      "依赖检测从70秒优化到3秒(单次Python进程)",
+      "移除pyproject.toml安装方式避免降级",
+      "统一version_constraints版本约束"
+    ],
+    "build_time": "2026-05-12T08:10:13.882188",
+    "version_number": "2026.05.12.0808"
   }
 }

@@ -1,5 +1,18 @@
 [
   {
+    "version": "2026.05.12.0808",
+    "date": "2026-05-12 08:10",
+    "message": "修复pyproject.toml版本冲突(torch2.9.0/移除torchvision/transformers<5.0)",
+    "changes": [
+      "修复pyproject.toml版本冲突(torch2.9.0/移除torchvision/transformers<5.0)",
+      "依赖检测从70秒优化到3秒(单次Python进程)",
+      "移除pyproject.toml安装方式避免降级",
+      "统一version_constraints版本约束"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0808.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.05.12.0717",
     "date": "2026-05-12 07:19",
     "message": "修复Python依赖检测：显示具体缺失依赖名",

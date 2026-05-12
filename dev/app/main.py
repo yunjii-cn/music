@@ -3556,73 +3556,8 @@ class MainWindow(QMainWindow):
         
         self._log(f"[信息] 共 {len(missing)} 个依赖缺失，开始安装...")
         
-        pyproject_toml = os.path.join(scripts_dir, "pyproject.toml")
-        
-        if os.path.exists(pyproject_toml):
-            self._log("[信息] 使用 uv pip install 从 pyproject.toml 安装完整依赖...")
-            try:
-                process = hidden_popen(
-                    [uv_path, "pip", "install", "--python", venv_python, "-r", "pyproject.toml", "--index-strategy", "unsafe-best-match"],
-                    cwd=scripts_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    env=env
-                )
-                stdout, _ = process.communicate(timeout=1800)
-                if stdout:
-                    for line in stdout.splitlines():
-                        if line.strip():
-                            self._log(f"[安装依赖] {line.strip()}")
-                if process.returncode == 0:
-                    self._log("✓ 完整依赖安装完成")
-                    return
-                else:
-                    self._log(f"[警告] uv pip install -r pyproject.toml 返回码: {process.returncode}", "#FF9800")
-                    if "Failed to read" in stdout and "dist-info" in stdout:
-                        import re
-                        broken = re.findall(r"Failed to read `(\S+)==(\S+)`", stdout)
-                        if broken:
-                            for pkg, ver in broken:
-                                self._log(f"[信息] 修复损坏的包: {pkg}=={ver}", "#FF9800")
-                                fix_process = hidden_popen(
-                                    [uv_path, "pip", "install", "--python", venv_python, "--force-reinstall", f"{pkg}=={ver}"],
-                                    cwd=scripts_dir,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT,
-                                    text=True,
-                                    env=env
-                                )
-                                fix_process.communicate(timeout=120)
-                            self._log("[信息] 损坏包已修复，重新安装完整依赖...")
-                            retry_process = hidden_popen(
-                                [uv_path, "pip", "install", "--python", venv_python, "-r", "pyproject.toml", "--index-strategy", "unsafe-best-match"],
-                                cwd=scripts_dir,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                text=True,
-                                env=env
-                            )
-                            retry_stdout, _ = retry_process.communicate(timeout=1800)
-                            if retry_stdout:
-                                for line in retry_stdout.splitlines():
-                                    if line.strip():
-                                        self._log(f"[安装依赖] {line.strip()}")
-                            if retry_process.returncode == 0:
-                                self._log("✓ 完整依赖安装完成")
-                                return
-                            else:
-                                self._log("[警告] 重试安装仍然失败", "#FF9800")
-            except subprocess.TimeoutExpired:
-                process.kill()
-                self._log("[警告] uv pip install -r pyproject.toml 超时", "#FF9800")
-            except Exception as e:
-                self._log(f"[警告] uv pip install -r pyproject.toml 失败: {e}", "#FF9800")
-        
-        self._log("[信息] 使用 uv pip install 直接安装缺失依赖...")
-        
         version_constraints = {
-            "transformers": "transformers>=4.51.0,<4.58.0",
+            "transformers": "transformers>=4.51.0,<5.0",
             "peft": "peft>=0.18.0",
             "diffusers": "diffusers",
             "loguru": "loguru>=0.7.3",
@@ -3630,11 +3565,19 @@ class MainWindow(QMainWindow):
             "lycoris": "lycoris-lora",
             "fastapi": "fastapi>=0.110.0",
             "uvicorn": "uvicorn[standard]>=0.27.0",
-            "gradio": "gradio==6.2.0",
+            "gradio": "gradio>=6.2.0",
             "accelerate": "accelerate>=1.12.0",
             "scipy": "scipy>=1.10.1",
             "soundfile": "soundfile>=0.13.1",
             "einops": "einops>=0.8.1",
+            "matplotlib": "matplotlib>=3.7.5",
+            "diskcache": "diskcache",
+            "numba": "numba>=0.63.1",
+            "lightning": "lightning>=2.0.0",
+            "tensorboard": "tensorboard>=2.0.0",
+            "modelscope": "modelscope",
+            "huggingface_hub": "huggingface_hub",
+            "safetensors": "safetensors",
         }
         
         basic_deps = [version_constraints.get(d, d) for d in missing if d not in ("torch", "torchaudio")]
@@ -3749,24 +3692,30 @@ class MainWindow(QMainWindow):
         """快速检查关键依赖是否已安装 - 返回缺失依赖列表（空列表表示全部OK）"""
         
         deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "lycoris", "fastapi", "uvicorn", "accelerate", "scipy", "soundfile", "einops", "matplotlib", "diskcache", "numba", "lightning", "tensorboard", "modelscope", "huggingface_hub", "safetensors"]
-        missing = []
         
+        check_code = "import json; results={};\n"
         for dep in deps_to_check:
-            try:
-                process = hidden_popen(
-                    [venv_python, "-c", f"import {dep}"],
-                    cwd=self.base_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                stdout, stderr = process.communicate(timeout=10)
-                if process.returncode != 0:
-                    missing.append(dep)
-            except Exception:
-                missing.append(dep)
+            check_code += f"try:\n    import {dep}; results['{dep}']=True\nexcept:\n    results['{dep}']=False\n"
+        check_code += "print(json.dumps(results))"
         
-        return missing
+        try:
+            process = hidden_popen(
+                [venv_python, "-c", check_code],
+                cwd=self.base_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = process.communicate(timeout=60)
+            if process.returncode == 0 and stdout.strip():
+                import json
+                results = json.loads(stdout.strip())
+                missing = [dep for dep, ok in results.items() if not ok]
+                return missing
+        except Exception:
+            pass
+        
+        return deps_to_check
     
     def _verify_dependencies(self, venv_python):
         """验证关键依赖是否安装，区分必须依赖和可选加速项"""
@@ -3806,24 +3755,35 @@ class MainWindow(QMainWindow):
         all_ok = True
         
         self._log("[信息] 验证必须依赖...")
+        check_code = "import json; results={};\n"
         for dep, desc in required_deps:
-            try:
-                process = hidden_popen(
-                    [venv_python, "-c", f"import {dep}"],
-                    cwd=self.base_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                stdout, stderr = process.communicate(timeout=30)
-                if process.returncode == 0:
-                    self._log(f"✓ {dep} ({desc}) 已安装")
-                else:
-                    self._log(f"✗ {dep} ({desc}) 未安装", "#FF9800")
+            check_code += f"try:\n    import {dep}; results['{dep}']=True\nexcept:\n    results['{dep}']=False\n"
+        check_code += "print(json.dumps(results))"
+        try:
+            process = hidden_popen(
+                [venv_python, "-c", check_code],
+                cwd=self.base_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = process.communicate(timeout=60)
+            if process.returncode == 0 and stdout.strip():
+                import json
+                results = json.loads(stdout.strip())
+                for dep, desc in required_deps:
+                    if results.get(dep, False):
+                        self._log(f"✓ {dep} ({desc}) 已安装")
+                    else:
+                        self._log(f"✗ {dep} ({desc}) 未安装", "#FF9800")
+                        all_ok = False
+            else:
+                for dep, desc in required_deps:
+                    self._log(f"✗ {dep} ({desc}) 检测失败", "#FF9800")
                     all_ok = False
-            except Exception as e:
-                self._log(f"✗ 检查 {dep} 失败: {e}", "#FF9800")
-                all_ok = False
+        except Exception as e:
+            self._log(f"✗ 依赖检测失败: {e}", "#FF9800")
+            all_ok = False
         
         try:
             process = hidden_popen(
@@ -3840,7 +3800,7 @@ class MainWindow(QMainWindow):
                 self._log("[信息] 正在自动修复: 降级 transformers...", "#FF9800")
                 try:
                     uv_path = os.path.expanduser("~/.local/bin/uv.exe")
-                    fix_cmd = [uv_path, "pip", "install", "--python", venv_python, "transformers>=4.51.0,<4.58.0"] if os.path.exists(uv_path) else [venv_python, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"]
+                    fix_cmd = [uv_path, "pip", "install", "--python", venv_python, "transformers>=4.51.0,<5.0"] if os.path.exists(uv_path) else [venv_python, "-m", "pip", "install", "transformers>=4.51.0,<5.0", "--quiet"]
                     fix_process = hidden_popen(
                         fix_cmd,
                         cwd=self.base_dir,
@@ -4223,7 +4183,7 @@ class MainWindow(QMainWindow):
             # 5. 安装项目依赖
             self._log("5. 检查项目依赖...")
             try:
-                venv_python = os.path.join(scripts_dir, ".venv", "Scripts", "python.exe")
+                venv_python = self._find_venv_python()
                 pyproject_toml_path = os.path.join(scripts_dir, "pyproject.toml")
                 install_env_ps1 = os.path.join(scripts_dir, "install-env.ps1")
                 
@@ -4869,22 +4829,30 @@ try {
                     "huggingface_hub": "huggingface_hub",
                     "safetensors": "safetensors",
                 }
+                check_code = "import json; results={};\n"
+                for dep_module in REQUIRED_DEPS.keys():
+                    check_code += f"try:\n    import {dep_module}; results['{dep_module}']=True\nexcept:\n    results['{dep_module}']=False\n"
+                check_code += "print(json.dumps(results))"
                 all_ok = True
                 failed_deps = []
-                for dep_module, dep_name in REQUIRED_DEPS.items():
-                    try:
-                        process = hidden_popen(
-                            [venv_python, "-c", f"import {dep_module}"],
-                            cwd=self.base_dir,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-                        )
-                        stdout, stderr = process.communicate(timeout=10)
-                        if process.returncode != 0:
-                            all_ok = False
-                            failed_deps.append(dep_module)
-                    except:
+                try:
+                    process = hidden_popen(
+                        [venv_python, "-c", check_code],
+                        cwd=self.base_dir,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                    )
+                    stdout, stderr = process.communicate(timeout=60)
+                    if process.returncode == 0 and stdout.strip():
+                        import json
+                        results = json.loads(stdout.strip())
+                        failed_deps = [dep for dep, ok in results.items() if not ok]
+                        all_ok = len(failed_deps) == 0
+                    else:
                         all_ok = False
-                        failed_deps.append(dep_module)
+                        failed_deps = list(REQUIRED_DEPS.keys())
+                except:
+                    all_ok = False
+                    failed_deps = list(REQUIRED_DEPS.keys())
                 if failed_deps:
                     self._failed_deps_cache = failed_deps
                 else:
