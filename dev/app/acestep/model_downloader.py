@@ -36,6 +36,10 @@ _CHECKPOINT_TO_VARIANT: Dict[str, str] = {
     "acestep-v15-turbo-fix-inst-shift-continous": "turbo",
     "acestep-v15-turbo-fix-inst-shift-dynamic": "turbo",
     "acestep-v15-turbo-rl": "turbo",
+    # XL models share the xl model code (4B DiT)
+    "acestep-v15-xl-turbo": "xl_turbo",
+    "acestep-v15-xl-sft": "xl_sft",
+    "acestep-v15-xl-base": "xl_base",
 }
 
 
@@ -304,6 +308,10 @@ SUBMODEL_REGISTRY: Dict[str, str] = {
     "acestep-v15-base": "ACE-Step/acestep-v15-base",
     "acestep-v15-turbo-shift1": "ACE-Step/acestep-v15-turbo-shift1",
     "acestep-v15-turbo-continuous": "ACE-Step/acestep-v15-turbo-continuous",
+    # XL models (4B DiT, requires >=12GB VRAM)
+    "acestep-v15-xl-turbo": "ACE-Step/acestep-v15-xl-turbo",
+    "acestep-v15-xl-sft": "ACE-Step/acestep-v15-xl-sft",
+    "acestep-v15-xl-base": "ACE-Step/acestep-v15-xl-base",
 }
 
 # Components that come from the main model repo (ACE-Step/Ace-Step1.5)
@@ -360,6 +368,19 @@ MODEL_VALIDATION_INFO = {
     "acestep-v15-turbo-continuous": {
         "files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"],
         "min_size": 1.5e9  # ~1.5GB
+    },
+    # XL models (4B DiT, ~18.8GB bf16 weights)
+    "acestep-v15-xl-turbo": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"],
+        "min_size": 15e9  # ~15GB
+    },
+    "acestep-v15-xl-sft": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"],
+        "min_size": 15e9  # ~15GB
+    },
+    "acestep-v15-xl-base": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"],
+        "min_size": 15e9  # ~15GB
     }
 }
 

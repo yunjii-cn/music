@@ -6291,6 +6291,10 @@ for d in deps:
             "acestep-v15-turbo-shift1": "1.5TS1",
             "acestep-v15-turbo-shift3": "1.5TS3",
             "acestep-v15-turbo-continuous": "1.5TC",
+            # XL models (4B DiT, requires >=12GB VRAM)
+            "acestep-v15-xl-turbo": "XL-T",
+            "acestep-v15-xl-sft": "XL-S",
+            "acestep-v15-xl-base": "XL-B",
             "acestep-5Hz-lm-0.6B": "LM 0.6B",
             "acestep-5Hz-lm-1.7B": "LM 1.7B",
             "acestep-5Hz-lm-4B": "LM 4B",
@@ -6372,6 +6376,22 @@ for d in deps:
                 "repo": "ACE-Step/acestep-v15-turbo-continuous",
                 "description": "Turbo Continuous模型，适合长音频生成，稳定性极佳。",
                 "info": "Turbo系列，支持连续生成，适合长音频创作，稳定性极佳，能生成连贯的完整音乐作品。",
+            },
+            # XL models (4B DiT, requires >=12GB VRAM)
+            "acestep-v15-xl-turbo": {
+                "repo": "ACE-Step/acestep-v15-xl-turbo",
+                "description": "XL Turbo快速模型（4B DiT），8步推理，音质极佳，需要≥12GB VRAM。",
+                "info": "4B参数DiT解码器，Turbo蒸馏加速仅需8步推理，音频质量显著优于2B模型。最低12GB VRAM（offload+INT8），推荐20GB+。",
+            },
+            "acestep-v15-xl-sft": {
+                "repo": "ACE-Step/acestep-v15-xl-sft",
+                "description": "XL SFT微调模型（4B DiT），50步推理，品质最高，需要≥12GB VRAM。",
+                "info": "4B参数DiT解码器，经过监督微调，品质最高，适合专业音乐创作。最低12GB VRAM，推荐20GB+。",
+            },
+            "acestep-v15-xl-base": {
+                "repo": "ACE-Step/acestep-v15-xl-base",
+                "description": "XL 基础模型（4B DiT），50步推理，多样性最高，支持extract/lego/complete。",
+                "info": "4B参数DiT解码器，多样性最高，支持所有高级任务（音频提取、Lego拼接、完整生成）。最低12GB VRAM，推荐20GB+。",
             },
         }
 

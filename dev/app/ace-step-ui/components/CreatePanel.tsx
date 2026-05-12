@@ -431,7 +431,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
-    // 总是显示所有模型，不依赖后端返回
     return [
       { id: 'acestep-v15-base', name: 'acestep-v15-base' },
       { id: 'acestep-v15-sft', name: 'acestep-v15-sft' },
@@ -439,10 +438,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       { id: 'acestep-v15-turbo-shift1', name: 'acestep-v15-turbo-shift1' },
       { id: 'acestep-v15-turbo-shift3', name: 'acestep-v15-turbo-shift3' },
       { id: 'acestep-v15-turbo-continuous', name: 'acestep-v15-turbo-continuous' },
+      { id: 'acestep-v15-xl-turbo', name: 'acestep-v15-xl-turbo' },
+      { id: 'acestep-v15-xl-sft', name: 'acestep-v15-xl-sft' },
+      { id: 'acestep-v15-xl-base', name: 'acestep-v15-xl-base' },
     ];
   }, []);
 
-  // Map model ID to short display name
   const getModelDisplayName = (modelId: string): string => {
     const mapping: Record<string, string> = {
       'acestep-v15-base': '1.5B',
@@ -451,13 +452,19 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       'acestep-v15-turbo-shift3': '1.5TS3',
       'acestep-v15-turbo-continuous': '1.5TC',
       'acestep-v15-turbo': '1.5T',
+      'acestep-v15-xl-turbo': 'XL-T',
+      'acestep-v15-xl-sft': 'XL-S',
+      'acestep-v15-xl-base': 'XL-B',
     };
     return mapping[modelId] || modelId;
   };
 
-  // Check if model is a turbo variant
   const isTurboModel = (modelId: string): boolean => {
     return modelId.includes('turbo');
+  };
+
+  const isXlModel = (modelId: string): boolean => {
+    return modelId.startsWith('acestep-v15-xl');
   };
 
   // Genre selection state (cascading)
@@ -1895,7 +1902,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                         'acestep-v15-turbo': 'Turbo快速模型，生成速度快，适合快速迭代和测试想法。',
                         'acestep-v15-turbo-shift1': 'Turbo Shift 1模型，平衡速度与质量，是日常创作的首选。',
                         'acestep-v15-turbo-shift3': 'Turbo Shift 3模型，质量更好的快速模型，推荐用于正式创作。',
-                        'acestep-v15-turbo-continuous': 'Turbo Continuous模型，适合长音频生成，稳定性极佳。'
+                        'acestep-v15-turbo-continuous': 'Turbo Continuous模型，适合长音频生成，稳定性极佳。',
+                        'acestep-v15-xl-turbo': 'XL Turbo 4B模型，最高音质，8步快速推理，需要≥12GB VRAM。',
+                        'acestep-v15-xl-sft': 'XL SFT 4B模型，最高品质，50步精细推理，需要≥12GB VRAM。',
+                        'acestep-v15-xl-base': 'XL Base 4B模型，最高多样性，支持extract/lego/complete高级任务，需要≥12GB VRAM。',
                       };
                       const modelDescription = descriptions[model.id] || '';
                       
