@@ -1,5 +1,17 @@
 [
   {
+    "version": "2026.05.12.0813",
+    "date": "2026-05-12 08:15",
+    "message": "部署维护自动化：缺失依赖直接安装不再运行完整脚本",
+    "changes": [
+      "部署维护自动化：缺失依赖直接安装不再运行完整脚本",
+      "统一所有安装路径使用_install_missing_dependencies",
+      "移除uv_sync和install-env.ps1修复方式避免降级"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0813.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.05.12.0808",
     "date": "2026-05-12 08:10",
     "message": "修复pyproject.toml版本冲突(torch2.9.0/移除torchvision/transformers<5.0)",
