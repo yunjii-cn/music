@@ -6,17 +6,20 @@ param(
 )
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
+# 修复路径问题：ace-step-ui 在 scripts 的父目录（即 dev/app/）下
 # Set environment variables - 工作目录设为脚本父目录（项目根目录）
 Set-Location (Split-Path $PSScriptRoot -Parent)
-$env:PYTHONPATH = "$(Split-Path $PSScriptRoot -Parent)$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
+$project_root = Split-Path $PSScriptRoot -Parent
+$data_dir = Join-Path $project_root "..\data"
+$env:PYTHONPATH = "$project_root$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
 
-$Env:HF_HOME = "huggingface"
+$Env:HF_HOME = Join-Path $data_dir "huggingface"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:PILLOW_IGNORE_XMP_DATA_IS_TOO_LONG = "1"
 $Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 $Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
-$Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
+$Env:UV_CACHE_DIR = Join-Path $data_dir ".uv_cache"
 $Env:UV_NO_BUILD_ISOLATION = "1"
 $Env:UV_NO_CACHE = "0"
 $Env:UV_LINK_MODE = "symlink"
@@ -37,7 +40,7 @@ $ext_args = [System.Collections.ArrayList]::new()
 [void]$ext_args.Add($ServerHost)
 
 # Directly use virtual environment python to avoid uv pyproject.toml checks
-$venv_dir = "scripts\.venv"
+$venv_dir = Join-Path (Split-Path $PSScriptRoot -Parent) "..\data\.venv"
 $python_exe = Join-Path $venv_dir "Scripts\python.exe"
 
 if (-not (Test-Path $python_exe)) {
@@ -49,7 +52,6 @@ Write-Output "Starting API server..."
 Write-Output "Python path: $env:PYTHONPATH"
 Write-Output "Working directory: $(Get-Location)"
 Write-Output "Using Python: $python_exe"
-Write-Output "Venv dir: $venv_dir"
 
 # First test if we can import the necessary modules
 Write-Output "Testing imports..."

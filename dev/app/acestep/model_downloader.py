@@ -159,6 +159,38 @@ def _can_access_google(timeout: float = 3.0) -> bool:
         sock.close()
 
 
+def _merge_dir(src, dst):
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            if os.path.isdir(d):
+                _merge_dir(s, d)
+            else:
+                shutil.move(s, d)
+        elif not os.path.exists(d):
+            shutil.move(s, d)
+
+
+def _flatten_nested_models_dir(local_dir):
+    nested_dir = os.path.join(str(local_dir), "models")
+    if not os.path.isdir(nested_dir):
+        return
+    logger.info(f"[Model Download] Flattening nested models directory: {nested_dir} -> {local_dir}")
+    for item in os.listdir(nested_dir):
+        src = os.path.join(nested_dir, item)
+        dst = os.path.join(str(local_dir), item)
+        if os.path.isdir(src):
+            if os.path.isdir(dst):
+                _merge_dir(src, dst)
+                shutil.rmtree(src)
+            else:
+                shutil.move(src, dst)
+        elif not os.path.exists(dst):
+            shutil.move(src, dst)
+    shutil.rmtree(nested_dir)
+
+
 def _download_from_huggingface_internal(
     repo_id: str,
     local_dir: Path,
@@ -186,6 +218,8 @@ def _download_from_huggingface_internal(
         token=token,
     )
 
+    _flatten_nested_models_dir(local_dir)
+
 
 def _download_from_modelscope_internal(
     repo_id: str,
@@ -209,6 +243,8 @@ def _download_from_modelscope_internal(
         model_id=repo_id,
         local_dir=str(local_dir),
     )
+
+    _flatten_nested_models_dir(local_dir)
 
 
 def _smart_download(
@@ -420,20 +456,13 @@ def get_checkpoints_dir(custom_dir: Optional[str] = None) -> Path:
     """Get the checkpoints directory path."""
     if custom_dir:
         return Path(custom_dir)
-    # Use shared config manager for checkpoints directory
     try:
         from shared.config_manager import config_manager
         return Path(config_manager.get_checkpoints_dir())
     except ImportError:
-        # Fallback to local calculation, try models first, then checkpoints
-        project_root = Path(__file__).resolve().parent.parent
-        models_dir = project_root / "models"
-        checkpoints_dir = project_root / "checkpoints"
-        
-        # Prefer models directory if it exists
-        if models_dir.exists():
-            return models_dir
-        return checkpoints_dir
+        app_dir = Path(__file__).resolve().parent.parent
+        project_root = app_dir.parent
+        return project_root / "data" / "models"
 
 
 def check_main_model_exists(checkpoints_dir: Optional[Path] = None) -> bool:

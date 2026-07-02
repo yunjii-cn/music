@@ -1,29 +1,27 @@
 # ============================================
-# Git管理范围说明
+# Git管理范围说明 - 三目录结构
 # ============================================
-# Git只管理：
+# 三目录：
+# - dev/   开发目录（Git管理 dev/app/ 和 dev/ver/）
+# - dist/  分发目录（EXE构建输出，Git不管理）
+# - test/  测试目录（Git管理测试脚本）
+#
+# Git管理：
 # - .claude/ (AI技能配置)
 # - .githooks/ (Git钩子)
 # - .github/ (GitHub配置)
 # - docs/ (文档)
 # - .gitignore (本文件)
 # - .gitmodules (Git子模块)
-# - dev/app/ (纯净整合包文件夹)
+# - dev/app/ (纯净整合包文件夹 - 仅源代码和脚本)
 # - dev/ver/ (稳定版本EXE列表)
+# - test/ (测试脚本)
 #
 # Git不管理：
-# - dev/*.exe (开发测试用的临时EXE)
-# - dev/app/.cache/ (缓存)
-# - dev/app/.venv/ (虚拟环境)
-# - dev/app/checkpoints/ (模型)
-# - dev/app/models/ (模型)
-# - dev/app/output/ (输出)
-# - dev/app/temp/ (临时文件)
-# - dev/app/gradio_outputs/ (Gradio输出)
-# - dev/app/huggingface/ (Huggingface缓存)
-# - dev/app/logs/ (日志)
-# - dev/app/nodejs/ (Node.js)
-# - dev/app/tools/ (工具)
+# - dist/ (EXE构建输出)
+# - dev/data/ (用户数据：模型、虚拟环境、输出等)
+# - dev/temp/ (临时文件：缓存、日志等)
+# - ver/ (正式版本EXE，手动放入)
 # - build/ (版本历史)
 # - pack/ (本地发布包)
 # - BAK/ (备份目录)
@@ -89,20 +87,23 @@ MANIFEST
 # 忽略 dev/ 下的临时EXE，但是不忽略 dev/ver/ 下的稳定版本EXE
 dev/*.exe
 !dev/ver/*.exe
-dev/app/.cache/
-dev/app/.venv/
-dev/app/checkpoints/
-dev/app/models/
-dev/app/output/
-dev/app/temp/
-dev/app/gradio_outputs/
-dev/app/huggingface/
-dev/app/logs/
-dev/app/nodejs/
-dev/app/tools/
+
+# dev/data/ - 用户数据目录（Git不管理）
+dev/data/
+
+# dev/temp/ - 临时文件目录（Git不管理）
+dev/temp/
+
+# dev/app/ 下的运行时产物（Git不管理）
 dev/app/build/
 dev/app/dist/
 dev/app/*.spec
+
+# dist/ - EXE构建输出目录（Git不管理）
+dist/
+
+# ver/ - 正式版本EXE目录（Git不管理）
+ver/
 
 # build目录 - 版本历史，不提交到Git
 build/
@@ -351,6 +352,8 @@ version/*.zip
 # IDE and editor files
 .vscode/
 .idea/
+.lingma/
+.windsurf/
 *.swp
 *.swo
 *~

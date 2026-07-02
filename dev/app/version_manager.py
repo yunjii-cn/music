@@ -181,9 +181,9 @@ class _GitFetchWorker(QThread):
 class HybridVersionManagerDialog(QDialog):
     """混合模式版本管理器 - 支持Git和EXE两种模式"""
 
-    def __init__(self, parent=None, base_dir=None, as_widget=False):
+    def __init__(self, parent=None, project_root=None, as_widget=False):
         super().__init__(parent)
-        self.base_dir = base_dir
+        self.project_root = project_root
         self.as_widget = as_widget
         self.setWindowTitle("版本管理器")
         self.setMinimumSize(950, 650)
@@ -228,8 +228,8 @@ class HybridVersionManagerDialog(QDialog):
     def _load_local_version_history(self):
         self.version_history = {}
         possible_paths = [
-            Path(self.base_dir) / 'version_history.json',
-            Path(self.base_dir) / 'dist' / 'version_history.json',
+            Path(self.project_root) / 'app' / 'version_history.json',
+            Path(self.project_root).parent / 'dist' / 'version_history.json',
         ]
         if hasattr(sys, '_MEIPASS'):
             possible_paths.append(Path(sys._MEIPASS) / 'version_history.json')
@@ -252,7 +252,7 @@ class HybridVersionManagerDialog(QDialog):
 
     def _check_git_repo(self):
         try:
-            current_dir = Path(self.base_dir)
+            current_dir = Path(self.project_root)
             while current_dir.parent != current_dir:
                 git_dir = current_dir / ".git"
                 if git_dir.exists() and git_dir.is_dir():
@@ -537,10 +537,10 @@ class HybridVersionManagerDialog(QDialog):
     def _get_local_exe_versions(self):
         local_versions = {}
         ver_dirs = []
-        ver_dir = Path(self.base_dir) / "ver"
+        ver_dir = Path(self.project_root) / "ver"
         if ver_dir.exists():
             ver_dirs.append(ver_dir)
-        dev_dir = Path(self.base_dir).parent
+        dev_dir = Path(self.project_root)
         alt_ver = dev_dir / "ver"
         if alt_ver.exists() and alt_ver not in ver_dirs:
             ver_dirs.append(alt_ver)
@@ -567,8 +567,8 @@ class HybridVersionManagerDialog(QDialog):
                             'name': exe_file.name,
                         }
 
-        if Path(self.base_dir).exists():
-            for exe_file in Path(self.base_dir).glob("*.exe"):
+        if Path(self.project_root).exists():
+            for exe_file in Path(self.project_root).glob("*.exe"):
                 match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
                 if match:
                     version = match.group(1)
@@ -1119,7 +1119,7 @@ class HybridVersionManagerDialog(QDialog):
 
                 result = subprocess.run(
                     ["git", "checkout", full_sha],
-                    cwd=self.base_dir,
+                    cwd=self.project_root,
                     startupinfo=si,
                     creationflags=creation_flags,
                     capture_output=True,

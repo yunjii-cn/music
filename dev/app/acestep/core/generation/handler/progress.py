@@ -9,10 +9,19 @@ from typing import Optional
 
 class ProgressMixin:
     def _get_project_root(self) -> str:
-        """Get project root directory path."""
-        import os
+        """Get project root directory path (dev/app/)."""
         from pathlib import Path
         return str(Path(__file__).resolve().parent.parent.parent.parent.parent)
+
+    def _get_data_dir(self) -> str:
+        """Get data directory path (dev/data/)."""
+        import os
+        return os.path.join(os.path.dirname(self._get_project_root()), "data")
+
+    def _get_temp_dir(self) -> str:
+        """Get temp directory path (dev/temp/)."""
+        import os
+        return os.path.join(os.path.dirname(self._get_project_root()), "temp")
 
     def _load_progress_estimates(self) -> None:
         """Load persisted diffusion progress estimates if available."""

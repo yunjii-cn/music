@@ -5,19 +5,19 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "ACE-Step 统一启动脚本" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 
-# 获取项目根目录
-$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$ProjectRoot = Split-Path -Parent $ProjectRoot
+# 获取项目根目录（scripts 的父目录）
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ProjectRoot = Split-Path -Parent $ScriptDir
 
 Write-Host "项目根目录: $ProjectRoot" -ForegroundColor Cyan
 
 # 启动API服务器
 Write-Host "\n[1/2] 启动 API 服务器..." -ForegroundColor Yellow
 $ApiServerJob = Start-Job -ScriptBlock {
-    param($Root)
+    param($Root, $ScriptDir)
     Set-Location $Root
-    & "$Root\3、run_server.ps1"
-} -ArgumentList $ProjectRoot
+    & "$ScriptDir\3、run_server.ps1"
+} -ArgumentList $ProjectRoot, $ScriptDir
 
 # 等待API服务器启动
 Start-Sleep -Seconds 3

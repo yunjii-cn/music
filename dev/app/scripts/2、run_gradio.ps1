@@ -18,16 +18,17 @@ param(
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
 # Set environment variables - go up one directory to project root
+# 修复路径问题：ace-step-ui 在 scripts 的父目录（即 dev/app/）下
 $project_root = Split-Path -Parent $PSScriptRoot
+$data_dir = Join-Path $project_root "..\data"
 Set-Location $project_root
 $env:PYTHONPATH = "$project_root$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
 
-# 设置环境变量 - 所有缓存都存储在项目目录，避免占用C盘
-$Env:HF_HOME = Join-Path $project_root "huggingface"
+$Env:HF_HOME = Join-Path $data_dir "huggingface"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
-$Env:UV_CACHE_DIR = Join-Path $project_root ".uv_cache"
+$Env:UV_CACHE_DIR = Join-Path $data_dir ".uv_cache"
 $Env:UV_NO_BUILD_ISOLATION = "1"
 $Env:UV_NO_CACHE = "0"
 $Env:UV_LINK_MODE = "symlink"
@@ -100,7 +101,7 @@ if ($AuthPassword -ne "none") {
 }
 
 # Directly use virtual environment python to avoid uv issues
-$venv_dir = "scripts\.venv"
+$venv_dir = Join-Path $project_root "..\data\.venv"
 $python_exe = Join-Path $venv_dir "Scripts\python.exe"
 
 if (-not (Test-Path $python_exe)) {

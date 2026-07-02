@@ -17,9 +17,6 @@
     "last_tab": 0
   },
   "service_settings": {
-    "music": {
-      "auto_open": true
-    },
     "api": {
       "auto_open": false
     },
@@ -28,10 +25,13 @@
     },
     "backend": {
       "auto_open": false
+    },
+    "music": {
+      "auto_open": true
     }
   },
   "browser": {
-    "default": "Chrome",
+    "default": "🌐 Chrome",
     "custom_path": ""
   }
 }

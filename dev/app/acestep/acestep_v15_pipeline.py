@@ -272,6 +272,7 @@ def main():
             # Get project root (same logic as in handler)
             current_file = os.path.abspath(__file__)
             project_root = os.path.dirname(os.path.dirname(current_file))
+            data_root = os.path.join(os.path.dirname(project_root), "data")
             
             # Determine flash attention setting
             use_flash_attention = args.use_flash_attention
@@ -330,7 +331,7 @@ def main():
                         args.init_llm = False
                 
                 if args.init_llm and args.lm_model_path:
-                    checkpoint_dir = os.path.join(project_root, "checkpoints")
+                    checkpoint_dir = os.path.join(data_root, "checkpoints")
 
                     # Ensure LM model is downloaded before initialization
                     prefer_source = None

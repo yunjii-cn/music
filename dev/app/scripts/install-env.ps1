@@ -5,6 +5,7 @@ $ErrorActionPreference = "Stop"
 
 # 切换到脚本所在目录，确保所有操作都在 scripts/ 目录下进行
 Set-Location $PSScriptRoot
+$data_dir = Join-Path $PSScriptRoot "..\..\data"
 
 Write-Output ""
 Write-Output "============================================================"
@@ -14,11 +15,11 @@ Write-Output ""
 Write-Output "📂 工作目录: $PWD"
 Write-Output ""
 
-# 配置国内镜像源
 Write-Output "🔧 配置国内镜像源..."
 $Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 $Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
-$Env:UV_CACHE_DIR = "${env:LOCALAPPDATA}/uv/cache"
+$Env:UV_CACHE_DIR = Join-Path $data_dir ".uv_cache"
+$Env:HF_HOME = Join-Path $data_dir "huggingface"
 Write-Output "   PyPI 镜像: https://pypi.tuna.tsinghua.edu.cn/simple/"
 Write-Output "   PyTorch 镜像: https://download.pytorch.org/whl/cu128"
 Write-Output ""
@@ -72,8 +73,8 @@ Write-Output "  步骤 3: 创建/激活虚拟环境"
 Write-Output "============================================================"
 Write-Output ""
 
-$venv_dir = ".venv"
-$venv_activate = "$venv_dir\Scripts\Activate.ps1"
+$venv_dir = Join-Path $PSScriptRoot "..\..\data\.venv"
+$venv_activate = Join-Path $venv_dir "Scripts\Activate.ps1"
 
 # 检查现有虚拟环境的 PyTorch 版本
 $needs_reinstall = $false
@@ -127,11 +128,15 @@ if (Test-Path $venv_activate) {
 
 # 创建或使用虚拟环境
 if (-not (Test-Path $venv_activate)) {
-    Write-Output "📦 创建新虚拟环境 (.venv)"
-    ~/.local/bin/uv venv -p 3.12 --seed
+    Write-Output "📦 创建新虚拟环境 (data\.venv)"
+    $data_dir = Join-Path $PSScriptRoot "..\..\data"
+    if (-not (Test-Path $data_dir)) {
+        New-Item -ItemType Directory -Path $data_dir -Force | Out-Null
+    }
+    ~/.local/bin/uv venv -p 3.12 --seed $venv_dir
     . $venv_activate
 } else {
-    Write-Output "✅ 使用现有虚拟环境 (.venv)"
+    Write-Output "✅ 使用现有虚拟环境 (data\.venv)"
     . $venv_activate
 }
 
@@ -157,7 +162,7 @@ Write-Output "✅ PyTorch 生态系统安装完成"
 Write-Output ""
 Write-Output "📦 安装项目依赖..."
 Write-Output "   正在安装 transformers, diffusers, gradio 等核心依赖..."
-~/.local/bin/uv pip install transformers diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba peft lycoris-lora lightning tensorboard modelscope huggingface_hub safetensors
+~/.local/bin/uv pip install transformers diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba peft lycoris-lora lightning tensorboard modelscope huggingface_hub safetensors vector-quantize-pytorch
 if ($LASTEXITCODE -eq 0) {
     Write-Output "✅ 项目依赖安装完成"
 }

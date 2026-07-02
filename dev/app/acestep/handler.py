@@ -137,8 +137,8 @@ class AceStepHandler(
         self._progress_estimates_lock = threading.Lock()
         self._progress_estimates = {"records": []}
         self._progress_estimates_path = os.path.join(
-            self._get_project_root(),
-            ".cache",
+            self._get_temp_dir(),
+            "cache",
             "acestep",
             "progress_estimates.json",
         )

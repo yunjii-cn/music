@@ -621,7 +621,8 @@ def create_openrouter_router(app_state_getter) -> APIRouter:
         import os
         from pathlib import Path
         project_root = Path(__file__).resolve().parent.parent
-        checkpoint_dir = project_root / "checkpoints"
+        data_root = project_root.parent / "data"
+        checkpoint_dir = data_root / "checkpoints"
         
         # Scan all model directories in checkpoints folder
         if checkpoint_dir.exists() and checkpoint_dir.is_dir():

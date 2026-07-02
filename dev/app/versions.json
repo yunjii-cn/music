@@ -1,5 +1,95 @@
 [
   {
+    "version": "2026.05.26.0502",
+    "date": "2026-05-26 05:04",
+    "message": "改用 --console 模式调试闪退问题",
+    "changes": [
+      "改用 --console 模式调试闪退问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0502.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0447",
+    "date": "2026-05-26 04:49",
+    "message": "改用 --hide-console hide-early 替代 --windowed",
+    "changes": [
+      "改用 --hide-console hide-early 替代 --windowed"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0447.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0430",
+    "date": "2026-05-26 04:32",
+    "message": "修复 windowed 模式下 _NullWriter 导致闪退",
+    "changes": [
+      "修复 windowed 模式下 _NullWriter 导致闪退"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0430.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0336",
+    "date": "2026-05-26 03:38",
+    "message": "重构目录结构和路径解析，参考视频创意站三目录原则",
+    "changes": [
+      "重构目录结构和路径解析，参考视频创意站三目录原则"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0336.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0133",
+    "date": "2026-05-26 01:34",
+    "message": "修复 base_dir 支持 dev/app/ 兄弟目录查找",
+    "changes": [
+      "修复 base_dir 支持 dev/app/ 兄弟目录查找"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0133.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0131",
+    "date": "2026-05-26 01:31",
+    "message": "修复 base_dir 路径解析优先查找真实源码目录",
+    "changes": [
+      "修复 base_dir 路径解析优先查找真实源码目录"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0131.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0120",
+    "date": "2026-05-26 01:20",
+    "message": "修复 base_dir 路径解析优先查找真实源码目录",
+    "changes": [
+      "修复 base_dir 路径解析优先查找真实源码目录"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0120.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0117",
+    "date": "2026-05-26 01:17",
+    "message": "修复 frozen 模式下脚本找不到和 base_dir 路径解析问题",
+    "changes": [
+      "修复 frozen 模式下脚本找不到和 base_dir 路径解析问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0117.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0043",
+    "date": "2026-05-26 00:43",
+    "message": "修复 qt.conf 缺失导致 Qt 平台插件加载失败",
+    "changes": [
+      "修复 qt.conf 缺失导致 Qt 平台插件加载失败"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0043.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.05.12.0918",
     "date": "2026-05-12 09:20",
     "message": "架构升级：adapter适配层+acestep-sync同步脚本",

@@ -19,6 +19,9 @@ from PyQt6.QtGui import QFont
 from git_detector import GitDetector, GitInstallDialog
 from git_downloader import ensure_git_available_silent
 
+_APP_NAME_PARTS = [0x4e91, 0x96c6, 0x667a, 0x80fd, 0x97f3, 0x4e50, 0x521b, 0x610f, 0x53f0]
+_APP_NAME = "".join(chr(c) for c in _APP_NAME_PARTS)
+
 
 class InitStep:
     """初始化步骤"""
@@ -36,9 +39,9 @@ class InitWorker(QThread):
     step_completed = pyqtSignal(str, bool, str)  # 步骤名, 是否成功, 消息
     finished = pyqtSignal(bool, str)  # 是否成功, 消息
     
-    def __init__(self, base_dir):
+    def __init__(self, data_dir):
         super().__init__()
-        self.base_dir = Path(base_dir)
+        self.data_dir = Path(data_dir)
         self.config = {}
     
     def run(self):
@@ -130,7 +133,7 @@ class InitWorker(QThread):
         
         created = []
         for dir_name in dirs:
-            dir_path = self.base_dir / dir_name
+            dir_path = self.data_dir / dir_name
             if not dir_path.exists():
                 dir_path.mkdir(parents=True, exist_ok=True)
                 created.append(dir_name)
@@ -149,7 +152,7 @@ class InitWorker(QThread):
         self.config['init_time'] = datetime.now().isoformat()
         self.config['version'] = "1.0.0"
         
-        config_file = self.base_dir / 'config' / 'init_config.json'
+        config_file = self.data_dir / 'config' / 'init_config.json'
         config_file.parent.mkdir(parents=True, exist_ok=True)
         
         with open(config_file, 'w', encoding='utf-8') as f:
@@ -161,9 +164,10 @@ class InitWorker(QThread):
 class InitWizardDialog(QDialog):
     """初始化向导对话框"""
     
-    def __init__(self, base_dir=None, parent=None):
+    def __init__(self, app_dir=None, data_dir=None, parent=None):
         super().__init__(parent)
-        self.base_dir = Path(base_dir) if base_dir else Path.cwd()
+        self.app_dir = Path(app_dir) if app_dir else Path.cwd()
+        self.data_dir = Path(data_dir) if data_dir else Path.cwd()
         self.worker = None
         
         self.setWindowTitle("初始化向导")
@@ -185,7 +189,7 @@ class InitWizardDialog(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
         
         # 标题
-        title_label = QLabel("🚀 欢迎使用云集智能音乐创意台")
+        title_label = QLabel(f"🚀 欢迎使用{_APP_NAME}")
         title_label.setFont(QFont("Microsoft YaHei", 18, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #FFFFFF;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -333,7 +337,7 @@ class InitWizardDialog(QDialog):
     
     def _start_init(self):
         """开始初始化"""
-        self.worker = InitWorker(self.base_dir)
+        self.worker = InitWorker(self.data_dir)
         self.worker.progress_updated.connect(self._on_progress_updated)
         self.worker.step_completed.connect(self._on_step_completed)
         self.worker.finished.connect(self._on_finished)
@@ -368,11 +372,11 @@ class InitWizardDialog(QDialog):
             # 静默检查Git是否可用（不弹对话框）
             git_cmd = None
             try:
-                git_cmd, git_ok = ensure_git_available_silent(self.base_dir)
+                git_cmd, git_ok = ensure_git_available_silent(self.app_dir)
                 if git_ok and git_cmd:
                     # 更新配置，记录Git路径
                     import json
-                    config_file = self.base_dir / 'config' / 'init_config.json'
+                    config_file = self.data_dir / 'config' / 'init_config.json'
                     if config_file.exists():
                         with open(config_file, 'r', encoding='utf-8') as f:
                             config = json.load(f)
@@ -401,20 +405,18 @@ class InitWizardDialog(QDialog):
                 widget.name_label.setStyleSheet("color: #F44336;")
 
 
-def is_initialized(base_dir):
-    """检查是否已初始化"""
-    config_file = Path(base_dir) / 'config' / 'init_config.json'
+def is_initialized(data_dir):
+    config_file = Path(data_dir) / 'config' / 'init_config.json'
     return config_file.exists()
 
 
-def auto_check_and_update_config(base_dir):
-    """自动检测并更新配置信息"""
+def auto_check_and_update_config(data_dir):
     import json
     import platform
     import psutil
     from datetime import datetime
     
-    config_file = Path(base_dir) / 'config' / 'init_config.json'
+    config_file = Path(data_dir) / 'config' / 'init_config.json'
     
     config = {}
     

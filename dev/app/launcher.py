@@ -1,61 +1,88 @@
 import sys
 import os
+import ctypes
+import ctypes.wintypes
+import time
 
-if sys.platform == 'win32':
-    try:
-        import ctypes
-        ctypes.windll.kernel32.FreeConsole()
-    except Exception:
-        pass
+if sys.platform == 'win32' and getattr(sys, 'frozen', False):
+    class _NullWriter:
+        def write(self, *args, **kwargs):
+            return 0
+        def flush(self):
+            pass
+        def isatty(self):
+            return False
+    if sys.stdout is None:
+        sys.stdout = _NullWriter()
+    if sys.stderr is None:
+        sys.stderr = _NullWriter()
 
-    import subprocess as _subprocess
 
-    if not getattr(_subprocess, '_pyi_hidden_patched', False):
-        def _ensure_hidden(kwargs):
-            si = kwargs.get('startupinfo', None)
-            if si is None:
-                si = _subprocess.STARTUPINFO()
-            si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0
-            kwargs['startupinfo'] = si
-            flags = _subprocess.CREATE_NO_WINDOW
-            if 'creationflags' in kwargs:
-                kwargs['creationflags'] = kwargs['creationflags'] | flags
-            else:
-                kwargs['creationflags'] = flags
-            return kwargs
+def _kill_old_instances():
+    if sys.platform != 'win32' or not getattr(sys, 'frozen', False):
+        return
 
-        _orig_popen_init = _subprocess.Popen.__init__
-        def _patched_popen_init(self, *args, **kwargs):
-            kwargs = _ensure_hidden(kwargs)
-            _orig_popen_init(self, *args, **kwargs)
-        _subprocess.Popen.__init__ = _patched_popen_init
+    my_exe = os.path.normcase(os.path.abspath(sys.executable))
+    my_name = os.path.basename(my_exe)
 
-        _orig_run = _subprocess.run
-        def _patched_run(*args, **kwargs):
-            kwargs = _ensure_hidden(kwargs)
-            return _orig_run(*args, **kwargs)
-        _subprocess.run = _patched_run
+    dash_v = my_name.find('-v')
+    if dash_v <= 0:
+        return
+    base_name = my_name[:dash_v].lower()
 
-        _orig_call = _subprocess.call
-        def _patched_call(*args, **kwargs):
-            kwargs = _ensure_hidden(kwargs)
-            return _orig_call(*args, **kwargs)
-        _subprocess.call = _patched_call
+    kernel32 = ctypes.windll.kernel32
 
-        _orig_check_call = _subprocess.check_call
-        def _patched_check_call(*args, **kwargs):
-            kwargs = _ensure_hidden(kwargs)
-            return _orig_check_call(*args, **kwargs)
-        _subprocess.check_call = _patched_check_call
+    TH32CS_SNAPPROCESS = 0x00000002
+    INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
-        _orig_check_output = _subprocess.check_output
-        def _patched_check_output(*args, **kwargs):
-            kwargs = _ensure_hidden(kwargs)
-            return _orig_check_output(*args, **kwargs)
-        _subprocess.check_output = _patched_check_output
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", ctypes.wintypes.DWORD),
+            ("cntUsage", ctypes.wintypes.DWORD),
+            ("th32ProcessID", ctypes.wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+            ("th32ModuleID", ctypes.wintypes.DWORD),
+            ("cntThreads", ctypes.wintypes.DWORD),
+            ("th32ParentProcessID", ctypes.wintypes.DWORD),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", ctypes.wintypes.DWORD),
+            ("szExeFile", ctypes.c_wchar * 260),
+        ]
 
-        _subprocess._pyi_hidden_patched = True
+    snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snap == INVALID_HANDLE_VALUE:
+        return
+
+    entry = PROCESSENTRY32W()
+    entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+
+    my_pid = kernel32.GetCurrentProcessId()
+    pids_to_kill = []
+
+    if kernel32.Process32FirstW(snap, ctypes.byref(entry)):
+        while True:
+            pid = entry.th32ProcessID
+            exe_name = entry.szExeFile.lower()
+            if pid != my_pid and exe_name.startswith(base_name) and exe_name.endswith('.exe'):
+                pids_to_kill.append(pid)
+            entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+            if not kernel32.Process32NextW(snap, ctypes.byref(entry)):
+                break
+
+    kernel32.CloseHandle(snap)
+
+    PROCESS_TERMINATE = 0x0001
+    for pid in pids_to_kill:
+        handle = kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
+        if handle:
+            kernel32.TerminateProcess(handle, 0)
+            kernel32.CloseHandle(handle)
+
+    if pids_to_kill:
+        time.sleep(0.5)
+
+
+_kill_old_instances()
 
 try:
     import pyi_splash
@@ -64,4 +91,10 @@ except Exception:
     pass
 
 import main
+
+try:
+    pyi_splash.close()
+except Exception:
+    pass
+
 main.main()

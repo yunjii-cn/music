@@ -150,7 +150,8 @@ class LLMHandler:
             return os.path.join(self.persistent_storage_path, "checkpoints")
         current_file = os.path.abspath(__file__)
         project_root = os.path.dirname(os.path.dirname(current_file))
-        return os.path.join(project_root, "checkpoints")
+        data_root = os.path.join(os.path.dirname(project_root), "data")
+        return os.path.join(data_root, "checkpoints")
 
     def get_available_5hz_lm_models(self) -> List[str]:
         """Scan and return all model directory names starting with 'acestep-5Hz-lm-'"""

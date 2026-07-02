@@ -7,7 +7,7 @@
 核心功能:
 - 环境维护与检测
 - 模型管理界面
-- 项目服务启动（青龙训练器、官方音乐演练场等）
+- 项目服务启动（青龙 LoRA 训练器等）
 - 版本管理器集成
 - 日志显示和UI更新
 
@@ -76,6 +76,10 @@ if sys.platform == 'win32':
             return _orig_call(*args, **kwargs)
         _subprocess.call = _patched_call
 
+        # Clear proxy env that may affect httpx/gradio import (SOCKS proxy triggers socksio requirement)
+        for proxy_var in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'all_proxy']:
+            os.environ.pop(proxy_var, None)
+
         _orig_check_call = _subprocess.check_call
         def _patched_check_call(*args, **kwargs):
             kwargs = _ensure_hidden(kwargs)
@@ -94,6 +98,7 @@ import subprocess
 import threading
 import socket
 import traceback
+import winreg
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
@@ -141,14 +146,14 @@ from PyQt6.QtWidgets import (
     QMenu, QStyle, QComboBox, QFileDialog, QLineEdit, QStackedWidget, QSizePolicy, QDialog,
     QSplashScreen
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QPropertyAnimation, QRectF, pyqtProperty
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QPropertyAnimation, QRectF, pyqtProperty, QSize
 from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPainter, QPixmap, QLinearGradient
 
 # Version manager - lazy imported
 
 # Version based on executable filename
 def get_version_from_filename():
-    """从可执行文件名称中提取版本号"""
+    """从可执行文件名称中提取版本号；开发模式下追加 -dev 后缀"""
     try:
         if hasattr(sys, 'frozen'):
             exe_path = sys.executable
@@ -157,25 +162,17 @@ def get_version_from_filename():
             match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_name)
             if match:
                 return match.group(1)
-        return datetime.now().strftime("%Y.%m.%d.%H%M")
+        return datetime.now().strftime("%Y.%m.%d.%H%M") + "-dev"
     except:
-        return datetime.now().strftime("%Y.%m.%d.%H%M")
+        return datetime.now().strftime("%Y.%m.%d.%H%M") + "-dev"
 
 VERSION = get_version_from_filename()
 
 # 项目定义
 PROJECTS = {
-    "music": {
-        "name": "官方音乐演练场",
+    "qinglong": {
+        "name": "青龙 LoRA 训练器",
         "services": {
-            "gradio": {
-                "name": "官方音乐演练场",
-                "port": 7860,
-                "script": "scripts/2、run_gradio.ps1",
-                "url": "http://127.0.0.1:7860",
-                "color": "#E53935",
-                "icon": "🎵"
-            },
             "api": {
                 "name": "API 服务",
                 "port": 8001,
@@ -184,12 +181,7 @@ PROJECTS = {
                 "color": "#E53935",
                 "icon": "🔌",
                 "is_core": True
-            }
-        }
-    },
-    "qinglong": {
-        "name": "青龙 LoRA 训练器",
-        "services": {
+            },
             "backend": {
                 "name": "青龙后端",
                 "port": 3001,
@@ -402,8 +394,8 @@ class ServiceProcess(QThread):
             
             if self.service_id == "qinglong_frontend" and "qinglong_backend" in SERVICES:
                 cmd.extend(["-BackendPort", str(SERVICES["qinglong_backend"]["port"])])
-            elif self.service_id == "qinglong_backend" and "music_api" in SERVICES:
-                cmd.extend(["-ApiPort", str(SERVICES["music_api"]["port"])])
+            elif self.service_id == "qinglong_backend" and "qinglong_api" in SERVICES:
+                cmd.extend(["-ApiPort", str(SERVICES["qinglong_api"]["port"])])
             
             env = os.environ.copy()
             env["SERVICE_PORT"] = str(self.service_info["port"])
@@ -413,8 +405,8 @@ class ServiceProcess(QThread):
             elif self.service_id == "qinglong_backend":
                 if "qinglong_frontend" in SERVICES:
                     env["FRONTEND_URL"] = f"http://localhost:{SERVICES['qinglong_frontend']['port']}"
-                if "music_api" in SERVICES:
-                    env["ACESTEP_API_URL"] = f"http://localhost:{SERVICES['music_api']['port']}"
+                if "qinglong_api" in SERVICES:
+                    env["ACESTEP_API_URL"] = f"http://localhost:{SERVICES['qinglong_api']['port']}"
             
             self.process = hidden_popen(
                 cmd,
@@ -919,14 +911,13 @@ class ConfigManager:
             "version": VERSION,
             "services": {
                 "auto_start": False,
-                "start_sequence": ["music", "api", "frontend", "backend"]
+                "start_sequence": ["api", "backend", "frontend"]
             },
             "ui": {
                 "window_size": {"width": 1200, "height": 850},
                 "last_tab": 0
             },
             "service_settings": {
-                "music": {"auto_open": True},
                 "api": {"auto_open": False},
                 "frontend": {"auto_open": True},
                 "backend": {"auto_open": False}
@@ -1329,8 +1320,12 @@ class SplashScreen(QSplashScreen):
             for name in ('icon.png', 'icon.ico'):
                 p = os.path.join(base, name)
                 if os.path.exists(p):
-                    self._icon_pixmap = QPixmap(p)
-                    break
+                    if name.endswith('.ico'):
+                        self._icon_pixmap = QIcon(p).pixmap(QSize(256, 256))
+                    else:
+                        self._icon_pixmap = QPixmap(p)
+                    if not self._icon_pixmap.isNull():
+                        break
         except Exception:
             pass
 
@@ -1344,17 +1339,10 @@ class SplashScreen(QSplashScreen):
     progress = pyqtProperty(float, _get_progress, _set_progress)
 
     def set_progress(self, value, message=""):
+        self._progress = value
         if message:
             self._message = message
-        anim = QPropertyAnimation(self, b"progress")
-        anim.setDuration(300)
-        anim.setStartValue(self._progress)
-        anim.setEndValue(value)
-        anim.start()
-        self._anim = anim
-        if message:
-            self._message = message
-            self.repaint()
+        self.repaint()
 
     def drawContents(self, painter):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -1414,6 +1402,7 @@ class MainWindow(QMainWindow):
     def __init__(self, splash=None):
         super().__init__()
         self._splash = splash
+        self._force_exit = False
         self.setWindowTitle(f"云集智能音乐创意台 v{VERSION}")
         self.setStyleSheet("""
             QMainWindow {
@@ -1448,8 +1437,8 @@ class MainWindow(QMainWindow):
             if os.path.exists(app_dir):
                 self.base_dir = app_dir
         else:
-            self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            while not os.path.exists(os.path.join(self.base_dir, 'acestep')) and not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1')):
+            self.base_dir = os.path.dirname(os.path.abspath(__file__))
+            while not os.path.exists(os.path.join(self.base_dir, 'acestep')) and not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1')) and not os.path.exists(os.path.join(self.base_dir, 'scripts', 'install-env.ps1')):
                 parent_dir = os.path.dirname(self.base_dir)
                 if parent_dir == self.base_dir:
                     break
@@ -1459,6 +1448,7 @@ class MainWindow(QMainWindow):
         self.service_cards: Dict[str, ServiceCard] = {}
         self.api_process = None
         self.is_starting = False
+        self._running_services_count = 0
         self.current_project = "qinglong"
         self.browsers = {"系统默认": "system"}
         self.selected_browser = "system"
@@ -1588,14 +1578,6 @@ class MainWindow(QMainWindow):
         self.btn_home.clicked.connect(lambda: self._switch_page(0))
         nav_bar_layout.addWidget(self.btn_home)
         
-        self.btn_version_nav = QPushButton("🔄 软件更新")
-        self.btn_version_nav.setCheckable(True)
-        self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_version_nav.setStyleSheet(menu_button_style)
-        self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
-        nav_bar_layout.addWidget(self.btn_version_nav)
-        
         self.btn_deploy_nav = QPushButton("⚙️ 部署维护")
         self.btn_deploy_nav.setCheckable(True)
         self.btn_deploy_nav.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1611,6 +1593,14 @@ class MainWindow(QMainWindow):
         self.btn_model_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_model_nav.clicked.connect(lambda: self._switch_page(1))
         nav_bar_layout.addWidget(self.btn_model_nav)
+        
+        self.btn_version_nav = QPushButton("🔄 软件更新")
+        self.btn_version_nav.setCheckable(True)
+        self.btn_version_nav.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_version_nav.setStyleSheet(menu_button_style)
+        self.btn_version_nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_version_nav.clicked.connect(lambda: self._switch_page(2))
+        nav_bar_layout.addWidget(self.btn_version_nav)
         
         main_layout.addWidget(nav_bar)
         
@@ -1636,46 +1626,49 @@ class MainWindow(QMainWindow):
             self._splash.set_progress(0.2, "正在初始化框架...")
     
     def _deferred_init(self):
-        if self._splash:
-            self._splash.set_progress(0.3, "正在加载配置...")
-        
+        if self._home_loaded:
+            return
+        from PyQt6.QtWidgets import QApplication
+        app = QApplication.instance()
+
+        def _pulse(msg, val):
+            if self._splash:
+                self._splash.set_progress(val, msg)
+            if app:
+                app.processEvents()
+
+        _pulse("正在加载配置...", 0.3)
         self.config = ConfigManager(self.base_dir)
-        
-        if self._splash:
-            self._splash.set_progress(0.4, "正在检测浏览器...")
-        
+
+        _pulse("正在检测浏览器...", 0.4)
         self.browsers = self._detect_browsers()
         self.selected_browser = self.config.get("browser.default", "system")
         self.custom_browser_path = self.config.get("browser.custom_path", "")
         if self.custom_browser_path and os.path.exists(self.custom_browser_path):
             self.browsers["自定义浏览器"] = self.custom_browser_path
         self.selected_download_source = self.config.get("download.source", "auto")
-        
-        if self._splash:
-            self._splash.set_progress(0.5, "正在构建主界面...")
-        
+
+        _pulse("正在构建主界面...", 0.5)
+
         while self.home_layout.count():
             item = self.home_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        
-        self._populate_home_page()
-        
-        if self._splash:
-            self._splash.set_progress(0.75, "正在启动监控...")
-        
+
+        self._populate_home_page(_pulse)
+
+        _pulse("正在启动监控...", 0.75)
         self._setup_monitor()
         self._setup_tray()
-        
+
         size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
         self.resize(size["width"], size["height"])
-        
+
         self._home_loaded = True
-        
-        if self._splash:
-            self._splash.set_progress(1.0, "加载完成！")
+
+        _pulse("加载完成！", 1.0)
     
-    def _populate_home_page(self):
+    def _populate_home_page(self, _pulse=None):
         """填充首页内容到已有的home_layout"""
         
         # 日志区域（高度紧凑结构：系统信息+日志融合）
@@ -1837,7 +1830,10 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(self.log_output)
         
         self.home_layout.addWidget(self.log_group, 1)
-        
+
+        if _pulse:
+            _pulse("正在构建控制面板...", 0.55)
+
         # 服务区域容器（用于展开/收起）
         self.services_container = QWidget()
         self.services_layout = QVBoxLayout(self.services_container)
@@ -1853,7 +1849,7 @@ class MainWindow(QMainWindow):
         # 加载系统信息或显示初始化流程（延迟执行，避免启动时弹窗）
         QTimer.singleShot(500, self._check_and_load_system_info)
         
-        # 1. 浏览器设置面板 - 一排横向布局
+        # 1. 浏览器设置面板 - 单排三栏饱满布局
         browser_panel = QFrame()
         browser_panel.setStyleSheet("""
             QFrame {
@@ -1868,26 +1864,45 @@ class MainWindow(QMainWindow):
             }
         """)
         browser_layout = QHBoxLayout(browser_panel)
-        browser_layout.setSpacing(12)
-        browser_layout.setContentsMargins(12, 10, 12, 10)
-        
-        browser_label = QLabel("🌐 浏览器:")
-        browser_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #FFFFFF;")
-        browser_layout.addWidget(browser_label)
-        
+        browser_layout.setSpacing(10)
+        browser_layout.setContentsMargins(10, 10, 10, 10)
+
+        # 统一的内联卡片样式
+        def _make_browser_section(inner_layout):
+            section = QFrame()
+            section.setStyleSheet("""
+                QFrame {
+                    background-color: #252525;
+                    border: 1px solid #333333;
+                    border-radius: 6px;
+                }
+            """)
+            section_layout = QHBoxLayout(section)
+            section_layout.setSpacing(8)
+            section_layout.setContentsMargins(10, 8, 10, 8)
+            section_layout.addLayout(inner_layout)
+            return section
+
+        # 第1栏：浏览器选择
+        browser_sel_layout = QHBoxLayout()
+        browser_sel_layout.setSpacing(8)
+        browser_label = QLabel("🌐 浏览器")
+        browser_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #B0B0B0;")
+        browser_sel_layout.addWidget(browser_label)
+
         self.browser_combo = QComboBox()
         self.browser_combo.setStyleSheet("""
             QComboBox {
-                background-color: #252525;
+                background-color: #1A1A1A;
                 color: #FFFFFF;
-                border: 1px solid #333333;
-                border-radius: 4px;
+                border: 1px solid #444444;
+                border-radius: 6px;
                 padding: 6px 30px 6px 10px;
                 font-size: 12px;
-                min-width: 180px;
+                min-width: 150px;
             }
             QComboBox:hover {
-                border-color: #444444;
+                border-color: #555555;
             }
             QComboBox:focus {
                 border-color: #1976D2;
@@ -1906,9 +1921,9 @@ class MainWindow(QMainWindow):
                 right: 8px;
             }
             QComboBox QAbstractItemView {
-                background-color: #252525;
-                border: 1px solid #333333;
-                border-radius: 4px;
+                background-color: #1A1A1A;
+                border: 1px solid #444444;
+                border-radius: 6px;
                 outline: none;
                 selection-background-color: #C62828;
                 selection-color: #FFFFFF;
@@ -1917,18 +1932,14 @@ class MainWindow(QMainWindow):
                 padding: 6px 10px;
             }
         """)
-        
-        # 添加浏览器选项，包括自定义选项
+
+        # 添加浏览器选项
         for browser_name, browser_path in self.browsers.items():
             self.browser_combo.addItem(browser_name, browser_path)
-        
-        # 添加自定义浏览器选项
         self.browser_combo.addItem("📁 自定义浏览器...", "custom")
-        
-        # 设置当前选中的浏览器
+
         is_custom = self.selected_browser == "自定义浏览器" or self.selected_browser == "custom"
         if is_custom and self.custom_browser_path:
-            # 如果是自定义模式，检查是否在列表中
             found = False
             for i in range(self.browser_combo.count()):
                 if self.browser_combo.itemText(i) == self.selected_browser:
@@ -1936,53 +1947,58 @@ class MainWindow(QMainWindow):
                     found = True
                     break
             if not found:
-                # 选择自定义选项
                 for i in range(self.browser_combo.count()):
                     if self.browser_combo.itemData(i) == "custom":
                         self.browser_combo.setCurrentIndex(i)
                         break
         else:
-            # 选择系统浏览器
             for i in range(self.browser_combo.count()):
                 if self.browser_combo.itemText(i) == self.selected_browser:
                     self.browser_combo.setCurrentIndex(i)
                     break
-        
-        # 保存浏览器选择
+
         self.browser_combo.currentIndexChanged.connect(self._on_browser_changed)
-        
-        browser_layout.addWidget(self.browser_combo)
-        
-        # 自定义浏览器路径（默认隐藏）
+        browser_sel_layout.addWidget(self.browser_combo, 1)
+        browser_sel_section = _make_browser_section(browser_sel_layout)
+        browser_layout.addWidget(browser_sel_section, 1)
+
+        # 第2栏：浏览器路径（始终显示，非自定义时只读）
+        browser_path_layout = QHBoxLayout()
+        browser_path_layout.setSpacing(8)
+        path_label = QLabel("📁 路径")
+        path_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #B0B0B0;")
+        browser_path_layout.addWidget(path_label)
+
         self.browser_path_edit = QLineEdit()
-        self.browser_path_edit.setReadOnly(False)
-        self.browser_path_edit.setPlaceholderText("粘贴或输入浏览器路径...")
+        self.browser_path_edit.setReadOnly(True)
+        self.browser_path_edit.setPlaceholderText("选择浏览器后显示路径...")
         self.browser_path_edit.setStyleSheet("""
             QLineEdit {
-                background-color: #121212;
-                color: #F0F0F0;
-                border: 1px solid #333333;
+                background-color: #1A1A1A;
+                color: #A0A0A0;
+                border: 1px solid #444444;
                 border-radius: 6px;
-                padding: 8px 10px;
+                padding: 6px 10px;
                 font-size: 12px;
             }
-            QLineEdit:hover, QLineEdit:focus {
-                border-color: #1976D2;
+            QLineEdit:hover {
+                border-color: #555555;
+            }
+            QLineEdit:enabled {
+                color: #F0F0F0;
             }
         """)
-        self.browser_path_edit.setText(self.custom_browser_path)
-        self.browser_path_edit.setVisible(is_custom)
-        self.browser_path_edit.textChanged.connect(self._on_custom_browser_path_changed)
-        browser_layout.addWidget(self.browser_path_edit, 1)
-        
+        browser_path_layout.addWidget(self.browser_path_edit, 1)
+
         self.btn_select_browser = QPushButton("📂 选择")
+        self.btn_select_browser.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_select_browser.setStyleSheet("""
             QPushButton {
                 background-color: #1565C0;
                 color: #E0E0E0;
                 border: 1px solid #1976D2;
                 border-radius: 6px;
-                padding: 8px 16px;
+                padding: 6px 14px;
                 font-size: 12px;
                 font-weight: bold;
             }
@@ -1993,41 +2009,35 @@ class MainWindow(QMainWindow):
         """)
         self.btn_select_browser.clicked.connect(self._select_custom_browser)
         self.btn_select_browser.setVisible(is_custom)
-        browser_layout.addWidget(self.btn_select_browser)
-        
-        settings_layout.addWidget(browser_panel)
-        
-        self.services_layout.addWidget(settings_container)
-        
-        music_project = PROJECTS["music"]
-        self.music_group = QFrame()
-        self.music_group.setFrameShape(QFrame.Shape.NoFrame)
-        self.music_group.setStyleSheet("""
-            QFrame {
-                background-color: #1A1A1A;
-                border: 1px solid #2A2A2A;
+        browser_path_layout.addWidget(self.btn_select_browser)
+        browser_path_section = _make_browser_section(browser_path_layout)
+        browser_layout.addWidget(browser_path_section, 2)
+
+        # 第3栏：使用说明按钮（带图标文字）
+        self.btn_help = QPushButton("📖 使用说明")
+        self.btn_help.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_help.setStyleSheet("""
+            QPushButton {
+                background-color: #263238;
+                color: #FFFFFF;
+                border: 1px solid #37474F;
                 border-radius: 6px;
+                padding: 8px 18px;
+                font-size: 12px;
+                font-weight: bold;
             }
-            QFrame QLabel {
-                border: none;
-                background: transparent;
+            QPushButton:hover {
+                background-color: #37474F;
+                border-color: #546E7A;
             }
         """)
-        music_layout = QGridLayout(self.music_group)
-        
-        col = 0
-        for service_id, service in music_project["services"].items():
-            full_service_id = f"music_{service_id}"
-            card = ServiceCard(full_service_id)
-            card.restart_clicked.connect(self._restart_service)
-            card.open_clicked.connect(self._open_service)
-            card.port_changed.connect(self._on_port_changed)
-            music_layout.addWidget(card, 0, col)
-            self.service_cards[full_service_id] = card
-            col += 1
-        
-        self.services_layout.addWidget(self.music_group)
-        
+        self.btn_help.clicked.connect(self._show_help_dialog)
+        browser_layout.addWidget(self.btn_help, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        settings_layout.addWidget(browser_panel)
+
+        self.services_layout.addWidget(settings_container)
+
         qinglong_project = PROJECTS["qinglong"]
         self.qinglong_group = QFrame()
         self.qinglong_group.setFrameShape(QFrame.Shape.NoFrame)
@@ -2043,7 +2053,7 @@ class MainWindow(QMainWindow):
             }
         """)
         qinglong_layout = QGridLayout(self.qinglong_group)
-        
+
         col = 0
         for service_id, service in qinglong_project["services"].items():
             full_service_id = f"qinglong_{service_id}"
@@ -2054,113 +2064,102 @@ class MainWindow(QMainWindow):
             qinglong_layout.addWidget(card, 0, col)
             self.service_cards[full_service_id] = card
             col += 1
-        
+
         self.services_layout.addWidget(self.qinglong_group)
-        
-        # 功能按钮区域
-        start_btn_layout = QVBoxLayout()
-        
-        function_buttons = QHBoxLayout()
-        function_buttons.setSpacing(15)
-        
-        self.btn_deploy_maintain = QPushButton("⚙️ 部署维护")
-        self.btn_deploy_maintain.setStyleSheet("""
+
+        # 底部操作栏：三按钮布局，中间按钮占一半宽度
+        bottom_bar = QHBoxLayout()
+        bottom_bar.setSpacing(12)
+        bottom_bar.setContentsMargins(0, 6, 0, 0)
+
+        # 左侧：重启服务
+        self.btn_bottom_restart = QPushButton("🔄 重启服务")
+        self.btn_bottom_restart.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_bottom_restart.setFixedHeight(44)
+        self.btn_bottom_restart.setStyleSheet("""
             QPushButton {
                 background-color: #1565C0;
                 color: white;
                 border: 2px solid #1976D2;
                 border-radius: 8px;
-                padding: 12px 20px;
+                padding: 10px 18px;
                 font-size: 13px;
                 font-weight: bold;
-                transition: all 0.3s ease;
             }
             QPushButton:hover {
                 background-color: #1976D2;
                 border-color: #1E88E5;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
             }
-        """)
-        self.btn_deploy_maintain.clicked.connect(lambda: self._switch_page(3))
-        function_buttons.addWidget(self.btn_deploy_maintain)
-        
-        self.btn_stop_all = QPushButton("⏹ 退出服务")
-        self.btn_stop_all.setStyleSheet("""
-            QPushButton {
+            QPushButton:disabled {
                 background-color: #424242;
-                color: #E0E0E0;
-                border: 2px solid #616161;
-                border-radius: 8px;
-                padding: 12px 20px;
-                font-size: 13px;
-                font-weight: bold;
-                transition: all 0.3s ease;
-            }
-            QPushButton:hover {
-                background-color: #616161;
-                border-color: #757575;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(97, 97, 97, 0.3);
+                border-color: #616161;
+                color: #888888;
             }
         """)
-        self.btn_stop_all.clicked.connect(self._stop_all_services)
-        function_buttons.addWidget(self.btn_stop_all)
-        
-        start_btn_layout.addLayout(function_buttons)
-        
-        # 启动按钮区域（放在最下面）
-        start_buttons = QHBoxLayout()
-        start_buttons.setSpacing(20)
-        
-        self.btn_start_music = QPushButton("🎵 启动官方音乐演练场")
-        self.btn_start_music.setStyleSheet("""
-            QPushButton {
-                background-color: #E53935;
-                color: white;
-                border: 2px solid #E53935;
-                border-radius: 8px;
-                padding: 14px 24px;
-                font-size: 14px;
-                font-weight: bold;
-                transition: all 0.3s ease;
-            }
-            QPushButton:hover {
-                background-color: #C62828;
-                border-color: #C62828;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(229, 57, 53, 0.3);
-            }
-        """)
-        self.btn_start_music.clicked.connect(lambda: self._start_project("music"))
-        start_buttons.addWidget(self.btn_start_music)
-        
-        self.btn_start_qinglong = QPushButton("🎨 启动青龙 LoRA 训练器")
+        self.btn_bottom_restart.clicked.connect(self._restart_all_services)
+        bottom_bar.addWidget(self.btn_bottom_restart, 1)
+
+        # 中间：启动音乐创意台（占一半宽度）
+        self.btn_start_qinglong = QPushButton("🎵 启动音乐创意台")
+        self.btn_start_qinglong.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_start_qinglong.setFixedHeight(48)
         self.btn_start_qinglong.setStyleSheet("""
             QPushButton {
                 background-color: #E53935;
                 color: white;
                 border: 2px solid #E53935;
-                border-radius: 8px;
-                padding: 14px 24px;
-                font-size: 14px;
+                border-radius: 10px;
+                padding: 12px 24px;
+                font-size: 16px;
                 font-weight: bold;
-                transition: all 0.3s ease;
             }
             QPushButton:hover {
                 background-color: #C62828;
                 border-color: #C62828;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(229, 57, 53, 0.3);
+            }
+            QPushButton:disabled {
+                background-color: #424242;
+                border-color: #616161;
+                color: #AAAAAA;
             }
         """)
         self.btn_start_qinglong.clicked.connect(lambda: self._start_project("qinglong"))
-        start_buttons.addWidget(self.btn_start_qinglong)
-        
-        start_btn_layout.addLayout(start_buttons)
-        self.services_layout.addLayout(start_btn_layout)
-        
+        bottom_bar.addWidget(self.btn_start_qinglong, 2)
+
+        # 右侧：停止服务
+        self.btn_bottom_stop = QPushButton("⏹ 停止服务")
+        self.btn_bottom_stop.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_bottom_stop.setFixedHeight(44)
+        self.btn_bottom_stop.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                color: #E0E0E0;
+                border: 2px solid #616161;
+                border-radius: 8px;
+                padding: 10px 18px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #616161;
+                border-color: #757575;
+            }
+            QPushButton:disabled {
+                background-color: #424242;
+                border-color: #616161;
+                color: #888888;
+            }
+        """)
+        self.btn_bottom_stop.clicked.connect(self._stop_all_services)
+        bottom_bar.addWidget(self.btn_bottom_stop, 1)
+
+        self.services_layout.addLayout(bottom_bar)
+
         self.home_layout.addWidget(self.services_container)
+
+        if _pulse:
+            _pulse("正在完成初始化...", 0.65)
+
     
     def _on_auto_scroll_toggled(self, checked):
         """自动滚动开关切换"""
@@ -2695,6 +2694,75 @@ class MainWindow(QMainWindow):
         """状态变化处理"""
         if service_id in self.service_cards:
             self.service_cards[service_id].update_status(is_running)
+        
+        # 跟踪运行中的服务数量，更新底部按钮显示
+        if is_running:
+            self._running_services_count += 1
+        else:
+            self._running_services_count = max(0, self._running_services_count - 1)
+        
+        self._update_bottom_bar()
+    
+    def _update_bottom_bar(self):
+        """根据服务运行状态更新底部按钮状态"""
+        has_running = self._running_services_count > 0
+        is_starting = getattr(self, 'is_starting', False)
+        
+        if is_starting:
+            self.btn_bottom_restart.setEnabled(False)
+            self.btn_bottom_stop.setEnabled(False)
+            self.btn_start_qinglong.setText("⏳ 正在启动...")
+            self.btn_start_qinglong.setEnabled(False)
+        elif has_running:
+            self.btn_bottom_restart.setEnabled(True)
+            self.btn_bottom_stop.setEnabled(True)
+            self.btn_start_qinglong.setText("🎵 音乐创意台运行中")
+            self.btn_start_qinglong.setStyleSheet("""
+                QPushButton {
+                    background-color: #2E7D32;
+                    color: white;
+                    border: 2px solid #2E7D32;
+                    border-radius: 10px;
+                    padding: 12px 24px;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #1B5E20;
+                    border-color: #1B5E20;
+                }
+                QPushButton:disabled {
+                    background-color: #424242;
+                    border-color: #616161;
+                    color: #AAAAAA;
+                }
+            """)
+            self.btn_start_qinglong.setEnabled(False)
+        else:
+            self.btn_bottom_restart.setEnabled(True)
+            self.btn_bottom_stop.setEnabled(True)
+            self.btn_start_qinglong.setText("🎵 启动音乐创意台")
+            self.btn_start_qinglong.setStyleSheet("""
+                QPushButton {
+                    background-color: #E53935;
+                    color: white;
+                    border: 2px solid #E53935;
+                    border-radius: 10px;
+                    padding: 12px 24px;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #C62828;
+                    border-color: #C62828;
+                }
+                QPushButton:disabled {
+                    background-color: #424242;
+                    border-color: #616161;
+                    color: #AAAAAA;
+                }
+            """)
+            self.btn_start_qinglong.setEnabled(True)
     
     def _append_log_to_ui(self, message: str, color: str):
         """在主线程中添加日志到UI（由信号调用）"""
@@ -2857,10 +2925,7 @@ class MainWindow(QMainWindow):
             return
         
         self.is_starting = True
-        self.btn_deploy_maintain.setEnabled(False)
-        self.btn_start_music.setEnabled(False)
-        self.btn_start_qinglong.setEnabled(False)
-        self.btn_stop_all.setEnabled(False)
+        self._update_bottom_bar()
         
         self.start_thread = threading.Thread(target=self._start_project_services, args=(project_id,))
         self.start_thread.start()
@@ -2951,8 +3016,7 @@ class MainWindow(QMainWindow):
                             installed_ver = stdout.strip() if stdout.strip() else "unknown"
                             self._log(f"[错误] transformers 版本不兼容: {installed_ver} (需要 <5.0)", "#F44336")
                             self._log("[信息] 正在自动修复: 降级 transformers 到兼容版本...", "#FF9800")
-                            uv_path = os.path.expanduser("~/.local/bin/uv.exe")
-                            fix_cmd = [uv_path, "pip", "install", "--python", python_exe, "transformers>=4.51.0,<4.58.0"] if os.path.exists(uv_path) else [python_exe, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"]
+                            fix_cmd = [python_exe, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"]
                             fix_process = hidden_popen(
                                 fix_cmd,
                                 cwd=self.base_dir,
@@ -2982,7 +3046,7 @@ class MainWindow(QMainWindow):
                         self._log("[警告] ace-step-ui node_modules 不存在，尝试直接启动...", "#FF9800")
                         self._log("[提示] 如果启动失败，请先运行部署维护安装依赖", "#FF9800")
             
-            if project_id in ["qinglong", "music"]:
+            if project_id == "qinglong":
                 try:
                     api_port = 8001
                     api_running = self.monitor._check_port(api_port)
@@ -3176,10 +3240,8 @@ class MainWindow(QMainWindow):
     
     def _enable_buttons(self):
         """启用所有按钮"""
-        self.btn_deploy_maintain.setEnabled(True)
-        self.btn_start_music.setEnabled(True)
-        self.btn_start_qinglong.setEnabled(True)
-        self.btn_stop_all.setEnabled(True)
+        self.is_starting = False
+        self._update_bottom_bar()
         
         if hasattr(self, 'btn_one_click_deploy'):
             self.btn_one_click_deploy.setEnabled(True)
@@ -3565,7 +3627,7 @@ class MainWindow(QMainWindow):
             "lycoris": "lycoris-lora",
             "fastapi": "fastapi>=0.110.0",
             "uvicorn": "uvicorn[standard]>=0.27.0",
-            "gradio": "gradio>=6.2.0",
+            "gradio": "gradio>=6.2.0,<7.0.0",
             "accelerate": "accelerate>=1.12.0",
             "scipy": "scipy>=1.10.1",
             "soundfile": "soundfile>=0.13.1",
@@ -3580,74 +3642,105 @@ class MainWindow(QMainWindow):
             "safetensors": "safetensors",
         }
         
-        basic_deps = [version_constraints.get(d, d) for d in missing if d not in ("torch", "torchaudio")]
-        torch_deps = [d for d in missing if d in ("torch", "torchaudio")]
-        
-        if basic_deps:
-            self._log(f"[信息] 安装基础依赖: {', '.join(basic_deps)}")
+        self._log("[信息] 清理 uv 等可能残留的冲突包...")
+        for stale_pkg in ["hf-xet"]:
             try:
-                cmd = [uv_path, "pip", "install", "--python", venv_python, "--index-strategy", "unsafe-best-match"] + basic_deps
-                process = hidden_popen(
-                    cmd,
+                p = hidden_popen(
+                    [venv_python, "-m", "pip", "uninstall", stale_pkg, "-y", "--quiet"],
                     cwd=scripts_dir,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    env=env
+                    stderr=subprocess.PIPE,
+                    text=True
                 )
-                stdout, _ = process.communicate(timeout=600)
-                if stdout:
-                    for line in stdout.splitlines():
+                out, _ = p.communicate(timeout=30)
+                if out and "Successfully uninstalled" in out:
+                    self._log(f"[信息] 已清理残留包: {stale_pkg}")
+            except:
+                pass
+        
+        pip_deps = []
+        for d in missing:
+            if d == "torch":
+                pip_deps.append("torch>=2.9.0,<3.0")
+            elif d == "torchaudio":
+                pip_deps.append("torchaudio>=2.9.0,<3.0")
+            elif d in version_constraints:
+                pip_deps.append(version_constraints[d])
+            else:
+                pip_deps.append(d)
+        
+        pip_torch_deps = [d for d in pip_deps if d.startswith("torch")]
+        pip_other_deps = [d for d in pip_deps if not d.startswith("torch")]
+        
+        if pip_other_deps:
+            self._log(f"[信息] 安装基础依赖: {', '.join(pip_other_deps)}")
+            try:
+                cmd = [venv_python, "-m", "pip", "install"] + pip_other_deps
+                p = hidden_popen(
+                    cmd, cwd=scripts_dir,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+                )
+                out, _ = p.communicate(timeout=600)
+                if out:
+                    for line in out.splitlines():
                         if line.strip():
                             self._log(f"[安装] {line.strip()}")
-                if process.returncode == 0:
-                    self._log(f"✓ 基础依赖安装完成")
+                if p.returncode == 0:
+                    self._log("✓ 基础依赖安装完成")
                 else:
-                    self._log(f"[警告] 基础依赖安装返回码: {process.returncode}", "#FF9800")
+                    self._log(f"[警告] 基础依赖安装返回码: {p.returncode}", "#FF9800")
             except Exception as e:
                 self._log(f"[警告] 基础依赖安装失败: {e}", "#FF9800")
         
-        if torch_deps:
-            self._log(f"[信息] 安装 PyTorch 依赖: {', '.join(torch_deps)}")
-            torch_env = env.copy()
-            torch_env["UV_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
-            torch_env["UV_EXTRA_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+        if pip_torch_deps:
+            self._log(f"[信息] 安装 PyTorch 依赖: {', '.join(pip_torch_deps)}")
             try:
-                cmd = [uv_path, "pip", "install", "--python", venv_python, "--index-strategy", "unsafe-best-match"] + torch_deps
-                process = hidden_popen(
-                    cmd,
-                    cwd=scripts_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    env=torch_env
+                cmd = [venv_python, "-m", "pip", "install", "--index-url", "https://download.pytorch.org/whl/cu128"] + pip_torch_deps
+                p = hidden_popen(
+                    cmd, cwd=scripts_dir,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
                 )
-                stdout, _ = process.communicate(timeout=1200)
-                if stdout:
-                    for line in stdout.splitlines():
+                out, _ = p.communicate(timeout=1200)
+                if out:
+                    for line in out.splitlines():
                         if line.strip():
                             self._log(f"[安装PyTorch] {line.strip()}")
-                if process.returncode == 0:
+                if p.returncode == 0:
                     self._log("✓ PyTorch 依赖安装完成")
                 else:
-                    self._log(f"[警告] PyTorch 依赖安装返回码: {process.returncode}", "#FF9800")
+                    self._log(f"[警告] PyTorch 依赖安装返回码: {p.returncode}", "#FF9800")
             except Exception as e:
                 self._log(f"[警告] PyTorch 依赖安装失败: {e}", "#FF9800")
         
         self._log("[信息] 验证安装结果...")
         still_missing = []
         for dep, desc in required_deps:
+            import_name = dep
             try:
-                process = hidden_popen(
-                    [venv_python, "-c", f"import {dep}"],
+                p = hidden_popen(
+                    [venv_python, "-c", f"import {import_name}"],
                     cwd=self.base_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                 )
-                stdout, stderr = process.communicate(timeout=10)
-                if process.returncode != 0:
+                out, err = p.communicate(timeout=30)
+                if p.returncode != 0:
                     still_missing.append(dep)
+                    if err:
+                        for line in err.splitlines():
+                            if line.strip():
+                                self._log(f"[诊断] {dep} 导入失败: {line.strip()}", "#FF9800")
+                    try:
+                        detail = hidden_popen(
+                            [venv_python, "-c", f"import traceback, sys\ntry:\n    import {import_name}\nexcept:\n    traceback.print_exc(file=sys.stdout)"],
+                            cwd=self.base_dir,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                        )
+                        dout, derr = detail.communicate(timeout=15)
+                        for line in (dout or "").splitlines():
+                            if line.strip():
+                                self._log(f"[诊断] {line.strip()}", "#FF9800")
+                    except:
+                        pass
             except Exception:
                 still_missing.append(dep)
         
@@ -3799,8 +3892,7 @@ class MainWindow(QMainWindow):
                 self._log(f"✗ transformers 版本不兼容: {installed_ver} (需要 <5.0，5.x 会导致模型加载失败)", "#F44336")
                 self._log("[信息] 正在自动修复: 降级 transformers...", "#FF9800")
                 try:
-                    uv_path = os.path.expanduser("~/.local/bin/uv.exe")
-                    fix_cmd = [uv_path, "pip", "install", "--python", venv_python, "transformers>=4.51.0,<5.0"] if os.path.exists(uv_path) else [venv_python, "-m", "pip", "install", "transformers>=4.51.0,<5.0", "--quiet"]
+                    fix_cmd = [venv_python, "-m", "pip", "install", "transformers>=4.51.0,<5.0", "--quiet"]
                     fix_process = hidden_popen(
                         fix_cmd,
                         cwd=self.base_dir,
@@ -3922,8 +4014,8 @@ class MainWindow(QMainWindow):
                 self._log("✓ 关键依赖已完整安装")
             self._verify_dependencies(venv_python)
             
-            # 6. 检查 git 子模块
-            self._log("6. 检查 git 子模块...")
+            # 6. 检查 Web 前端（可选）
+            self._log("6. 检查 Web 前端（可选）...")
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
             if os.path.exists(ace_step_ui_path):
                 git_dir = os.path.join(ace_step_ui_path, ".git")
@@ -3933,15 +4025,15 @@ class MainWindow(QMainWindow):
                     node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
                     if os.path.exists(node_modules_path):
                         self._log("✓ ace-step-ui node_modules 已存在")
-            
-            # 7. 检查前端依赖
-            self._log("7. 检查前端依赖...")
-            ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
-            package_json_path = os.path.join(ace_step_ui_path, "package.json")
-            if os.path.exists(package_json_path):
-                node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
-                if os.path.exists(node_modules_path):
-                    self._log("✓ 前端依赖已安装")
+                package_json_path = os.path.join(ace_step_ui_path, "package.json")
+                if os.path.exists(package_json_path):
+                    node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+                    if os.path.exists(node_modules_path):
+                        self._log("✓ Web 前端依赖已安装")
+                    else:
+                        self._log("○ Web 前端依赖未安装（可选，不影响核心功能）")
+            else:
+                self._log("○ ace-step-ui 未检出（可选 Web 前端，不影响核心功能）")
             
             self._log("✓ 快速环境验证完成")
             
@@ -4181,19 +4273,17 @@ class MainWindow(QMainWindow):
             # 验证关键依赖是否安装
             self._verify_dependencies(venv_python)
             
-            # 6. 检查并初始化git子模块
-            self._log("6. 检查git子模块...")
+            # 6. 检查 Web 前端（可选）
+            self._log("6. 检查 Web 前端（可选）...")
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
-            git_dir = os.path.join(ace_step_ui_path, ".git")
             
-            if os.path.exists(ace_step_ui_path):
-                # 检查是否是未初始化的git子模块
+            if not os.path.exists(ace_step_ui_path):
+                self._log("○ ace-step-ui 未检出，跳过（可选 Web 前端）")
+            else:
+                git_dir = os.path.join(ace_step_ui_path, ".git")
                 if not os.path.exists(git_dir):
-                    self._log("[信息] ace-step-ui 是git子模块，当前未初始化，正在初始化...")
+                    self._log("[信息] ace-step-ui git子模块未初始化，尝试初始化...")
                     try:
-
-                        
-                        # 初始化并更新子模块
                         process = hidden_popen(
                             ["git", "submodule", "update", "--init", "--recursive"],
                             cwd=self.base_dir,
@@ -4201,40 +4291,31 @@ class MainWindow(QMainWindow):
                             stderr=subprocess.STDOUT,
                             text=True
                         )
-                        
                         try:
                             stdout, _ = process.communicate(timeout=300)
-                            
                             if stdout:
                                 for line in stdout.splitlines():
                                     if line.strip():
                                         self._log(f"[初始化子模块] {line.strip()}")
-                            
                             if process.returncode == 0:
                                 self._log("✓ git子模块初始化完成")
                             else:
                                 self._log(f"[警告] git子模块初始化返回码: {process.returncode}", "#FF9800")
                         except subprocess.TimeoutExpired:
                             process.kill()
-                            self._log("[警告] git子模块初始化超时(5分钟)，跳过继续", "#FF9800")
+                            self._log("[警告] git子模块初始化超时，跳过继续", "#FF9800")
                     except Exception as e:
                         self._log(f"[警告] 初始化git子模块失败: {e}", "#FF9800")
                 else:
                     self._log("✓ git子模块已初始化")
-            else:
-                self._log("[警告] ace-step-ui 目录不存在，跳过子模块检查", "#FF9800")
             
-            # 7. 安装/修复前端依赖
-            self._log("7. 安装/修复前端依赖...")
-            self._log(f"[调试] ace-step-ui 路径: {ace_step_ui_path}")
+            # 7. 安装/修复前端依赖（可选）
+            self._log("7. 安装/修复前端依赖（可选）...")
             if os.path.exists(ace_step_ui_path):
-                self._log(f"[调试] ace-step-ui 目录存在")
                 package_json_path = os.path.join(ace_step_ui_path, "package.json")
                 if os.path.exists(package_json_path):
-                    self._log(f"[调试] package.json 存在")
                     node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
                     server_node_modules_path = os.path.join(ace_step_ui_path, "server", "node_modules")
-                    self._log(f"[调试] node_modules 路径: {node_modules_path}")
                     
                     # 检查是否需要重新安装
                     need_reinstall = False
@@ -4422,9 +4503,9 @@ try {
                     else:
                         self._log("✓ 前端依赖已安装且无需修复")
                 else:
-                    self._log("[警告] package.json 不存在，跳过前端依赖安装", "#FF9800")
+                    self._log("○ package.json 不存在，跳过（可选 Web 前端）")
             else:
-                self._log("[警告] ace-step-ui 目录不存在，跳过前端依赖安装", "#FF9800")
+                self._log("○ ace-step-ui 目录不存在，跳过（可选 Web 前端）")
             
             # 8. 检查启动脚本
             self._log("8. 检查启动脚本...")
@@ -4766,11 +4847,15 @@ try {
         
         try:
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
-            package_json_path = os.path.join(ace_step_ui_path, "package.json")
-            node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
-            checks["frontend_deps"] = os.path.exists(package_json_path) and os.path.exists(node_modules_path)
+            # ace-step-ui 是可选 Web 前端，不存在不影响核心功能
+            if os.path.exists(ace_step_ui_path):
+                package_json_path = os.path.join(ace_step_ui_path, "package.json")
+                node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+                checks["frontend_deps"] = os.path.exists(package_json_path) and os.path.exists(node_modules_path)
+            else:
+                checks["frontend_deps"] = True  # 可选组件，不存在视为正常
         except:
-            checks["frontend_deps"] = False
+            checks["frontend_deps"] = True
         
         try:
             scripts = [
@@ -4982,11 +5067,12 @@ for d in deps:
         
         if hasattr(self, 'btn_one_click_deploy'):
             self.btn_one_click_deploy.setEnabled(False)
-        if hasattr(self, 'btn_deploy_maintain'):
-            self.btn_deploy_maintain.setEnabled(False)
-        self.btn_start_music.setEnabled(False)
-        self.btn_start_qinglong.setEnabled(False)
-        self.btn_stop_all.setEnabled(False)
+        if hasattr(self, 'btn_bottom_restart'):
+            self.btn_bottom_restart.setEnabled(False)
+        if hasattr(self, 'btn_start_qinglong'):
+            self.btn_start_qinglong.setEnabled(False)
+        if hasattr(self, 'btn_bottom_stop'):
+            self.btn_bottom_stop.setEnabled(False)
         
         def _install():
             try:
@@ -5038,11 +5124,7 @@ for d in deps:
                 self.is_starting = False
                 if hasattr(self, 'btn_one_click_deploy'):
                     self.btn_one_click_deploy.setEnabled(True)
-                if hasattr(self, 'btn_deploy_maintain'):
-                    self.btn_deploy_maintain.setEnabled(True)
-                self.btn_start_music.setEnabled(True)
-                self.btn_start_qinglong.setEnabled(True)
-                self.btn_stop_all.setEnabled(True)
+                self._update_bottom_bar()
         
         t = threading.Thread(target=_install, daemon=True)
         t.start()
@@ -5172,8 +5254,18 @@ for d in deps:
                 
                 self._log("[信息] 安装基础依赖...")
                 base_deps = ["wheel_stub", "psutil", "hatchling", "editables"]
+                self._log("[信息] 清空 uv 缓存以确保强制重新下载...")
+                try:
+                    subprocess.run([uv_path, "cache", "clean"], capture_output=True, timeout=30)
+                except:
+                    pass
+
+                reinstall_flags = []
+                for dep in base_deps:
+                    pkg = dep.split(">=")[0].split("==")[0].split("<")[0].strip()
+                    reinstall_flags.extend(["--reinstall-package", pkg])
                 process = hidden_popen(
-                    [uv_path, "pip", "install", "--python", venv_python, "--upgrade"] + base_deps,
+                    [uv_path, "pip", "install", "--python", venv_python, "--refresh", "--upgrade"] + reinstall_flags + base_deps,
                     cwd=self.base_dir,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                 )
@@ -5181,14 +5273,18 @@ for d in deps:
                 
                 self._log("[信息] 安装 PyTorch 2.9.0 + torchaudio 2.9.0 (CUDA 12.8)...")
                 pytorch_deps = [
-                    "torch==2.9.0",
-                    "torchaudio==2.9.0",
+                    "torch>=2.9.0,<3.0",
+                    "torchaudio>=2.9.0,<3.0",
                 ]
                 env = os.environ.copy()
                 env["UV_INDEX_URL"] = "https://pypi.tuna.tsinghua.edu.cn/simple/"
                 env["UV_EXTRA_INDEX_URL"] = "https://download.pytorch.org/whl/cu128"
+                reinstall_flags = []
+                for dep in pytorch_deps:
+                    pkg = dep.split(">=")[0].split("==")[0].split("<")[0].strip()
+                    reinstall_flags.extend(["--reinstall-package", pkg])
                 process = hidden_popen(
-                    [uv_path, "pip", "install", "--python", venv_python] + pytorch_deps,
+                    [uv_path, "pip", "install", "--python", venv_python, "--refresh"] + reinstall_flags + pytorch_deps,
                     cwd=self.base_dir,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                     env=env
@@ -5197,7 +5293,7 @@ for d in deps:
                 if process.returncode != 0:
                     self._log("[警告] PyTorch 安装可能失败，尝试不带版本约束...", "#FF9800")
                     process = hidden_popen(
-                        [uv_path, "pip", "install", "--python", venv_python, "torch", "torchaudio"],
+                        [uv_path, "pip", "install", "--python", venv_python, "--refresh", "torch", "torchaudio"],
                         cwd=self.base_dir,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                         env=env
@@ -5227,8 +5323,12 @@ for d in deps:
                     "huggingface_hub",
                     "safetensors",
                 ]
+                reinstall_flags = []
+                for dep in project_deps:
+                    pkg = dep.split(">=")[0].split("==")[0].split("<")[0].strip()
+                    reinstall_flags.extend(["--reinstall-package", pkg])
                 process = hidden_popen(
-                    [uv_path, "pip", "install", "--python", venv_python] + project_deps,
+                    [uv_path, "pip", "install", "--python", venv_python, "--refresh"] + reinstall_flags + project_deps,
                     cwd=self.base_dir,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                     env=env
@@ -5239,7 +5339,7 @@ for d in deps:
                 if os.path.exists(flash_attn_wheel):
                     self._log("[信息] 安装 flash_attn 加速库...")
                     process = hidden_popen(
-                        [uv_path, "pip", "install", "--python", venv_python, flash_attn_wheel],
+                        [uv_path, "pip", "install", "--python", venv_python, "--reinstall-package", "flash-attn", "--refresh", flash_attn_wheel],
                         cwd=self.base_dir,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                         env=env
@@ -5305,10 +5405,7 @@ for d in deps:
             return
         
         self.is_starting = True
-        self.btn_deploy_maintain.setEnabled(False)
-        self.btn_start_music.setEnabled(False)
-        self.btn_start_qinglong.setEnabled(False)
-        self.btn_stop_all.setEnabled(False)
+        self._update_bottom_bar()
         
         if hasattr(self, 'btn_one_click_deploy'):
             self.btn_one_click_deploy.setEnabled(False)
@@ -5567,18 +5664,19 @@ for d in deps:
             else:
                 self.deploy_step_signal.emit("venv", "fail")
             
-            environment_installed = False
-            if os.path.exists(uv_path) and os.path.exists(venv_path):
+            environment_installed = bool(os.path.exists(uv_path) and os.path.exists(venv_path))
+            if environment_installed:
+                ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
                 if os.path.exists(ace_step_ui_path):
-                    package_json_path = os.path.join(ace_step_ui_path, "package.json")
-                    if os.path.exists(package_json_path):
-                        node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
-                        if os.path.exists(node_modules_path):
-                            environment_installed = True
-                            self._log("✓ 环境已完全安装")
+                    node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
+                    if os.path.exists(node_modules_path):
+                        self._log("✓ 环境已完全安装（含 Web 前端）")
+                    else:
+                        self._log("✓ 核心环境已就绪（Web 前端可选，未安装 node_modules）")
+                else:
+                    self._log("✓ 核心环境已就绪（Web 前端可选，未检出 ace-step-ui）")
             
             if not environment_installed:
-                # 环境未安装，执行完整安装
                 self._log("[信息] 环境未完全安装，开始自动部署...", "#FF9800")
                 
                 install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
@@ -5645,7 +5743,7 @@ for d in deps:
                         uv_path = os.path.expanduser("~/.local/bin/uv.exe")
                         if os.path.exists(uv_path):
                             install_process = hidden_popen(
-                                [uv_path, "pip", "install", "--python", venv_python, flash_attn_wheel],
+                                [uv_path, "pip", "install", "--python", venv_python, "--reinstall", "--refresh", flash_attn_wheel],
                                 cwd=self.base_dir,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                             )
@@ -5694,10 +5792,6 @@ for d in deps:
                     if os.path.exists(venv_python):
                         self._install_missing_dependencies(venv_python, os.path.join(self.base_dir, "scripts"))
                 
-                if not final_checks.get("frontend_deps"):
-                    self._log("[修复] 重新安装前端依赖...")
-                    self._install_frontend_deps()
-                
                 self._log("[信息] 修复完成，重新验证...")
                 retry_checks = self._check_deploy_env()
                 
@@ -5720,10 +5814,14 @@ for d in deps:
                     all_green = True
                     self._log("✅ 修复成功，所有环境项已通过验证", "#4CAF50")
                 else:
-                    failed_items = [k for k, v in retry_checks.items() if k != "gpu" and not v]
+                    failed_items = [k for k, v in retry_checks.items() if k not in ("gpu", "frontend_deps") and not v]
                     if not (isinstance(retry_checks.get("gpu"), str) and retry_checks.get("gpu")):
                         failed_items.append("gpu")
-                    self._log(f"[错误] 以下环境项仍未通过: {', '.join(failed_items)}", "#F44336")
+                    if failed_items:
+                        self._log(f"[错误] 以下环境项仍未通过: {', '.join(failed_items)}", "#F44336")
+                    else:
+                        self._log("⚠ 环境核心项已通过（Web 前端等可选组件未就绪）", "#FF9800")
+                        all_green = True
             
             if all_green:
                 self._log("")
@@ -5782,7 +5880,7 @@ for d in deps:
                         self._log("✓ API服务 - 运行正常 (端口: 8001)")
                     else:
                         self._log("⚠ API服务 - 未运行", "#FF9800")
-                        self._log("  建议：先启动官方音乐演练场来启动API服务", "#FF9800")
+                        self._log("  建议：先启动青龙 LoRA 训练器来启动API服务", "#FF9800")
                         all_ok = False
                 except Exception as e:
                     self._log(f"[警告] 检查API服务失败: {e}", "#FF9800")
@@ -5909,6 +6007,23 @@ for d in deps:
         self._log("========================================")
         self._log("所有服务已停止")
         self._log("========================================")
+    
+    def _restart_all_services(self):
+        """重启所有服务：停止后启动青龙 LoRA 训练器"""
+        self._log("========================================")
+        self._log("正在重启所有服务...")
+        self._log("========================================")
+        
+        self._stop_all_services()
+        
+        self._log("")
+        self._log("2 秒后自动启动青龙 LoRA 训练器...")
+        
+        def delayed_start():
+            time.sleep(2)
+            self._start_project("qinglong")
+        
+        threading.Thread(target=delayed_start, daemon=True).start()
     
     def _stop_service(self, service_id: str, skip_pause=False):
         """停止单个服务"""
@@ -6107,13 +6222,65 @@ for d in deps:
         self.system_info_label.setText(" | ".join(compact_info))
     
     def _detect_browsers(self) -> Dict[str, str]:
-        """检测本地已安装的浏览器"""
+        """检测本地已安装的浏览器（注册表 + 常见路径 + 便携版扫描）"""
         browsers = {
             "系统默认": "system"
         }
-        
-        # 检测常见浏览器
-        browser_paths = [
+
+        # 浏览器可执行文件名与显示名称、图标的映射
+        browser_registry_map = {
+            "chrome.exe": ("Chrome", "🌐"),
+            "msedge.exe": ("Edge", "🌊"),
+            "firefox.exe": ("Firefox", "🦊"),
+            "brave.exe": ("Brave", "🦁"),
+            "opera.exe": ("Opera", "🔴"),
+            "launcher.exe": ("Opera", "🔴"),  # Opera launcher
+            "vivaldi.exe": ("Vivaldi", "🌈"),
+            "centbrowser.exe": ("Cent Browser", "🌀"),
+            "360chrome.exe": ("360 浏览器", "🛡"),
+            "360se.exe": ("360 安全浏览器", "🛡"),
+            "qqbrowser.exe": ("QQ 浏览器", "🐧"),
+            "ucweb.exe": ("UC 浏览器", "🌎"),
+            "maxthon.exe": ("傲游浏览器", "🛥"),
+            "sogouexplorer.exe": ("搜狗浏览器", "🐶"),
+            "liebao.exe": ("猎豹浏览器", "🐆"),
+        }
+
+        # 1. 通过注册表 App Paths 查找
+        try:
+            app_paths_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, app_paths_key) as root_key:
+                i = 0
+                while True:
+                    try:
+                        subkey_name = winreg.EnumKey(root_key, i)
+                        i += 1
+                        exe_name = subkey_name.lower()
+                        if exe_name not in browser_registry_map:
+                            continue
+                        with winreg.OpenKey(root_key, subkey_name) as sub_key:
+                            try:
+                                path, _ = winreg.QueryValueEx(sub_key, None)
+                                if path and os.path.exists(path):
+                                    display_name, icon = browser_registry_map[exe_name]
+                                    if exe_name == "launcher.exe":
+                                        display_name = "Opera"
+                                    unique_name = f"{icon} {display_name}"
+                                    base_name = unique_name
+                                    counter = 2
+                                    while unique_name in browsers:
+                                        unique_name = f"{base_name} ({counter})"
+                                        counter += 1
+                                    browsers[unique_name] = path
+                            except OSError:
+                                continue
+                    except OSError:
+                        break
+        except Exception:
+            pass
+
+        # 2. 补充常见安装路径（覆盖未写入注册表或便携版）
+        common_paths = [
             # Chrome
             r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -6123,28 +6290,87 @@ for d in deps:
             # Firefox
             r"C:\Program Files\Mozilla Firefox\firefox.exe",
             r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
-            # Opera
-            r"C:\Program Files\Opera\launcher.exe",
-            r"C:\Program Files (x86)\Opera\launcher.exe",
             # Brave
             r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
             r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+            # Opera
+            r"C:\Program Files\Opera\launcher.exe",
+            r"C:\Program Files (x86)\Opera\launcher.exe",
+            r"C:\Program Files\Opera\opera.exe",
+            r"C:\Program Files (x86)\Opera\opera.exe",
+            # Vivaldi
+            r"C:\Program Files\Vivaldi\Application\vivaldi.exe",
+            r"C:\Program Files (x86)\Vivaldi\Application\vivaldi.exe",
+            # Cent Browser
+            r"C:\Program Files\CentBrowser\centbrowser.exe",
+            r"C:\Program Files (x86)\CentBrowser\centbrowser.exe",
+            # 360 Chrome
+            r"C:\Program Files (x86)\360\360Chrome\Chrome\Application\360chrome.exe",
+            r"C:\Program Files\360\360Chrome\Chrome\Application\360chrome.exe",
+            # 360 Safe Browser
+            r"C:\Program Files (x86)\360\360se6\360se.exe",
+            r"C:\Program Files\360\360se6\360se.exe",
+            # QQ Browser
+            r"C:\Program Files (x86)\Tencent\QQBrowser\QQBrowser.exe",
+            r"C:\Program Files\Tencent\QQBrowser\QQBrowser.exe",
+            r"C:\Program Files (x86)\Tencent\QQBrowser\qqbrowser.exe",
+            r"C:\Program Files\Tencent\QQBrowser\qqbrowser.exe",
+            # UC Browser
+            r"C:\Program Files (x86)\UCBrowser\Application\UCWeb.exe",
+            r"C:\Program Files\UCBrowser\Application\UCWeb.exe",
+            # Maxthon
+            r"C:\Program Files (x86)\Maxthon\Maxthon.exe",
+            r"C:\Program Files\Maxthon\Maxthon.exe",
+            # Sogou
+            r"C:\Program Files (x86)\SogouExplorer\SogouExplorer.exe",
+            r"C:\Program Files\SogouExplorer\SogouExplorer.exe",
+            # Liebao
+            r"C:\Program Files (x86)\liebao\liebao.exe",
+            r"C:\Program Files\liebao\liebao.exe",
         ]
-        
-        browser_names = {
-            "chrome.exe": "Chrome",
-            "msedge.exe": "Edge",
-            "firefox.exe": "Firefox",
-            "launcher.exe": "Opera",
-            "brave.exe": "Brave"
-        }
-        
-        for path in browser_paths:
+
+        for path in common_paths:
             if os.path.exists(path):
-                exe_name = os.path.basename(path)
-                if exe_name in browser_names:
-                    browsers[browser_names[exe_name]] = path
-        
+                exe_name = os.path.basename(path).lower()
+                if exe_name in browser_registry_map:
+                    display_name, icon = browser_registry_map[exe_name]
+                    unique_name = f"{icon} {display_name}"
+                    base_name = unique_name
+                    counter = 2
+                    while unique_name in browsers:
+                        unique_name = f"{base_name} ({counter})"
+                        counter += 1
+                    browsers[unique_name] = path
+
+        # 3. 在常用父目录下扫描 portable 版本
+        try:
+            for drive in ["C:", "D:", "E:", "F:", "G:"]:
+                if not os.path.exists(drive):
+                    continue
+                for tools_dir in ["Tools", "Software", "Browser", "App", "Programs"]:
+                    base = os.path.join(drive, tools_dir)
+                    if not os.path.isdir(base):
+                        continue
+                    for root, dirs, files in os.walk(base):
+                        depth = root[len(base):].count(os.sep)
+                        if depth > 2:
+                            del dirs[:]
+                            continue
+                        for file in files:
+                            file_lower = file.lower()
+                            if file_lower in browser_registry_map:
+                                full_path = os.path.join(root, file)
+                                display_name, icon = browser_registry_map[file_lower]
+                                unique_name = f"{icon} {display_name} (便携)"
+                                base_name = unique_name
+                                counter = 2
+                                while unique_name in browsers:
+                                    unique_name = f"{base_name} ({counter})"
+                                    counter += 1
+                                browsers[unique_name] = full_path
+        except Exception:
+            pass
+
         return browsers
     
     def _on_browser_changed(self, index):
@@ -6156,7 +6382,7 @@ for d in deps:
         is_custom = selected_data == "custom" or selected_browser == "自定义浏览器"
         
         # 显示/隐藏自定义设置
-        self.browser_path_edit.setVisible(is_custom)
+        self.browser_path_edit.setReadOnly(not is_custom)
         self.btn_select_browser.setVisible(is_custom)
         
         if is_custom:
@@ -6172,6 +6398,22 @@ for d in deps:
             self.selected_browser = selected_browser
             self.config.set("browser.default", selected_browser)
             self._log(f"已设置默认浏览器为: {selected_browser}")
+        
+        # 更新路径显示
+        self._update_browser_path_display()
+    
+    def _update_browser_path_display(self):
+        """根据当前浏览器选择更新路径显示"""
+        if self.selected_browser == "custom" or self.selected_browser == "自定义浏览器":
+            self.browser_path_edit.setText(self.custom_browser_path)
+            self.browser_path_edit.setPlaceholderText("粘贴或输入浏览器路径...")
+        elif self.selected_browser == "系统默认" or self.selected_browser == "system":
+            self.browser_path_edit.setText("")
+            self.browser_path_edit.setPlaceholderText("使用系统默认浏览器")
+        else:
+            path = self.browsers.get(self.selected_browser, "")
+            self.browser_path_edit.setText(path)
+            self.browser_path_edit.setPlaceholderText("选择浏览器后显示路径...")
     
     def _on_custom_browser_path_changed(self, path):
         """处理自定义浏览器路径变化"""
@@ -6181,6 +6423,7 @@ for d in deps:
             self.selected_browser = "custom"
             self.config.set("browser.default", "custom")
             self._log(f"已设置自定义浏览器: {path}")
+        self._update_browser_path_display()
     
     def _open_url_in_browser(self, url: str):
         """使用选择的浏览器打开URL"""
@@ -6210,6 +6453,95 @@ for d in deps:
                 else:
                     import webbrowser
                     webbrowser.open(url)
+    
+    def _show_help_dialog(self):
+        """显示使用说明对话框"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("使用说明")
+        dialog.setMinimumSize(650, 500)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #1A1A1A;
+            }
+            QTextEdit {
+                background-color: #252525;
+                color: #F0F0F0;
+                border: 1px solid #333333;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+            QPushButton {
+                background-color: #1565C0;
+                color: white;
+                border: 1px solid #1976D2;
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+        
+        help_text = QTextEdit()
+        help_text.setReadOnly(True)
+        help_text.setHtml("""
+        <h2>云集智能音乐创意台 - 使用说明</h2>
+        
+        <h3>快速入门</h3>
+        <ul>
+            <li><b>启动服务</b>：点击底部"🎵 启动音乐创意台"按钮，按顺序启动 API 服务、青龙后端、青龙前端</li>
+            <li><b>打开界面</b>：服务就绪后，点击对应服务卡片的"打开"按钮在浏览器中访问</li>
+            <li><b>停止服务</b>：点击底部"⏹ 停止服务"按钮，一键终止所有后台进程</li>
+            <li><b>重启服务</b>：点击底部"🔄 重启服务"按钮，停止所有服务后重新启动</li>
+        </ul>
+        
+        <h3>服务管理</h3>
+        <ul>
+            <li>API 服务（端口 8001）：核心模型推理与 API 接口</li>
+            <li>青龙后端（端口 3001）：Express.js 业务后端</li>
+            <li>青龙前端（端口 3000）：Vite 用户界面</li>
+            <li>每个服务卡片显示运行状态，可单独重启或修改端口</li>
+        </ul>
+        
+        <h3>浏览器设置</h3>
+        <ul>
+            <li>顶部面板可选择系统默认浏览器或已安装的浏览器</li>
+            <li>支持 Chrome、Edge、Firefox、Brave、Opera、Vivaldi 等常见浏览器</li>
+            <li>选择"自定义浏览器"可手动指定 .exe 路径</li>
+        </ul>
+        
+        <h3>模型管理</h3>
+        <ul>
+            <li>切换到"📦 模型管理"页面可查看、下载、删除模型</li>
+            <li>支持 HuggingFace、ModelScope 等下载源</li>
+        </ul>
+        
+        <h3>软件更新</h3>
+        <ul>
+            <li>切换到"🔄 软件更新"页面检查并安装新版本</li>
+        </ul>
+        
+        <h3>日志查看</h3>
+        <ul>
+            <li>底部日志区域实时显示启动、运行、错误信息</li>
+            <li>可开启/关闭自动滚动以便查看历史日志</li>
+        </ul>
+        """)
+        layout.addWidget(help_text)
+        
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.close)
+        layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        dialog.exec()
     
     def _select_custom_browser(self):
         """手动选择浏览器"""
@@ -6246,14 +6578,10 @@ for d in deps:
         """处理模型管理面板展开/折叠变化"""
         if is_expanded:
             # 展开时隐藏服务管理区域
-            if hasattr(self, 'music_group'):
-                self.music_group.hide()
             if hasattr(self, 'qinglong_group'):
                 self.qinglong_group.hide()
         else:
             # 折叠时显示服务管理区域
-            if hasattr(self, 'music_group'):
-                self.music_group.show()
             if hasattr(self, 'qinglong_group'):
                 self.qinglong_group.show()
     
@@ -7044,21 +7372,45 @@ for d in deps:
             "height": self.height()
         })
         
+        self._force_exit = True
         self.close()
     
     def closeEvent(self, event):
-        """关闭事件"""
-        self.config.set("ui.window_size", {
-            "width": self.width(),
-            "height": self.height()
-        })
-        
-        self.monitor.stop()
-        self.monitor.wait()
-        
-        self.tray_icon.hide()
-        
-        event.accept()
+        """关闭事件：默认最小化到系统托盘，托盘退出时真正关闭"""
+        if self._force_exit:
+            self.config.set("ui.window_size", {
+                "width": self.width(),
+                "height": self.height()
+            })
+            
+            self._debug_logging = False
+            if self._debug_log_file:
+                try:
+                    self._debug_log_file.close()
+                except Exception:
+                    pass
+                self._debug_log_file = None
+            
+            self.monitor.stop()
+            self.monitor.wait()
+            
+            self.tray_icon.hide()
+            
+            event.accept()
+        else:
+            # 隐藏到系统托盘
+            self.hide()
+            self.tray_icon.show()
+            try:
+                self.tray_icon.showMessage(
+                    "云集智能音乐创意台",
+                    "程序已最小化到系统托盘，双击托盘图标可恢复窗口",
+                    QIcon(),
+                    3000
+                )
+            except Exception:
+                pass
+            event.ignore()
 
 
 def extract_scripts():
@@ -7089,58 +7441,86 @@ def extract_scripts():
                     pass
 
 
-def _create_single_instance_event():
-    """创建命名事件，仅用于标记当前进程为有效实例"""
+def _ensure_single_instance():
+    """确保只运行一个实例：已有实例则退出，新实例获得互斥体"""
     try:
         import ctypes
-        from ctypes import wintypes
-
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.CreateEventW.restype = wintypes.HANDLE
-        kernel32.CreateEventW.argtypes = [
-            wintypes.LPVOID,
-            wintypes.BOOL,
-            wintypes.BOOL,
-            wintypes.LPCWSTR,
-        ]
-        event_name = "Global\\云集智能音乐创意台_SingleInstance_Mutex"
-        h_event = kernel32.CreateEventW(None, False, True, event_name)
-        return h_event
+        mutex_name = "Global\\云集智能音乐创意台_SingleInstance"
+        h_mutex = kernel32.CreateMutexW(None, True, mutex_name)
+        if not h_mutex:
+            return
+        if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+            kernel32.CloseHandle(h_mutex)
+            print("[信息] 已有实例在运行，本次启动被阻止")
+            sys.exit(0)
+        import atexit
+        atexit.register(lambda: kernel32.CloseHandle(h_mutex))
     except Exception:
-        return None
+        pass
 
+
+def _kill_old_instances_sync():
+    """同步查找并杀掉同名的旧进程实例"""
+    import os
+    import psutil
+    try:
+        my_pid = os.getpid()
+    except Exception:
+        return
+    ancestor_pids = set()
+    try:
+        cur = psutil.Process(my_pid)
+        while True:
+            parent = cur.parent()
+            if parent is None or parent.pid == cur.pid:
+                break
+            ancestor_pids.add(parent.pid)
+            cur = parent
+            if len(ancestor_pids) > 20:
+                break
+    except Exception:
+        pass
+    for proc in psutil.process_iter(["pid", "exe", "ppid", "cmdline"]):
+        try:
+            pid = proc.info["pid"]
+            if pid == my_pid:
+                continue
+            if pid in ancestor_pids:
+                continue
+            if proc.info.get("ppid") == my_pid:
+                continue
+            exe = proc.info.get("exe") or ""
+            cmdline = ' '.join(proc.info.get("cmdline") or [])
+            is_self_instance = (
+                "云集智能音乐创意台" in exe or
+                "云集智能音乐创意台" in os.path.dirname(exe) or
+                ("云集智能音乐创意台" in cmdline and "main.py" in cmdline)
+            )
+            if not is_self_instance:
+                continue
+            proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
 
 def _kill_old_instances_async():
-    """后台查找并杀掉同名的旧进程实例（基于 psutil + exe 路径匹配）"""
+    """后台查找并杀掉同名的旧进程实例"""
     try:
         import threading
-        def _kill_worker():
-            import os
-            import psutil
-            try:
-                my_pid = os.getpid()
-                my_exe = os.path.normcase(os.path.abspath(__file__))
-            except Exception:
-                return
-            for proc in psutil.process_iter(["pid", "exe"]):
-                try:
-                    if proc.info["pid"] == my_pid:
-                        continue
-                    if not proc.info["exe"]:
-                        continue
-                    if "云集智能音乐创意台" not in proc.info["exe"]:
-                        continue
-                    proc.kill()
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-        threading.Thread(target=_kill_worker, daemon=True).start()
+        threading.Thread(target=_kill_old_instances_sync, daemon=True).start()
     except Exception:
         pass
 
 
 def main(app=None, splash=None):
-    _create_single_instance_event()
-    _kill_old_instances_async()
+    # Kill old instances FIRST (protects against stale orphaned processes)
+    _kill_old_instances_sync()
+    # Now claim the singleton mutex — if another process already holds it, exit
+    _ensure_single_instance()
+    # Second pass: kill any remaining instances that raced past the mutex
+    # (e.g., two processes started at identical wall-clock time)
+    if "--no-dedup" not in sys.argv:
+        _kill_old_instances_sync()
 
     extract_scripts()
     
@@ -7179,12 +7559,12 @@ def main(app=None, splash=None):
     
     splash.set_progress(0.1, "正在创建主窗口...")
     app.processEvents()
-    
+
     window = MainWindow(splash=splash)
+
     window.show()
-    
     splash.finish(window)
-    
+
     sys.exit(app.exec())
 
 

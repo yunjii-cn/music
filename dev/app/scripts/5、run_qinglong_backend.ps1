@@ -8,12 +8,11 @@ param(
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
+$DataDir = Split-Path -Parent $RootDir | Join-Path -ChildPath "data"
 Set-Location "$RootDir\ace-step-ui\server"
 
-# 查找 npm 命令的完整路径
-# 首先检查便携版 Node.js（优先使用 Node.js 24）
-$portableNode24Dir = "$RootDir\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64"
-$portableNode22Dir = "$RootDir\tools\node-v22.22.2-win-x64\node-v22.22.2-win-x64"
+$portableNode24Dir = "$DataDir\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64"
+$portableNode22Dir = "$DataDir\nodejs\node-v22.14.0-win-x64"
 $nodePath = Get-Command node -ErrorAction SilentlyContinue
 if ($nodePath) {
     $nodeDir = Split-Path -Parent $nodePath.Path
@@ -36,7 +35,7 @@ if ($nodePath) {
 }
 
 # 设置 Python 环境变量，使用 uv 虚拟环境中的 Python 用于编译 better-sqlite3
-$venvPython = "$RootDir\scripts\.venv\Scripts\python.exe"
+$venvPython = "$DataDir\.venv\Scripts\python.exe"
 if (Test-Path $venvPython) {
     Write-Output "Using Python for compilation: $venvPython"
     $env:PYTHON = $venvPython
@@ -55,9 +54,13 @@ Write-Output "Starting ACE-Step UI Backend..."
 
 # 检查依赖是否安装
 if (-not (Test-Path "node_modules")) {
-    Write-Error "Error: Dependencies not installed!"
-    Write-Error "Please run setup.bat first."
-    exit 1
+    Write-Output "[信息] node_modules 不存在，正在自动安装依赖..."
+    & $npmCmd install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "[错误] 依赖安装失败！"
+        exit 1
+    }
+    Write-Output "✓ 依赖安装完成"
 }
 
 Write-Output "Starting backend server..."

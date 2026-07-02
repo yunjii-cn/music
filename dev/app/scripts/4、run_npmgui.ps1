@@ -3,33 +3,42 @@
 # 使用脚本所在目录的绝对路径
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# 修复路径问题：ace-step-ui 在 scripts 的父目录（即 dist/）下
+# 修复路径问题：ace-step-ui 在 scripts 的父目录（即 dev/app/）下
 $ParentDir = Split-Path -Parent $ScriptDir
+$DataDir = Join-Path (Split-Path $ParentDir -Parent) "data"
 Set-Location "$ParentDir\ace-step-ui"
 
-# 查找 npm 命令的完整路径
-# 首先检查便携版 Node.js（优先使用 Node.js 24）
-$portableNode24Dir = "$ScriptDir\node-v24.14.1-win-x64\node-v24.14.1-win-x64"
-$portableNode22Dir = "$ScriptDir\node-v22.22.2-win-x64\node-v22.22.2-win-x64"
+$nodeExe = $null
+$npmCmd = $null
+$portableNode24Dir = "$DataDir\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64"
+$portableNode22Dir = "$DataDir\nodejs\node-v22.14.0-win-x64"
+$portableNode20Dir = "$ScriptDir\node-v20.20.0-win-x64"
+$systemNodeDir = "D:\Programs\nodejs"
 $nodePath = Get-Command node -ErrorAction SilentlyContinue
 if ($nodePath) {
     $nodeDir = Split-Path -Parent $nodePath.Path
     $npmCmd = "$nodeDir\npm.cmd"
+    $env:PATH = "$nodeDir;$env:PATH"
 } elseif (Test-Path "$portableNode24Dir\node.exe") {
-    # 使用便携版 Node.js 24
-    Write-Output "Using portable Node.js: $portableNode24Dir"
+    Write-Output "Using portable Node.js 24: $portableNode24Dir"
     $npmCmd = "$portableNode24Dir\npm.cmd"
-    # 将便携版 Node.js 添加到 PATH，确保子进程也能找到
     $env:PATH = "$portableNode24Dir;$env:PATH"
 } elseif (Test-Path "$portableNode22Dir\node.exe") {
-    # 使用便携版 Node.js 22
-    Write-Output "Using portable Node.js: $portableNode22Dir"
+    Write-Output "Using portable Node.js 22: $portableNode22Dir"
     $npmCmd = "$portableNode22Dir\npm.cmd"
-    # 将便携版 Node.js 添加到 PATH，确保子进程也能找到
     $env:PATH = "$portableNode22Dir;$env:PATH"
+} elseif (Test-Path "$portableNode20Dir\node.exe") {
+    Write-Output "Using portable Node.js 20: $portableNode20Dir"
+    $npmCmd = "$portableNode20Dir\npm.cmd"
+    $env:PATH = "$portableNode20Dir;$env:PATH"
+} elseif (Test-Path "$systemNodeDir\node.exe") {
+    Write-Output "Using system Node.js: $systemNodeDir"
+    $npmCmd = "$systemNodeDir\npm.cmd"
+    $env:PATH = "$systemNodeDir;$env:PATH"
 } else {
-    # 如果找不到 node，尝试使用系统路径中的 npm
-    $npmCmd = "npm"
+    Write-Error "Error: Node.js not found! Please install Node.js or place portable Node.js in scripts/ directory."
+    Read-Host "按回车键退出" | Out-Null
+    exit 1
 }
 
 Write-Output "Using npm: $npmCmd"
@@ -41,7 +50,7 @@ if (-not (Test-Path "node_modules")) {
     Write-Output "Dependencies not installed, installing now..."
     
     # 配置 npm 使用项目虚拟环境中的 Python（用于 node-gyp 编译）
-    $venvPython = "$ScriptDir\..\.venv\Scripts\python.exe"
+    $venvPython = "$ScriptDir\..\..\data\.venv\Scripts\python.exe"
     if (Test-Path $venvPython) {
         Write-Output "[信息] 配置 npm 使用虚拟环境 Python: $venvPython"
         & $npmCmd config set python "$venvPython"
@@ -69,7 +78,7 @@ if (-not (Test-Path "server\node_modules")) {
     Write-Output "Server dependencies not installed, installing now..."
     
     # 配置 npm 使用项目虚拟环境中的 Python（用于 node-gyp 编译）
-    $venvPython = "$ScriptDir\..\.venv\Scripts\python.exe"
+    $venvPython = "$ScriptDir\..\..\data\.venv\Scripts\python.exe"
     if (Test-Path $venvPython) {
         Write-Output "[信息] 配置 npm 使用虚拟环境 Python: $venvPython"
         & $npmCmd config set python "$venvPython"

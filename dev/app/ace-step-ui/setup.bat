@@ -1,73 +1,93 @@
 @echo off
-REM ACE-Step UI Setup Script for Windows
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-echo ==================================
-echo   ACE-Step UI Setup (Windows)
-echo ==================================
+echo ============================================================
+echo   ACE-Step UI - ??????
+echo ============================================================
 echo.
 
-REM Check Node.js
+REM ?? Node.js ??
+set NPM_CMD=
+set NODE_FOUND=0
+
+REM 1. ???? PATH ?? node
 where node >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo Error: Node.js not found!
-    echo Please install Node.js 18+ from https://nodejs.org/
+if %errorlevel% equ 0 (
+    set NPM_CMD=npm
+    set NODE_FOUND=1
+    echo [??] ???? Node.js
+)
+
+REM 2. ?? D:\Programs\nodejs
+if %NODE_FOUND% equ 0 (
+    if exist "D:\Programs\nodejs\npm.cmd" (
+        set NPM_CMD="D:\Programs\nodejs\npm.cmd"
+        set PATH=D:\Programs\nodejs;%PATH%
+        set NODE_FOUND=1
+        echo [??] ?? D:\Programs\nodejs
+    )
+)
+
+REM 3. 检查便携版 Node.js 24 (data/tools/)
+if %NODE_FOUND% equ 0 (
+    if exist "..\..\data\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64\npm.cmd" (
+        set NPM_CMD="..\..\data\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64\npm.cmd"
+        set PATH=..\..\data\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64;%PATH%
+        set NODE_FOUND=1
+        echo [信息] 使用便携版 Node.js 24
+    )
+)
+
+REM 4. 检查便携版 Node.js 22 (data/nodejs/)
+if %NODE_FOUND% equ 0 (
+    if exist "..\..\data\nodejs\node-v22.14.0-win-x64\npm.cmd" (
+        set NPM_CMD="..\..\data\nodejs\node-v22.14.0-win-x64\npm.cmd"
+        set PATH=..\..\data\nodejs\node-v22.14.0-win-x64;%PATH%
+        set NODE_FOUND=1
+        echo [信息] 使用便携版 Node.js 22
+    )
+)
+
+if %NODE_FOUND% equ 0 (
+    echo [??] ??? Node.js?
+    echo.
+    echo ??? Node.js ??????? ..\scripts\ ???
+    echo.
     pause
     exit /b 1
 )
 
-REM Show Node version
-for /f "tokens=*" %%i in ('node --version') do echo Node.js version: %%i
-
-REM Install frontend dependencies
+echo [??] ?? npm: %NPM_CMD%
 echo.
-echo Installing frontend dependencies...
-call npm install
-if %ERRORLEVEL% NEQ 0 (
-    echo Error: Failed to install frontend dependencies
+
+echo [??] ??????...
+call %NPM_CMD% install
+if !errorlevel! neq 0 (
+    echo [??] ?????????
     pause
     exit /b 1
 )
+echo [??] ????????
 
-REM Install server dependencies
 echo.
-echo Installing server dependencies...
+echo [??] ???????...
 cd server
-call npm install
-if %ERRORLEVEL% NEQ 0 (
-    echo Error: Failed to install server dependencies
+call %NPM_CMD% install
+if !errorlevel! neq 0 (
+    echo [??] ??????????
     cd ..
     pause
     exit /b 1
 )
 cd ..
-
-REM Create server .env if it doesn't exist
-if not exist "server\.env" (
-    echo.
-    echo Creating server\.env from example...
-    copy server\.env.example server\.env
-)
-
-REM Create data directory
-if not exist "server\data" (
-    mkdir server\data
-)
+echo [??] ?????????
 
 echo.
-echo ==================================
-echo   Setup Complete!
-echo ==================================
+echo ============================================================
+echo   ???????
+echo ============================================================
 echo.
-echo Next steps:
-echo.
-echo   1. Start ACE-Step API (in ACE-Step folder):
-echo      cd path\to\ACE-Step
-echo      uv run acestep-api --port 8001
-echo.
-echo   2. Start ACE-Step UI:
-echo      start.bat
-echo.
-echo   3. Open http://localhost:3000
+echo ?????? start.bat ?????
 echo.
 pause

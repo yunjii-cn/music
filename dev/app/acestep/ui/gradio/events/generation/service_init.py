@@ -99,7 +99,8 @@ def init_service_wrapper(
     )
 
     if init_llm:
-        checkpoint_dir = os.path.join(project_root, "checkpoints")
+        data_root = os.path.join(os.path.dirname(project_root), "data")
+        checkpoint_dir = os.path.join(data_root, "checkpoints")
 
         lm_status, lm_success = llm_handler.initialize(
             checkpoint_dir=checkpoint_dir,
