@@ -84,9 +84,8 @@ share/python-wheels/
 MANIFEST
 
 # dev目录 - Git管理纯净整合包，忽略开发临时文件
-# 忽略 dev/ 下的临时EXE，但是不忽略 dev/ver/ 下的稳定版本EXE
+# 忽略 dev/ 下的所有EXE，稳定版通过 Release 发布
 dev/*.exe
-!dev/ver/*.exe
 
 # dev/data/ - 用户数据目录（Git不管理）
 dev/data/
