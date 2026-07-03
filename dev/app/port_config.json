@@ -1,4 +1,5 @@
 {
   "qinglong_frontend": 3070,
-  "qinglong_backend": 3060
+  "qinglong_backend": 3060,
+  "qinglong_api": 8050
 }

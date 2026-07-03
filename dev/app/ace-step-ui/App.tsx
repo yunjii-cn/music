@@ -1555,7 +1555,7 @@ function AppContent() {
                 referenceTracks={referenceTracks}
                 onPlay={playSong}
                 onSelect={(s) => {
-                  setSelectedSong(s);
+                  playSong(s);
                   setShowRightSidebar(true);
                 }}
                 onToggleLike={toggleLike}

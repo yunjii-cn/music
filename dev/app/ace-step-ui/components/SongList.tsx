@@ -304,7 +304,7 @@ export const SongList: React.FC<SongListProps> = ({
 
     return (
         <div 
-            className="flex-1 bg-white dark:bg-black h-full overflow-y-auto custom-scrollbar p-6 pb-32 transition-colors duration-300"
+            className="flex-1 bg-white dark:bg-black h-full overflow-y-auto custom-scrollbar p-6 pb-36 transition-colors duration-300"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}

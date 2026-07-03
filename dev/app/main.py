@@ -175,26 +175,26 @@ PROJECTS = {
         "services": {
             "api": {
                 "name": "API 服务",
-                "port": 8001,
+                "port": 8050,
                 "script": "scripts/3、run_server.ps1",
-                "url": "http://127.0.0.1:8001/docs",
+                "url": "http://127.0.0.1:8050/docs",
                 "color": "#E53935",
                 "icon": "🔌",
                 "is_core": True
             },
             "backend": {
                 "name": "青龙后端",
-                "port": 3001,
+                "port": 3060,
                 "script": "scripts/5、run_qinglong_backend.ps1",
-                "url": "http://localhost:3001",
+                "url": "http://localhost:3060",
                 "color": "#E53935",
                 "icon": "⚙️"
             },
             "frontend": {
                 "name": "青龙前端",
-                "port": 3000,
+                "port": 3070,
                 "script": "scripts/6、run_qinglong_frontend.ps1",
-                "url": "http://localhost:3000",
+                "url": "http://localhost:3070",
                 "color": "#E53935",
                 "icon": "🎨"
             }
@@ -2656,8 +2656,16 @@ class MainWindow(QMainWindow):
     
     def _setup_tray(self):
         """设置系统托盘"""
+        if hasattr(self, 'tray_icon') and self.tray_icon is not None:
+            try:
+                self.tray_icon.hide()
+                self.tray_icon.deleteLater()
+            except Exception:
+                pass
+            self.tray_icon = None
+        
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setToolTip(f"ACE-Step 启动器 v{VERSION}")
+        self.tray_icon.setToolTip(f"云集智能音乐创意台 v{VERSION}")
         
         try:
             if hasattr(sys, '_MEIPASS'):
@@ -2683,7 +2691,8 @@ class MainWindow(QMainWindow):
         
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self._tray_activated)
-        self.tray_icon.show()
+        QApplication.instance().processEvents()
+        self.tray_icon.setVisible(True)
     
     def _tray_activated(self, reason):
         """托盘图标激活"""
@@ -2694,75 +2703,10 @@ class MainWindow(QMainWindow):
         """状态变化处理"""
         if service_id in self.service_cards:
             self.service_cards[service_id].update_status(is_running)
-        
-        # 跟踪运行中的服务数量，更新底部按钮显示
-        if is_running:
-            self._running_services_count += 1
-        else:
-            self._running_services_count = max(0, self._running_services_count - 1)
-        
-        self._update_bottom_bar()
     
     def _update_bottom_bar(self):
-        """根据服务运行状态更新底部按钮状态"""
-        has_running = self._running_services_count > 0
-        is_starting = getattr(self, 'is_starting', False)
-        
-        if is_starting:
-            self.btn_bottom_restart.setEnabled(False)
-            self.btn_bottom_stop.setEnabled(False)
-            self.btn_start_qinglong.setText("⏳ 正在启动...")
-            self.btn_start_qinglong.setEnabled(False)
-        elif has_running:
-            self.btn_bottom_restart.setEnabled(True)
-            self.btn_bottom_stop.setEnabled(True)
-            self.btn_start_qinglong.setText("🎵 音乐创意台运行中")
-            self.btn_start_qinglong.setStyleSheet("""
-                QPushButton {
-                    background-color: #2E7D32;
-                    color: white;
-                    border: 2px solid #2E7D32;
-                    border-radius: 10px;
-                    padding: 12px 24px;
-                    font-size: 16px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #1B5E20;
-                    border-color: #1B5E20;
-                }
-                QPushButton:disabled {
-                    background-color: #424242;
-                    border-color: #616161;
-                    color: #AAAAAA;
-                }
-            """)
-            self.btn_start_qinglong.setEnabled(False)
-        else:
-            self.btn_bottom_restart.setEnabled(True)
-            self.btn_bottom_stop.setEnabled(True)
-            self.btn_start_qinglong.setText("🎵 启动音乐创意台")
-            self.btn_start_qinglong.setStyleSheet("""
-                QPushButton {
-                    background-color: #E53935;
-                    color: white;
-                    border: 2px solid #E53935;
-                    border-radius: 10px;
-                    padding: 12px 24px;
-                    font-size: 16px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #C62828;
-                    border-color: #C62828;
-                }
-                QPushButton:disabled {
-                    background-color: #424242;
-                    border-color: #616161;
-                    color: #AAAAAA;
-                }
-            """)
-            self.btn_start_qinglong.setEnabled(True)
+        """三个按钮永久固定，不做状态切换"""
+        pass
     
     def _append_log_to_ui(self, message: str, color: str):
         """在主线程中添加日志到UI（由信号调用）"""
@@ -3048,7 +2992,7 @@ class MainWindow(QMainWindow):
             
             if project_id == "qinglong":
                 try:
-                    api_port = 8001
+                    api_port = SERVICES["qinglong_api"]["port"]
                     api_running = self.monitor._check_port(api_port)
                     
                     if not api_running:
@@ -3060,10 +3004,10 @@ class MainWindow(QMainWindow):
                             self._enable_buttons()
                             return
                         
-
+                        
                         
                         process = hidden_popen(
-                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", api_script],
+                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", api_script, "-Port", str(api_port)],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
@@ -5874,10 +5818,10 @@ for d in deps:
             if project_id == "qinglong":
                 try:
                     self._log("2. 核心API服务检查...")
-                    api_port = 8001
+                    api_port = SERVICES["qinglong_api"]["port"]
                     api_running = self.monitor._check_port(api_port)
                     if api_running:
-                        self._log("✓ API服务 - 运行正常 (端口: 8001)")
+                        self._log(f"✓ API服务 - 运行正常 (端口: {api_port})")
                     else:
                         self._log("⚠ API服务 - 未运行", "#FF9800")
                         self._log("  建议：先启动青龙 LoRA 训练器来启动API服务", "#FF9800")
@@ -6505,7 +6449,7 @@ for d in deps:
         
         <h3>服务管理</h3>
         <ul>
-            <li>API 服务（端口 8001）：核心模型推理与 API 接口</li>
+            <li>API 服务（端口 8050）：核心模型推理与 API 接口</li>
             <li>青龙后端（端口 3001）：Express.js 业务后端</li>
             <li>青龙前端（端口 3000）：Vite 用户界面</li>
             <li>每个服务卡片显示运行状态，可单独重启或修改端口</li>
@@ -7371,9 +7315,11 @@ for d in deps:
             "width": self.width(),
             "height": self.height()
         })
-        
         self._force_exit = True
         self.close()
+        app = QApplication.instance()
+        if app:
+            app.quit()
     
     def closeEvent(self, event):
         """关闭事件：默认最小化到系统托盘，托盘退出时真正关闭"""
@@ -7400,7 +7346,6 @@ for d in deps:
         else:
             # 隐藏到系统托盘
             self.hide()
-            self.tray_icon.show()
             try:
                 self.tray_icon.showMessage(
                     "云集智能音乐创意台",
@@ -7526,6 +7471,7 @@ def main(app=None, splash=None):
     
     if app is None:
         app = QApplication(sys.argv)
+        app.setQuitOnLastWindowClosed(False)
         app.setStyle('Fusion')
         
         palette = QPalette()

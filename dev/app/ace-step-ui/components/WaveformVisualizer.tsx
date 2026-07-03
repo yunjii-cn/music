@@ -159,6 +159,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!duration) return;
+    e.stopPropagation();
     
     // Use progressBarRef if available for consistent calculation
     const container = progressBarRef?.current || canvasRef.current;
