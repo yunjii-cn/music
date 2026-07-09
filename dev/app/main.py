@@ -6191,15 +6191,45 @@ for d in deps:
             "系统默认": "system"
         }
 
+        # 已收录浏览器的可执行文件真实路径与品牌，用于去重，
+        # 避免同一浏览器经「注册表 / 常见路径 / 便携扫描」多次命中而在列表中重复出现
+        seen_paths = set()
+        added_brands = set()
+
+        def _norm_path(p):
+            try:
+                return os.path.normcase(os.path.abspath(p))
+            except Exception:
+                return os.path.normcase(p)
+
+        def _add_browser(unique_name_base, path, brand):
+            # 同一浏览器经多种途径检测时只保留一条：
+            # 1) 按可执行文件真实路径去重 —— 解决注册表 + 常见路径的重复识别
+            # 2) 按品牌去重 —— 解决 Opera 的 launcher.exe / opera.exe 等同源重复识别
+            np = _norm_path(path)
+            if np in seen_paths or brand in added_brands:
+                return
+            seen_paths.add(np)
+            added_brands.add(brand)
+            base_name = unique_name_base
+            counter = 2
+            unique_name = base_name
+            while unique_name in browsers:
+                unique_name = f"{base_name} ({counter})"
+                counter += 1
+            browsers[unique_name] = path
+
         # 浏览器可执行文件名与显示名称、图标的映射
         browser_registry_map = {
+            # 主流浏览器
             "chrome.exe": ("Chrome", "🌐"),
             "msedge.exe": ("Edge", "🌊"),
             "firefox.exe": ("Firefox", "🦊"),
             "brave.exe": ("Brave", "🦁"),
             "opera.exe": ("Opera", "🔴"),
-            "launcher.exe": ("Opera", "🔴"),  # Opera launcher
+            "launcher.exe": ("Opera", "🔴"),  # Opera launcher（与 opera.exe 同源，靠品牌去重只保留一条）
             "vivaldi.exe": ("Vivaldi", "🌈"),
+            # 国产浏览器
             "centbrowser.exe": ("Cent Browser", "🌀"),
             "360chrome.exe": ("360 浏览器", "🛡"),
             "360se.exe": ("360 安全浏览器", "🛡"),
@@ -6208,6 +6238,24 @@ for d in deps:
             "maxthon.exe": ("傲游浏览器", "🛥"),
             "sogouexplorer.exe": ("搜狗浏览器", "🐶"),
             "liebao.exe": ("猎豹浏览器", "🐆"),
+            "baidubrowser.exe": ("百度浏览器", "🅱"),
+            "2345explorer.exe": ("2345 浏览器", "🔢"),
+            "twinkstar.exe": ("星愿浏览器", "⭐"),
+            "115chrome.exe": ("115 浏览器", "💯"),
+            # 国际 / 隐私浏览器
+            "yandex.exe": ("Yandex", "🟦"),
+            "whale.exe": ("Whale", "🐳"),
+            "avastbrowser.exe": ("Avast Secure", "🛡"),
+            "dragon.exe": ("Comodo Dragon", "🐉"),
+            "falkon.exe": ("Falkon", "🦅"),
+            "waterfox.exe": ("Waterfox", "💧"),
+            "librewolf.exe": ("LibreWolf", "🐺"),
+            "zen.exe": ("Zen Browser", "🧘"),
+            "slimjet.exe": ("Slimjet", "🚀"),
+            "coccoc.exe": ("CocCoc", "🐤"),
+            "epic.exe": ("Epic Privacy", "🔒"),
+            "palemoon.exe": ("Pale Moon", "🌙"),
+            "iridium.exe": ("Iridium", "🔘"),
         }
 
         # 1. 通过注册表 App Paths 查找
@@ -6227,15 +6275,7 @@ for d in deps:
                                 path, _ = winreg.QueryValueEx(sub_key, None)
                                 if path and os.path.exists(path):
                                     display_name, icon = browser_registry_map[exe_name]
-                                    if exe_name == "launcher.exe":
-                                        display_name = "Opera"
-                                    unique_name = f"{icon} {display_name}"
-                                    base_name = unique_name
-                                    counter = 2
-                                    while unique_name in browsers:
-                                        unique_name = f"{base_name} ({counter})"
-                                        counter += 1
-                                    browsers[unique_name] = path
+                                    _add_browser(f"{icon} {display_name}", path, display_name)
                             except OSError:
                                 continue
                     except OSError:
@@ -6291,6 +6331,44 @@ for d in deps:
             # Liebao
             r"C:\Program Files (x86)\liebao\liebao.exe",
             r"C:\Program Files\liebao\liebao.exe",
+            # Avast Secure Browser
+            r"C:\Program Files\AVAST Software\Browser\AvastBrowser.exe",
+            r"C:\Program Files (x86)\AVAST Software\Browser\AvastBrowser.exe",
+            # Comodo Dragon
+            r"C:\Program Files\Comodo\Dragon\dragon.exe",
+            r"C:\Program Files (x86)\Comodo\Dragon\dragon.exe",
+            # 百度浏览器
+            r"C:\Program Files (x86)\Baidu\BaiduBrowser\BaiduBrowser.exe",
+            r"C:\Program Files\Baidu\BaiduBrowser\BaiduBrowser.exe",
+            # 2345 浏览器
+            r"C:\Program Files (x86)\2345Soft\2345Explorer\2345Explorer.exe",
+            r"C:\Program Files\2345Soft\2345Explorer\2345Explorer.exe",
+            # 星愿浏览器
+            r"C:\Program Files (x86)\Twinkstar\Twinkstar.exe",
+            r"C:\Program Files\Twinkstar\Twinkstar.exe",
+            # 115 浏览器
+            r"C:\Program Files (x86)\115\115chrome.exe",
+            r"C:\Program Files\115\115chrome.exe",
+            # Falkon
+            r"C:\Program Files\Falkon\falkon.exe",
+            # Waterfox
+            r"C:\Program Files\Waterfox\waterfox.exe",
+            # LibreWolf
+            r"C:\Program Files\LibreWolf\librewolf.exe",
+            # Zen Browser
+            r"C:\Program Files\Zen Browser\zen.exe",
+            # Slimjet
+            r"C:\Program Files\Slimjet\slimjet.exe",
+            r"C:\Program Files (x86)\Slimjet\slimjet.exe",
+            # CocCoc
+            r"C:\Program Files\CocCoc\Browser\coccoc.exe",
+            # Epic Privacy Browser
+            r"C:\Program Files (x86)\Epic Privacy Browser\epic.exe",
+            # Pale Moon
+            r"C:\Program Files\Pale Moon\palemoon.exe",
+            # Iridium
+            r"C:\Program Files (x86)\Iridium\iridium.exe",
+            r"C:\Program Files\Iridium\iridium.exe",
         ]
 
         for path in common_paths:
@@ -6298,13 +6376,7 @@ for d in deps:
                 exe_name = os.path.basename(path).lower()
                 if exe_name in browser_registry_map:
                     display_name, icon = browser_registry_map[exe_name]
-                    unique_name = f"{icon} {display_name}"
-                    base_name = unique_name
-                    counter = 2
-                    while unique_name in browsers:
-                        unique_name = f"{base_name} ({counter})"
-                        counter += 1
-                    browsers[unique_name] = path
+                    _add_browser(f"{icon} {display_name}", path, display_name)
 
         # 3. 在常用父目录下扫描 portable 版本
         try:
@@ -6325,13 +6397,7 @@ for d in deps:
                             if file_lower in browser_registry_map:
                                 full_path = os.path.join(root, file)
                                 display_name, icon = browser_registry_map[file_lower]
-                                unique_name = f"{icon} {display_name} (便携)"
-                                base_name = unique_name
-                                counter = 2
-                                while unique_name in browsers:
-                                    unique_name = f"{base_name} ({counter})"
-                                    counter += 1
-                                browsers[unique_name] = full_path
+                                _add_browser(f"{icon} {display_name} (便携)", full_path, display_name)
         except Exception:
             pass
 
@@ -6478,7 +6544,7 @@ for d in deps:
         <h3>浏览器设置</h3>
         <ul>
             <li>顶部面板可选择系统默认浏览器或已安装的浏览器</li>
-            <li>支持 Chrome、Edge、Firefox、Brave、Opera、Vivaldi 等常见浏览器</li>
+            <li>支持 Chrome、Edge、Firefox、Brave、Opera、Vivaldi 等主流浏览器，并识别 搜狗、傲游、猎豹、360、QQ、UC、百度、星愿、115、Yandex、Whale 等国内外第三方浏览器</li>
             <li>选择"自定义浏览器"可手动指定 .exe 路径</li>
         </ul>
         
