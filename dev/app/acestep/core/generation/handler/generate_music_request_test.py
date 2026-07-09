@@ -59,6 +59,28 @@ class GenerateMusicRequestMixinTests(unittest.TestCase):
         self.assertIsNone(out["audio_duration"])
         self.assertIsNone(out["repainting_end"])
 
+    def test_resolve_task_applies_cover_instruction_for_explicit_cover(self):
+        """Explicit cover request must use the cover instruction, not the DIT default.
+
+        Regression test for the cover=white-noise bug. ``GenerationParams``
+        defaults ``instruction`` to the DIT prompt
+        (``"Fill the audio semantic mask based on the given conditions:"``) and
+        ``inference.generate_music`` forwards it unchanged for ``task_type="cover"``.
+        If that default leaks through, ``_build_chunk_masks_and_src_latents``
+        sets ``is_covers=False`` (the cover substring is missing and the
+        ``"mask"`` clause fails) and the text encoder receives a
+        text2music/repaint prompt while the source audio still sits in the
+        context latents — the model then emits noise instead of a cover.
+        """
+        host = _Host()
+        task, instruction = host._resolve_generate_music_task(
+            task_type="cover",
+            audio_code_string="",
+            instruction="Fill the audio semantic mask based on the given conditions:",
+        )
+        self.assertEqual(task, "cover")
+        self.assertIn("generate audio semantic tokens", instruction.lower())
+
     def test_prepare_reference_and_source_audio_returns_error_for_invalid_reference(self):
         """Invalid reference audio should return a structured early error payload."""
         host = _Host()

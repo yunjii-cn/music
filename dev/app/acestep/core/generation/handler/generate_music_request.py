@@ -50,9 +50,31 @@ class GenerateMusicRequestMixin:
         audio_code_string: Union[str, List[str]],
         instruction: str,
     ) -> Tuple[str, str]:
-        """Auto-switch text2music to cover task when audio codes are provided."""
+        """Auto-switch text2music to cover task when audio codes are provided.
+
+        For an explicit ``task_type == "cover"`` request, the cover instruction
+        (``TASK_INSTRUCTIONS["cover"]``) is enforced unless the caller already
+        supplied a valid cover instruction.
+
+        This is critical: ``conditioning_masks._build_chunk_masks_and_src_latents``
+        only sets ``is_covers=True`` when the instruction contains
+        ``"generate audio semantic tokens"``. If the default DIT instruction
+        (``"Fill the audio semantic mask based on the given conditions:"``) leaks
+        into a cover request, ``is_covers`` becomes ``False`` and the text
+        encoder is fed a text2music/repaint prompt while the source audio still
+        sits in the context latents — the model then emits white-noise instead of
+        a cover. See bug report: cover mode generates noise.
+        """
         if task_type == "text2music" and self._has_non_empty_audio_codes(audio_code_string):
             return "cover", TASK_INSTRUCTIONS["cover"]
+        if task_type == "cover":
+            # Apply the cover instruction only when the caller has not already
+            # provided one (detected by the canonical cover substring). This keeps
+            # any explicit custom cover instruction intact while fixing the common
+            # case where the default DIT instruction was passed through unchanged.
+            if "generate audio semantic tokens" not in (instruction or "").lower():
+                return task_type, TASK_INSTRUCTIONS["cover"]
+            return task_type, instruction
         return task_type, instruction
 
     def _prepare_generate_music_runtime(
