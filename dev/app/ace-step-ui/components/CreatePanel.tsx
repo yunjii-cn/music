@@ -1695,6 +1695,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   };
 
   const handleGenerate = () => {
+    // cover / audio2audio require a source audio (or audio codes).
+    if ((taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim()) {
+      alert('翻唱(cover) / 音频转音频(audio2audio) 模式需要先上传源音频，或提供音频码(audio codes)。');
+      return;
+    }
     let baseStyle = style;
     if (effectiveStyleForLora && !baseStyle.includes(effectiveStyleForLora.tag)) {
       const { tag, pos } = effectiveStyleForLora;
@@ -4092,7 +4097,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         <button
           onClick={handleGenerate}
           className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110"
-          disabled={isGenerating || !isAuthenticated}
+          disabled={isGenerating || !isAuthenticated || ((taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim())}
         >
           <Sparkles size={18} />
           <span>

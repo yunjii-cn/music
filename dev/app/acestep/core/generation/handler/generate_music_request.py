@@ -133,6 +133,17 @@ class GenerateMusicRequestMixin:
             refer_audios = [[torch.zeros(2, 30 * self.sample_rate)] for _ in range(actual_batch_size)]
 
         processed_src_audio = None
+        if task_type == "cover" and src_audio is None:
+            logger.error("[generate_music] Cover task requires source audio but none provided")
+            return None, None, {
+                "audios": [],
+                "status_message": (
+                    "翻唱(cover)模式必须提供源音频。请先上传或选择一段源音频后再生成。"
+                ),
+                "extra_outputs": {},
+                "success": False,
+                "error": "Cover task requires source audio",
+            }
         if task_type == "text2music":
             if src_audio is not None:
                 logger.info("[generate_music] text2music task does not use src_audio, ignoring")

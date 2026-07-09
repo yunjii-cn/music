@@ -296,6 +296,14 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       return;
     }
 
+    // Guard: cover / audio2audio require a source audio or audio codes.
+    // Without this, src_audio_path is silently omitted and the Python side
+    // falls back to a silent latent -> pure noise output.
+    if ((taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl && !audioCodes) {
+      res.status(400).json({ error: `task_type='${taskType}' requires a source audio or audio codes` });
+      return;
+    }
+
     const params = {
       customMode,
       songDescription,
