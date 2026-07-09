@@ -1697,7 +1697,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const handleGenerate = () => {
     // cover / audio2audio require a source audio (or audio codes).
     if ((taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim()) {
-      alert('翻唱(cover) / 音频转音频(audio2audio) 模式需要先上传源音频，或提供音频码(audio codes)。');
+      alert('翻唱(cover) / 音频转音频(audio2audio) 模式需要先上传「内容参考」（源音频），或在音频码框中提供 audio codes。');
       return;
     }
     let baseStyle = style;
@@ -2471,6 +2471,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Cover / audio2audio guidance: tell the user to upload source audio */}
+              {(taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim() && (
+                <div className="px-3 py-2.5 bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/20 flex items-start gap-2">
+                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+                    <span className="font-bold">翻唱模式需要「{t('cover')}」（内容参考）源音频。</span> 请点击上方的「{t('cover')}」标签，上传您想要翻唱的歌曲后再生成；未上传源音频将无法生成。
+                  </p>
+                </div>
+              )}
 
               {/* Audio Content */}
               <div className="p-3 space-y-2">
@@ -3561,7 +3571,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Choose text-to-music or audio-based modes.">{t('taskType')}</label>
                 <select
                   value={taskType}
-                   onChange={(e) => { const v = e.target.value; setTaskType(v); localStorage.setItem('ace-taskType', v); }}
+                   onChange={(e) => { const v = e.target.value; setTaskType(v); localStorage.setItem('ace-taskType', v); if (v === 'cover' || v === 'audio2audio') setAudioTab('source'); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   <option value="text2music">{t('textToMusic')}</option>
@@ -4098,6 +4108,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           onClick={handleGenerate}
           className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110"
           disabled={isGenerating || !isAuthenticated || ((taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim())}
+          title={(taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim() ? `翻唱 / 音频转音频模式：请先在「${t('cover')}」（内容参考）上传源音频` : undefined}
         >
           <Sparkles size={18} />
           <span>
