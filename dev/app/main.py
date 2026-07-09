@@ -3006,24 +3006,44 @@ class MainWindow(QMainWindow):
                         
                         
                         
+                        api_log_file = os.path.join(self.base_dir, "logs", f"api_server_{datetime.now():%Y%m%d_%H%M%S}.log")
+                        os.makedirs(os.path.dirname(api_log_file), exist_ok=True)
+                        
                         process = hidden_popen(
-                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", api_script, "-Port", str(api_port)],
+                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", api_script, "-Port", str(api_port), "-LogFile", api_log_file],
                             cwd=self.base_dir,
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
                             text=True
                         )
                         
                         self.api_process = process
                         
                         def read_api_output():
-                            while process.poll() is None:
+                            api_port_local = api_port
+                            start_time = time.time()
+                            last_line_time = time.time()
+                            while True:
+                                elapsed = time.time() - start_time
                                 line = process.stdout.readline()
                                 if line:
                                     self._log(f"[API 服务] {line.strip()}")
-                                line_err = process.stderr.readline()
-                                if line_err:
-                                    self._log(f"[API 服务] {line_err.strip()}", "#FF9800")
+                                    last_line_time = time.time()
+                                else:
+                                    # No data: check if process exited (uv stub may exit before real Python)
+                                    if process.poll() is not None:
+                                        grace = time.time() - last_line_time
+                                        port_alive = self.monitor._check_port(api_port_local)
+                                        if grace > 5 and not port_alive:
+                                            break
+                                        if process.poll() is not None and port_alive and grace > 5:
+                                            # uv stub exited but real Python still running — log once
+                                            if not hasattr(read_api_output, '_warned_orphan'):
+                                                read_api_output._warned_orphan = True
+                                                self._log("[API 服务] ⚠ 检测到 uv Python 存根已退出（真实进程可能仍在运行）", "#FF9800")
+                                        time.sleep(1)
+                                        continue
+                                    time.sleep(0.1)
                         
                         threading.Thread(target=read_api_output, daemon=True).start()
                         

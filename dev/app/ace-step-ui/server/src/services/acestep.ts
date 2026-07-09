@@ -209,6 +209,9 @@ async function submitToApi(params: GenerationParams): Promise<{ taskId: string }
         // fall through
       }
     }
+    if (audioUrl.startsWith('references/')) {
+      return path.join(AUDIO_DIR, audioUrl);
+    }
     return audioUrl;
   };
 

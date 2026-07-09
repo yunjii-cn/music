@@ -647,20 +647,34 @@ cron.schedule('0 3 * * *', async () => {
 });
 
 // Start server on configured host (default 0.0.0.0 for LAN access)
-app.listen(config.port, config.host, () => {
-  console.log(`ACE-Step UI Server running on http://localhost:${config.port}`);
-  console.log(`Environment: ${config.nodeEnv}`);
-  console.log(`ACE-Step API: ${config.acestep.apiUrl}`);
+// Retry on EADDRINUSE to handle tsx watch restart race (TIME_WAIT)
+function startServer(attempt = 1): void {
+  const server = app.listen(config.port, config.host, () => {
+    console.log(`ACE-Step UI Server running on http://localhost:${config.port}`);
+    console.log(`Environment: ${config.nodeEnv}`);
+    console.log(`ACE-Step API: ${config.acestep.apiUrl}`);
 
-  // Show LAN access info
-  import('os').then(os => {
-    const nets = os.networkInterfaces();
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name] || []) {
-        if (net.family === 'IPv4' && !net.internal) {
-          console.log(`LAN access: http://${net.address}:${config.port}`);
+    // Show LAN access info
+    import('os').then(os => {
+      const nets = os.networkInterfaces();
+      for (const name of Object.keys(nets)) {
+        for (const net of nets[name] || []) {
+          if (net.family === 'IPv4' && !net.internal) {
+            console.log(`LAN access: http://${net.address}:${config.port}`);
+          }
         }
       }
+    });
+  });
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if ((err as any).code === 'EADDRINUSE' && attempt < 5) {
+      console.log(`Port ${config.port} in use (TIME_WAIT), retrying in ${attempt}s...`);
+      setTimeout(() => startServer(attempt + 1), attempt * 1000);
+    } else {
+      console.error('Failed to start server:', err);
+      process.exit(1);
     }
   });
-});
+}
+
+startServer();

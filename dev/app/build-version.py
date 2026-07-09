@@ -451,6 +451,19 @@ def main():
         print()
 
         exe_in_dist = DIST_DIR / f"{version_name}.exe"
+
+        # Also copy to dev/ver/ for release publishing
+        VER_DIR = DEV_DIR / "ver"
+        VER_DIR.mkdir(parents=True, exist_ok=True)
+        if exe_in_dist.exists():
+            ver_target = VER_DIR / f"{version_name}.exe"
+            if not ver_target.exists():
+                import shutil as _shutil
+                _shutil.copy2(str(exe_in_dist), str(ver_target))
+                print(f"  ✓ 复制到 dev/ver/: {ver_target.name}")
+            else:
+                print(f"  - dev/ver/ 中已存在: {ver_target.name}")
+
         print("=" * 60)
         print("  构建完成！")
         print(f"  发布目录: {release_dir}")

@@ -2379,6 +2379,9 @@ def create_app() -> FastAPI:
                     else:
                         instruction_to_use = raw_instruction
 
+                if req.task_type == "cover":
+                    print(f"[Cover] task_type=cover, instruction={instruction_to_use}, src_audio_path={req.src_audio_path}, cover_noise_strength={req.cover_noise_strength}")
+
                 # Build GenerationParams using unified interface
                 # Note: thinking controls LM code generation, sample_mode only affects CoT metas
                 params = GenerationParams(
@@ -2795,6 +2798,12 @@ def create_app() -> FastAPI:
         cleanup_task = asyncio.create_task(_job_store_cleanup_worker())
         app.state.worker_tasks = workers
         app.state.cleanup_task = cleanup_task
+
+        # Pre-import model_downloader to avoid first-request sync import blocking the event loop
+        try:
+            import acestep.model_downloader
+        except Exception:
+            pass
 
         # =================================================================
         # Initialize models at startup (not lazily on first request)
@@ -3811,6 +3820,14 @@ def create_app() -> FastAPI:
                     lora_path = resolved_path.replace("\\", "/")
 
             adapter_name = request.adapter_name.strip() if isinstance(request.adapter_name, str) else None
+
+            # Check if this adapter is already loaded (e.g. restored from saved state by _ensure_initialized)
+            active = getattr(handler, "_active_loras", None) or {}
+            effective_name = adapter_name if adapter_name else os.path.basename(lora_path.rstrip(os.sep)) or "default"
+            if effective_name in active:
+                _save_lora_state(lora_path, 1.0, adapter_name)
+                return _wrap_response({"message": f"✅ LoRA already loaded: {effective_name}", "lora_path": lora_path, "already_loaded": True})
+
             if adapter_name:
                 result = handler.add_lora(lora_path, adapter_name=adapter_name)
             else:
@@ -4351,6 +4368,18 @@ def main() -> None:
     if args.download_source and args.download_source != "auto":
         os.environ["ACESTEP_DOWNLOAD_SOURCE"] = args.download_source
         print(f"Using preferred download source: {args.download_source}")
+
+    # Enable faulthandler to capture C-level crashes (segfaults from CUDA/PyTorch)
+    # Use a file because loguru replaces sys.stderr with StderrLogger (no fileno)
+    import faulthandler
+    try:
+        import io
+        faulthandler_log = os.path.join(os.path.dirname(__file__), "..", "logs", "faulthandler.log")
+        os.makedirs(os.path.dirname(faulthandler_log), exist_ok=True)
+        fh_file = io.open(faulthandler_log, "a")
+        faulthandler.enable(file=fh_file)
+    except Exception:
+        pass
 
     # Set init LLM flag
     if args.init_llm:

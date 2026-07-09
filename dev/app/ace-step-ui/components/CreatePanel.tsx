@@ -292,7 +292,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [repaintingEnd, setRepaintingEnd] = useState(() => { const v = localStorage.getItem('ace-repaintingEnd'); return v !== null ? parseFloat(v) : -1; });
   const [instruction, setInstruction] = useState('Fill the audio semantic mask based on the given conditions:');
   const [audioCoverStrength, setAudioCoverStrength] = useState(() => { const v = localStorage.getItem('ace-audioCoverStrength'); return v !== null ? parseFloat(v) : 1.0; });
-  const [taskType, setTaskType] = useState('text2music');
+  const [coverNoiseStrength, setCoverNoiseStrength] = useState(() => { const v = localStorage.getItem('ace-coverNoiseStrength'); return v !== null ? parseFloat(v) : 0.3; });
+  const [taskType, setTaskType] = useState(() => localStorage.getItem('ace-taskType') || 'text2music');
   const [useAdg, setUseAdg] = useState(() => localStorage.getItem('ace-useAdg') !== 'false');
   const [cfgIntervalStart, setCfgIntervalStart] = useState(() => { const v = localStorage.getItem('ace-cfgIntervalStart'); return v !== null ? parseFloat(v) : 0.0; });
   const [cfgIntervalEnd, setCfgIntervalEnd] = useState(() => { const v = localStorage.getItem('ace-cfgIntervalEnd'); return v !== null ? parseFloat(v) : 1.0; });
@@ -656,6 +657,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       lmNegativePrompt,
       taskType,
       audioCoverStrength,
+      coverNoiseStrength,
       useAdg,
       cfgIntervalStart,
       cfgIntervalEnd,
@@ -675,7 +677,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       loraPath,
       loraScale,
     };
-  }, [customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender, bpm, keyScale, timeSignature, duration, inferenceSteps, guidanceScale, batchSize, randomSeed, seed, thinking, audioFormat, inferMethod, lmBackend, lmModel, shift, lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, taskType, audioCoverStrength, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption, useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize, isFormatCaption, selectedModel, loraLoaded, loraPath, loraScale]);
+  }, [customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender, bpm, keyScale, timeSignature, duration, inferenceSteps, guidanceScale, batchSize, randomSeed, seed, thinking, audioFormat, inferMethod, lmBackend, lmModel, shift, lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, taskType, audioCoverStrength, coverNoiseStrength, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption, useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize, isFormatCaption, selectedModel, loraLoaded, loraPath, loraScale]);
 
   const getCurrentParamsRef = useRef(getCurrentParams);
   getCurrentParamsRef.current = getCurrentParams;
@@ -712,6 +714,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       lmNegativePrompt,
       taskType,
       audioCoverStrength,
+      coverNoiseStrength,
       useAdg,
       cfgIntervalStart,
       cfgIntervalEnd,
@@ -728,7 +731,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       isFormatCaption,
       ditModel: selectedModel,
     };
-  }, [customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender, bpm, keyScale, timeSignature, duration, inferenceSteps, guidanceScale, batchSize, randomSeed, seed, thinking, audioFormat, inferMethod, lmBackend, lmModel, shift, lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, taskType, audioCoverStrength, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption, useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize, isFormatCaption, selectedModel]);
+  }, [customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender, bpm, keyScale, timeSignature, duration, inferenceSteps, guidanceScale, batchSize, randomSeed, seed, thinking, audioFormat, inferMethod, lmBackend, lmModel, shift, lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, taskType, audioCoverStrength, coverNoiseStrength, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption, useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize, isFormatCaption, selectedModel]);
 
   useEffect(() => {
     if (!selectedPresetId || presets.length === 0) return;
@@ -778,8 +781,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     if (p.inferMethod !== undefined) { setInferMethod(p.inferMethod); localStorage.setItem('ace-inferMethod', p.inferMethod); }
     if (p.shift !== undefined) { setShift(p.shift); localStorage.setItem('ace-shift', String(p.shift)); }
     if (p.useAdg !== undefined) { setUseAdg(p.useAdg); localStorage.setItem('ace-useAdg', String(p.useAdg)); }
-    if (p.taskType !== undefined) { setTaskType(p.taskType); }
+    if (p.taskType !== undefined) { setTaskType(p.taskType); localStorage.setItem('ace-taskType', p.taskType); }
     if (p.audioCoverStrength !== undefined) { setAudioCoverStrength(p.audioCoverStrength); localStorage.setItem('ace-audioCoverStrength', String(p.audioCoverStrength)); }
+    if (p.coverNoiseStrength !== undefined) { setCoverNoiseStrength(p.coverNoiseStrength); localStorage.setItem('ace-coverNoiseStrength', String(p.coverNoiseStrength)); }
     if (p.ditModel !== undefined) { setSelectedModel(p.ditModel); localStorage.setItem('ace-model', p.ditModel); }
     if (p.lmModel !== undefined) { setLmModel(p.lmModel); localStorage.setItem('ace-lmModel', p.lmModel); }
     if (p.lmBackend !== undefined) { setLmBackend(p.lmBackend); localStorage.setItem('ace-lmBackend', p.lmBackend); }
@@ -881,8 +885,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     if (p.lmTopK !== undefined) { setLmTopK(p.lmTopK); localStorage.setItem('ace-lmTopK', String(p.lmTopK)); }
     if (p.lmTopP !== undefined) { setLmTopP(p.lmTopP); localStorage.setItem('ace-lmTopP', String(p.lmTopP)); }
     if (p.lmNegativePrompt !== undefined) { setLmNegativePrompt(p.lmNegativePrompt); localStorage.setItem('ace-lmNegativePrompt', p.lmNegativePrompt); }
-    if (p.taskType !== undefined) { setTaskType(p.taskType); }
+    if (p.taskType !== undefined) { setTaskType(p.taskType); localStorage.setItem('ace-taskType', p.taskType); }
     if (p.audioCoverStrength !== undefined) { setAudioCoverStrength(p.audioCoverStrength); localStorage.setItem('ace-audioCoverStrength', String(p.audioCoverStrength)); }
+    if (p.coverNoiseStrength !== undefined) { setCoverNoiseStrength(p.coverNoiseStrength); localStorage.setItem('ace-coverNoiseStrength', String(p.coverNoiseStrength)); }
     if (p.useAdg !== undefined) { setUseAdg(p.useAdg); localStorage.setItem('ace-useAdg', String(p.useAdg)); }
     if (p.cfgIntervalStart !== undefined) { setCfgIntervalStart(p.cfgIntervalStart); localStorage.setItem('ace-cfgIntervalStart', String(p.cfgIntervalStart)); }
     if (p.cfgIntervalEnd !== undefined) { setCfgIntervalEnd(p.cfgIntervalEnd); localStorage.setItem('ace-cfgIntervalEnd', String(p.cfgIntervalEnd)); }
@@ -1754,6 +1759,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         repaintingEnd,
         instruction,
         audioCoverStrength,
+        coverNoiseStrength,
         taskType,
         useAdg,
         cfgIntervalStart,
@@ -2561,7 +2567,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() => { setSourceAudioUrl(''); setSourceAudioTitle(''); setSourcePlaying(false); setSourceTime(0); setSourceDuration(0); }}
+                      onClick={() => { setSourceAudioUrl(''); setSourceAudioTitle(''); setSourcePlaying(false); setSourceTime(0); setSourceDuration(0); if (taskType === 'cover') setTaskType('text2music'); }}
                       className="p-1.5 rounded-full hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-400 hover:text-zinc-600 dark:hover:text-white transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
@@ -3550,7 +3556,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Choose text-to-music or audio-based modes.">{t('taskType')}</label>
                 <select
                   value={taskType}
-                  onChange={(e) => setTaskType(e.target.value)}
+                   onChange={(e) => { const v = e.target.value; setTaskType(v); localStorage.setItem('ace-taskType', v); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   <option value="text2music">{t('textToMusic')}</option>
@@ -3568,6 +3574,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   max="1"
                   value={audioCoverStrength}
                   onChange={(e) => { const v = Number(e.target.value); setAudioCoverStrength(v); localStorage.setItem('ace-audioCoverStrength', String(v)); }}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Noise level during cover mixing (0=more noise/more creative, 1=more faithful to source).">Cover Noise Str.</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="1"
+                  value={coverNoiseStrength}
+                  onChange={(e) => { const v = Number(e.target.value); setCoverNoiseStrength(v); localStorage.setItem('ace-coverNoiseStrength', String(v)); }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>

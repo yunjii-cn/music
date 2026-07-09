@@ -8,6 +8,8 @@ import sys
 import os
 import re
 import base64
+import threading
+import time as time_module
 from datetime import datetime
 import json
 from pathlib import Path
@@ -23,8 +25,17 @@ from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 
 
-REMOTE_REPO_OWNER = "yunjii"
-REMOTE_REPO_NAME = "ace"
+# ── 品牌 & 仓库坐标 ──
+BRAND_NAME = "云集智能音乐创意台"
+APP_NAME = BRAND_NAME
+
+GITEE_OWNER = "yunjii"
+GITEE_REPO = "music"
+GITHUB_OWNER = "yunjii-cn"
+GITHUB_REPO = "music"
+
+REMOTE_REPO_OWNER = GITEE_OWNER
+REMOTE_REPO_NAME = GITEE_REPO
 REMOTE_COMMITS_URL = f"https://gitee.com/api/v5/repos/{REMOTE_REPO_OWNER}/{REMOTE_REPO_NAME}/commits"
 REMOTE_VERSIONS_API = f"https://gitee.com/api/v5/repos/{REMOTE_REPO_OWNER}/{REMOTE_REPO_NAME}/contents/dev/app/versions.json"
 
@@ -115,6 +126,16 @@ def _get_gitee_token():
     return ""
 
 
+def _get_github_token():
+    if hasattr(sys, '_MEIPASS'):
+        token_file = Path(sys._MEIPASS) / ".github_token"
+    else:
+        token_file = Path(__file__).parent / ".github_token"
+    if token_file.exists():
+        return token_file.read_text(encoding='utf-8').strip()
+    return ""
+
+
 def _build_api_url(base_url):
     token = _get_gitee_token()
     if token:
@@ -123,33 +144,126 @@ def _build_api_url(base_url):
     return base_url
 
 
+# ── 更新源配置 ──
+def _get_gitee_token_param():
+    token = _get_gitee_token()
+    if token:
+        return f"&access_token={token}"
+    return ""
+
+_GITEE_TOKEN_PARAM = _get_gitee_token_param()
+
+UPDATE_SOURCES = {
+    "github_mirror": {
+        "name": "GitHub镜像",
+        "version_url": f"https://ghgo.xyz/https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/dev/app/versions.json",
+        "download_url_tpl": f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/v{{version}}/{{filename}}",
+        "releases_url": f"https://ghgo.xyz/https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases",
+        "is_api": False,
+    },
+    "github": {
+        "name": "GitHub",
+        "version_url": f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/dev/app/versions.json",
+        "download_url_tpl": f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/v{{version}}/{{filename}}",
+        "releases_url": f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases",
+        "is_api": False,
+    },
+    "gitee": {
+        "name": "Gitee",
+        "version_url": f"https://gitee.com/api/v5/repos/{GITEE_OWNER}/{GITEE_REPO}/contents/dev/app/versions.json?ref=main{_GITEE_TOKEN_PARAM}",
+        "download_url_tpl": f"https://gitee.com/{GITEE_OWNER}/{GITEE_REPO}/releases/download/v{{version}}/{{filename}}{_GITEE_TOKEN_PARAM}",
+        "releases_url": f"https://gitee.com/api/v5/repos/{GITEE_OWNER}/{GITEE_REPO}/releases?per_page=10{_GITEE_TOKEN_PARAM}",
+        "is_api": True,
+    },
+}
+
+
 class _ExeFetchWorker(QThread):
-    data_ready = pyqtSignal(object, list, dict)
+    data_ready = pyqtSignal(object, object, dict, str)
 
     def __init__(self, dialog):
         super().__init__()
         self.dialog = dialog
         self._cancelled = False
+        self._result_versions = None
+        self._result_winner = None
 
     def cancel(self):
         self._cancelled = True
+
+    def _fetch_url(self, url, is_api=False, timeout=10):
+        """Single URL fetch, returns (data_dict, error)"""
+        try:
+            req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp = urlopen(req, timeout=timeout)
+            raw = resp.read().decode("utf-8")
+            if is_api:
+                api_data = json.loads(raw)
+                if isinstance(api_data, list):
+                    file_data = api_data[0] if api_data else {}
+                else:
+                    file_data = api_data
+                content_b64 = file_data.get("content", "")
+                decoded = base64.b64decode(content_b64).decode("utf-8")
+                return json.loads(decoded), None
+            else:
+                return json.loads(raw), None
+        except Exception as e:
+            return None, str(e)
 
     def run(self):
         try:
             current = self.dialog._get_current_exe_version()
             if self._cancelled:
                 return
-            remote = self.dialog._fetch_remote_versions()
+
+            # Multi-source racing
+            sources = UPDATE_SOURCES
+            result = None
+            winner = None
+            results_lock = threading.Lock()
+            done_event = threading.Event()
+
+            def try_source(key):
+                nonlocal result, winner
+                if done_event.is_set() or self._cancelled:
+                    return
+                source = sources[key]
+                data, error = self._fetch_url(source["version_url"], source.get("is_api", False))
+                if data is not None and not done_event.is_set() and not self._cancelled:
+                    with results_lock:
+                        if not done_event.is_set():
+                            result = data
+                            winner = key
+                            done_event.set()
+
+            threads = []
+            for key in sources:
+                t = threading.Thread(target=try_source, args=(key,), daemon=True)
+                t.start()
+                threads.append(t)
+
+            for t in threads:
+                t.join(timeout=20)
+
             if self._cancelled:
                 return
+
+            remote = result if result else self.dialog._fetch_remote_versions(fallback=True)
+            remote = remote if isinstance(remote, list) else []
+
+            if self._cancelled:
+                return
+
             local = self.dialog._get_local_exe_versions()
             if self._cancelled:
                 return
-            self.data_ready.emit(current, remote, local)
+
+            self.data_ready.emit(current, remote, local, winner or "gitee")
         except Exception as e:
             print(f"EXE版本数据获取失败: {e}")
             if not self._cancelled:
-                self.data_ready.emit(None, [], {})
+                self.data_ready.emit(None, [], {}, "")
 
 
 class _GitFetchWorker(QThread):
@@ -206,6 +320,13 @@ class HybridVersionManagerDialog(QDialog):
         self._all_expanded = True
         self._exe_worker = None
         self._git_worker = None
+
+        # 多源竞速 / 下载相关
+        self._ver_race_winner = ""
+        self._ver_stable_data = []
+        self._ver_current_version = ""
+        self._ver_source_combo = None
+        self._ver_active_source = "auto"
 
         self._setup_ui()
         self._load_local_version_history()
@@ -352,6 +473,38 @@ class HybridVersionManagerDialog(QDialog):
         top_bar.addWidget(self.mode_buttons_widget)
 
         top_bar.addStretch()
+
+        src_label = QLabel("下载源:")
+        src_label.setStyleSheet("font-size: 11px; color: #AAAAAA; margin-left: 8px;")
+        top_bar.addWidget(src_label)
+
+        self._ver_source_combo = QComboBox()
+        self._ver_source_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #252525; color: #FFFFFF;
+                border: 1px solid #333333; border-radius: 4px;
+                padding: 4px 24px 4px 8px; font-size: 11px;
+                min-width: 110px;
+            }
+            QComboBox:hover { border-color: #444444; }
+            QComboBox::drop-down { border: none; width: 20px; }
+            QComboBox::down-arrow {
+                image: none; border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 4px solid #888888; width: 0; height: 0; right: 6px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #252525; border: 1px solid #333333;
+                border-radius: 4px; outline: none;
+                selection-background-color: #1976D2; selection-color: #FFFFFF;
+            }
+            QComboBox QAbstractItemView::item { padding: 4px 8px; }
+        """)
+        self._ver_source_combo.addItem("⚡ 自动竞速", "auto")
+        for key, src in UPDATE_SOURCES.items():
+            self._ver_source_combo.addItem(src["name"], key)
+        self._ver_source_combo.currentIndexChanged.connect(self._on_ver_source_changed)
+        top_bar.addWidget(self._ver_source_combo)
 
         refresh_btn = QPushButton("🔄 刷新")
         refresh_btn.clicked.connect(self._load_versions)
@@ -510,8 +663,8 @@ class HybridVersionManagerDialog(QDialog):
             print(f"获取当前EXE版本失败：{e}")
             return None
 
-    def _fetch_remote_versions(self):
-        if self._remote_versions_cache is not None:
+    def _fetch_remote_versions(self, fallback=False):
+        if not fallback and self._remote_versions_cache is not None:
             return self._remote_versions_cache
         try:
             url = _build_api_url(REMOTE_VERSIONS_API)
@@ -522,7 +675,8 @@ class HybridVersionManagerDialog(QDialog):
             content_b64 = data.get('content', '')
             content = base64.b64decode(content_b64).decode('utf-8')
             versions = json.loads(content)
-            self._remote_versions_cache = versions
+            if not fallback:
+                self._remote_versions_cache = versions
             return versions
         except HTTPError as e:
             print(f"远程稳定版获取失败 (HTTP {e.code}): {e.reason}")
@@ -653,7 +807,11 @@ class HybridVersionManagerDialog(QDialog):
         self._exe_worker.data_ready.connect(self._on_exe_data_ready)
         self._exe_worker.start()
 
-    def _on_exe_data_ready(self, current, remote_versions, local_versions):
+    def _on_ver_source_changed(self, index):
+        key = self._ver_source_combo.itemData(index)
+        self._ver_active_source = key
+
+    def _on_exe_data_ready(self, current, remote_versions, local_versions, winner_source):
         if self.current_mode != "exe":
             return
 
@@ -670,6 +828,8 @@ class HybridVersionManagerDialog(QDialog):
             self.current_info_label.setText("⚠️ 无法获取当前版本信息")
 
         current_version = current['version'] if current else None
+        self._ver_current_version = current_version or ""
+        self._ver_race_winner = winner_source or "gitee"
 
         if not remote_versions and not local_versions:
             no_version_label = QLabel("未找到稳定版信息\n\n请检查网络连接")
@@ -678,9 +838,17 @@ class HybridVersionManagerDialog(QDialog):
             self.versions_layout.addWidget(no_version_label)
             return
 
+        # Determine download URL template from winning source
+        source = UPDATE_SOURCES.get(winner_source, {})
+        download_tpl = source.get("download_url_tpl", "")
+
         merged = {}
         for rv in remote_versions:
             ver = rv.get('version', '')
+            dl_url = rv.get('download_url', '')
+            if not dl_url and download_tpl:
+                fn = rv.get('name', f"{APP_NAME}-v{ver}.exe")
+                dl_url = download_tpl.format(filename=fn, version=ver)
             merged[ver] = {
                 'version': ver,
                 'name': rv.get('name', f"v{ver}"),
@@ -691,7 +859,7 @@ class HybridVersionManagerDialog(QDialog):
                 'local_path': local_versions.get(ver, {}).get('path'),
                 'local_size': local_versions.get(ver, {}).get('size'),
                 'local_date': local_versions.get(ver, {}).get('date'),
-                'download_url': rv.get('download_url', ''),
+                'download_url': dl_url,
             }
 
         for ver, lv in local_versions.items():
@@ -717,10 +885,16 @@ class HybridVersionManagerDialog(QDialog):
             is_current = version['version'] == current_version
             self._create_exe_version_item(version, is_current)
 
+        # Async fetch release assets for real download URLs
+        if winner_source:
+            self._fetch_release_assets(winner_source, all_versions)
+
     def _create_exe_version_item(self, version, is_current):
         changes = version.get('changes', [])
         is_available = version.get('available', False)
         is_expanded = True
+        ver_str = version['version']
+        dl_url = version.get('download_url', '')
 
         card = QFrame()
         card.setObjectName("versionCard")
@@ -774,7 +948,7 @@ class HybridVersionManagerDialog(QDialog):
         header = QHBoxLayout()
         header.setSpacing(10)
 
-        version_label = QLabel(f"v{version['version']}")
+        version_label = QLabel(f"v{ver_str}")
         version_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         if is_current:
             version_label.setStyleSheet("color: #4CAF50; border: none; background: transparent;")
@@ -810,6 +984,11 @@ class HybridVersionManagerDialog(QDialog):
                 switch_btn.clicked.connect(lambda checked, v=version: self._launch_exe_version(v))
                 switch_btn.setStyleSheet(DARK_BTN_PRIMARY)
                 header.addWidget(switch_btn)
+            elif dl_url:
+                dl_btn = QPushButton("下载")
+                dl_btn.setFixedWidth(60)
+                dl_btn.setStyleSheet(DARK_BTN_PRIMARY)
+                header.addWidget(dl_btn)
             else:
                 status_label = QLabel("未提供")
                 status_label.setFont(QFont("Microsoft YaHei", 9))
@@ -822,6 +1001,42 @@ class HybridVersionManagerDialog(QDialog):
             header.addWidget(toggle_btn)
 
         layout.addLayout(header)
+
+        # Progress row (hidden by default)
+        progress_row = QFrame()
+        progress_row.setObjectName(f"_dl_progress_{ver_str}")
+        progress_row.setVisible(False)
+        progress_row.setStyleSheet("border: none; background: transparent;")
+        progress_layout = QHBoxLayout(progress_row)
+        progress_layout.setContentsMargins(0, 4, 0, 0)
+        progress_layout.setSpacing(6)
+
+        dl_progress = QProgressBar()
+        dl_progress.setRange(0, 100)
+        dl_progress.setValue(0)
+        dl_progress.setFixedHeight(16)
+        dl_progress.setStyleSheet("""
+            QProgressBar { background-color: #1A1A1A; border: 1px solid #333333;
+                border-radius: 3px; text-align: center; color: #FFFFFF; font-size: 10px; }
+            QProgressBar::chunk { background-color: #CC0000; border-radius: 2px; }
+        """)
+        progress_layout.addWidget(dl_progress, 1)
+
+        dl_status_label = QLabel("0.0/0.0MB")
+        dl_status_label.setStyleSheet("color: #AAAAAA; font-size: 10px; min-width: 80px; border: none; background: transparent;")
+        progress_layout.addWidget(dl_status_label)
+
+        pause_btn = QPushButton("暂停")
+        pause_btn.setFixedWidth(50)
+        pause_btn.setStyleSheet("QPushButton { background-color: #FF8F00; color: white; border: none; border-radius: 3px; padding: 3px 8px; font-size: 10px; } QPushButton:hover { background-color: #FF6F00; }")
+        progress_layout.addWidget(pause_btn)
+
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setFixedWidth(50)
+        cancel_btn.setStyleSheet("QPushButton { background-color: #C62828; color: white; border: none; border-radius: 3px; padding: 3px 8px; font-size: 10px; } QPushButton:hover { background-color: #D32F2F; }")
+        progress_layout.addWidget(cancel_btn)
+
+        layout.addWidget(progress_row)
 
         if version.get('message'):
             msg_label = QLabel(version['message'])
@@ -869,7 +1084,319 @@ class HybridVersionManagerDialog(QDialog):
                 tb.setText("收起" if is_visible else "详情")
             toggle_btn.clicked.connect(toggle_detail)
 
+        # Connect download button if present
+        if not is_current and not is_available and dl_url:
+            remote_info = {
+                "version": ver_str,
+                "filename": version.get('name', f"{APP_NAME}-v{ver_str}.exe"),
+                "download_url": dl_url,
+                "changes": changes,
+            }
+            dl_btn.clicked.connect(lambda checked, ri=remote_info: self._start_inline_download(ri, progress_row, dl_progress, dl_status_label, pause_btn, cancel_btn))
+
         self.versions_layout.addWidget(card)
+
+    def _effective_source_key(self):
+        """Return the effective source key to use for download URLs"""
+        key = self._ver_active_source if hasattr(self, '_ver_active_source') else "auto"
+        if key == "auto":
+            return self._ver_race_winner or "github_mirror"
+        return key
+
+    def _fetch_release_assets(self, source_key, current_versions):
+        """Async fetch real download URLs from Releases API"""
+        source = UPDATE_SOURCES.get(source_key, {})
+        releases_url = source.get("releases_url", "")
+        if not releases_url:
+            return
+
+        def on_done():
+            try:
+                req = Request(releases_url, headers={"User-Agent": "Mozilla/5.0"})
+                resp = urlopen(req, timeout=15)
+                raw = resp.read().decode("utf-8")
+                releases = json.loads(raw)
+                if not isinstance(releases, list):
+                    return
+
+                release_downloads = {}
+                for rel in releases:
+                    tag = rel.get("tag_name", "")
+                    tag_ver = tag.lstrip("v")
+                    if not re.match(r"\d+\.\d+\.\d+\.\d+", tag_ver):
+                        continue
+                    assets = rel.get("assets", [])
+                    if source.get("is_api"):
+                        for asset in assets:
+                            fname = asset.get("name", "")
+                            if fname.endswith(".exe"):
+                                url = asset.get("browser_download_url", "")
+                                if url:
+                                    asset_ver = tag_ver
+                                    release_downloads[asset_ver] = {
+                                        "download_url": url,
+                                        "filename": fname,
+                                    }
+                                    break
+                    else:
+                        for asset in assets:
+                            fname = asset.get("name", "")
+                            if fname.endswith(".exe"):
+                                url = asset.get("browser_download_url", "")
+                                if url:
+                                    asset_ver = tag_ver
+                                    release_downloads[asset_ver] = {
+                                        "download_url": url,
+                                        "filename": fname,
+                                    }
+                                    break
+                if release_downloads:
+                    QTimer.singleShot(0, lambda rd=release_downloads: self._apply_release_assets(rd))
+            except Exception:
+                pass
+
+        t = threading.Thread(target=on_done, daemon=True)
+        t.start()
+
+    def _apply_release_assets(self, release_downloads):
+        """Update version card UIs with real download URLs (must run on main thread)."""
+        if not release_downloads:
+            return
+        for i in range(self.versions_layout.count()):
+            item = self.versions_layout.itemAt(i)
+            if not item or not item.widget():
+                continue
+            card = item.widget()
+            version_labels = card.findChildren(QLabel, Qt.FindChildOption.FindChildrenRecursively)
+            for vl in version_labels:
+                font = vl.font()
+                if font and "Consolas" in font.family() and font.bold():
+                    raw_ver = vl.text().lstrip("v")
+                    if raw_ver in release_downloads:
+                        rd = release_downloads[raw_ver]
+                        btns = card.findChildren(QPushButton)
+                        for btn in btns:
+                            if btn.text() == "下载":
+                                ri = {
+                                    "version": raw_ver,
+                                    "filename": rd["filename"],
+                                    "download_url": rd["download_url"],
+                                    "changes": [],
+                                }
+                                try:
+                                    btn.clicked.disconnect()
+                                except TypeError:
+                                    pass
+                                progress_row = card.findChild(QFrame, f"_dl_progress_{raw_ver}")
+                                dl_progress = progress_row.findChild(QProgressBar) if progress_row else None
+                                dl_status = progress_row.findChildren(QLabel) if progress_row else []
+                                pause_btn_widgets = progress_row.findChildren(QPushButton) if progress_row else []
+                                cancel_btn = None
+                                status_label = None
+                                for pw in (pause_btn_widgets or []):
+                                    if pw.text() in ("暂停", "继续"):
+                                        pause_btn_widgets = pw
+                                    elif pw.text() == "取消":
+                                        cancel_btn = pw
+                                for sl in (dl_status or []):
+                                    if "MB" in sl.text() or sl.text() == "0.0/0.0MB":
+                                        status_label = sl
+                                btn.clicked.connect(lambda checked, ri=ri, pr=progress_row, dp=dl_progress, ds=status_label, pb=pause_btn_widgets, cb=cancel_btn: self._start_inline_download(ri, pr, dp, ds, pb, cb) if pr else None)
+                                break
+                        break
+
+    def _start_inline_download(self, remote_info, progress_row, dl_progress, dl_status_label, pause_btn, cancel_btn):
+        """Inline download with progress bar in the version card"""
+        if not remote_info:
+            return
+        filename = remote_info.get("filename", "")
+        download_url = remote_info.get("download_url", "")
+        version = remote_info.get("version", "")
+
+        if not download_url:
+            source_key = self._effective_source_key()
+            source = UPDATE_SOURCES.get(source_key, list(UPDATE_SOURCES.values())[0] if UPDATE_SOURCES else {})
+            if filename and version:
+                download_url = source.get("download_url_tpl", "").format(filename=filename, version=version)
+        if not download_url:
+            return
+
+        ver_dir = Path(self.project_root) / "ver" if self.project_root else Path("ver")
+        ver_dir.mkdir(parents=True, exist_ok=True)
+        target_filename = filename if filename else f"{APP_NAME}-v{version}.exe"
+        target_path = ver_dir / target_filename
+
+        # If already exists, switch directly
+        if target_path.exists():
+            self._switch_to_exe(str(target_path))
+            return
+
+        # Show progress row
+        progress_row.setVisible(True)
+        dl_progress.setValue(0)
+        dl_status_label.setText("0.0/0.0MB")
+
+        dl_state = {"paused": False, "cancelled": False, "done": False, "pause_event": threading.Event()}
+        dl_state["pause_event"].set()
+
+        def on_pause():
+            if dl_state["paused"]:
+                dl_state["paused"] = False
+                dl_state["pause_event"].set()
+                if pause_btn:
+                    pause_btn.setText("暂停")
+            else:
+                dl_state["paused"] = True
+                dl_state["pause_event"].clear()
+                if pause_btn:
+                    pause_btn.setText("继续")
+
+        def on_cancel():
+            dl_state["cancelled"] = True
+            dl_state["pause_event"].set()
+
+        if pause_btn:
+            try:
+                pause_btn.clicked.disconnect()
+            except Exception:
+                pass
+            pause_btn.clicked.connect(on_pause)
+        if cancel_btn:
+            try:
+                cancel_btn.clicked.disconnect()
+            except Exception:
+                pass
+            cancel_btn.clicked.connect(on_cancel)
+
+        tmp_path = str(target_path) + ".downloading"
+
+        def do_download():
+            try:
+                req = Request(download_url, headers={"User-Agent": "Mozilla/5.0"})
+                resp = urlopen(req, timeout=60)
+                total = int(resp.headers.get("Content-Length", 0))
+                downloaded = 0
+                block_size = 65536
+                with open(tmp_path, "wb") as f:
+                    while True:
+                        if dl_state["cancelled"]:
+                            break
+                        dl_state["pause_event"].wait()
+                        if dl_state["cancelled"]:
+                            break
+                        chunk = resp.read(block_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            pct = int(downloaded * 100 / total)
+                            mb = downloaded / (1024 * 1024)
+                            total_mb = total / (1024 * 1024)
+                            QTimer.singleShot(0, lambda p=pct, m=mb, t=total_mb: (
+                                dl_progress.setValue(p),
+                                dl_status_label.setText(f"{m:.1f}/{t:.1f}MB")
+                            ))
+
+                if dl_state["cancelled"]:
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                    QTimer.singleShot(0, lambda: progress_row.setVisible(False))
+                    return
+
+                # Verify download
+                if os.path.isfile(tmp_path) and os.path.getsize(tmp_path) > 1024 * 1024:
+                    os.replace(tmp_path, str(target_path))
+                    dl_state["done"] = True
+                    QTimer.singleShot(0, lambda: (
+                        dl_progress.setValue(100),
+                        dl_status_label.setText("下载完成"),
+                    ))
+                    time_module.sleep(0.5)
+                    # Auto switch
+                    QTimer.singleShot(800, lambda: self._switch_to_exe(str(target_path)))
+                else:
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                    QTimer.singleShot(0, lambda: (
+                        progress_row.setVisible(False),
+                        dl_status_label.setText("下载失败: 文件异常")
+                    ))
+            except Exception as e:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+                QTimer.singleShot(0, lambda: (
+                    progress_row.setVisible(False),
+                    dl_status_label.setText(f"下载失败")
+                ))
+
+        t = threading.Thread(target=do_download, daemon=True)
+        t.start()
+
+    def _switch_to_exe(self, exe_path):
+        """Verify EXE, create hardlink to entry point, stop services, launch new version"""
+        if not os.path.exists(exe_path):
+            return
+
+        try:
+            exe_size = os.path.getsize(exe_path)
+            if exe_size < 1024 * 1024:
+                return
+        except Exception:
+            return
+
+        # Find deployment directory
+        dev_dir = Path(self.project_root).parent
+        entry_exe = dev_dir / f"{BRAND_NAME}.exe"
+
+        # Backup current entry
+        backup_exe = str(entry_exe) + ".bak"
+        if entry_exe.exists():
+            try:
+                import shutil
+                shutil.copy2(str(entry_exe), backup_exe)
+            except Exception:
+                backup_exe = ""
+
+        # Copy new EXE as entry point (hardlink may fail on different drives)
+        import shutil
+        try:
+            os.link(exe_path, str(entry_exe))
+        except Exception:
+            try:
+                shutil.copy2(exe_path, str(entry_exe))
+            except Exception:
+                # Try removing first then copy
+                removed = False
+                try:
+                    entry_exe.unlink()
+                    removed = True
+                except Exception:
+                    pass
+                try:
+                    shutil.copy2(exe_path, str(entry_exe))
+                except Exception as exc:
+                    # Restore from backup if available
+                    if removed and backup_exe and os.path.exists(backup_exe):
+                        try:
+                            shutil.copy2(backup_exe, str(entry_exe))
+                        except Exception:
+                            pass
+                    return
+
+        # Stop current app (signal main window if available)
+        import subprocess
+        # Launch new version with delay
+        cmd = f'ping -n 2 127.0.0.1 >nul & start "" "{entry_exe}"'
+        subprocess.Popen(cmd, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
+        QApplication.quit()
 
     def _launch_exe_version(self, version):
         if not version.get('local_path'):

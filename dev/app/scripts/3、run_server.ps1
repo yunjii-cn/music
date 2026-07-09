@@ -2,7 +2,8 @@
 # ============= Command Line Parameters | 命令行参数 =====================
 param(
   [int]$Port = 8001,                          # Server port
-  [string]$ServerHost = "127.0.0.1"                 # Server host
+  [string]$ServerHost = "127.0.0.1",                 # Server host
+  [string]$LogFile = ""                       # Redirect all output to this file (launcher uses this to survive uv stub exit)
 )
 
 # ============= DO NOT MODIFY CONTENTS BELOW | 请勿修改下方内容 =====================
@@ -13,6 +14,7 @@ $project_root = Split-Path $PSScriptRoot -Parent
 $data_dir = Join-Path $project_root "..\data"
 $env:PYTHONPATH = "$project_root$([System.IO.Path]::PathSeparator)$($env:PYTHONPATH)"
 
+#$Env:ACESTEP_NO_INIT = "true"  # Disabled: model now loads at startup for faster LoRA loading
 $Env:HF_HOME = Join-Path $data_dir "huggingface"
 $Env:XFORMERS_FORCE_DISABLE_TRITON = "1"
 $Env:HF_ENDPOINT = "https://hf-mirror.com"
@@ -64,6 +66,14 @@ try {
 
 # Run API server directly with virtual environment python
 Write-Output "Starting API server..."
-& $python_exe acestep/api_server.py $ext_args
+
+if ($LogFile -ne "") {
+    # Tee stdout to log file AND pipe (launcher reads both). Redirect stderr to separate file to avoid PowerShell error wrapping.
+    $logDir = Split-Path $LogFile -Parent
+    $errLog = Join-Path $logDir "api_server_stderr.log"
+    & $python_exe acestep/api_server.py $ext_args 2>>"$errLog" | Tee-Object -FilePath $LogFile -Append
+} else {
+    & $python_exe acestep/api_server.py $ext_args
+}
 
 Write-Output "Start finished"

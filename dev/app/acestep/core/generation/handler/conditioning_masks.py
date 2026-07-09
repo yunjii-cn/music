@@ -56,10 +56,15 @@ class ConditioningMaskMixin:
             spans.append(("full", 0, max_latent_length))
             instruction_i = instructions[i] if instructions and i < len(instructions) else ""
             instruction_lower = instruction_i.lower()
+            has_audio_signal = target_wavs is not None and target_wavs[i].abs().sum() > 1e-6
             is_cover = (
                 "generate audio semantic tokens" in instruction_lower
                 and "based on the given conditions" in instruction_lower
-            ) or has_code_hint
+            ) or has_code_hint or (
+                has_audio_signal
+                and "audio semantic" in instruction_lower
+                and "mask" not in instruction_lower
+            )
             is_covers.append(is_cover)
 
         chunk_masks_tensor = torch.stack(chunk_masks)
@@ -80,4 +85,5 @@ class ConditioningMaskMixin:
             else:
                 src_latents_list.append(silence_latent_tiled.clone())
         src_latents = torch.stack(src_latents_list)
+        print(f"[Cover] is_covers={is_covers}, has_audio_signal={[target_wavs[i].abs().sum().item() > 1e-6 if target_wavs is not None else False for i in range(batch_size)]}")
         return chunk_masks_tensor, spans, is_covers_tensor, src_latents

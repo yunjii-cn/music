@@ -51,6 +51,10 @@ function resolveAudioPath(audioUrl: string): string {
       // fall through
     }
   }
+  // Handle uploaded URL keys (e.g. "references/{userId}/...")
+  if (audioUrl.startsWith('references/')) {
+    return path.join(AUDIO_DIR, audioUrl);
+  }
   return audioUrl;
 }
 
@@ -206,7 +210,7 @@ router.post('/upload-audio', authMiddleware, audioUpload.single('audio'), async 
     const ext = extFromName || extFromType || '.audio';
     const key = `references/${req.user!.id}/${Date.now()}-${generateUUID()}${ext}`;
     const storedKey = await storage.upload(key, req.file.buffer, req.file.mimetype);
-    const publicUrl = storedKey;
+    const publicUrl = storage.getPublicUrl(storedKey);
 
     res.json({ url: publicUrl, key: storedKey });
   } catch (error) {
@@ -365,6 +369,10 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     );
 
     // Call 8001 API to start generation
+    if (params.taskType === 'cover') {
+      const resolvedSrc = params.sourceAudioUrl ? resolveAudioPath(params.sourceAudioUrl) : '(none)';
+      console.log(`[Cover] sourceAudioUrl: ${params.sourceAudioUrl}, resolved: ${resolvedSrc}, coverNoiseStrength: ${params.coverNoiseStrength}`);
+    }
     const acestepResponse = await fetchWithTimeout(`${config.acestep.apiUrl}/release_task`, {
       method: 'POST',
       headers: {
@@ -391,9 +399,9 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
         repainting_end: params.repaintingEnd,
         instruction: params.instruction,
         ...(params.referenceAudioUrl ? { reference_audio_path: resolveAudioPath(params.referenceAudioUrl) } : {}),
-        ...(params.sourceAudioUrl ? { src_audio_path: resolveAudioPath(params.sourceAudioUrl) } : {}),
+        ...(params.sourceAudioUrl ? {         src_audio_path: resolveAudioPath(params.sourceAudioUrl) } : {}),
         audio_cover_strength: params.audioCoverStrength ?? 1.0,
-        cover_noise_strength: params.taskType === 'cover' ? (params.coverNoiseStrength ?? 0.15) : 0.0,
+        cover_noise_strength: params.taskType === 'cover' ? (params.coverNoiseStrength ?? 0.3) : 0.0,
         enable_normalization: params.enableNormalization !== undefined ? params.enableNormalization : true,
         normalization_db: params.normalizationDb !== undefined ? params.normalizationDb : -1.0,
         latent_shift: params.latentShift || 0.0,

@@ -231,6 +231,7 @@ celerybeat.pid
 .env
 .envrc
 .gitee_token
+.github_token
 .venv
 env/
 venv/
