@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Play, Square, FolderOpen, Save, FileJson, Zap, Database, ChevronDown, ChevronUp, Edit2, X } from 'lucide-react';
+import { Upload, Play, Square, FolderOpen, Save, FileJson, Zap, Database, ChevronDown, ChevronUp, Edit2, X, Cpu } from 'lucide-react';
 
 const VOCAL_LANGUAGE_VALUES = [
   { value: 'unknown', key: 'autoInstrumental' as const },
@@ -30,6 +30,9 @@ const VOCAL_LANGUAGE_VALUES = [
 import { useI18n } from '../context/I18nContext';
 import { useAuth } from '../context/AuthContext';
 import { trainingApi, DatasetSample } from '../services/api';
+import { TrainingAdvancedParams, TrainingParams, DEFAULT_TRAINING_PARAMS } from './TrainingAdvancedParams';
+import { QuickTrainPanel } from './QuickTrainPanel';
+import { QUALITY_PRESETS } from '../data/qualityPresets';
 
 interface DisplaySample {
   index: number;
@@ -48,7 +51,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
   const { t } = useI18n();
   const { token } = useAuth();
   
-  const [activeTab, setActiveTab] = useState<'dataset' | 'training'>('dataset');
+  const [activeTab, setActiveTab] = useState<'dataset' | 'training' | 'quick'>('dataset');
   
   // Dataset Builder State
   const [loadJsonPath, setLoadJsonPath] = useState('./datasets/my_lora_dataset.json');
@@ -94,18 +97,21 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
   // Training State
   const [trainingTensorDir, setTrainingTensorDir] = useState('./datasets/preprocessed_tensors');
   const [trainingDatasetInfo, setTrainingDatasetInfo] = useState('');
-  const [loraRank, setLoraRank] = useState(64);
-  const [loraAlpha, setLoraAlpha] = useState(128);
-  const [loraDropout, setLoraDropout] = useState(0.1);
-  const [learningRate, setLearningRate] = useState(3e-4);
-  const [trainEpochs, setTrainEpochs] = useState(1000);
-  const [trainBatchSize, setTrainBatchSize] = useState(1);
-  const [gradientAccumulation, setGradientAccumulation] = useState(1);
-  const [saveEveryNEpochs, setSaveEveryNEpochs] = useState(200);
-  const [trainingShift, setTrainingShift] = useState(3.0);
-  const [trainingSeed, setTrainingSeed] = useState(42);
-  const [loraOutputDir, setLoraOutputDir] = useState('./lora_output');
-  const [useFP8, setUseFP8] = useState(false);
+  // Shared advanced training parameters (used by both the 训练 and 一键训练 tabs).
+  const [trainingParams, setTrainingParams] = useState<TrainingParams>({ ...DEFAULT_TRAINING_PARAMS });
+  const [modelVariant, setModelVariant] = useState<string>(() => localStorage.getItem('ace-trainingModelVariant') || 'turbo');
+  const [trainMode, setTrainMode] = useState<'simple' | 'standard'>(() => {
+    const v = localStorage.getItem('ace-trainMode');
+    return v === 'standard' ? 'standard' : 'simple';
+  });
+  const setTP = (patch: Partial<TrainingParams>) => setTrainingParams((p) => ({ ...p, ...patch }));
+  const handleModelVariantChange = (v: string) => {
+    setModelVariant(v);
+    localStorage.setItem('ace-trainingModelVariant', v);
+    const shiftDefaults: Record<string, number> = { turbo: 3.0, sft: 1.0, base: 1.0 };
+    setTP({ trainingShift: shiftDefaults[v] ?? 3.0 });
+  };
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [trainingProgress, setTrainingProgress] = useState('');
   const [trainingLog, setTrainingLog] = useState('');
   const [isTraining, setIsTraining] = useState(false);
@@ -495,18 +501,20 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
     try {
       const result = await trainingApi.startTraining({
         tensor_dir: trainingTensorDir,
-        lora_rank: loraRank,
-        lora_alpha: loraAlpha,
-        lora_dropout: loraDropout,
-        learning_rate: learningRate,
-        train_epochs: trainEpochs,
-        train_batch_size: trainBatchSize,
-        gradient_accumulation: gradientAccumulation,
-        save_every_n_epochs: saveEveryNEpochs,
-        training_shift: trainingShift,
-        training_seed: trainingSeed,
-        lora_output_dir: loraOutputDir,
-        use_fp8: useFP8,
+        lora_rank: trainingParams.loraRank,
+        lora_alpha: trainingParams.loraAlpha,
+        lora_dropout: trainingParams.loraDropout,
+        learning_rate: trainingParams.learningRate,
+        train_epochs: trainingParams.trainEpochs,
+        train_batch_size: trainingParams.trainBatchSize,
+        gradient_accumulation: trainingParams.gradientAccumulation,
+        save_every_n_epochs: trainingParams.saveEveryNEpochs,
+        training_shift: trainingParams.trainingShift,
+        training_seed: trainingParams.trainingSeed,
+        lora_output_dir: trainingParams.loraOutputDir,
+        use_fp8: trainingParams.useFP8,
+        gradient_checkpointing: trainingParams.gradientCheckpointing,
+        model_variant: modelVariant,
       }, token);
       if (!result) {
         setTrainingProgress(t('failedToStartTrainingNoResponse'));
@@ -564,6 +572,16 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
           }`}
         >
           🚀 {t('trainLora')}
+        </button>
+        <button
+          onClick={() => setActiveTab('quick')}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'quick'
+              ? 'border-pink-500 text-pink-500'
+              : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+          }`}
+        >
+          ⚡ {t('quickTrain')}
         </button>
       </div>
 
@@ -930,6 +948,8 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
               </div>
             </div>
           </>
+        ) : activeTab === 'quick' ? (
+          <QuickTrainPanel trainingParams={trainingParams} onTrainingParamsChange={setTP} modelVariant={modelVariant} onModelVariantChange={handleModelVariantChange} />
         ) : (
           <>
             {/* Training Tab */}
@@ -963,191 +983,96 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
                 )}
               </div>
 
-              {/* LoRA Settings */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-xl p-4 space-y-4 border-2 border-purple-200 dark:border-purple-800 shadow-md">
-                <h3 className="text-base font-semibold text-zinc-900 dark:text-white">⚙️ {t('loraSettings')}</h3>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('loraRank')}: {loraRank}
-                    </label>
-                    <input
-                      type="range"
-                      min="4"
-                      max="256"
-                      step="4"
-                      value={loraRank}
-                      onChange={(e) => setLoraRank(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('loraAlpha')}: {loraAlpha}
-                    </label>
-                    <input
-                      type="range"
-                      min="4"
-                      max="512"
-                      step="4"
-                      value={loraAlpha}
-                      onChange={(e) => setLoraAlpha(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('dropout')}: {loraDropout.toFixed(2)}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="0.5"
-                      step="0.05"
-                      value={loraDropout}
-                      onChange={(e) => setLoraDropout(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
+              {/* Model Variant Selector */}
+              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 rounded-xl p-4 space-y-3 border-2 border-indigo-200 dark:border-indigo-800">
+                <h3 className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <Cpu size={18} className="text-indigo-500" />
+                  {t('modelVariant')}
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {['turbo', 'sft', 'base'].map((v) => (
+                    <button key={v} onClick={() => handleModelVariantChange(v)}
+                      className={`py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${
+                        modelVariant === v
+                          ? 'border-indigo-500 bg-indigo-500 text-white'
+                          : 'border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:border-indigo-300'
+                      }`}>
+                      <div className="font-semibold">acestep-v15-{v}</div>
+                      <div className="text-[10px] opacity-80">{v === 'turbo' ? t('fastModel') || '快速' : v === 'sft' ? 'SFT ' + (t('fineTuned') || '微调') : t('baseModel') || '基础'}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Training Parameters */}
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 rounded-xl p-4 space-y-4 border-2 border-orange-200 dark:border-orange-800 shadow-md">
-                <h3 className="text-base font-semibold text-zinc-900 dark:text-white">🎛️ {t('trainingParameters')}</h3>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('learningRate')}
-                    </label>
-                    <input
-                      type="number"
-                      value={learningRate}
-                      onChange={(e) => setLearningRate(Number(e.target.value))}
-                      step="0.0001"
-                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('maxEpochs')}: {trainEpochs}
-                    </label>
-                    <input
-                      type="range"
-                      min="100"
-                      max="4000"
-                      step="100"
-                      value={trainEpochs}
-                      onChange={(e) => setTrainEpochs(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('batchSize')}: {trainBatchSize}
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="8"
-                      step="1"
-                      value={trainBatchSize}
-                      onChange={(e) => setTrainBatchSize(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('gradientAccumulation')}: {gradientAccumulation}
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="16"
-                      step="1"
-                      value={gradientAccumulation}
-                      onChange={(e) => setGradientAccumulation(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('saveEvery')}: {saveEveryNEpochs} {t('epochs')}
-                    </label>
-                    <input
-                      type="range"
-                      min="50"
-                      max="1000"
-                      step="50"
-                      value={saveEveryNEpochs}
-                      onChange={(e) => setSaveEveryNEpochs(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('shift')}: {trainingShift.toFixed(1)}
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      step="0.5"
-                      value={trainingShift}
-                      onChange={(e) => setTrainingShift(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      {t('seed')}
-                    </label>
-                    <input
-                      type="number"
-                      value={trainingSeed}
-                      onChange={(e) => setTrainingSeed(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                    {t('outputDirectory')}
-                  </label>
-                  <input
-                    type="text"
-                    value={loraOutputDir}
-                    onChange={(e) => setLoraOutputDir(e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                  <input
-                    type="checkbox"
-                    id="useFP8"
-                    checked={useFP8}
-                    onChange={(e) => setUseFP8(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 rounded focus:ring-purple-500"
-                  />
-                  <label htmlFor="useFP8" className="text-sm font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer">
-                    ⚡ {t('useFP8')} <span className="text-xs text-zinc-500 dark:text-zinc-400">({t('fp8Description')})</span>
-                  </label>
-                </div>
+              {/* Mode Toggle: Simple / Standard */}
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1 border-2 border-zinc-200 dark:border-zinc-700">
+                <button onClick={() => { setTrainMode('simple'); localStorage.setItem('ace-trainMode', 'simple'); }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                    trainMode === 'simple' ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                  }`}>
+                  🚀 {t('simple')} {t('mode')}
+                </button>
+                <button onClick={() => { setTrainMode('standard'); localStorage.setItem('ace-trainMode', 'standard'); }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                    trainMode === 'standard' ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                  }`}>
+                  🎛️ {t('standard')} {t('mode')}
+                </button>
               </div>
+
+              {/* Simple Mode: Quality Preset + Basic Params */}
+              {trainMode === 'simple' && (
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-xl p-4 space-y-4 border-2 border-purple-200 dark:border-purple-800 shadow-md">
+                  <h3 className="text-base font-semibold text-zinc-900 dark:text-white">🎯 {t('quality')}</h3>
+                  <div className="flex gap-2">
+                    {(['fast', 'balanced', 'quality'] as const).map((q) => (
+                      <button key={q} onClick={() => {
+                        const p = QUALITY_PRESETS[q];
+                        setTP({ loraRank: p.rank, loraAlpha: p.alpha, trainEpochs: p.epochs, learningRate: p.lr, gradientCheckpointing: p.gradCheckpoint });
+                      }}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${
+                          trainingParams.trainEpochs === QUALITY_PRESETS[q].epochs && trainingParams.loraRank === QUALITY_PRESETS[q].rank
+                            ? 'border-pink-500 bg-pink-500 text-white'
+                            : 'border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:border-pink-300'
+                        }`}>
+                        {t(`quality${q.charAt(0).toUpperCase() + q.slice(1)}` as any)}
+                        <span className="block text-[10px] font-normal opacity-80">
+                          {t(`quality${q.charAt(0).toUpperCase() + q.slice(1)}Desc` as any)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{t('maxEpochs')}: {trainingParams.trainEpochs}</label>
+                      <input type="range" min="100" max="4000" step="100" value={trainingParams.trainEpochs}
+                        onChange={(e) => setTP({ trainEpochs: Number(e.target.value) })} className="w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{t('loraRank')}: {trainingParams.loraRank}</label>
+                      <input type="range" min="4" max="256" step="4" value={trainingParams.loraRank}
+                        onChange={(e) => setTP({ loraRank: Number(e.target.value) })} className="w-full" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Standard Mode: All Advanced Params */}
+              {trainMode === 'standard' && (
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-xl p-4 space-y-3 border-2 border-purple-200 dark:border-purple-800 shadow-md">
+                  <button
+                    type="button"
+                    onClick={() => setAdvancedOpen(!advancedOpen)}
+                    className="w-full flex items-center justify-between text-base font-semibold text-zinc-900 dark:text-white"
+                  >
+                    <span>⚙️ {t('advancedSettings')}</span>
+                    {advancedOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </button>
+                  {advancedOpen && (
+                    <TrainingAdvancedParams value={trainingParams} onChange={setTP} />
+                  )}
+                </div>
+              )}
 
               {/* Training Controls */}
               <div className="flex gap-4">

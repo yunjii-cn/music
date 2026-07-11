@@ -492,6 +492,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [dragKind, setDragKind] = useState<'file' | 'audio' | null>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const sourceInputRef = useRef<HTMLInputElement>(null);
+  const audioSectionRef = useRef<HTMLDivElement>(null);
+  // 翻唱/音频转音频缺少源音频时，点击「创建」后高亮引导用户上传「内容参考」
+  const [sourceHintActive, setSourceHintActive] = useState(false);
   const dragDepthRef = useRef(0);
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [audioModalTarget, setAudioModalTarget] = useState<'reference' | 'source'>('reference');
@@ -1696,8 +1699,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   const handleGenerate = () => {
     // cover / audio2audio require a source audio (or audio codes).
+    // 点击「创建」时立即拦截并引导：切到「内容参考」标签、滚动定位、高亮闪烁，避免让用户进入生成流程后等待很久才报错。
     if ((taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim()) {
-      alert('翻唱(cover) / 音频转音频(audio2audio) 模式需要先上传「内容参考」（源音频），或在音频码框中提供 audio codes。');
+      setCustomMode(true);          // 音频区仅在自定义模式显示，确保引导可见
+      setAudioTab('source');        // 自动切到「内容参考」标签（源音频槽）
+      setSourceHintActive(true);    // 触发高亮闪烁
+      // 滚动到音频区并聚焦上传入口
+      requestAnimationFrame(() => {
+        audioSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      window.setTimeout(() => setSourceHintActive(false), 2600);
       return;
     }
     let baseStyle = style;
@@ -2437,9 +2448,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           <div className="space-y-5">
             {/* Audio Section */}
             <div
+              ref={audioSectionRef}
               onDrop={(e) => handleDrop(e, audioTab)}
               onDragOver={handleDragOver}
-              className="bg-white dark:bg-[#1a1a1f] rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden"
+              className={`bg-white dark:bg-[#1a1a1f] rounded-xl border overflow-hidden transition-all duration-300 ${
+                sourceHintActive
+                  ? 'border-amber-400 ring-2 ring-amber-400/60 shadow-lg shadow-amber-400/20 animate-pulse'
+                  : 'border-zinc-200 dark:border-white/5'
+              }`}
             >
               {/* Header with Audio label and tabs */}
               <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/[0.02]">
@@ -2474,11 +2490,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
               {/* Cover / audio2audio guidance: tell the user to upload source audio */}
               {(taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim() && (
-                <div className="px-3 py-2.5 bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/20 flex items-start gap-2">
+                <div className={`px-3 py-2.5 border-b flex items-start gap-2 transition-colors ${
+                  sourceHintActive
+                    ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-300 dark:border-amber-500/40'
+                    : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'
+                }`}>
                   <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
-                    <span className="font-bold">翻唱模式需要「{t('cover')}」（内容参考）源音频。</span> 请点击上方的「{t('cover')}」标签，上传您想要翻唱的歌曲后再生成；未上传源音频将无法生成。
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+                      <span className="font-bold">翻唱模式需要「{t('cover')}」（内容参考）源音频。</span> 请上传您想要翻唱的原曲后再点击创建；未上传源音频无法生成。
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setAudioTab('source'); sourceInputRef.current?.click(); }}
+                      className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12V4m0 0L8 8m4-4l4 4" /></svg>
+                      立即上传内容参考
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -4106,9 +4136,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       <div className="p-4 mt-auto sticky bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-10 border-t border-zinc-200 dark:border-white/5 space-y-3">
         <button
           onClick={handleGenerate}
-          className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110"
-          disabled={isGenerating || !isAuthenticated || ((taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim())}
-          title={(taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim() ? `翻唱 / 音频转音频模式：请先在「${t('cover')}」（内容参考）上传源音频` : undefined}
+          className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
+          disabled={isGenerating || !isAuthenticated}
+          title={(taskType === 'cover' || taskType === 'audio2audio') && !sourceAudioUrl.trim() && !audioCodes.trim() ? `翻唱 / 音频转音频模式：点击后将引导您在「${t('cover')}」（内容参考）上传源音频` : undefined}
         >
           <Sparkles size={18} />
           <span>

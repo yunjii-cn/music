@@ -1,13 +1,14 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { config } from '../config/index.js';
+import { startQuickTrain, getQuickTask, cancelQuickTrain } from '../services/quickTrain.js';
 
 const router = Router();
 
 const ACESTEP_API_URL = config.acestep.apiUrl;
 const ACESTEP_API_KEY = process.env.ACESTEP_API_KEY || '';
 
-async function proxyToAceStep(endpoint: string, method: string, data?: any) {
+export async function proxyToAceStep(endpoint: string, method: string, data?: any) {
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -261,6 +262,61 @@ router.post('/export', authMiddleware, async (req: AuthenticatedRequest, res: Re
   try {
     const result = await proxyToAceStep('/v1/training/export', 'POST', req.body);
     res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- One-click training (一键训练) -------------------------------------------
+
+// Environment profile: proxied straight to the Python side.
+router.get('/env-profile', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await proxyToAceStep('/v1/training/env-profile', 'GET');
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Start a one-click training job (orchestrated on the Node side).
+router.post('/quick', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { folder, name, tag, quality, captionTemplate, advanced } = req.body || {};
+    if (!folder || !name) {
+      return res.status(400).json({ error: 'folder and name are required' });
+    }
+    if (!['fast', 'balanced', 'quality'].includes(quality)) {
+      return res.status(400).json({ error: 'quality must be fast | balanced | quality' });
+    }
+    const task = startQuickTrain({ folder, name, tag: tag || '', quality, captionTemplate, advanced });
+    res.json(task);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Poll the status of a one-click training job.
+router.get('/quick-status/:id', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const task = getQuickTask(req.params.id);
+    if (!task) {
+      return res.status(404).json({ error: 'task not found' });
+    }
+    res.json(task);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel a one-click training job.
+router.post('/quick-cancel/:id', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const task = cancelQuickTrain(req.params.id);
+    if (!task) {
+      return res.status(404).json({ error: 'task not found' });
+    }
+    res.json(task);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

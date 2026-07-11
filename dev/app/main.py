@@ -4670,10 +4670,21 @@ try {
             os.path.join(self.base_dir, ".venv", "Scripts", "python.exe"),
             os.path.join(self.base_dir, "app", "scripts", ".venv", "Scripts", "python.exe"),
         ]
+        # 打包成单文件 exe 运行时，base_dir 可能被解析到 PyInstaller 临时目录/错误根目录，
+        # 此时上面的候选都找不到。额外回退推导 dev/app/scripts/.venv
+        # （标准布局：dist/*.exe 与 dev/app 处于同一父目录）。
+        if getattr(sys, 'frozen', False):
+            try:
+                exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+                candidates.append(os.path.join(exe_dir, "..", "dev", "app", "scripts", ".venv", "Scripts", "python.exe"))
+                candidates.append(os.path.join(exe_dir, "..", "..", "dev", "app", "scripts", ".venv", "Scripts", "python.exe"))
+            except Exception:
+                pass
         for candidate in candidates:
-            if os.path.exists(candidate):
-                return candidate
-        return os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe")
+            norm = os.path.normpath(candidate)
+            if os.path.exists(norm):
+                return norm
+        return os.path.normpath(os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe"))
     
     def _check_deploy_env(self):
         """检测部署环境各步骤状态"""
@@ -6227,8 +6238,9 @@ for d in deps:
             "firefox.exe": ("Firefox", "🦊"),
             "brave.exe": ("Brave", "🦁"),
             "opera.exe": ("Opera", "🔴"),
-            "launcher.exe": ("Opera", "🔴"),  # Opera launcher（与 opera.exe 同源，靠品牌去重只保留一条）
+            "opera_gx.exe": ("Opera GX", "🔴"),
             "vivaldi.exe": ("Vivaldi", "🌈"),
+            "iexplore.exe": ("Internet Explorer", "🧭"),
             # 国产浏览器
             "centbrowser.exe": ("Cent Browser", "🌀"),
             "360chrome.exe": ("360 极速浏览器", "🛡"),
@@ -6263,91 +6275,63 @@ for d in deps:
             "iridium.exe": ("Iridium", "🔘"),
         }
 
-        # 品牌关键字兜底：exe 名不在上表，但路径/命令含这些关键字时也能识别（顺序敏感，更具体者在前）
-        brand_keywords = [
-            ("360chrome", "360 极速浏览器", "🛡"),
-            ("360se", "360 安全浏览器", "🛡"),
-            ("360", "360 浏览器", "🛡"),
-            ("qqbrowser", "QQ 浏览器", "🐧"),
-            ("ucbrowser", "UC 浏览器", "🌎"),
-            ("uc", "UC 浏览器", "🌎"),
-            ("maxthon", "傲游浏览器", "🛥"),
-            ("sogou", "搜狗浏览器", "🐶"),
-            ("liebao", "猎豹浏览器", "🐆"),
-            ("baidu", "百度浏览器", "🅱"),
-            ("2345", "2345 浏览器", "🔢"),
-            ("twinkstar", "星愿浏览器", "⭐"),
-            ("115", "115 浏览器", "💯"),
-            ("theworld", "世界之窗浏览器", "🌍"),
-            ("greenbrowser", "GreenBrowser", "🟢"),
-            ("centbrowser", "Cent Browser", "🌀"),
-            ("yandex", "Yandex", "🟦"),
-            ("whale", "Whale", "🐳"),
-            ("brave", "Brave", "🦁"),
-            ("vivaldi", "Vivaldi", "🌈"),
-            ("opera", "Opera", "🔴"),
-            ("firefox", "Firefox", "🦊"),
-            ("msedge", "Edge", "🌊"),
-            ("chrome", "Chrome", "🌐"),
-            ("avast", "Avast Secure", "🛡"),
-            ("dragon", "Comodo Dragon", "🐉"),
-            ("falkon", "Falkon", "🦅"),
-            ("waterfox", "Waterfox", "💧"),
-            ("librewolf", "LibreWolf", "🐺"),
-            ("zen", "Zen Browser", "🧘"),
-            ("slimjet", "Slimjet", "🚀"),
-            ("coccoc", "CocCoc", "🐤"),
-            ("epic", "Epic Privacy", "🔒"),
-            ("palemoon", "Pale Moon", "🌙"),
-            ("iridium", "Iridium", "🔘"),
-        ]
-
-        def _resolve_brand(path):
-            """根据路径中的关键字推断品牌（兜底，覆盖 exe 名不在 map 的情况）"""
-            low = path.lower().replace("/", "\\")
-            for kw, name, icon in brand_keywords:
-                if kw in low:
-                    return name, icon
-            return None
-
         def _collect(path):
-            """根据 exe 路径收录浏览器：优先查表，其次关键字兜底"""
-            if not path or not os.path.exists(path):
+            """精确收录：仅当 exe 文件名在映射表中精确匹配才收录。
+            不再做「关键字子串模糊匹配」，从根源杜绝把非浏览器 exe 误判为浏览器。"""
+            if not path:
+                return
+            path = path.strip().strip('"')
+            if not os.path.exists(path):
                 return
             exe_name = os.path.basename(path).lower()
-            if exe_name in browser_registry_map:
-                display_name, icon = browser_registry_map[exe_name]
-            else:
-                rb = _resolve_brand(path)
-                if not rb:
-                    return
-                display_name, icon = rb
+            entry = browser_registry_map.get(exe_name)
+            if not entry:
+                return
+            display_name, icon = entry
             _add_browser(f"{icon} {display_name}", path, display_name)
 
-        # 1. 注册表 App Paths（主流浏览器多注册于此）
-        try:
-            app_paths_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, app_paths_key) as root_key:
-                i = 0
-                while True:
-                    try:
-                        subkey_name = winreg.EnumKey(root_key, i)
-                        i += 1
-                        exe_name = subkey_name.lower()
-                        if exe_name not in browser_registry_map and not _resolve_brand(subkey_name):
-                            continue
-                        with winreg.OpenKey(root_key, subkey_name) as sub_key:
-                            try:
-                                path, _ = winreg.QueryValueEx(sub_key, None)
-                                _collect(path)
-                            except OSError:
-                                continue
-                    except OSError:
-                        break
-        except Exception:
-            pass
+        def _collect_from_start_menu(path, friendly=None):
+            """StartMenuInternet 是 Windows 官方浏览器登记处，登记项必为浏览器。
+            优先用映射表识别品牌；未收录时用注册表登记的友好名兜底（仍属精确权威来源，不会误报）。"""
+            if not path:
+                return
+            path = path.strip().strip('"')
+            if not os.path.exists(path):
+                return
+            exe_name = os.path.basename(path).lower()
+            entry = browser_registry_map.get(exe_name)
+            if entry:
+                display_name, icon = entry
+            elif friendly and str(friendly).strip():
+                display_name, icon = str(friendly).strip(), "🌐"
+            else:
+                return
+            _add_browser(f"{icon} {display_name}", path, display_name)
 
-        # 2. 注册表 StartMenuInternet（几乎所有浏览器都在此注册，含大量国产浏览器）
+        # 1. 注册表 App Paths（HKLM + HKCU），仅精确匹配已知浏览器 exe
+        for _hk in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                app_paths_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
+                with winreg.OpenKey(_hk, app_paths_key) as root_key:
+                    i = 0
+                    while True:
+                        try:
+                            subkey_name = winreg.EnumKey(root_key, i)
+                            i += 1
+                            if subkey_name.lower() not in browser_registry_map:
+                                continue
+                            with winreg.OpenKey(root_key, subkey_name) as sub_key:
+                                try:
+                                    path, _ = winreg.QueryValueEx(sub_key, None)
+                                    _collect(path)
+                                except OSError:
+                                    continue
+                        except OSError:
+                            break
+            except Exception:
+                continue
+
+        # 2. 注册表 StartMenuInternet（HKLM + HKCU）—— Windows 官方浏览器登记处，含大量国产浏览器
         try:
             import re as _re
             for hkey in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
@@ -6359,19 +6343,35 @@ for d in deps:
                             try:
                                 sub = winreg.EnumKey(smi_key, i)
                                 i += 1
+                            except OSError:
+                                break
+                            try:
+                                friendly = None
                                 with winreg.OpenKey(smi_key, sub) as sub_key:
+                                    # 友好名：优先 Capabilities\ApplicationName，其次子键默认值
+                                    try:
+                                        friendly, _ = winreg.QueryValueEx(sub_key, None)
+                                    except OSError:
+                                        friendly = None
+                                    try:
+                                        with winreg.OpenKey(sub_key, "Capabilities") as cap_key:
+                                            an, _ = winreg.QueryValueEx(cap_key, "ApplicationName")
+                                            if an:
+                                                friendly = an
+                                    except OSError:
+                                        pass
                                     try:
                                         with winreg.OpenKey(sub_key, "shell\\open\\command") as cmd_key:
                                             cmd, _ = winreg.QueryValueEx(cmd_key, None)
                                     except OSError:
-                                        continue
-                                    if not cmd:
-                                        continue
-                                    m = _re.search(r'"?([^"]+\.exe)', cmd, _re.IGNORECASE)
-                                    exe_path = m.group(1) if m else cmd.strip().strip('"')
-                                    _collect(exe_path)
+                                        cmd = None
+                                if not cmd:
+                                    continue
+                                m = _re.search(r'"?([^"]+\.exe)', cmd, _re.IGNORECASE)
+                                exe_path = m.group(1) if m else cmd.strip().strip('"')
+                                _collect_from_start_menu(exe_path, friendly)
                             except OSError:
-                                break
+                                continue
                 except OSError:
                     continue
         except Exception:
@@ -6479,58 +6479,27 @@ for d in deps:
         for path in common_paths:
             _collect(path)
 
-        # 4. 用户 AppData 目录（国产浏览器常装在此）
+        # 4. 便携版精确扫描（仅按「精确 exe 文件名」匹配，且只扫常见便携目录的浅层，避免误报）
+        #    绝大多数正规安装的浏览器已被上面 1~3 步的权威来源覆盖；这里仅补充便携版，
+        #    且严格要求文件名精确命中映射表，不做任何子串模糊匹配。
         try:
-            appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-            if appdata and os.path.isdir(appdata):
-                for root, dirs, files in os.walk(appdata):
-                    depth = root[len(appdata):].count(os.sep)
-                    if depth > 4:
-                        del dirs[:]
-                        continue
-                    for f in files:
-                        fl = f.lower()
-                        if fl in browser_registry_map or any(kw in fl for kw, _, _ in brand_keywords):
-                            _collect(os.path.join(root, f))
-        except Exception:
-            pass
-
-        # 5. 便携版扫描（常用父目录）
-        try:
+            portable_bases = []
             for drive in ["C:", "D:", "E:", "F:", "G:"]:
-                if not os.path.exists(drive):
+                if not os.path.exists(drive + os.sep):
                     continue
-                for tools_dir in ["Tools", "Software", "Browser", "App", "Programs"]:
-                    base = os.path.join(drive, tools_dir)
-                    if not os.path.isdir(base):
-                        continue
-                    for root, dirs, files in os.walk(base):
-                        depth = root[len(base):].count(os.sep)
-                        if depth > 2:
-                            del dirs[:]
-                            continue
-                        for file in files:
-                            file_lower = file.lower()
-                            if file_lower in browser_registry_map or any(kw in file_lower for kw, _, _ in brand_keywords):
-                                full_path = os.path.join(root, file)
-                                _collect(full_path)
-        except Exception:
-            pass
-
-        # 6. Program Files 模糊扫描兜底
-        try:
-            for pf in [r"C:\Program Files", r"C:\Program Files (x86)"]:
-                if not os.path.isdir(pf):
-                    continue
-                for root, dirs, files in os.walk(pf):
-                    depth = root[len(pf):].count(os.sep)
+                for tools_dir in ["Tools", "Software", "Browser", "PortableApps", "Programs"]:
+                    base = os.path.join(drive + os.sep, tools_dir)
+                    if os.path.isdir(base):
+                        portable_bases.append(base)
+            for base in portable_bases:
+                for root, dirs, files in os.walk(base):
+                    depth = root[len(base):].count(os.sep)
                     if depth > 3:
                         del dirs[:]
                         continue
-                    for f in files:
-                        fl = f.lower()
-                        if fl in browser_registry_map or any(kw in fl for kw, _, _ in brand_keywords):
-                            _collect(os.path.join(root, f))
+                    for file in files:
+                        if file.lower() in browser_registry_map:
+                            _collect(os.path.join(root, file))
         except Exception:
             pass
 

@@ -856,6 +856,7 @@ export const trainingApi = {
     network_weights?: string;
     use_fp8?: boolean;
     gradient_checkpointing?: boolean;
+    model_variant?: string;
   }, token: string): Promise<{
     message: string;
     tensor_dir: string;
@@ -905,6 +906,46 @@ export const trainingApi = {
     export_path: string;
     source: string;
   }> => api('/api/training/export', { method: 'POST', body: params, token }),
+
+  // One-click training (一键训练)
+  getEnvProfile: (token: string): Promise<{
+    vram_total_mb: number | null;
+    vram_free_mb: number | null;
+    tier: 'full' | 'fp8' | 'low' | 'unknown';
+    downloaded_variants: string[];
+    recommended_variant: string | null;
+    missing_variants: string[];
+    project_root: string;
+    lora_outputs_root: string;
+  }> => api('/api/training/env-profile', { token }),
+
+  quickTrain: (params: {
+    folder: string;
+    name: string;
+    tag?: string;
+    quality: 'fast' | 'balanced' | 'quality';
+    captionTemplate?: string;
+    advanced?: Record<string, any> | null;
+  }, token: string): Promise<{
+    id: string;
+    stage: string;
+    progress: number;
+    message: string;
+    status: string;
+  }> => api('/api/training/quick', { method: 'POST', body: params, token }),
+
+  getQuickStatus: (id: string, token: string): Promise<{
+    id: string;
+    stage: string;
+    progress: number;
+    message: string;
+    status: string;
+    lora_path?: string;
+    error?: string;
+  }> => api(`/api/training/quick-status/${id}`, { token }),
+
+  cancelQuickTrain: (id: string, token: string): Promise<any> =>
+    api(`/api/training/quick-cancel/${id}`, { method: 'POST', token }),
 };
 
 // Presets API

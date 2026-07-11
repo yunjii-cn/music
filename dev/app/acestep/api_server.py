@@ -3996,8 +3996,14 @@ def create_app() -> FastAPI:
         except Exception:
             return {}
 
-    def _extract_training_hints(meta: dict, project_root: str) -> dict:
+    def _extract_training_hints(meta: dict, project_root: str, adapter_config: Optional[dict] = None) -> dict:
         hints = {}
+        # T4: a stamped adapter_config.json is the authoritative source for the
+        # base model variant (surfaces which checkpoint the LoRA was trained on).
+        if adapter_config and adapter_config.get("base_model"):
+            hints["model_variant"] = adapter_config["base_model"]
+            if adapter_config.get("model_variant_dir"):
+                hints["model_variant_dir"] = adapter_config["model_variant_dir"]
         run_meta = meta.get("run_metadata")
         if isinstance(run_meta, dict):
             tc = run_meta.get("training_config", {})
@@ -4005,10 +4011,8 @@ def create_app() -> FastAPI:
             steps = tc.get("num_inference_steps")
             if shift is not None:
                 hints["recommended_shift"] = shift
-                if shift >= 2.5:
-                    hints["model_variant"] = "turbo"
-                else:
-                    hints["model_variant"] = "base"
+                if "model_variant" not in hints:
+                    hints["model_variant"] = "turbo" if shift >= 2.5 else "base"
             if steps is not None:
                 hints["recommended_steps"] = steps
             tensor_dir = run_meta.get("tensor_dir", "")
@@ -4073,6 +4077,64 @@ def create_app() -> FastAPI:
         ]
         
         discovered = []
+
+        def _discover_adapter_in_dir(dir_path, display_name, priority, root, out):
+            """Append any adapter found directly inside *dir_path* (final or checkpoint)."""
+            if not os.path.isdir(dir_path):
+                return
+            cfg = _read_adapter_config(dir_path)
+            lokr_path = os.path.join(dir_path, "lokr_weights.safetensors")
+            adapter_model_path = os.path.join(dir_path, "adapter_model.safetensors")
+            if os.path.isfile(lokr_path):
+                rel = os.path.relpath(lokr_path, root).replace("\\", "/")
+                meta = _read_safetensors_metadata(lokr_path)
+                out.append({
+                    "path": rel, "type": "LoKr", "format": "lycoris",
+                    "display_name": display_name, "is_final": priority == 0,
+                    "priority": priority, "metadata": meta, "adapter_config": cfg or None,
+                    "training_hints": _extract_training_hints(meta, root, cfg),
+                })
+            elif os.path.isfile(adapter_model_path) or os.path.isfile(os.path.join(dir_path, "adapter_config.json")):
+                rel = os.path.relpath(dir_path, root).replace("\\", "/")
+                meta = _read_safetensors_metadata(adapter_model_path) if os.path.isfile(adapter_model_path) else {}
+                out.append({
+                    "path": rel, "type": "LoRA", "format": "peft",
+                    "display_name": display_name, "is_final": priority == 0,
+                    "priority": priority, "metadata": meta, "adapter_config": cfg or None,
+                    "training_hints": _extract_training_hints(meta, root, cfg),
+                })
+            else:
+                for f in os.listdir(dir_path):
+                    fp = os.path.join(dir_path, f)
+                    if f.lower().endswith(".safetensors"):
+                        rel = os.path.relpath(fp, root).replace("\\", "/")
+                        meta = _read_safetensors_metadata(fp)
+                        fmt = "lycoris" if meta.get("lokr_config") else "peft"
+                        out.append({
+                            "path": rel, "type": "LoRA", "format": fmt,
+                            "display_name": f"{display_name}/{f}", "is_final": priority == 0,
+                            "priority": priority, "metadata": meta, "adapter_config": cfg or None,
+                            "training_hints": _extract_training_hints(meta, root, cfg),
+                        })
+
+        # T4: unified output root dev/data/outputs/lora/<name>/{final,checkpoints}.
+        # The quick-training flow writes here; discovery should surface it.
+        data_root = os.path.join(os.path.dirname(project_root), "data")
+        unified_root = os.path.join(data_root, "outputs", "lora")
+        if os.path.isdir(unified_root):
+            for name in sorted(os.listdir(unified_root)):
+                name_dir = os.path.join(unified_root, name)
+                if not os.path.isdir(name_dir):
+                    continue
+                final_dir = os.path.join(name_dir, "final")
+                if os.path.isdir(final_dir):
+                    _discover_adapter_in_dir(final_dir, f"{name}/final", 0, project_root, discovered)
+                ckpt_dir = os.path.join(name_dir, "checkpoints")
+                if os.path.isdir(ckpt_dir):
+                    for epoch_dir in sorted(os.listdir(ckpt_dir)):
+                        ep = os.path.join(ckpt_dir, epoch_dir)
+                        if os.path.isdir(ep):
+                            _discover_adapter_in_dir(ep, f"{name}/checkpoints/{epoch_dir}", 1, project_root, discovered)
         
         for dir_name, adapter_type in search_dirs:
             base_dir = os.path.join(project_root, dir_name)
@@ -4097,7 +4159,7 @@ def create_app() -> FastAPI:
                         "priority": 0,
                         "metadata": meta,
                         "adapter_config": adapter_config or None,
-                        "training_hints": _extract_training_hints(meta, project_root),
+                        "training_hints": _extract_training_hints(meta, project_root, adapter_config),
                     })
                 elif os.path.isfile(adapter_model_path) or os.path.isfile(os.path.join(final_root, "adapter_config.json")):
                     rel_path = os.path.relpath(final_root, project_root).replace("\\", "/")
@@ -4111,7 +4173,7 @@ def create_app() -> FastAPI:
                         "priority": 0,
                         "metadata": meta,
                         "adapter_config": adapter_config or None,
-                        "training_hints": _extract_training_hints(meta, project_root),
+                        "training_hints": _extract_training_hints(meta, project_root, adapter_config),
                     })
                 else:
                     for f in os.listdir(final_root):
@@ -4129,7 +4191,7 @@ def create_app() -> FastAPI:
                                 "priority": 0,
                                 "metadata": meta,
                                 "adapter_config": adapter_config or None,
-                                "training_hints": _extract_training_hints(meta, project_root),
+                                "training_hints": _extract_training_hints(meta, project_root, adapter_config),
                             })
             
             checkpoints_dir = os.path.join(base_dir, "checkpoints")
@@ -4155,7 +4217,7 @@ def create_app() -> FastAPI:
                             "priority": 1,
                             "metadata": meta,
                             "adapter_config": adapter_config or None,
-                            "training_hints": _extract_training_hints(meta, project_root),
+                            "training_hints": _extract_training_hints(meta, project_root, adapter_config),
                         })
                     elif os.path.isfile(adapter_model_path) or os.path.isfile(os.path.join(epoch_path, "adapter_config.json")):
                         rel_path = os.path.relpath(epoch_path, project_root).replace("\\", "/")
@@ -4169,7 +4231,7 @@ def create_app() -> FastAPI:
                             "priority": 1,
                             "metadata": meta,
                             "adapter_config": adapter_config or None,
-                            "training_hints": _extract_training_hints(meta, project_root),
+                            "training_hints": _extract_training_hints(meta, project_root, adapter_config),
                         })
         
         discovered.sort(key=lambda x: (x.get("priority", 99), x.get("display_name", "")))

@@ -27,6 +27,7 @@ import trainingRoutes from './routes/training.js';
 import loraRoutes from './routes/lora.js';
 import presetsRoutes from './routes/presets.js';
 import projectsRoutes from './routes/projects.js';
+import uiStateRoutes from './routes/uiState.js';
 import { pool } from './db/pool.js';
 import './db/migrate.js';
 
@@ -628,6 +629,7 @@ app.use('/api/training', trainingRoutes);
 app.use('/api/lora', loraRoutes);
 app.use('/api/presets', presetsRoutes);
 app.use('/api/projects', projectsRoutes);
+app.use('/api/ui-state', uiStateRoutes);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

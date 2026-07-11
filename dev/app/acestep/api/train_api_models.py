@@ -61,6 +61,18 @@ class ExportLoRARequest(BaseModel):
 
     export_path: str = Field(..., description="Export destination path")
     lora_output_dir: str = Field(..., description="Training output directory")
+    base_model: Optional[str] = Field(
+        default=None,
+        description="Base model variant used for training (written into adapter_config.json)",
+    )
+    model_variant: Optional[str] = Field(
+        default=None,
+        description="Normalised model variant (turbo/base/sft) for inference hints",
+    )
+    model_variant_dir: Optional[str] = Field(
+        default=None,
+        description="Absolute or relative directory of the base model checkpoint",
+    )
 
 
 @dataclass

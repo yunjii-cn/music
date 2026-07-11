@@ -14,6 +14,58 @@ from acestep.api.train_api_dataset_service import register_training_dataset_rout
 from acestep.api.train_api_lokr_start_route import register_lokr_training_start_route
 from acestep.api.train_api_lora_start_route import register_lora_training_start_route
 from acestep.api.train_api_models import ExportLoRARequest, initialize_training_state
+from acestep.training_v2.quick_presets import (
+    classify_vram_tier,
+    pick_variant,
+)
+
+
+def _stamp_adapter_config(
+    export_dir: str,
+    base_model: Optional[str],
+    model_variant: Optional[str],
+    model_variant_dir: Optional[str],
+    training_state: Dict,
+) -> None:
+    """Merge base-model metadata into ``export_dir/adapter_config.json``.
+
+    Preserves any peft fields already present (e.g. when the source was
+    produced by the training_v2 pipeline) and only fills in ``base_model`` /
+    ``model_variant`` / ``model_variant_dir`` and best-effort ``r`` /
+    ``lora_alpha`` when missing.
+    """
+    try:
+        cfg_path = os.path.join(export_dir, "adapter_config.json")
+        existing: Dict[str, Any] = {}
+        if os.path.isfile(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+            except Exception:
+                existing = {}
+
+        merged = dict(existing)
+        if base_model:
+            merged["base_model"] = base_model
+        if model_variant:
+            merged["model_variant"] = model_variant
+        elif base_model and not merged.get("model_variant"):
+            merged["model_variant"] = base_model
+        if model_variant_dir:
+            merged["model_variant_dir"] = model_variant_dir
+
+        tcfg = training_state.get("config", {}) if isinstance(training_state, dict) else {}
+        if tcfg.get("lora_rank") is not None and "r" not in merged:
+            merged["r"] = tcfg["lora_rank"]
+        if tcfg.get("lora_alpha") is not None and "lora_alpha" not in merged:
+            merged["lora_alpha"] = tcfg["lora_alpha"]
+        if "peft_type" not in merged:
+            merged["peft_type"] = "LORA"
+
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(merged, f, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        logger.warning("[QuickTrain] Failed to stamp adapter_config.json: %s", exc)
 
 
 def register_training_api_routes(
@@ -155,6 +207,42 @@ def register_training_api_routes(
             }
         )
 
+    @app.get("/v1/training/env-profile")
+    async def training_env_profile(_: None = Depends(verify_api_key)):
+        """Report VRAM tier, downloaded model variants, and the unified LoRA output root.
+
+        Used by the one-click training flow to auto-select a base model and to
+        decide FP8 / gradient-checkpointing defaults.
+        """
+        from acestep.training_v2.gpu_utils import detect_gpu
+        from acestep.training_v2.model_discovery import scan_models
+
+        project_root = getattr(app.state, "project_root", os.getcwd())
+        data_root = os.path.join(os.path.dirname(project_root), "data")
+        outputs_root = os.path.join(data_root, "outputs", "lora")
+
+        gpu = detect_gpu()
+        vram_total = gpu.vram_total_mb
+        vram_free = gpu.vram_free_mb
+        tier = classify_vram_tier(vram_total)
+
+        ckpt_dir = os.path.join(data_root, "models")
+        models = scan_models(ckpt_dir) if os.path.isdir(ckpt_dir) else []
+        downloaded = sorted({m.base_model for m in models if m.base_model in ("turbo", "base", "sft")})
+        recommended = pick_variant(downloaded, tier)
+        missing = [v for v in ("turbo", "base", "sft") if v not in downloaded]
+
+        return wrap_response({
+            "vram_total_mb": vram_total,
+            "vram_free_mb": vram_free,
+            "tier": tier,
+            "downloaded_variants": downloaded,
+            "recommended_variant": recommended,
+            "missing_variants": missing,
+            "project_root": project_root,
+            "lora_outputs_root": outputs_root,
+        })
+
     @app.post("/v1/training/export")
     async def export_lora(request: ExportLoRARequest, _: None = Depends(verify_api_key)):
         """Export trained LoRA/LoKr weights."""
@@ -178,6 +266,17 @@ def register_training_api_routes(
             if os.path.exists(export_path):
                 shutil.rmtree(export_path)
             shutil.copytree(source_path, export_path)
+
+            # T3: stamp the trained base model into adapter_config.json so the
+            # "My LoRA" list can surface which variant it was trained on.
+            _stamp_adapter_config(
+                export_path,
+                base_model=request.base_model,
+                model_variant=request.model_variant,
+                model_variant_dir=request.model_variant_dir,
+                training_state=getattr(app.state, "training_state", {}) or {},
+            )
+
             return wrap_response({"message": "LoRA exported successfully", "export_path": export_path, "source": source_path})
         except Exception as exc:
             return wrap_response(None, code=500, error=f"Export failed: {exc}")
