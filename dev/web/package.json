@@ -1,0 +1,14 @@
+{
+  "name": "yunji-music-web",
+  "version": "1.0.0",
+  "description": "云集智能音乐创意台 — 营销官网（暗黑+CC0000，UM扫码登录，多语言）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.18.0"
+  }
+}

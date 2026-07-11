@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>云集智能音乐创意台 · 用 AI 创作属于你的音乐</title>
+  <meta name="description" content="本地优先的 AI 音乐创作平台：文本生成音乐、翻唱、LoRA 风格训练，全部在你的显卡上完成。" />
+  <link rel="icon" href="/assets/img/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/style.css" />
+</head>
+<body>
+
+  <!-- 顶部导航 -->
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="#home">
+        <img src="/assets/img/logo.svg" alt="logo" />
+        <span data-i18n="brand">云集音乐</span>
+      </a>
+      <nav class="nav-links" data-nav></nav>
+      <div class="nav-actions">
+        <select id="langSelect" class="lang-select" aria-label="language"></select>
+        <button id="loginBtn" class="btn btn-primary" data-i18n="hero.ctaSecondary">登录创作</button>
+        <div id="userChip" class="user-chip">
+          <img id="userAvatar" class="avatar" alt="" />
+          <span class="name" id="userName"></span>
+          <button class="btn btn-ghost" id="logoutBtn"></button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero" id="home">
+    <div class="container">
+      <span class="badge" data-hero="badge"></span>
+      <h1 data-hero="title"></h1>
+      <p data-hero="subtitle"></p>
+      <div class="hero-cta">
+        <a href="#download" class="btn btn-primary" data-hero="cta1"></a>
+        <button id="loginHeroBtn" class="btn btn-ghost" data-hero="cta2"></button>
+      </div>
+      <div class="hero-stats" data-hero="stats"></div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <h2 data-features-title></h2>
+        <p data-features-sub></p>
+      </div>
+      <div class="feature-grid" data-features></div>
+    </div>
+  </section>
+
+  <!-- How -->
+  <section class="section" id="how">
+    <div class="container">
+      <div class="section-head">
+        <h2 data-how-title></h2>
+        <p data-how-sub></p>
+      </div>
+      <div class="steps" data-how></div>
+    </div>
+  </section>
+
+  <!-- Download -->
+  <section class="section" id="download">
+    <div class="container">
+      <div class="download-wrap" data-download>
+        <h2 data-download-title></h2>
+        <p style="color:var(--text-muted);font-size:17px" data-download-sub></p>
+        <div class="download-btns">
+          <button class="btn btn-primary" data-dl-win data-platform="windows"></button>
+          <button class="btn btn-ghost" data-dl-mac data-platform="mac"></button>
+          <button class="btn btn-ghost" data-dl-linux data-platform="linux"></button>
+        </div>
+        <p class="download-version" data-dl-version style="color:var(--text-dim);font-size:13px;margin-top:14px"></p>
+        <p class="download-note" data-dl-note></p>
+        <div class="mirror-row" data-dl-mirrors></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span class="footer-copy" data-footer-copy></span>
+      <nav class="footer-links" data-footer-links></nav>
+    </div>
+  </footer>
+
+  <!-- 登录弹窗 -->
+  <div class="modal-mask" id="loginMask">
+    <div class="modal">
+      <button class="close" id="loginClose" aria-label="close">×</button>
+      <h3 data-i18n="login.title">扫码登录</h3>
+      <p class="sub" data-i18n="login.subtitle"></p>
+      <div class="qr-frame" id="qrFrameWrap">
+        <iframe id="qrFrame" title="qrcode" src="about:blank"></iframe>
+      </div>
+      <div class="status" id="loginStatus"></div>
+    </div>
+  </div>
+
+  <script src="/assets/js/i18n.js"></script>
+  <script src="/assets/js/main.js"></script>
+</body>
+</html>
