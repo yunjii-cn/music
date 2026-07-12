@@ -461,11 +461,12 @@ class ModelDownloadThread(QThread):
     download_finished = pyqtSignal(bool, str)
     progress_updated = pyqtSignal(int, str)
     
-    def __init__(self, model_name: str, base_dir: str, download_source: str, parent=None):
+    def __init__(self, model_name: str, base_dir: str, download_source: str, force: bool = False, parent=None):
         super().__init__(parent)
         self.model_name = model_name
         self.base_dir = base_dir
         self.download_source = download_source
+        self.force = force
         self.process = None
         self._should_stop = False
         self.current_progress = 0
@@ -498,6 +499,9 @@ class ModelDownloadThread(QThread):
                 cmd_args.extend(["--model", self.model_name])
             if self.download_source != "auto":
                 cmd_args.extend(["--source", self.download_source])
+
+            if self.force:
+                cmd_args.append("--force")
             
             cmd_str = " ".join(f'"{arg}"' if ' ' in arg else arg for arg in cmd_args)
             
@@ -1849,41 +1853,25 @@ class MainWindow(QMainWindow):
         # 加载系统信息或显示初始化流程（延迟执行，避免启动时弹窗）
         QTimer.singleShot(500, self._check_and_load_system_info)
         
-        # 1. 浏览器设置面板 - 单排三栏饱满布局
+        # 1. 浏览器设置条 - 极简扁平淡色卡片，控件内联
         browser_panel = QFrame()
+        browser_panel.setObjectName("browserPanel")
         browser_panel.setStyleSheet("""
-            QFrame {
+            QFrame#browserPanel {
                 background-color: #1A1A1A;
-                border: 1px solid #333333;
+                border: 1px solid #2A2A2A;
                 border-radius: 8px;
-                padding: 10px;
             }
-            QFrame QLabel {
+            QFrame#browserPanel QLabel {
                 border: none;
                 background: transparent;
             }
         """)
         browser_layout = QHBoxLayout(browser_panel)
-        browser_layout.setSpacing(10)
-        browser_layout.setContentsMargins(10, 10, 10, 10)
+        browser_layout.setSpacing(14)
+        browser_layout.setContentsMargins(14, 11, 14, 11)
 
-        # 统一的内联卡片样式
-        def _make_browser_section(inner_layout):
-            section = QFrame()
-            section.setStyleSheet("""
-                QFrame {
-                    background-color: #252525;
-                    border: 1px solid #333333;
-                    border-radius: 6px;
-                }
-            """)
-            section_layout = QHBoxLayout(section)
-            section_layout.setSpacing(8)
-            section_layout.setContentsMargins(10, 8, 10, 8)
-            section_layout.addLayout(inner_layout)
-            return section
-
-        # 第1栏：浏览器选择
+        # 第1组：浏览器选择
         browser_sel_layout = QHBoxLayout()
         browser_sel_layout.setSpacing(8)
         browser_label = QLabel("🌐 浏览器")
@@ -1893,19 +1881,19 @@ class MainWindow(QMainWindow):
         self.browser_combo = QComboBox()
         self.browser_combo.setStyleSheet("""
             QComboBox {
-                background-color: #1A1A1A;
+                background-color: #1E1E1E;
                 color: #FFFFFF;
-                border: 1px solid #444444;
+                border: 1px solid #3A3A3A;
                 border-radius: 6px;
                 padding: 6px 30px 6px 10px;
                 font-size: 12px;
                 min-width: 150px;
             }
             QComboBox:hover {
-                border-color: #555555;
+                border-color: #4A4A4A;
             }
             QComboBox:focus {
-                border-color: #1976D2;
+                border-color: #1565C0;
             }
             QComboBox::drop-down {
                 border: none;
@@ -1921,11 +1909,11 @@ class MainWindow(QMainWindow):
                 right: 8px;
             }
             QComboBox QAbstractItemView {
-                background-color: #1A1A1A;
-                border: 1px solid #444444;
+                background-color: #1E1E1E;
+                border: 1px solid #3A3A3A;
                 border-radius: 6px;
                 outline: none;
-                selection-background-color: #C62828;
+                selection-background-color: #1565C0;
                 selection-color: #FFFFFF;
             }
             QComboBox QAbstractItemView::item {
@@ -1959,10 +1947,9 @@ class MainWindow(QMainWindow):
 
         self.browser_combo.currentIndexChanged.connect(self._on_browser_changed)
         browser_sel_layout.addWidget(self.browser_combo, 1)
-        browser_sel_section = _make_browser_section(browser_sel_layout)
-        browser_layout.addWidget(browser_sel_section, 1)
+        browser_layout.addLayout(browser_sel_layout, 1)
 
-        # 第2栏：浏览器路径（始终显示，非自定义时只读）
+        # 第2组：浏览器路径（始终显示，非自定义时只读）
         browser_path_layout = QHBoxLayout()
         browser_path_layout.setSpacing(8)
         path_label = QLabel("📁 路径")
@@ -1974,15 +1961,15 @@ class MainWindow(QMainWindow):
         self.browser_path_edit.setPlaceholderText("选择浏览器后显示路径...")
         self.browser_path_edit.setStyleSheet("""
             QLineEdit {
-                background-color: #1A1A1A;
+                background-color: #1E1E1E;
                 color: #A0A0A0;
-                border: 1px solid #444444;
+                border: 1px solid #3A3A3A;
                 border-radius: 6px;
                 padding: 6px 10px;
                 font-size: 12px;
             }
             QLineEdit:hover {
-                border-color: #555555;
+                border-color: #4A4A4A;
             }
             QLineEdit:enabled {
                 color: #F0F0F0;
@@ -2010,25 +1997,32 @@ class MainWindow(QMainWindow):
         self.btn_select_browser.clicked.connect(self._select_custom_browser)
         self.btn_select_browser.setVisible(is_custom)
         browser_path_layout.addWidget(self.btn_select_browser)
-        browser_path_section = _make_browser_section(browser_path_layout)
-        browser_layout.addWidget(browser_path_section, 2)
+        browser_layout.addLayout(browser_path_layout, 2)
 
-        # 第3栏：使用说明按钮（带图标文字）
+        # 竖向分隔，使使用说明按钮与设置区分隔
+        help_sep = QFrame()
+        help_sep.setFrameShape(QFrame.Shape.VLine)
+        help_sep.setStyleSheet("background-color: #2A2A2A;")
+        help_sep.setFixedWidth(1)
+        browser_layout.addWidget(help_sep)
+
+        # 使用说明按钮（幽灵描边风格，与整条统一）
         self.btn_help = QPushButton("📖 使用说明")
         self.btn_help.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_help.setStyleSheet("""
             QPushButton {
-                background-color: #263238;
-                color: #FFFFFF;
-                border: 1px solid #37474F;
+                background-color: transparent;
+                color: #A0A0A0;
+                border: 1px solid #3A3A3A;
                 border-radius: 6px;
-                padding: 8px 18px;
+                padding: 7px 16px;
                 font-size: 12px;
-                font-weight: bold;
+                font-weight: 500;
             }
             QPushButton:hover {
-                background-color: #37474F;
-                border-color: #546E7A;
+                background-color: #242424;
+                border-color: #4A4A4A;
+                color: #E0E0E0;
             }
         """)
         self.btn_help.clicked.connect(self._show_help_dialog)
@@ -6920,8 +6914,13 @@ for d in deps:
             except Exception:
                 return False
     
-    def _download_model(self, model_name):
-        """下载模型 - 使用异步线程避免UI阻塞"""
+    def _download_model(self, model_name, force: bool = False):
+        """下载模型 - 使用异步线程避免UI阻塞
+        
+        Args:
+            model_name: 模型名称
+            force: 是否强制重新下载（用于修复不完整/损坏的模型）
+        """
         if self.is_downloading or self.is_deleting or self.is_verifying:
             self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
             return
@@ -6938,7 +6937,8 @@ for d in deps:
             self.model_download_thread = ModelDownloadThread(
                 model_name, 
                 self.base_dir, 
-                self.selected_download_source
+                self.selected_download_source,
+                force
             )
             
             self.model_download_thread.log_received.connect(self._log)
@@ -7349,53 +7349,129 @@ for d in deps:
                     btn_layout.addWidget(pause_btn)
                 elif model["exists"]:
                     is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
-                    delete_btn = QPushButton("删除")
-                    delete_btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #C62828;
-                            color: white;
-                            border: none;
-                            border-radius: 3px;
-                            padding: 3px 8px;
-                            font-size: 11px;
-                            font-weight: normal;
-                        }
-                        QPushButton:hover {
-                            background-color: #B71C1C;
-                        }
-                        QPushButton:disabled {
-                            background-color: #333333;
-                            color: #666666;
-                        }
-                    """)
-                    if is_main_component:
-                        delete_btn.setEnabled(False)
-                        delete_btn.setToolTip("主模型组件，请删除主模型")
-                    delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
-                    btn_layout.addWidget(delete_btn)
-                else:
-                    # 未安装的模型：下载按钮
-                    download_btn = QPushButton("下载")
-                    download_btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #C62828;
-                            color: white;
-                            border: none;
-                            border-radius: 3px;
-                            padding: 3px 10px;
-                            font-size: 11px;
-                            font-weight: normal;
-                        }
-                        QPushButton:hover {
-                            background-color: #D32F2F;
-                        }
-                        QPushButton:disabled {
-                            background-color: #333333;
-                            color: #666666;
-                        }
-                    """)
-                    download_btn.clicked.connect(lambda checked, m=model["name"]: self._download_model(m))
-                    btn_layout.addWidget(download_btn)
+                    # 主模型组件无法单独下载，统一路由到主模型下载
+                    dl_target = "main" if is_main_component else model["name"]
+
+                    if integrity_status == "incomplete":
+                        # 不完整/损坏：同时提供「删除」与「重新下载」
+                        delete_btn = QPushButton("删除")
+                        delete_btn.setStyleSheet("""
+                            QPushButton {
+                                background-color: #C62828;
+                                color: white;
+                                border: none;
+                                border-radius: 3px;
+                                padding: 3px 8px;
+                                font-size: 11px;
+                                font-weight: normal;
+                            }
+                            QPushButton:hover {
+                                background-color: #B71C1C;
+                            }
+                            QPushButton:disabled {
+                                background-color: #333333;
+                                color: #666666;
+                            }
+                        """)
+                        delete_btn.setToolTip("删除不完整/损坏的模型文件")
+                        delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
+                        btn_layout.addWidget(delete_btn)
+
+                        redownload_btn = QPushButton("重新下载")
+                        redownload_btn.setStyleSheet("""
+                            QPushButton {
+                                background-color: #C62828;
+                                color: white;
+                                border: none;
+                                border-radius: 3px;
+                                padding: 3px 10px;
+                                font-size: 11px;
+                                font-weight: normal;
+                            }
+                            QPushButton:hover {
+                                background-color: #D32F2F;
+                            }
+                            QPushButton:disabled {
+                                background-color: #333333;
+                                color: #666666;
+                            }
+                        """)
+                        redownload_btn.setToolTip("强制重新下载以修复不完整/损坏的模型")
+                        redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
+                        btn_layout.addWidget(redownload_btn)
+                    elif integrity_status == "missing":
+                        # 未安装的模型：下载按钮
+                        download_btn = QPushButton("下载")
+                        download_btn.setStyleSheet("""
+                            QPushButton {
+                                background-color: #C62828;
+                                color: white;
+                                border: none;
+                                border-radius: 3px;
+                                padding: 3px 10px;
+                                font-size: 11px;
+                                font-weight: normal;
+                            }
+                            QPushButton:hover {
+                                background-color: #D32F2F;
+                            }
+                            QPushButton:disabled {
+                                background-color: #333333;
+                                color: #666666;
+                            }
+                        """)
+                        download_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t))
+                        btn_layout.addWidget(download_btn)
+                    else:
+                        # integrity_status == "complete"
+                        delete_btn = QPushButton("删除")
+                        delete_btn.setStyleSheet("""
+                            QPushButton {
+                                background-color: #C62828;
+                                color: white;
+                                border: none;
+                                border-radius: 3px;
+                                padding: 3px 8px;
+                                font-size: 11px;
+                                font-weight: normal;
+                            }
+                            QPushButton:hover {
+                                background-color: #B71C1C;
+                            }
+                            QPushButton:disabled {
+                                background-color: #333333;
+                                color: #666666;
+                            }
+                        """)
+                        if is_main_component:
+                            delete_btn.setEnabled(False)
+                            delete_btn.setToolTip("主模型组件，请删除主模型")
+                            # 主模型组件损坏时仍允许通过「重新下载」修复
+                            redownload_btn = QPushButton("重新下载")
+                            redownload_btn.setStyleSheet("""
+                                QPushButton {
+                                    background-color: #C62828;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 3px;
+                                    padding: 3px 10px;
+                                    font-size: 11px;
+                                    font-weight: normal;
+                                }
+                                QPushButton:hover {
+                                    background-color: #D32F2F;
+                                }
+                                QPushButton:disabled {
+                                    background-color: #333333;
+                                    color: #666666;
+                                }
+                            """)
+                            redownload_btn.setToolTip("强制重新下载以修复主模型组件")
+                            redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
+                            btn_layout.addWidget(redownload_btn)
+                        else:
+                            delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
+                        btn_layout.addWidget(delete_btn)
                 
                 row1.addLayout(btn_layout)
                 

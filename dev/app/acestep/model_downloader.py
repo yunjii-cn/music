@@ -593,6 +593,21 @@ def download_main_model(
     if not force and check_main_model_exists(checkpoints_dir):
         return True, f"Main model already exists at {checkpoints_dir}"
 
+    # 强制重新下载时，先清除不完整/损坏的主模型组件，避免残留文件导致反复失败。
+    # 仍保持完整的组件会被保留，避免无谓的重复下载。
+    if force:
+        for component in MAIN_MODEL_COMPONENTS:
+            component_path = checkpoints_dir / component
+            if component_path.exists() and not check_model_exists(component, checkpoints_dir):
+                try:
+                    if component_path.is_dir():
+                        shutil.rmtree(component_path)
+                    else:
+                        component_path.unlink()
+                    logger.info(f"[Download] 已移除损坏的主模型组件以重新下载: {component}")
+                except Exception as e:
+                    logger.error(f"[Download] 移除主模型组件失败: {component}: {e}")
+
     print(f"Downloading main model from {MAIN_MODEL_REPO}...")
     print(f"Destination: {checkpoints_dir}")
     print("This may take a while depending on your internet connection...")
@@ -645,6 +660,18 @@ def download_submodel(
 
     if not force and check_model_exists(model_name, checkpoints_dir):
         return True, f"Model '{model_name}' already exists at {model_path}"
+
+    # 强制重新下载时，先删除已存在的（可能不完整/损坏的）模型目录，确保全新下载。
+    if force and model_path.exists():
+        try:
+            if model_path.is_dir():
+                shutil.rmtree(model_path)
+            else:
+                model_path.unlink()
+            logger.info(f"[Download] 已移除现有模型以重新下载: {model_name}")
+        except Exception as e:
+            logger.error(f"[Download] 移除现有模型失败: {model_name}: {e}")
+            return False, f"Failed to remove existing model {model_name}: {e}"
 
     repo_id = SUBMODEL_REGISTRY[model_name]
 
