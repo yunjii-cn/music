@@ -159,7 +159,7 @@ def get_version_from_filename():
             exe_path = sys.executable
             exe_name = os.path.basename(exe_path)
             import re
-            match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_name)
+            match = re.search(r'v(\d+\.\d+\.\d+(?:\.\d+)?)', exe_name)
             if match:
                 return match.group(1)
         return datetime.now().strftime("%Y.%m.%d.%H%M") + "-dev"
