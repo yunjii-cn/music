@@ -1997,36 +1997,39 @@ class ModelManagerDialog(QDialog):
                     download_btn.setStyleSheet(DARK_BTN_PRIMARY)
                     download_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t))
                     btn_layout.addWidget(download_btn)
-                elif model["exists"]:
-                    if integrity_status == "incomplete":
-                        # 不完整/损坏：同时提供「删除」与「重新下载」，让用户能清除坏文件并重装
-                        delete_btn = QPushButton("删除")
-                        delete_btn.setStyleSheet(DARK_BTN_DANGER)
-                        delete_btn.setToolTip("删除不完整/损坏的模型文件")
-                        delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
-                        btn_layout.addWidget(delete_btn)
+                elif integrity_status == "incomplete":
+                    # 不完整/损坏：同时提供「删除」与「重新下载」，让用户能清除坏文件并重装。
+                    # 注意：不完整模型在 _load_model_list 中 exists 被算为 False
+                    # （check_model_exists 要求文件齐全 + 大小达标才返回 True），因此该分支
+                    # 不能依赖 model["exists"] 判断，否则会落入空分支、无任何按钮（与
+                    # 之前『下载按钮消失』同源 bug）。
+                    delete_btn = QPushButton("删除")
+                    delete_btn.setStyleSheet(DARK_BTN_DANGER)
+                    delete_btn.setToolTip("删除不完整/损坏的模型文件")
+                    delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
+                    btn_layout.addWidget(delete_btn)
 
+                    redownload_btn = QPushButton("重新下载")
+                    redownload_btn.setStyleSheet(DARK_BTN_PRIMARY)
+                    redownload_btn.setToolTip("强制重新下载以修复不完整/损坏的模型")
+                    redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
+                    btn_layout.addWidget(redownload_btn)
+                elif model["exists"]:
+                    # integrity_status == "complete"（已安装）
+                    delete_btn = QPushButton("删除")
+                    delete_btn.setStyleSheet(DARK_BTN_DANGER)
+                    if is_main_component:
+                        delete_btn.setEnabled(False)
+                        delete_btn.setToolTip("主模型组件，请删除主模型")
+                        # 主模型组件损坏时仍允许通过「重新下载」修复
                         redownload_btn = QPushButton("重新下载")
                         redownload_btn.setStyleSheet(DARK_BTN_PRIMARY)
-                        redownload_btn.setToolTip("强制重新下载以修复不完整/损坏的模型")
+                        redownload_btn.setToolTip("强制重新下载以修复主模型组件")
                         redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
                         btn_layout.addWidget(redownload_btn)
                     else:
-                        # integrity_status == "complete"（已安装）
-                        delete_btn = QPushButton("删除")
-                        delete_btn.setStyleSheet(DARK_BTN_DANGER)
-                        if is_main_component:
-                            delete_btn.setEnabled(False)
-                            delete_btn.setToolTip("主模型组件，请删除主模型")
-                            # 主模型组件损坏时仍允许通过「重新下载」修复
-                            redownload_btn = QPushButton("重新下载")
-                            redownload_btn.setStyleSheet(DARK_BTN_PRIMARY)
-                            redownload_btn.setToolTip("强制重新下载以修复主模型组件")
-                            redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
-                            btn_layout.addWidget(redownload_btn)
-                        else:
-                            delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
-                        btn_layout.addWidget(delete_btn)
+                        delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
+                    btn_layout.addWidget(delete_btn)
 
                 row_layout.addLayout(btn_layout)
                 model_item_layout.addLayout(row_layout)

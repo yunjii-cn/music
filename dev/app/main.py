@@ -7374,7 +7374,10 @@ for d in deps:
                     """)
                     download_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t))
                     btn_layout.addWidget(download_btn)
-                elif model["exists"]:
+                elif model["exists"] or integrity_status == "incomplete":
+                    # 注意：不完整模型 exists 恒为 False（check_model_exists 要求文件齐全+大小达标才
+                    # 返回 True），因此必须单独放行 integrity_status=="incomplete"，否则会落入空分支、
+                    # 无任何按钮（与『下载按钮消失』同源 bug）。
                     if integrity_status == "incomplete":
                         # 不完整/损坏：同时提供「删除」与「重新下载」
                         delete_btn = QPushButton("删除")
