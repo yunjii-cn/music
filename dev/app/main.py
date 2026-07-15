@@ -7323,7 +7323,11 @@ for d in deps:
                 
                 # 检查是否是当前正在下载的模型
                 is_downloading = self.is_downloading and self.current_operation_model == model["name"]
-                
+
+                # 主模型组件无法单独下载，统一路由到主模型下载
+                is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
+                dl_target = "main" if is_main_component else model["name"]
+
                 if is_downloading:
                     # 正在下载的模型：暂停按钮
                     pause_btn = QPushButton("暂停")
@@ -7347,11 +7351,30 @@ for d in deps:
                     """)
                     pause_btn.clicked.connect(self._pause_download)
                     btn_layout.addWidget(pause_btn)
+                elif integrity_status == "missing":
+                    # 未安装（含完全未下载的模型）：始终显示下载按钮
+                    download_btn = QPushButton("下载")
+                    download_btn.setStyleSheet("""
+                        QPushButton {
+                            background-color: #C62828;
+                            color: white;
+                            border: none;
+                            border-radius: 3px;
+                            padding: 3px 10px;
+                            font-size: 11px;
+                            font-weight: normal;
+                        }
+                        QPushButton:hover {
+                            background-color: #D32F2F;
+                        }
+                        QPushButton:disabled {
+                            background-color: #333333;
+                            color: #666666;
+                        }
+                    """)
+                    download_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t))
+                    btn_layout.addWidget(download_btn)
                 elif model["exists"]:
-                    is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
-                    # 主模型组件无法单独下载，统一路由到主模型下载
-                    dl_target = "main" if is_main_component else model["name"]
-
                     if integrity_status == "incomplete":
                         # 不完整/损坏：同时提供「删除」与「重新下载」
                         delete_btn = QPushButton("删除")
@@ -7399,31 +7422,8 @@ for d in deps:
                         redownload_btn.setToolTip("强制重新下载以修复不完整/损坏的模型")
                         redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
                         btn_layout.addWidget(redownload_btn)
-                    elif integrity_status == "missing":
-                        # 未安装的模型：下载按钮
-                        download_btn = QPushButton("下载")
-                        download_btn.setStyleSheet("""
-                            QPushButton {
-                                background-color: #C62828;
-                                color: white;
-                                border: none;
-                                border-radius: 3px;
-                                padding: 3px 10px;
-                                font-size: 11px;
-                                font-weight: normal;
-                            }
-                            QPushButton:hover {
-                                background-color: #D32F2F;
-                            }
-                            QPushButton:disabled {
-                                background-color: #333333;
-                                color: #666666;
-                            }
-                        """)
-                        download_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t))
-                        btn_layout.addWidget(download_btn)
                     else:
-                        # integrity_status == "complete"
+                        # integrity_status == "complete"（已安装）
                         delete_btn = QPushButton("删除")
                         delete_btn.setStyleSheet("""
                             QPushButton {
