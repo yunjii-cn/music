@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import LoginGate from './LoginGate';
 import { AuthProvider } from './context/AuthContext';
 import { ResponsiveProvider } from './context/ResponsiveContext';
 import { hydrateFromServer, startAutoSync } from './services/persistence';
@@ -21,7 +22,9 @@ async function bootstrap() {
     <React.StrictMode>
       <AuthProvider>
         <ResponsiveProvider>
-          <App />
+          <LoginGate>
+            <App />
+          </LoginGate>
         </ResponsiveProvider>
       </AuthProvider>
     </React.StrictMode>

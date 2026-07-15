@@ -129,6 +129,87 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
   }
 });
 
+// UM (云集统一用户中心) 扫码登录回调
+// 接收官网登录页(web/um)扫码成功后 postMessage 过来的用户信息，
+// 在本地库按 social_uid 找/建用户并签发 JWT，复用现有本地 token 体系。
+router.post('/um', async (req: Request, res: Response) => {
+  try {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const socialUid = body['social_uid'];
+    const nickname = typeof body['nickname'] === 'string' ? body['nickname'] : '';
+    const faceimg = typeof body['faceimg'] === 'string' ? body['faceimg'] : '';
+
+    if (typeof socialUid !== 'string' || !socialUid) {
+      res.status(400).json({ error: 'Missing social_uid' });
+      return;
+    }
+
+    // 1) 已绑定过 UM 账号的本地用户
+    const existing = await pool.query(
+      'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE um_uid = ?',
+      [socialUid]
+    );
+
+    let user;
+    if (existing.rows.length > 0) {
+      user = existing.rows[0];
+      // 同步最新头像
+      if (faceimg) {
+        await pool.query(
+          `UPDATE users SET avatar_url = ?, updated_at = datetime('now') WHERE id = ?`,
+          [faceimg, user.id]
+        );
+      }
+    } else {
+      // 2) 新用户：以昵称生成唯一 username
+      const base =
+        nickname.trim().replace(/[^a-zA-Z0-9_一-龥-]/g, '').slice(0, 24) || 'umuser';
+      let username = base;
+      let n = 1;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const clash = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+        if (clash.rows.length === 0) break;
+        username = `${base}${n}`;
+        n++;
+        if (n > 9999) {
+          username = `um_${socialUid.slice(-6)}`;
+          break;
+        }
+      }
+      const userId = generateUUID();
+      await pool.query(
+        `INSERT INTO users (id, username, avatar_url, um_uid, is_admin, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, datetime('now'), datetime('now'))`,
+        [userId, username, faceimg || null, socialUid]
+      );
+      const newUser = await pool.query(
+        'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE id = ?',
+        [userId]
+      );
+      user = newUser.rows[0];
+    }
+
+    const token = issueAccessToken({ id: user.id, username: user.username });
+
+    res.status(200).json({
+      user: {
+        id: user.id,
+        username: user.username,
+        bio: user.bio,
+        avatar_url: user.avatar_url,
+        banner_url: user.banner_url,
+        isAdmin: Boolean(user.is_admin),
+        createdAt: user.created_at,
+      },
+      token,
+    });
+  } catch (error) {
+    console.error('UM auth error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get current user
 router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {

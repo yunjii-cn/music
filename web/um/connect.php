@@ -49,6 +49,10 @@ if (isset($_GET['code']) && $_GET['code']) {
         exit("<script language='javascript'>
             if (window.parent && window.parent !== window) {
                 window.parent.postMessage({type: 'loginSuccess', user: $userJson}, '*');
+            } else if (window.opener) {
+                // 弹窗场景（被启动前端以 window.open 打开）：回传消息后关闭弹窗
+                window.opener.postMessage({type: 'loginSuccess', user: $userJson}, '*');
+                window.close();
             } else {
                 window.location.href = './index.php?t=' + Date.now();
             }

@@ -64,6 +64,15 @@ export interface AuthResponse {
   token: string;
 }
 
+// Payload posted by the official 云集 login page (music.yunjii.cn/um) after a
+// successful UM scan-code login. It is forwarded to POST /api/auth/um.
+export interface UMLoginPayload {
+  social_uid: string;
+  nickname?: string;
+  faceimg?: string;
+  [key: string]: unknown;
+}
+
 export const authApi = {
   // Auto-login: Get existing user from database (for local single-user app)
   auto: (): Promise<AuthResponse> =>
@@ -83,6 +92,10 @@ export const authApi = {
 
   updateUsername: (username: string, token: string): Promise<AuthResponse> =>
     api('/api/auth/username', { method: 'PATCH', body: { username }, token }),
+
+  // UM scan-code login: exchange the official login page's user info for a JWT
+  umLogin: (umUser: UMLoginPayload): Promise<AuthResponse> =>
+    api('/api/auth/um', { method: 'POST', body: umUser }),
 };
 
 // Songs API

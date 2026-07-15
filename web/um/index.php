@@ -227,10 +227,16 @@ if (defined('MI_APP_URL') && MI_APP_URL) {
     </div>
 
     <script>
-        // 监听 iframe 内 connect.php 发来的登录成功消息，刷新本页以显示已登录态
+        // 监听 iframe 内 connect.php 发来的登录成功消息。
+        // - 若本页被门控页(启动前端)嵌套：向上转发给顶层，由门控页解锁应用；
+        // - 否则(官网独立打开)：自行刷新以显示已登录态。
         window.addEventListener('message', function (e) {
             if (e.data && e.data.type === 'loginSuccess') {
-                window.location.reload();
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage(e.data, '*');
+                } else {
+                    window.location.reload();
+                }
             }
         });
     </script>

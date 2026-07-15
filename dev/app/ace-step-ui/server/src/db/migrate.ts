@@ -307,6 +307,19 @@ function migrate(): void {
       console.error('Failed to add is_default column:', error);
     }
   }
+
+  // Add um_uid column to users table (links local user to 云集 UM account)
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN um_uid TEXT`);
+    console.log('Added um_uid column to users table');
+  } catch (error) {
+    const errorMsg = String(error);
+    if (errorMsg.includes('duplicate column name')) {
+      console.log('Column um_uid already exists in users table');
+    } else {
+      console.error('Failed to add um_uid column:', error);
+    }
+  }
 }
 
 // Run migrations
