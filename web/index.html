@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云集智能音乐创意台 - 本地 AI 音乐生成一站式创作平台</title>
+    <meta name="description" content="基于 ACE-Step 1.5 引擎的本地化 AI 音乐创作平台，类似 Spotify 的专业界面，本地 GPU 免费无限量生成高质量音乐。内置 936 种风格、LoRA/LoKR 训练、人声分离与视频可视化。">
+    <meta name="keywords" content="AI音乐生成,本地音乐创作,ACE-Step,云集智能,LoRA训练,Suno替代,音乐创意">
+    <link rel="shortcut icon" href="./favicon.ico">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+<!-- 导航栏 -->
+<nav class="navbar" id="navbar">
+    <div class="nav-container">
+        <a href="./" class="nav-brand">
+            <img src="./favicon.ico" alt="云集" class="nav-logo">
+            <span class="nav-title">云集智能音乐创意台</span>
+        </a>
+        <div class="nav-links" id="navLinks">
+            <a href="#features" class="nav-link">核心功能</a>
+            <a href="#advantages" class="nav-link">为什么选云集</a>
+            <a href="#showcase" class="nav-link">产品展示</a>
+            <a href="#tech" class="nav-link">技术架构</a>
+            <a href="#roadmap" class="nav-link">发展路线</a>
+            <a href="https://github.com/sdbds/ACE-Step-1.5-for-windows" target="_blank" rel="noopener" class="nav-link">GitHub</a>
+            <a href="#download" class="nav-link">免费下载</a>
+        </div>
+        <a href="./um/index.php" class="nav-login">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/></svg>
+            登录
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="菜单">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+</nav>
+
+<!-- Hero 区域 -->
+<section class="hero" id="hero">
+    <div class="hero-bg">
+        <canvas class="hero-particles" id="particles"></canvas>
+        <div class="hero-gradient"></div>
+    </div>
+    <div class="hero-content">
+        <div class="hero-badge">基于 ACE-Step 1.5 引擎</div>
+        <h1 class="hero-title">
+            <span class="title-line">AI 驱动</span>
+            <span class="title-line accent">音乐创作</span>
+            <span class="title-line">一站直达</span>
+        </h1>
+        <p class="hero-desc">
+            类似 Spotify 的专业级界面，在你的本地 GPU 上<strong>免费、无限量</strong>生成高质量 AI 音乐。<br>
+            100% 本地运行，作品版权完全归你所有，无需任何云端订阅。
+        </p>
+        <div class="hero-actions">
+            <a href="#download" class="btn btn-primary btn-lg">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                免费下载
+            </a>
+            <a href="#features" class="btn btn-outline btn-lg">
+                了解更多
+            </a>
+        </div>
+        <div class="hero-stats">
+            <div class="stat-item">
+                <span class="stat-value">免费</span>
+                <span class="stat-label">完全免费</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value">本地</span>
+                <span class="stat-label">100% 本地运行</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value">∞</span>
+                <span class="stat-label">无生成限制</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value">936</span>
+                <span class="stat-label">内置风格</span>
+            </div>
+        </div>
+    </div>
+    <div class="hero-scroll-hint">
+        <div class="scroll-arrow"></div>
+    </div>
+</section>
+
+<!-- 核心功能 -->
+<section class="section features" id="features">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">CORE FEATURES</span>
+            <h2 class="section-title">六大核心能力</h2>
+            <p class="section-desc">从灵感到成片，AI 赋能音乐创作的每一个环节</p>
+        </div>
+        <div class="feature-grid">
+            <div class="feature-card" data-delay="0">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 30V14l8-4v16" /><path d="M20 26V10l10-5v18" /><path d="M30 23V8l6-3v18"/><circle cx="12" cy="32" r="4"/><circle cx="20" cy="28" r="4"/><circle cx="30" cy="25" r="4"/><circle cx="36" cy="23" r="4"/>
+                    </svg>
+                </div>
+                <h3>AI 音乐生成</h3>
+                <p>简单模式一句话出歌，自定义模式精确控制歌词、风格、时长、BPM、调性与拍号，支持批量生成多版本。</p>
+            </div>
+            <div class="feature-card" data-delay="1">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="24" cy="24" r="18"/><path d="M24 10v28M10 24h28M15 15l18 18M33 15L15 33"/>
+                    </svg>
+                </div>
+                <h3>936 种风格库</h3>
+                <p>内置 936 种风格同步自 Suno 探索器，涵盖流行、摇滚、电子、古典、爵士等，支持搜索与随机灵感。</p>
+            </div>
+            <div class="feature-card" data-delay="2">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 24h10l4-10 6 20 4-10h12"/>
+                    </svg>
+                </div>
+                <h3>高级参数</h3>
+                <p>参考音频、音频翻唱、局部重绘、种子精确复现、推理步数调节，以及 12GB+ 显存专属的 Thinking Mode 提示增强。</p>
+            </div>
+            <div class="feature-card" data-delay="3">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="8" y="8" width="32" height="32" rx="4"/><path d="M16 18v12M24 14v20M32 20v10"/><circle cx="16" cy="18" r="2"/><circle cx="24" cy="14" r="2"/><circle cx="32" cy="20" r="2"/>
+                    </svg>
+                </div>
+                <h3>LoRA / LoKR 训练</h3>
+                <p>训练专属音色与风格，可视化数据集构建器，显存优化最低即可训练，LoRA/LoKR 适配器一键加载复用。</p>
+            </div>
+            <div class="feature-card" data-delay="4">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="10" width="36" height="28" rx="3"/><path d="M14 18l8 5-8 5V18z" fill="currentColor" opacity="0.3"/><path d="M28 20h8M28 26h8M28 32h5"/>
+                    </svg>
+                </div>
+                <h3>内置创作工具</h3>
+                <p>音频编辑器、Demucs 人声分离、10 种视频可视化预设、自动专辑封面，一站式完成从创作到发布的全部工序。</p>
+            </div>
+            <div class="feature-card" data-delay="5">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 32c0 0-3-9 4-9s4 6 8 6 5-9 11-9"/><circle cx="14" cy="23" r="2"/><circle cx="22" cy="29" r="2"/><circle cx="33" cy="20" r="2"/>
+                    </svg>
+                </div>
+                <h3>音乐库 & 播放器</h3>
+                <p>类似 Spotify 的浏览、搜索、收藏与播放列表管理，底部专业播放器带波形可视化、进度拖拽与音量控制。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 为什么选择云集 -->
+<section class="section advantages" id="advantages">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">WHY CHOOSE US</span>
+            <h2 class="section-title">为什么要选云集</h2>
+            <p class="section-desc">同样能写出好歌，云集让你的创作真正属于你</p>
+        </div>
+
+        <div class="adv-grid">
+            <div class="adv-item">
+                <div class="adv-number">01</div>
+                <div class="adv-content">
+                    <h3>完全免费</h3>
+                    <p>Suno / Udio 每月需 $10–50 订阅，云集智能音乐创意台本地运行，<strong>零订阅费</strong>，永久免费使用。</p>
+                </div>
+            </div>
+            <div class="adv-item">
+                <div class="adv-number">02</div>
+                <div class="adv-content">
+                    <h3>100% 本地运行</h3>
+                    <p>推理全部在你的 GPU 上完成，无需上传素材到云端，<strong>隐私无忧</strong>，断网也能创作。</p>
+                </div>
+            </div>
+            <div class="adv-item">
+                <div class="adv-number">03</div>
+                <div class="adv-content">
+                    <h3>版权完全归你</h3>
+                    <p>生成的作品<strong>完全归您所有</strong>，不受云端平台受限许可约束，可自由发布与传播。</p>
+                </div>
+            </div>
+            <div class="adv-item">
+                <div class="adv-number">04</div>
+                <div class="adv-content">
+                    <h3>无限制可商用</h3>
+                    <p>无排队限制、无生成次数上限，<strong>商用无任何限制</strong>，从 demo 到正式发行一路畅通。</p>
+                </div>
+            </div>
+            <div class="adv-item">
+                <div class="adv-number">05</div>
+                <div class="adv-content">
+                    <h3>完全可控</h3>
+                    <p>支持参考音频、局部重绘、种子复现与自定义训练，每一个参数都<strong>掌握在你手中</strong>。</p>
+                </div>
+            </div>
+            <div class="adv-item">
+                <div class="adv-number">06</div>
+                <div class="adv-content">
+                    <h3>四语言界面</h3>
+                    <p>中 / 英 / 日 / 韩 四语界面随时切换，界面、文档与社区<strong>全球创作者通用</strong>。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="compare-wrap">
+            <h3 class="compare-title">云集 vs 主流云端音乐 AI</h3>
+            <div class="compare-table">
+                <div class="compare-row compare-head">
+                    <div class="compare-cell">对比项</div>
+                    <div class="compare-cell">Suno / Udio</div>
+                    <div class="compare-cell compare-us">云集智能音乐创意台</div>
+                </div>
+                <div class="compare-row">
+                    <div class="compare-cell">费用</div>
+                    <div class="compare-cell">$10–50 / 月</div>
+                    <div class="compare-cell compare-us"><strong>完全免费</strong></div>
+                </div>
+                <div class="compare-row">
+                    <div class="compare-cell">隐私</div>
+                    <div class="compare-cell">云端处理</div>
+                    <div class="compare-cell compare-us"><strong>100% 本地运行</strong></div>
+                </div>
+                <div class="compare-row">
+                    <div class="compare-cell">版权</div>
+                    <div class="compare-cell">受限许可</div>
+                    <div class="compare-cell compare-us"><strong>作品完全归您所有</strong></div>
+                </div>
+                <div class="compare-row">
+                    <div class="compare-cell">自定义</div>
+                    <div class="compare-cell">有限</div>
+                    <div class="compare-cell compare-us"><strong>完全可控</strong></div>
+                </div>
+                <div class="compare-row">
+                    <div class="compare-cell">生成限制</div>
+                    <div class="compare-cell">有排队限制</div>
+                    <div class="compare-cell compare-us"><strong>无限制</strong></div>
+                </div>
+                <div class="compare-row">
+                    <div class="compare-cell">商用</div>
+                    <div class="compare-cell">需高级套餐</div>
+                    <div class="compare-cell compare-us"><strong>无任何限制</strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 产品展示 -->
+<section class="section showcase" id="showcase">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">PRODUCT SHOWCASE</span>
+            <h2 class="section-title">产品展示</h2>
+            <p class="section-desc">简洁直观的操作界面，专业级音乐创作体验</p>
+        </div>
+
+        <div class="showcase-gallery">
+            <div class="gallery-main">
+                <div class="gallery-frame">
+                    <div class="film-strip film-top">
+                        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <div class="gallery-viewport" id="galleryViewport">
+
+                        <!-- 1. 创作工作台 -->
+                        <div class="gallery-screen active" data-index="0">
+                            <div class="mock mock-studio">
+                                <div class="mock-side">
+                                    <div class="mock-logo">♪ 云集</div>
+                                    <div class="mock-nav"><span class="on">创作</span><span>风格库</span><span>音乐库</span><span>训练</span></div>
+                                </div>
+                                <div class="mock-main">
+                                    <div class="mock-prompt">
+                                        <label>用一句话描述你的音乐</label>
+                                        <div class="mock-input">一首关于夏日冒险的欢快流行歌曲，带朗朗上口的旋律</div>
+                                    </div>
+                                    <div class="mock-tags">
+                                        <span>Pop</span><span>Upbeat</span><span>Acoustic</span><span>120 BPM</span><span>C major</span>
+                                    </div>
+                                    <div class="mock-actions">
+                                        <button class="mock-btn">生成音乐</button>
+                                        <button class="mock-btn ghost">批量 ×4</button>
+                                    </div>
+                                    <div class="mock-wave">
+                                        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. 风格库 -->
+                        <div class="gallery-screen" data-index="1">
+                            <div class="mock mock-styles">
+                                <div class="mock-bar">
+                                    <span class="mock-search">🔍 搜索 936 种风格…</span>
+                                    <span class="mock-count">936</span>
+                                </div>
+                                <div class="style-grid">
+                                    <span>Pop</span><span>Rock</span><span>EDM</span><span>Classical</span><span>Jazz</span><span>R&B</span><span>Hip-Hop</span><span>Folk</span><span>Lo-fi</span><span>Synthwave</span><span>Bossa Nova</span><span>Metal</span><span>K-Pop</span><span>Ambient</span><span>Reggae</span><span>Blues</span><span>Techno</span><span>Country</span><span>Anime</span><span>Orchestral</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. 音乐库 & 播放器 -->
+                        <div class="gallery-screen" data-index="2">
+                            <div class="mock mock-library">
+                                <div class="lib-head">🎵 我的音乐库</div>
+                                <div class="lib-list">
+                                    <div class="lib-item"><span class="lib-cover a"></span><div><b>夏日冒险</b><small>Pop · 3:24</small></div><span class="lib-play">▶</span></div>
+                                    <div class="lib-item"><span class="lib-cover b"></span><div><b>午夜霓虹</b><small>Synthwave · 4:02</small></div><span class="lib-play">▶</span></div>
+                                    <div class="lib-item"><span class="lib-cover c"></span><div><b>山间清晨</b><small>Folk · 2:48</small></div><span class="lib-play">▶</span></div>
+                                    <div class="lib-item"><span class="lib-cover d"></span><div><b>City Flow</b><small>Lo-fi · 3:11</small></div><span class="lib-play">▶</span></div>
+                                </div>
+                                <div class="lib-player">
+                                    <div class="lp-cover"></div>
+                                    <div class="lp-info"><b>夏日冒险</b><small>正在播放</small></div>
+                                    <div class="lp-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                                    <div class="lp-time">1:12 / 3:24</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. 训练工作台（实拍图） -->
+                        <div class="gallery-screen" data-index="3">
+                            <img src="./image/train.jpg" alt="LoRA 训练工作台" class="gallery-shot">
+                        </div>
+
+                        <!-- 5. 视频可视化 -->
+                        <div class="gallery-screen" data-index="4">
+                            <div class="mock mock-viz">
+                                <div class="viz-title">视频生成器 · 10 种预设</div>
+                                <div class="viz-grid">
+                                    <span>NCS Circle</span><span>Linear Bars</span><span>Dual Mirror</span><span>Center Wave</span><span>Orbital</span><span>Digital Rain</span><span>Hexagon</span><span>Shockwave</span><span>Oscilloscope</span><span>Minimal</span>
+                                </div>
+                                <div class="viz-fx">特效：抖动 · 故障风 · VHS · CCTV · 扫描线 · 色差 · 光晕 · 胶片颗粒 · 像素化 · 频闪</div>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="film-strip film-bottom">
+                        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+            <div class="gallery-thumbs" id="galleryThumbs">
+                <button class="thumb active" data-index="0">创作工作台</button>
+                <button class="thumb" data-index="1">风格库</button>
+                <button class="thumb" data-index="2">音乐库 & 播放器</button>
+                <button class="thumb" data-index="3">训练工作台</button>
+                <button class="thumb" data-index="4">视频可视化</button>
+            </div>
+        </div>
+
+        <!-- 训练实拍图集 -->
+        <div class="shot-grid">
+            <a class="shot-card" href="./image/model-select.jpg" target="_blank"><img src="./image/model-select.jpg" alt="选择模型加载"><span>选择模型加载</span></a>
+            <a class="shot-card" href="./image/preview-dataset.jpg" target="_blank"><img src="./image/preview-dataset.jpg" alt="预览数据集"><span>预览数据集</span></a>
+            <a class="shot-card" href="./image/label-data.jpg" target="_blank"><img src="./image/label-data.jpg" alt="标注数据"><span>标注数据</span></a>
+            <a class="shot-card" href="./image/key-bpm.jpg" target="_blank"><img src="./image/key-bpm.jpg" alt="Key / BPM 检测"><span>Key / BPM 检测</span></a>
+        </div>
+    </div>
+</section>
+
+<!-- 技术架构 -->
+<section class="section tech" id="tech">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">TECH STACK</span>
+            <h2 class="section-title">技术架构</h2>
+            <p class="section-desc">现代开源技术栈，本地优先、云端可选</p>
+        </div>
+        <div class="tech-grid">
+            <div class="tech-card">
+                <div class="tech-layer">前端</div>
+                <div class="tech-name">React 19 · TypeScript</div>
+                <p>Vite + TailwindCSS 构建的类 Spotify 专业界面，流畅交互与响应式布局。</p>
+            </div>
+            <div class="tech-card">
+                <div class="tech-layer">后端</div>
+                <div class="tech-name">Express.js · SQLite</div>
+                <p>better-sqlite3 本地优先存储，无需云端即可管理曲目、参数与播放列表。</p>
+            </div>
+            <div class="tech-card">
+                <div class="tech-layer">AI 引擎</div>
+                <div class="tech-name">ACE-Step 1.5</div>
+                <p>开源 AI 音乐生成模型，本地 GPU 推理，支持文生音乐与自定义训练。</p>
+            </div>
+            <div class="tech-card">
+                <div class="tech-layer">音频工具</div>
+                <div class="tech-name">AudioMass · Demucs · FFmpeg</div>
+                <p>网页音频编辑、人声/伴奏分离、格式与转码处理，一站式创作流水线。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 发展路线 -->
+<section class="section roadmap" id="roadmap">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">ROADMAP</span>
+            <h2 class="section-title">发展路线</h2>
+            <p class="section-desc">从本地桌面到开放生态，让每个人都能创作音乐</p>
+        </div>
+        <div class="timeline">
+            <div class="timeline-item current">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <span class="timeline-phase">Phase 1</span>
+                    <h3>Windows 桌面客户端</h3>
+                    <p>Windows 桌面应用，本地 AI 推理，一键部署，免费开放。当前已上线，持续迭代中。</p>
+                    <div class="timeline-tags">
+                        <span class="tl-tag active">已上线</span>
+                        <span class="tl-tag">Windows</span>
+                        <span class="tl-tag">本地推理</span>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <span class="timeline-phase">Phase 2</span>
+                    <h3>训练与协作增强</h3>
+                    <p>强化 LoRA/LoKR 训练体验，引入模型/风格分享，让创作者沉淀并复用专属音色。</p>
+                    <div class="timeline-tags">
+                        <span class="tl-tag">规划中</span>
+                        <span class="tl-tag">模型分享</span>
+                        <span class="tl-tag">风格市场</span>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <span class="timeline-phase">Phase 3</span>
+                    <h3>多平台覆盖</h3>
+                    <p>macOS 与 Linux 客户端陆续上线，云端推理作为本地算力的补充，随时随地创作。</p>
+                    <div class="timeline-tags">
+                        <span class="tl-tag">规划中</span>
+                        <span class="tl-tag">macOS</span>
+                        <span class="tl-tag">Linux</span>
+                    </div>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <span class="timeline-phase">Phase 4</span>
+                    <h3>平台生态</h3>
+                    <p>模型市场、模板市场与 API 开放平台，构建 AI 音乐创作生态，赋能更多创作者与开发者。</p>
+                    <div class="timeline-tags">
+                        <span class="tl-tag">远期规划</span>
+                        <span class="tl-tag">模型市场</span>
+                        <span class="tl-tag">API 开放</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 下载区域 -->
+<section class="section download" id="download">
+    <div class="container">
+        <div class="download-card">
+            <div class="download-glow"></div>
+            <div class="download-content">
+                <div class="download-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <path d="M7 10l5 5 5-5"/>
+                        <path d="M12 15V3"/>
+                    </svg>
+                </div>
+                <h2>免费下载，即刻开始创作</h2>
+                <p>云集智能音乐创意台完全免费提供给用户下载使用<br>Windows 10/11，NVIDIA GPU（最低 4GB 显存）</p>
+                <div class="download-buttons">
+                    <a href="https://github.com/sdbds/ACE-Step-1.5-for-windows" target="_blank" rel="noopener" class="btn btn-primary btn-xl">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        下载 Windows 版本
+                    </a>
+                </div>
+                <div class="download-meta">
+                    <span>最新版本：v2.8.3</span>
+                    <span class="meta-dot">|</span>
+                    <span>Windows 10/11</span>
+                    <span class="meta-dot">|</span>
+                    <span>免费使用</span>
+                </div>
+                <div class="download-notice">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                    内置 Python 环境与依赖，解压即用；首次启动将自动部署 AI 引擎（约 5GB 模型）
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 页脚 -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <img src="./favicon.ico" alt="云集" class="footer-logo">
+                <span class="footer-title">云集智能音乐创意台</span>
+            </div>
+            <div class="footer-links">
+                <a href="#features">核心功能</a>
+                <a href="#advantages">为什么选云集</a>
+                <a href="#showcase">产品展示</a>
+                <a href="#tech">技术架构</a>
+                <a href="#roadmap">发展路线</a>
+                <a href="#download">免费下载</a>
+            </div>
+            <a href="https://yunjii.cn" target="_blank" rel="noopener" class="footer-home">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                访问官网
+            </a>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 武汉市云集智能科技有限公司 版权所有</p>
+            <p>基于 <a href="https://github.com/ace-step/ACE-Step-1.5" target="_blank" rel="noopener">ACE-Step 1.5</a> 开源引擎构建 · MIT License</p>
+        </div>
+    </div>
+</footer>
+
+<script src="./js/main.js"></script>
+</body>
+</html>

@@ -374,3 +374,7 @@ ehthumbs.db
 
 # Windows special device files
 nul
+
+# Local artifacts (not source)
+web-pack.7z
+dev/app/lora_state.json

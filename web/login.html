@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 云集智能音乐创意台（预览）</title>
+    <link rel="shortcut icon" href="./favicon.ico">
+    <style>
+        :root {
+            --violet: #8B5CF6;
+            --violet-soft: rgba(139, 92, 246, 0.15);
+            --violet-glow: rgba(139, 92, 246, 0.45);
+            --bg: #0a0a0f;
+            --card: #14141c;
+            --card-border: #26263a;
+            --text: #ece9f5;
+            --muted: #9a96b3;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+        body::before {
+            content: "";
+            position: absolute;
+            width: 620px; height: 620px;
+            background: radial-gradient(circle, var(--violet-glow) 0%, transparent 70%);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            filter: blur(40px);
+            opacity: 0.5;
+            z-index: 0;
+        }
+        .login-card {
+            position: relative;
+            z-index: 1;
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 44px 36px 36px;
+            width: 380px;
+            max-width: calc(100vw - 32px);
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px var(--violet-soft) inset;
+        }
+        .login-logo {
+            width: 56px; height: 56px;
+            border-radius: 14px;
+            margin: 0 auto 18px;
+            display: block;
+            box-shadow: 0 0 24px var(--violet-glow);
+        }
+        .login-title { font-size: 21px; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px; }
+        .login-title .accent { color: var(--violet); }
+        .login-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 26px; }
+        .qrcode-wrap {
+            background: #1c1c28;
+            border: 2px solid var(--violet);
+            border-radius: 14px;
+            padding: 14px;
+            display: inline-block;
+            margin-bottom: 20px;
+            box-shadow: 0 0 18px var(--violet-soft);
+        }
+        .qrcode-wrap svg { display: block; border-radius: 6px; background: #fff; }
+        .login-hint { font-size: 12px; color: #6f6b88; margin-top: 14px; line-height: 1.6; }
+        .login-hint a { color: var(--violet); text-decoration: none; }
+        .login-hint a:hover { text-decoration: underline; }
+        .back-home {
+            position: absolute;
+            top: 18px; left: 20px;
+            font-size: 13px;
+            color: var(--muted);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+        .back-home:hover { color: var(--violet); }
+        .preview-tag {
+            position: absolute;
+            top: 18px; right: 20px;
+            font-size: 11px;
+            color: var(--violet);
+            border: 1px solid var(--violet);
+            border-radius: 999px;
+            padding: 3px 10px;
+        }
+    </style>
+</head>
+<body>
+    <a href="./index.html" class="back-home">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        返回首页
+    </a>
+    <span class="preview-tag">设计预览（无后端）</span>
+
+    <div class="login-card">
+        <img src="./favicon.ico" alt="云集" class="login-logo">
+        <div class="login-title">登录 <span class="accent">云集智能音乐创意台</span></div>
+        <div class="login-subtitle">微信扫一扫，快速登录你的创作账户</div>
+        <div class="qrcode-wrap">
+            <!-- 二维码为预览占位；部署后由 um.yunjii.cn 实时生成 -->
+            <svg width="200" height="200" viewBox="0 0 200 200" shape-rendering="crispEdges" aria-label="二维码占位">
+                <rect width="200" height="200" fill="#fff"/>
+                <g fill="#0a0a0f">
+                    <rect x="10" y="10" width="50" height="50"/><rect x="20" y="20" width="30" height="30" fill="#fff"/><rect x="28" y="28" width="14" height="14"/>
+                    <rect x="140" y="10" width="50" height="50"/><rect x="150" y="20" width="30" height="30" fill="#fff"/><rect x="158" y="28" width="14" height="14"/>
+                    <rect x="10" y="140" width="50" height="50"/><rect x="20" y="150" width="30" height="30" fill="#fff"/><rect x="28" y="158" width="14" height="14"/>
+                    <rect x="80" y="10" width="10" height="10"/><rect x="100" y="20" width="10" height="10"/><rect x="120" y="10" width="10" height="10"/>
+                    <rect x="80" y="40" width="10" height="10"/><rect x="110" y="50" width="10" height="10"/>
+                    <rect x="10" y="80" width="10" height="10"/><rect x="30" y="90" width="10" height="10"/><rect x="50" y="80" width="10" height="10"/><rect x="70" y="100" width="10" height="10"/>
+                    <rect x="90" y="80" width="10" height="10"/><rect x="110" y="90" width="10" height="10"/><rect x="130" y="80" width="10" height="10"/><rect x="150" y="100" width="10" height="10"/>
+                    <rect x="170" y="80" width="10" height="10"/><rect x="80" y="120" width="10" height="10"/><rect x="100" y="130" width="10" height="10"/><rect x="120" y="120" width="10" height="10"/>
+                    <rect x="140" y="140" width="10" height="10"/><rect x="160" y="150" width="10" height="10"/><rect x="180" y="130" width="10" height="10"/>
+                    <rect x="80" y="160" width="10" height="10"/><rect x="100" y="170" width="10" height="10"/><rect x="120" y="160" width="10" height="10"/><rect x="150" y="170" width="10" height="10"/><rect x="170" y="180" width="10" height="10"/>
+                </g>
+            </svg>
+        </div>
+        <div class="login-hint">
+            扫码即代表同意 <a href="#">用户协议</a> 和 <a href="#">隐私政策</a>
+        </div>
+    </div>
+</body>
+</html>
