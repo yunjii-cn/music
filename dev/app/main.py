@@ -6982,7 +6982,23 @@ for d in deps:
                 self.model_manager_widget.hide_progress()
         except Exception:
             pass
-        
+
+        if not success:
+            # 下载失败：之前只写隐藏日志，用户感知为『点击没反应』。
+            # 这里弹出明确提示，便于定位（venv 未就绪 / 网络不通 / 磁盘满等）。
+            try:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(
+                    self, "下载失败",
+                    f"模型「{model_name}」下载失败。\n\n"
+                    "请查看主界面下方的日志获取详细错误。常见原因：\n"
+                    "• 虚拟环境(Python)未就绪 —— 请先运行环境检测 / 初始化\n"
+                    "• 网络无法连接下载源（代理、防火墙、离线环境）\n"
+                    "• 磁盘空间不足"
+                )
+            except Exception:
+                pass
+
         if success:
             self.model_list = []
             try:

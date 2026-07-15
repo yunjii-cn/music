@@ -1968,7 +1968,11 @@ class ModelManagerDialog(QDialog):
                 btn_layout = QHBoxLayout()
                 btn_layout.setSpacing(4)
 
-                is_downloading = self.main_window.is_downloading and self.main_window.current_operation_model == model["name"]
+                # 下载中判定需同时匹配模型名与下载目标 dl_target：主模型组件实际以
+                # 下载目标 "main" 进行，main.current_operation_model 会是 "main" 而非组件名，
+                # 仅按 model["name"] 比对会让主组件的进度条/暂停按钮永远不显示。
+                _dl_target = "main" if model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B") else model["name"]
+                is_downloading = self.main_window.is_downloading and self.main_window.current_operation_model in (model["name"], _dl_target)
 
                 if is_downloading:
                     pause_btn = QPushButton("暂停")
@@ -2082,7 +2086,9 @@ class ModelManagerDialog(QDialog):
 
                     if not hasattr(self, '_model_progress_bars'):
                         self._model_progress_bars = {}
-                    self._model_progress_bars[model["name"]] = (progress_bar, progress_label)
+                    # 进度条以下载目标 _dl_target 为键，与 main._download_model 中
+                    # current_operation_model 的取值保持一致（主组件为 "main"）。
+                    self._model_progress_bars[_dl_target] = (progress_bar, progress_label)
 
                 self.models_layout.addWidget(model_item)
 
