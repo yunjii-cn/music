@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Song, Playlist } from '../types';
 import { usersApi, getAudioUrl, UserProfile as UserProfileType, songsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Play, Pause, Heart, Eye, Users, Music as MusicIcon, ChevronRight, Share2, MoreHorizontal, Edit3, X, Camera, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Eye, Users, Music as MusicIcon, ChevronRight, Share2, MoreHorizontal, Edit3, X, Camera, Image as ImageIcon, Upload, Loader2, LogOut } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 
 interface UserProfileProps {
@@ -19,7 +19,7 @@ interface UserProfileProps {
 
 export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPlaySong, onNavigateToProfile, onNavigateToPlaylist, currentSong, isPlaying, likedSongIds = new Set(), onToggleLike }) => {
     const { t, language } = useI18n();
-    const { user: currentUser, token } = useAuth();
+    const { user: currentUser, token, logout } = useAuth();
     const [profileUser, setProfileUser] = useState<UserProfileType | null>(null);
     const [publicSongs, setPublicSongs] = useState<Song[]>([]);
     const [publicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
@@ -374,15 +374,24 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                     </p>
                                 </div>
 
-                                {/* Edit Profile Button (Mobile/Desktop) */}
+                                {/* Edit Profile + Logout (Owner only) */}
                                 {isOwner && (
-                                    <button
-                                        onClick={() => setIsEditModalOpen(true)}
-                                        className="px-4 md:px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-full font-bold transition-colors text-sm flex items-center gap-2"
-                                    >
-                                        <Edit3 size={16} />
-                                        {t('editProfile')}
-                                    </button>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <button
+                                            onClick={() => setIsEditModalOpen(true)}
+                                            className="px-4 md:px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-full font-bold transition-colors text-sm flex items-center gap-2"
+                                        >
+                                            <Edit3 size={16} />
+                                            {t('editProfile')}
+                                        </button>
+                                        <button
+                                            onClick={logout}
+                                            className="px-4 md:px-6 py-2 border border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full font-bold transition-colors text-sm flex items-center gap-2"
+                                        >
+                                            <LogOut size={16} />
+                                            {t('signOut')}
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 

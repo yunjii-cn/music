@@ -149,24 +149,83 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QProcess, QPropertyAnimation, QRectF, pyqtProperty, QSize
 from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QAction, QKeySequence, QPainter, QPixmap, QLinearGradient
 
+# 品牌启动屏（与 installer.py 共享同一视觉：暗底 + 云标 + 渐变蓝条 + 缓动动画）
+from yunji_splash import BrandedSplash as SplashScreen, mark_splash_ready
+
 # Version manager - lazy imported
+
+# 品牌名 = self_relocate 创建的安装根目录名（与 launcher.py 的 BRAND 一致）
+BRAND_NAME = "云集智能音乐创意台"
+
+
+def get_install_root():
+    """返回安装根目录（含 app/data/ver/python_embeded 等的 云集智能音乐创意台/ 目录）。
+
+    统一 self_relocate 的自部署布局，避免不同代码路径对 app 位置各执一词：
+      - 打包运行：从 exe 位置逐级向上查找名为 BRAND_NAME 的目录
+        （exe 通常位于 <BRAND>/ver/*.exe 或 <BRAND>/*.exe）。找不到（尚未搬迁的
+        便携副本）则回退到 exe 所在目录，保证也能就地运行。
+      - 源码运行：返回 main.py 所在目录（dev/app）。
+    """
+    if getattr(sys, 'frozen', False):
+        # 就地运行（run-in-place，首次部署时由 launcher 设置）优先用该根目录，
+        # 避免 exe 仍在便携位置（如 Downloads）时把 app 建到同级目录。
+        env_root = os.environ.get("YUNJI_INSTALL_ROOT")
+        if env_root and os.path.isdir(env_root):
+            return env_root
+        exe_dir = os.path.abspath(os.path.dirname(sys.executable))
+        d = exe_dir
+        while True:
+            if os.path.basename(d) == BRAND_NAME:
+                return d
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+        return exe_dir
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def get_app_dir():
+    """应用文件夹：打包运行为 <安装根目录>/app；源码运行为 main.py 所在目录。"""
+    if getattr(sys, 'frozen', False):
+        return os.path.join(get_install_root(), "app")
+    return os.path.dirname(os.path.abspath(__file__))
+
 
 # Version based on executable filename
 def get_version_from_filename():
-    """从可执行文件名称中提取版本号；开发模式下追加 -dev 后缀"""
+    """从可执行文件名称中提取版本号。
+
+    优先级：
+      1) 版本化 exe（云集智能音乐创意台-v<版本>.exe）：直接取文件名中的 -v 版本。
+      2) 固定名入口（云集智能音乐创意台.exe）：文件名无 -v，回退读安装根目录
+         version.txt（由 launcher._self_relocate 部署时写入）。
+      3) 开发模式：追加 -dev 后缀。
+    """
     try:
-        if hasattr(sys, 'frozen'):
-            exe_path = sys.executable
-            exe_name = os.path.basename(exe_path)
-            import re
+        if getattr(sys, 'frozen', False):
+            exe_name = os.path.basename(sys.executable)
             match = re.search(r'v(\d+\.\d+\.\d+(?:\.\d+)?)', exe_name)
             if match:
                 return match.group(1)
+            # 固定名入口回退：读安装根目录 version.txt
+            try:
+                root = get_install_root()
+                vf = os.path.join(root, "version.txt")
+                if os.path.isfile(vf):
+                    with open(vf, "r", encoding="utf-8") as f:
+                        v = f.read().strip()
+                    if re.match(r'^\d+\.\d+\.\d+(?:\.\d+)?$', v):
+                        return v
+            except Exception:
+                pass
         return datetime.now().strftime("%Y.%m.%d.%H%M") + "-dev"
     except:
         return datetime.now().strftime("%Y.%m.%d.%H%M") + "-dev"
 
 VERSION = get_version_from_filename()
+
 
 # 项目定义
 PROJECTS = {
@@ -351,9 +410,9 @@ class ServiceProcess(QThread):
         """启动服务"""
         try:
             if hasattr(sys, '_MEIPASS'):
-                exe_dir = os.path.abspath(os.path.dirname(sys.executable))
-                script_path = os.path.join(exe_dir, "app", self.service_info["script"])
-                real_working_dir = os.path.join(exe_dir, "app")
+                app_dir = get_app_dir()
+                script_path = os.path.join(app_dir, self.service_info["script"])
+                real_working_dir = app_dir
             else:
                 script_path = os.path.join(working_dir, self.service_info["script"])
                 real_working_dir = working_dir
@@ -455,6 +514,42 @@ class ServiceProcess(QThread):
             return 0
 
 
+def find_venv_python(base_dir: str) -> str:
+    """统一查找虚拟环境 Python 路径，兼容多种目录结构（模块级函数，供线程与主窗口共用）"""
+    candidates = [
+        os.path.join(base_dir, "scripts", ".venv", "Scripts", "python.exe"),
+        os.path.join(base_dir, ".venv", "Scripts", "python.exe"),
+        os.path.join(base_dir, "app", "scripts", ".venv", "Scripts", "python.exe"),
+    ]
+    # 打包成单文件 exe 运行时，base_dir 可能被解析到 PyInstaller 临时目录/错误根目录，
+    # 此时上面的候选都找不到。额外回退推导 dev/app/scripts/.venv
+    # （标准布局：dist/*.exe 与 dev/app 处于同一父目录）。
+    if getattr(sys, 'frozen', False):
+        try:
+            exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+            candidates.append(os.path.join(exe_dir, "..", "dev", "app", "scripts", ".venv", "Scripts", "python.exe"))
+            candidates.append(os.path.join(exe_dir, "..", "..", "dev", "app", "scripts", ".venv", "Scripts", "python.exe"))
+        except Exception:
+            pass
+    for candidate in candidates:
+        norm = os.path.normpath(candidate)
+        if os.path.exists(norm):
+            return norm
+    return os.path.normpath(os.path.join(base_dir, "scripts", ".venv", "Scripts", "python.exe"))
+
+
+# 下载器子进程输出中属于“进度刷新”的行（tqdm 进度条 / 速度 / 百分比等），
+# 这类行刷新极快（约每秒一条）。运行日志只按固定间隔记录，避免刷屏。
+_DOWNLOAD_PROGRESS_RE = re.compile(
+    r"(\d+%|\bit/s\b|\bB/s\b|\bMB/s\b|\bkB/s\b|\bs/it\b|\[.*?<\s*.*?\])"
+)
+_DOWNLOAD_IMPORTANT_KEYWORDS = (
+    "error", "fail", "warn", "download", "verif", "complete", "success",
+    "ready", "====", "开始", "失败", "错误", "完成", "校验", "✓", "❌",
+)
+_DOWNLOAD_LOG_INTERVAL = 10.0  # 秒：进度类日志最小记录间隔
+
+
 class ModelDownloadThread(QThread):
     """模型下载线程 - 异步下载模型，避免UI阻塞"""
     log_received = pyqtSignal(str)
@@ -481,7 +576,7 @@ class ModelDownloadThread(QThread):
             self.progress_updated.emit(self.current_progress, "准备下载...")
             
             # 构建下载命令 - 使用虚拟环境中的Python
-            venv_python = self._find_venv_python()
+            venv_python = find_venv_python(self.base_dir)
             
             # 检查虚拟环境是否存在
             if not os.path.exists(venv_python):
@@ -532,12 +627,20 @@ class ModelDownloadThread(QThread):
             start_time = time.time()
             last_progress = self.current_progress
             
-            # 读取输出
+            # 读取输出（进度类行按固定间隔节流，关键行始终即时记录）
+            last_log_time = time.time()
             while self.process.poll() is None and not self._should_stop:
                 line = self.process.stdout.readline()
                 if line:
-                    self.log_received.emit(f"[模型下载] {line.strip()}")
-                    # 根据时间模拟进度
+                    clean = line.replace('\r', '').strip()
+                    if clean:
+                        now = time.time()
+                        is_progress = bool(_DOWNLOAD_PROGRESS_RE.search(clean))
+                        is_important = any(k in clean.lower() for k in _DOWNLOAD_IMPORTANT_KEYWORDS)
+                        if is_important or not is_progress or (now - last_log_time >= _DOWNLOAD_LOG_INTERVAL):
+                            self.log_received.emit(f"[模型下载] {clean}")
+                            last_log_time = now
+                    # 根据时间模拟进度（仅用于 UI 进度条，不影响日志频率）
                     elapsed = time.time() - start_time
                     if elapsed > 0.5:
                         # 随机增加进度
@@ -557,11 +660,13 @@ class ModelDownloadThread(QThread):
                             self.progress_updated.emit(int(self.current_progress), "下载中...")
                         start_time = time.time()
             
-            # 读取剩余的输出
+            # 读取剩余的输出（进程已结束，逐行完整记录）
             if not self._should_stop:
                 for line in self.process.stdout:
                     if line:
-                        self.log_received.emit(f"[模型下载] {line.strip()}")
+                        clean = line.replace('\r', '').strip()
+                        if clean:
+                            self.log_received.emit(f"[模型下载] {clean}")
             
             exit_code = self.process.poll()
             if exit_code == 0 and not self._should_stop:
@@ -610,7 +715,7 @@ class ModelDeleteThread(QThread):
         try:
             self.log_received.emit(f"开始删除模型: {self.model_name}")
             
-            venv_python = self._find_venv_python()
+            venv_python = find_venv_python(self.base_dir)
             
             if not os.path.exists(venv_python):
                 self.log_received.emit("[错误] 虚拟环境不存在")
@@ -1307,94 +1412,9 @@ class ServiceCard(QFrame):
             """)
 
 
-class SplashScreen(QSplashScreen):
-    def __init__(self):
-        pixmap = QPixmap(520, 360)
-        pixmap.fill(QColor("#0D0D0D"))
-        super().__init__(pixmap)
-        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint)
-        self._progress = 0.0
-        self._message = "正在初始化..."
-        self._icon_pixmap = None
-        try:
-            if hasattr(sys, '_MEIPASS'):
-                base = sys._MEIPASS
-            else:
-                base = os.path.dirname(os.path.abspath(__file__))
-            for name in ('icon.png', 'icon.ico'):
-                p = os.path.join(base, name)
-                if os.path.exists(p):
-                    if name.endswith('.ico'):
-                        self._icon_pixmap = QIcon(p).pixmap(QSize(256, 256))
-                    else:
-                        self._icon_pixmap = QPixmap(p)
-                    if not self._icon_pixmap.isNull():
-                        break
-        except Exception:
-            pass
-
-    def _get_progress(self):
-        return self._progress
-
-    def _set_progress(self, val):
-        self._progress = val
-        self.repaint()
-
-    progress = pyqtProperty(float, _get_progress, _set_progress)
-
-    def set_progress(self, value, message=""):
-        self._progress = value
-        if message:
-            self._message = message
-        self.repaint()
-
-    def drawContents(self, painter):
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        w, h = self.width(), self.height()
-        painter.fillRect(0, 0, w, h, QColor("#0D0D0D"))
-
-        if self._icon_pixmap:
-            icon_size = 80
-            scaled = self._icon_pixmap.scaled(icon_size, icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            ix = (w - scaled.width()) // 2
-            painter.drawPixmap(ix, 60, scaled)
-
-        painter.setPen(QColor("#F0F0F0"))
-        title_font = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
-        painter.setFont(title_font)
-        title = "云集智能音乐创意台"
-        fm = painter.fontMetrics()
-        tw = fm.horizontalAdvance(title)
-        painter.drawText((w - tw) // 2, 180, title)
-
-        bar_x, bar_y, bar_w, bar_h = 60, 240, w - 120, 10
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#222222"))
-        painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h), 5, 5)
-
-        fill_w = bar_w * min(self._progress, 1.0)
-        if fill_w > 0:
-            grad = QLinearGradient(bar_x, bar_y, bar_x + fill_w, bar_y)
-            grad.setColorAt(0, QColor("#1565C0"))
-            grad.setColorAt(1, QColor("#42A5F5"))
-            painter.setBrush(grad)
-            painter.drawRoundedRect(QRectF(bar_x, bar_y, fill_w, bar_h), 5, 5)
-
-        painter.setPen(QColor("#888888"))
-        msg_font = QFont("Microsoft YaHei", 10)
-        painter.setFont(msg_font)
-        msg = self._message
-        fm2 = painter.fontMetrics()
-        mw = fm2.horizontalAdvance(msg)
-        painter.drawText((w - mw) // 2, 275, msg)
-
-        pct = f"{int(min(self._progress, 1.0) * 100)}%"
-        painter.setPen(QColor("#42A5F5"))
-        pct_font = QFont("Microsoft YaHei", 9)
-        painter.setFont(pct_font)
-        fm3 = painter.fontMetrics()
-        pw = fm3.horizontalAdvance(pct)
-        painter.drawText((w - pw) // 2, 300, pct)
+# ── SplashScreen 已迁移至 yunji_splash.py（BrandedSplash）───
+# 本文件通过 from yunji_splash import BrandedSplash as SplashScreen 引入。
+# 安装器 installer.py 也复用同一组件，确保解压/启动两段进度条视觉一致。
 
 
 class MainWindow(QMainWindow):
@@ -1436,10 +1456,12 @@ class MainWindow(QMainWindow):
             pass
         
         if hasattr(sys, '_MEIPASS'):
-            self.base_dir = os.path.abspath(os.path.dirname(sys.executable))
-            app_dir = os.path.join(self.base_dir, 'app')
-            if os.path.exists(app_dir):
-                self.base_dir = app_dir
+            # 统一定位到安装根目录下的 app/（<品牌>/app），与 extract_scripts、ServiceProcess 一致
+            self.base_dir = get_app_dir()
+            try:
+                os.makedirs(self.base_dir, exist_ok=True)
+            except Exception:
+                pass
         else:
             self.base_dir = os.path.dirname(os.path.abspath(__file__))
             while not os.path.exists(os.path.join(self.base_dir, 'acestep')) and not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1')) and not os.path.exists(os.path.join(self.base_dir, 'scripts', 'install-env.ps1')):
@@ -1627,7 +1649,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.page_stack, 1)
         
         if self._splash:
-            self._splash.set_progress(0.2, "正在初始化框架...")
+            self._splash.set_progress(0.58, "正在初始化框架...")
     
     def _deferred_init(self):
         if self._home_loaded:
@@ -1641,10 +1663,10 @@ class MainWindow(QMainWindow):
             if app:
                 app.processEvents()
 
-        _pulse("正在加载配置...", 0.3)
+        _pulse("正在加载配置...", 0.65)
         self.config = ConfigManager(self.base_dir)
 
-        _pulse("正在检测浏览器...", 0.4)
+        _pulse("正在检测浏览器...", 0.72)
         self.browsers = self._detect_browsers()
         self.selected_browser = self.config.get("browser.default", "system")
         self.custom_browser_path = self.config.get("browser.custom_path", "")
@@ -1652,7 +1674,7 @@ class MainWindow(QMainWindow):
             self.browsers["自定义浏览器"] = self.custom_browser_path
         self.selected_download_source = self.config.get("download.source", "auto")
 
-        _pulse("正在构建主界面...", 0.5)
+        _pulse("正在构建主界面...", 0.8)
 
         while self.home_layout.count():
             item = self.home_layout.takeAt(0)
@@ -1661,7 +1683,7 @@ class MainWindow(QMainWindow):
 
         self._populate_home_page(_pulse)
 
-        _pulse("正在启动监控...", 0.75)
+        _pulse("正在启动监控...", 0.9)
         self._setup_monitor()
         self._setup_tray()
 
@@ -1670,8 +1692,37 @@ class MainWindow(QMainWindow):
 
         self._home_loaded = True
 
-        _pulse("加载完成！", 1.0)
+        # 软件已“充分加载、能快速显示”：把主窗口显示出来（在启动屏之下渲染），
+        # “进度到达 100%”的判定标准就是此刻——已充分加载可快速显示。
+        try:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+        except Exception:
+            pass
+
+        if self._splash:
+            # 让进度条“丝滑”推进到 100%——reached_full 由动画计时器在 _display
+            # 真正逼近 1.0 时才发出，此刻再收起启动屏，避免进度条突兀消失。
+            try:
+                self._splash.reached_full.disconnect()
+            except Exception:
+                pass
+            self._splash.reached_full.connect(self._finish_splash_once)
+            self._splash.set_progress(1.0, "加载完成！")
+        if app:
+            app.processEvents()
     
+    def _finish_splash_once(self):
+        """进度条丝滑到 100% 后收起启动屏（只执行一次）。"""
+        sp = self._splash
+        if sp is None:
+            return
+        try:
+            sp.finish(self)
+        except Exception:
+            pass
+
     def _populate_home_page(self, _pulse=None):
         """填充首页内容到已有的home_layout"""
         
@@ -4658,27 +4709,8 @@ try {
                 self._log(f"⚠️ 脚本不存在: {script_name}", "#FF9800")
     
     def _find_venv_python(self):
-        """统一查找虚拟环境 Python 路径，兼容多种目录结构"""
-        candidates = [
-            os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe"),
-            os.path.join(self.base_dir, ".venv", "Scripts", "python.exe"),
-            os.path.join(self.base_dir, "app", "scripts", ".venv", "Scripts", "python.exe"),
-        ]
-        # 打包成单文件 exe 运行时，base_dir 可能被解析到 PyInstaller 临时目录/错误根目录，
-        # 此时上面的候选都找不到。额外回退推导 dev/app/scripts/.venv
-        # （标准布局：dist/*.exe 与 dev/app 处于同一父目录）。
-        if getattr(sys, 'frozen', False):
-            try:
-                exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-                candidates.append(os.path.join(exe_dir, "..", "dev", "app", "scripts", ".venv", "Scripts", "python.exe"))
-                candidates.append(os.path.join(exe_dir, "..", "..", "dev", "app", "scripts", ".venv", "Scripts", "python.exe"))
-            except Exception:
-                pass
-        for candidate in candidates:
-            norm = os.path.normpath(candidate)
-            if os.path.exists(norm):
-                return norm
-        return os.path.normpath(os.path.join(self.base_dir, "scripts", ".venv", "Scripts", "python.exe"))
+        """统一查找虚拟环境 Python 路径（委托给模块级函数，兼容多种目录结构）"""
+        return find_venv_python(self.base_dir)
     
     def _check_deploy_env(self):
         """检测部署环境各步骤状态"""
@@ -7648,10 +7680,12 @@ def extract_scripts():
     from pathlib import Path
     
     if getattr(sys, 'frozen', False):
-        base_path = Path(sys._MEIPASS)
-        work_dir = Path.cwd()
-        app_dir = work_dir / "app"
-        app_dir.mkdir(exist_ok=True)
+        # onedir 模式下无 sys._MEIPASS，回退到 exe 所在目录（7z 已解压到此处）
+        _meipass = getattr(sys, '_MEIPASS', None)
+        base_path = Path(_meipass) if _meipass else Path(os.path.dirname(os.path.abspath(sys.executable)))
+        # 统一写入安装根目录下的 app/（不再用 CWD，避免在安装目录同级生成多余的 app）
+        app_dir = Path(get_app_dir())
+        app_dir.mkdir(parents=True, exist_ok=True)
         
         scripts_dir = app_dir / "scripts"
         scripts_dir.mkdir(exist_ok=True)
@@ -7740,7 +7774,75 @@ def _kill_old_instances_async():
         pass
 
 
+def _do_startup_cleanup(cleanup_target):
+    """启动成功后清理：删除首次运行前的原始（便携）exe。
+
+    两种清理来源（对齐用户描述与视频站自部署行为）：
+      1) --cleanup=<path>：搬迁时传入的原始 exe 精确路径，直接删除。
+      2) 同级目录扫描：若安装目录（<同级>/云集智能音乐创意台/）的同级目录中
+         存在含品牌名的 exe（即用户最初下载的便携副本），一并删除。
+    仅在本进程由 --cleanup 触发时执行，避免误删用户其他位置的副本。
+    """
+    try:
+        BRAND = "云集智能音乐创意台"
+        own = os.path.abspath(sys.executable)
+        # 1) 精确删除 --cleanup 指定的原始 exe
+        if cleanup_target and os.path.isfile(cleanup_target):
+            try:
+                if os.path.normpath(cleanup_target) != own:
+                    os.remove(cleanup_target)
+            except Exception:
+                pass
+        # 2) 扫描安装目录的同级目录，删除含品牌名的便携副本
+        exe_dir = os.path.dirname(own)
+        # 向上找到名为 BRAND 的安装目录
+        deploy_dir = exe_dir
+        while deploy_dir and os.path.basename(deploy_dir) != BRAND:
+            deploy_dir = os.path.dirname(deploy_dir)
+        if not deploy_dir:
+            return
+        sibling = os.path.dirname(deploy_dir)   # 原始下载所在目录
+        if not sibling or not os.path.isdir(sibling):
+            return
+        for f in os.listdir(sibling):
+            if not f.lower().endswith(".exe") or BRAND not in f:
+                continue
+            fp = os.path.join(sibling, f)
+            if os.path.normpath(fp) == own:
+                continue
+            # 保护安装目录内的 exe（ver/ 副本与入口 exe）
+            if os.path.normpath(fp).startswith(os.path.normpath(deploy_dir)):
+                continue
+            try:
+                os.remove(fp)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _force_close_splash(window, splash):
+    """安全网：极端情况下若初始化异常未能关闭启动屏，强制收尾。
+
+    （main() 中已用 60s QTimer 调度此函数）
+    """
+    try:
+        if window:
+            window.show()
+        if splash:
+            splash.finish(window)
+    except Exception:
+        pass
+
+
 def main(app=None, splash=None):
+    # 解析自部署清理参数：删除首次运行前的原始（便携）exe
+    cleanup_target = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--cleanup="):
+            cleanup_target = arg[len("--cleanup="):]
+            sys.argv.remove(arg)
+            break
     # Kill old instances FIRST (protects against stale orphaned processes)
     _kill_old_instances_sync()
     # Now claim the singleton mutex — if another process already holds it, exit
@@ -7754,20 +7856,21 @@ def main(app=None, splash=None):
     
     if app is None:
         app = QApplication(sys.argv)
-        app.setQuitOnLastWindowClosed(False)
-        app.setStyle('Fusion')
-        
-        palette = QPalette()
-        palette.setColor(QPalette.ColorRole.Window, QColor("#0D0D0D"))
-        palette.setColor(QPalette.ColorRole.WindowText, QColor("#F0F0F0"))
-        palette.setColor(QPalette.ColorRole.Base, QColor("#1A1A1A"))
-        palette.setColor(QPalette.ColorRole.Text, QColor("#F0F0F0"))
-        palette.setColor(QPalette.ColorRole.Button, QColor("#1A1A1A"))
-        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F0F0F0"))
-        app.setPalette(palette)
-        
-        font = QFont("Microsoft YaHei", 10)
-        app.setFont(font)
+
+    app.setQuitOnLastWindowClosed(False)
+    app.setStyle('Fusion')
+
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#0D0D0D"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#F0F0F0"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#1A1A1A"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#F0F0F0"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#1A1A1A"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#F0F0F0"))
+    app.setPalette(palette)
+
+    font = QFont("Microsoft YaHei", 10)
+    app.setFont(font)
     
     if splash is None:
         splash = SplashScreen()
@@ -7778,21 +7881,44 @@ def main(app=None, splash=None):
     splash.move(x, y)
     splash.show()
     splash.repaint()
+    # 通知独立启动屏子进程：品牌进度条已就位，可以淡出交替。
+    # 用 QTimer.singleShot(0) 把哨兵写入推迟到事件循环启动后——此时进度条
+    # 真正开始动画（而非刚 show() 的冻结态），「正在自动安装」再淡出，
+    # 避免黑屏空档。仅当由 launcher 带 --splash-child 拉起时该环境变量才
+    # 存在；直跑本模块时为 no-op。
+    _pr = os.environ.get("YUNJI_PROGRESS_READY")
+    if _pr:
+        def _mark_progress_ready():
+            try:
+                with open(_pr, "w", encoding="utf-8") as _f:
+                    _f.write("1")
+            except Exception:
+                pass
+        QTimer.singleShot(0, _mark_progress_ready)
     app.processEvents()
-    
-    try:
-        import pyi_splash
-        pyi_splash.close()
-    except Exception:
-        pass
-    
-    splash.set_progress(0.1, "正在创建主窗口...")
+
+    # 前半段（含解压）的真实进度条由 7z SFX 负责——双击 exe 后 7z 用
+    # 清晰进度条解压出 onedir 文件夹并自动运行本程序，对应「前 50%」。
+    # 此处 #2（PyQt 进度条）从 50% 接棒，完成「剩下的 50%」加载（0.5 → 1.0），
+    # 与主界面丝滑衔接、无突跳、无多余启动屏。
+    splash.set_progress(0.5, "正在创建主窗口...")
     app.processEvents()
 
     window = MainWindow(splash=splash)
 
-    window.show()
-    splash.finish(window)
+    # 此处不显示主窗口、也不关闭启动屏：MainWindow._deferred_init 在事件循环
+    # 启动后按真实加载阶段把进度目标从 0.1 推到 0.75，待“软件已充分加载、
+    # 可快速显示”时 self.show() 显示主窗口，再把目标设到 1.0 让进度条丝滑补满，
+    # reached_full 触发 finish() 收起启动屏——进度到达 100% 即界面出现，且全程平滑。
+    if splash:
+        splash.raise_()   # 保持启动屏在最前，避免主窗口先闪出
+
+    # 安全网：极端情况下若初始化异常未能关闭启动屏，60s 后强制收尾
+    if splash:
+        QTimer.singleShot(60000, lambda: _force_close_splash(window, splash))
+
+    if cleanup_target:
+        QTimer.singleShot(1500, lambda: _do_startup_cleanup(cleanup_target))
 
     sys.exit(app.exec())
 

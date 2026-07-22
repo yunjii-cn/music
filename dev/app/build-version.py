@@ -193,7 +193,7 @@ def build_exe():
     pyinstaller_args = [
         sys.executable, "-m", "PyInstaller",
         "--name", release_name,
-        "--onefile", "--console",
+        "--onefile", "--windowed",
         "--icon", icon_path,
         "--distpath", str(BUILD_DIR),
         "--workpath", str(BUILD_DIR / "_pyinstaller_work"),
@@ -224,6 +224,9 @@ def build_exe():
         "--exclude-module", "psutil._psosx",
         "--exclude-module", "psutil._psbsd",
         "--exclude-module", "psutil._pssunos",
+        # 启动画面 pyi_splash 在用户 Windows 上会因 _PYI_SPLASH_IPC 连接失败
+        # 直接崩掉整个 exe（KeyError: '_PYI_SPLASH_IPC'）。彻底排除该模块。
+        "--exclude-module", "pyi_splash",
     ]
 
     if os.path.exists(icon_path):
@@ -235,15 +238,36 @@ def build_exe():
         pyinstaller_args.extend(["--add-data", f"{icon_png};."])
         print(f"  已添加图标PNG: {icon_png}")
 
+    logo_png = str(ROOT_DIR / "logo.png")
+    if os.path.exists(logo_png):
+        pyinstaller_args.extend(["--add-data", f"{logo_png};."])
+        print(f"  已添加品牌LOGO: {logo_png}")
+
+    # 关键：把 main.py 自身也打进 exe（--add-data，作为数据文件随 exe 释放到
+    # _MEI 目录）。否则运行时 import main 依赖磁盘上的松文件 app/main.py，
+    # 轻量构建不拷贝 app/ 时会命中旧版、launcher 的进度条就绪哨兵逻辑不生效。
+    # import main 在 launcher 里执行时 app/ 尚未入 sys.path，故打包这份必然优先命中。
+    main_py = ROOT_DIR / "main.py"
+    if main_py.exists():
+        pyinstaller_args.extend(["--add-data", f"{str(main_py)};."])
+        print(f"  已打包应用主体: {main_py}")
+
+    ico_png = str(ROOT_DIR / "ico.png")
+    if os.path.exists(ico_png):
+        pyinstaller_args.extend(["--add-data", f"{ico_png};."])
+        print(f"  已添加品牌LOGO(ico.png): {ico_png}")
+
     qt_conf = ROOT_DIR / "qt.conf"
     if qt_conf.exists():
         pyinstaller_args.extend(["--add-data", f"{str(qt_conf)};PyQt6/Qt6"])
         print(f"  已添加Qt配置: {qt_conf}")
 
+    # 启动画面（--splash）在用户 Windows + PyInstaller 6.20.0 上会导致
+    # _PYI_SPLASH_IPC 连接失败、整个 exe 崩溃（KeyError: '_PYI_SPLASH_IPC'）。
+    # 启动画面仅为装饰，去掉不影响应用打开，故不再注入。
     splash_path = ROOT_DIR / "splash.png"
     if splash_path.exists():
-        pyinstaller_args.extend(["--splash", str(splash_path)])
-        print(f"  已添加启动画面: {splash_path}")
+        print(f"  跳过启动画面（splash.png 存在但已禁用，避免 _PYI_SPLASH_IPC 崩溃）")
 
     vh_file = ROOT_DIR / "version_history.json"
     if vh_file.exists():

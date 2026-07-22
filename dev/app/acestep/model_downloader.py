@@ -452,6 +452,55 @@ def _get_directory_size(directory: Path) -> int:
     return total_size
 
 
+def _required_file_present(model_path: Path, required_file: str) -> bool:
+    """Check whether a required file is present, tolerant to real repo layouts.
+
+    The validation manifest lists canonical file names (e.g. "model.safetensors",
+    "modeling_acestep_v15_xl.py"), but real HuggingFace repos may differ:
+
+    * Large models ship *sharded* weights: instead of a single
+      ``model.safetensors`` there are ``model-00001-of-000NN.safetensors`` shards
+      plus a ``model.safetensors.index.json``. Requiring the single-file name
+      would wrongly report the model as incomplete even after a 100% download.
+    * The custom modeling module may be named per-variant
+      (``modeling_acestep_v15_xl_base.py`` vs the manifest's
+      ``modeling_acestep_v15_xl.py``).
+
+    This matcher accepts these equivalent layouts so that a fully-downloaded
+    model is not falsely flagged as "missing files".
+    """
+    # 1) Exact match wins.
+    if (model_path / required_file).exists():
+        return True
+
+    try:
+        # 2) Sharded safetensors: a monolithic "model.safetensors" is satisfied
+        #    by an index.json + at least one shard.
+        if required_file.endswith(".safetensors") and not required_file.endswith(".index.json"):
+            index_json = model_path / (required_file + ".index.json")  # model.safetensors.index.json
+            shards = list(model_path.glob("*-of-*.safetensors"))
+            if index_json.exists() and shards:
+                return True
+            # Any single-part *.safetensors also satisfies a generic weight requirement.
+            if list(model_path.glob("*.safetensors")):
+                return True
+
+        # 3) A required weight index is satisfied by any *.index.json present.
+        if required_file.endswith(".index.json"):
+            if list(model_path.glob("*.index.json")):
+                return True
+
+        # 4) Custom modeling module: accept any modeling_*.py when the exact
+        #    per-variant name differs from the manifest.
+        if required_file.startswith("modeling_") and required_file.endswith(".py"):
+            if list(model_path.glob("modeling_*.py")):
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
 def get_checkpoints_dir(custom_dir: Optional[str] = None) -> Path:
     """Get the checkpoints directory path."""
     if custom_dir:
@@ -527,10 +576,9 @@ def check_model_exists(model_name: str, checkpoints_dir: Optional[Path] = None) 
     if model_name in MODEL_VALIDATION_INFO:
         validation_info = MODEL_VALIDATION_INFO[model_name]
         
-        # Check required files
+        # Check required files (tolerant to sharded weights / per-variant modeling files)
         for required_file in validation_info.get("files", []):
-            file_path = model_path / required_file
-            if not file_path.exists():
+            if not _required_file_present(model_path, required_file):
                 logger.warning(f"[check_model_exists] Missing required file: {required_file} for model {model_name}")
                 return False
         
@@ -1149,8 +1197,7 @@ def verify_model(model_name: str, checkpoints_dir: Optional[Path] = None) -> Tup
     # Check required files
     all_files_ok = True
     for required_file in validation_info.get("files", []):
-        file_path = model_path / required_file
-        if file_path.exists():
+        if _required_file_present(model_path, required_file):
             details["files_found"].append(required_file)
         else:
             details["files_missing"].append(required_file)

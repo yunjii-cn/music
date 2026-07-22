@@ -1,11 +1,31 @@
 # 项目长期记忆 (云集智能音乐创意台 / 青龙音乐训练器)
 
-## 构建与打包规范（Launcher EXE）
-- 入口程序是 `dev/app/launcher.py`（非 main.py）；单实例保护与版本号靠 **exe 文件名中的 `-v`** 解析（`launcher.py` 内 `_kill_old_instances` + `main.py` 的 `get_version_from_filename`）。**最终 exe 命名为「项目名 + `-v` + 版本号」**，例如 `云集智能音乐创意台-v2.8.3.exe`（用户 2026-07-12 指定，弃用原 `launcher-vX.Y.Z.exe` 命名）。`-v` 标记必须保留，否则单实例/版本解析失效。
-- `get_version_from_filename()` 正则已放宽：`v(\d+\.\d+\.\d+(?:\.\d+)?)` —— 同时接受 3 段（如 `2.8.3`）与 4 段（如 `2.8.3.0`）版本号；文件名用 3 段即可，版本资源(version_info.txt)仍按 Windows 惯例写 4 段(`2.8.3.0`)。
-- 采用 **PyInstaller onedir**（非 onefile）：launcher 需通过相对路径找到同目录的 `python_embeded/`（嵌入式 python）与项目目录；onefile 解压到临时目录会破坏该相对路径。
-- **重型依赖（torch/gradio/transformers/diffusers 等）不打进 exe**——它们在 `python_embeded` 里运行，launcher 只打包 PyQt6 + loguru + psutil + huggingface_hub。打包时须在 spec 的 `excludes` 里排除这些，否则体积 GB 级且易构建失败。
-- 发布 spec：`dev/app/release.spec`（引用 `dev/app/version_info.txt` 写 Windows 版本资源）；构建脚本：`dev/pack/build_exe.ps1`（本地发布包，gitignore 不入库）。两者均 gitignore。
-- 发版需同步四处版本号：`release.spec` 的 `APP_VERSION`、`version_info.txt` 的 `filevers/prodvers/FileVersion/ProductVersion`、`build_exe.ps1` 的 `$APP_VERSION` 与 `$ProjectName`，并让最终 exe 名为 `<项目名>-vX.Y.Z.exe`（如 `云集智能音乐创意台-v2.8.3.exe`）。
-- 专业分发建议：windowed（无黑框）+ 代码签名（signtool，消除 SmartScreen 未知发布者）+ Inno Setup 生成单个 Setup.exe。现有 `debug_full.spec` 等仅为本地调试用（console=True、未签名）。
-- 数据文件：`qt.conf`→`PyQt6/Qt6`、`icon.ico`、`splash.png` 须作为 datas 打入（已有 splash 启动屏降低 PyQt6 导入卡顿观感）。
+## 构建与打包规范（Launcher EXE）— 现行权威方案
+- **最终拍板方案（2026-07-21/22，对照 git 历史 07a04da 能用版本复刻）**：**极简 `launcher.py` + `build-version.py` 文件夹模型**。弃用「固定名入口 / ver/ 派发 / `_resolve_deploy_dir` 算错」那套过度设计（曾导致 206 递归、`固定名入口打不开版本号exe`）；**干净版 `_self_relocate` 单路径自部署已还原**（建 `云集智能音乐创意台/` + 二级目录 + 固定名入口 + `version.txt`，无递归）。
+- **`launcher.py`（现行 = 2328 拆进程版）**：`_kill_old_instances()` → `_self_relocate()`（首次���部署建文件夹）→ **拉起独立的「启动屏子进程」覆盖 `import main` 黑屏期**：supervisor 模式 `Popen([exe,'--splash-child','--progress-ready=<temp>'], CREATE_NO_WINDOW)` 拉起子进程；该子进程**只加载 PyQt6 + yunji_splash、绝不 `import main`**，显示 `BrandedSplash.set_indeterminate("正在自动安装…")` 转圈光带；supervisor 在后台默默 `import main`，再调 `main.main()`——**`main.main()` 在真正 `splash.show()` 显示自己的确定进度条、且用 `QTimer.singleShot(0, _mark_progress_ready)` 把回写 `YUNJI_PROGRESS_READY` 哨兵推迟到事件循环启动后**（此时进度条真正在动画、非刚 show 的冻结态）；子进程轮询到该哨兵（而非"import 完成"）即 `raise_` 自身到最前并 `app.quit()` 淡出收屏，与进度条**平滑交替**（修复 2315 版"import 一完就淡出、进度条迟迟不出、中间黑屏空档"的 bug）。**为什么必须拆进程（2026-07-22 血泪教训）**：`import main`（PyQt6 冷加载 + 7838 行主模块）长时间占 GIL；启动屏若与主进程同体，GUI 线程拿不到 GIL 片 → 动画跳帧/卡顿。0823 版（主线程 `processEvents(30)+sleep`）+ 1826 版（后台线程 import + `app.exec()` + `sys.setswitchinterval(1)`）**都更卡**——尤其 `setswitchinterval(1)` 把 GIL 切换搞成每 1ms 一次、开销暴增、反而更卡顿（用户实测 1826「感觉更卡了」）。拆成独立进程后启动屏 0 重型 import、0 GIL 争用 → 转圈光带绝对丝滑。子进程用 ctypes `OpenProcess/GetExitCodeProcess`（`_parent_alive()`，Windows 上 `os.kill(pid,0)` 会抛 ValueError 不可用）探测父进程存活、父死即收屏；另有 180s 兜底超时。**已彻底删除 Win32 GDI `_PreSplash` 类**（~270 行，用户实测黑屏）。品牌 LOGO **就是 `ico.png`**（`dev/app/ico.png`，红色云朵+音乐柱，用户2026-07-22明确指出），`_draw_logo` 优先加载 `ico.png` → `logo.png`（曾从 BAK 复制但现已不存在，正确跳过）→ `icon.ico` → 回退矢量。`build-version.py` 已把 `ico.png` 加进 `--add-data`（CArchive 归档确证含 `ico.png`）。`python_embeded` 单 d 拼写。
+- **`build-version.py`（现行 = git 07a04da 版本）**：PyInstaller `--onefile --console`。关键：构建后用 `post_build()` 把 `app/acestep/`、`app/ace-step-ui/`、`scripts/`、`data/{outputs,models,config}/` **复制进 `build/云集智能音乐创意台-v<版本>/` 发布文件夹**，并把单文件 exe 复制进 `dev/dist/`。**历史上"文件夹出现"的来源就是 `post_build()` 在构建时建好的发布文件夹，不是运行时解压/自迁。**
+- **分发物**：`云集智能音乐创意台/build/云集智能音乐创意台-v<版本>/`（post_build 建的发布文件夹，含 exe + `app/` + `data/`，用户拿到这个文件夹双击里面的 exe 即可）+ `云集智能音乐创意台/dist/云集智能音乐创意台-v<版本>.exe`（裸单文件，仅启动器本身，acestep 等重型模块依赖发布文件夹里的 `app/`）。轻量构建 `build_light.py` 只跑 `build_exe()`，exe 落在 `云集智能音乐创意台/build/` 与 `云集智能音乐创意台/dist/`。
+- **⚠️ `--splash` / `pyi_splash` 致命坑（2026-07-22 实测 + 二进制扫描验证）**：PyInstaller 6.20.0 的 `--splash splash.png` 在用户 Windows 上会触发 `pyi_splash` 连不上 bootloader IPC（WinError 10061 / `KeyError: '_PYI_SPLASH_IPC'`），**直接把整个 exe 崩掉、连 `main.main()` 都到不了**。关键修正：**光注释掉 `--splash` 开关不够**——`launcher.py` 里残留的 `import pyi_splash` 仍会被 PyInstaller 静态分析捕获并**打包进 exe**（二进制扫描证实 `2032` 与 `0043` 两个 exe 都含 `pyi_splash`+`_PYI_SPLASH_IPC` 字节）。必须**双管齐下**：① `launcher.py` 彻底删掉 `import pyi_splash`/`pyi_splash.close()` 死代码；② `build-version.py` 加 `--exclude-module pyi_splash`。**验证手段**：构建后用 Python 以 `rb` 读 exe 搜 `b"pyi_splash"`，**必须为 0**（模块未被打包才不会 `import pyi_splash` 触发 IPC 崩溃）；`b"_PYI_SPLASH_IPC"` 出现 1 次是 **PyInstaller 引导器自身惰性常量**（仅 `--splash` 时才启用，本项目已禁用），属无害、不必为 0。校验可用 `dev/app/verify_exe.py`（CArchive 取 launcher 模块字节 + main.py 数据条目，确认 launcher 含 `_parent_alive`/`_run_splash_child`/`--progress-ready=`、无 `--ready-file=`；**main.py 必须以 `--add-data` 打进 exe**——否则运行时 `import main` 命中磁盘旧版松文件 `app/main.py`、哨兵逻辑不生效、淡出交替失效）。**启动画面只是装饰，去掉不影响 app 打开。**
+- **🚨 致命坑：main.py 必须 `--add-data` 随 exe 打包（2026-07-22 踩中）**：`build_exe()` 用 `launcher.py` 作入口，`launcher._run_supervisor` 里 `import main` 在静态分析时**未被收集进 CArchive**（toc 只有 `launcher`、无 `main`），运行时 `import main` 靠的是**磁盘松文件 `app/main.py`**（部署目录那份）。后果：轻量构建 `build_light.py` 只打 exe、不拷 `app/`，用户测的 exe 运行时命中**之前完整构建留下的旧版 `app/main.py`** → 我加在 `dev/app/main.py` 的"进度条就绪才回写哨兵"逻辑没生效 → 子进程收不到信号、走 `_parent_alive`/180s 兜底 → 表现即"刚出现就淡出+黑屏空档"。**修复**：`build-version.py` 的 `build_exe()` 加 `--add-data "main.py;."` 让 exe 自带改过的 `main.py`；因 `import main` 在 `launcher` 里执行时 `app/` 尚未入 `sys.path`，打包进 `_MEI` 的这份必然优先命中，不依赖外部松文件。`verify_exe.py` 已升级为同时校验 main.py 是否打进 exe 且含延迟哨兵。⚠️ 以后改 `main.main()` 的启动屏/哨兵逻辑，**务必重新打包 exe** 才生效（改 `dev/app/main.py` ≠ 运行时那份已更新）。
+- **构建环境**：必须用 `D:\Programs\Python312\python.exe`（含 PyInstaller 6.20.0）。受管 3.13.12 无 PyInstaller，用它跑会 `No module named PyInstaller`。
+- **`build-version.py` 文件名带连字符**：不能直接 `import build_version`（连字符非合法标识符 → ModuleNotFoundError）。要当脚本跑 `python build-version.py "改动说明"`（传 argv 可跳过交互 input），或用 `importlib.util.spec_from_file_location` 按路径加载。其 `main()` 末尾会 `git add/commit/push`，沙箱里 push 会失败但被 try/except 兜住、不影响已产出的产物；需要干净构建时可写个小 driver 只调 `build_exe()+post_build()+_deploy_to_dev()` 跳过 git。
+- **打包不崩关键（07a04da 原始配置）**：`main.py` 顶层只 `import` stdlib + PyQt6 + yunji_splash（均随 PyInstaller 静态分析自动打入）；`acestep`/`torch`/`transformers`/`diffusers`/`gradio`/`numpy` 等重型依赖全 `--exclude-module`（运行时靠发布文件夹里的 `app/acestep/` 松文件懒加载）。勿把 acestep 设成 `--hidden-import` 打进单文件，否则与 post_build 的 `app/acestep/` 复制逻辑重复且体积暴涨。
+- **版本号格式（用户指定）**：日期+时间 `v2026.07.21.1734`，正则 `v(\d+\.\d+\.\d+(?:\.\d+)?)`。
+- **入口程序是 `launcher.py`（非 main.py）**；单实例靠 `_kill_old_instances()` 按品牌前缀杀旧进程。`-v` 标记由文件名携带（如 `云集智能音乐创意台-v2026.07.21.1734.exe`），`main.py` 的 `get_version_from_filename()` 解析。
+
+## 历史废弃/踩坑方案（勿复用）
+- **self-deploy / 固定名入口 / ver/ 派发 launcher 三分支（2026-07-21 我误加）**：参考「云集智能文件清理专家」项目时过度设计。致命问题：`_resolve_deploy_dir()` 算错会把 deploy_dir 算成自身子文件夹 → 无限嵌套自部署 → 反复弹启动屏 → 路径超 260 字符 `WinError 206`；以及"固定名入口打不开版本号exe"。本项目的 `main.py`/`version_manager` 根本不依赖这套运行时派发，**纯属画蛇添足把能用的版本搞坏**。已回滚到 07a04da 极简版。
+- **7z SFX 外壳（2026-07-21 早）**：`build_sfx_7z.py` 套 `7zS.sfx`。致命：7zS 9.20 只认 `InstallPath="."`（解压 `%TEMP%` 自动清理），launcher 靠探测父进程才建文件夹，探测失败即不建 → 用户"解压后没文件夹"。弃用。
+- **品牌安装器 onefile EXE（2026-07-21 早）**：`build_sfx_exe.py` 嵌入 zip payload。用户实测"依然不行"。弃用。
+- **`--splash`（PyInstaller 6.20.0）**：见上，会 IPC 连接失败崩 exe。禁用。
+
+## 登录门控（音乐工作台前端 / ace-step-ui）
+- 门控文件：`dev/app/ace-step-ui/LoginGate.tsx`（已在 `index.tsx` 中以 `<LoginGate><App/></LoginGate>` 挂载）。
+- 机制：未登录 → 整页 302 跳 `https://music.yunjii.cn/login?embed=1&redirect=<本应用 origin>&state=<随机>`；官网登录成功回跳时 URL 带 `yunji_user`（base64 JSON：social_uid/openid、nickname、faceimg、token）→ 解码 → `loginWithUM` → 后端 `POST /api/auth/um` 按 social_uid 找/建本地用户并签发 JWT。
+- 登录页地址由 `UM_LOGIN_URL` 控制，默认 `https://music.yunjii.cn/login`，可用 `VITE_UM_LOGIN_URL` 覆盖（见 `ace-step-ui/.env.example`）。旧方案是内嵌本地 `web/um` 的 iframe + postMessage，已废弃。
+- 改 LoginGate.tsx 后须 `vite build` 重建 dist/（Express 3060 服务 dist/；Vite 3070 开发服实时读源码）。
+- 前置依赖：官网登录页须把本应用 origin 加入 redirect 白名单，否则回跳被拒。
+
+## 文件/目录约定
+- `dev/app/` = 应用源码（git 管理）；`dev/dist/` = 裸单文件 exe（gitignore）；`dev/_build/` = 发布文件夹（含 exe+app/+data/，gitignore）；`dev/data/` = 用户数据（gitignore）。
+- `BAK/` 下是备份（含被改名的旧 `build-version.py`），现行用 `dev/app/` 下的。

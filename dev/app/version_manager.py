@@ -2107,12 +2107,20 @@ class ModelManagerDialog(QDialog):
             self.main_window._delete_model(model_name)
             QTimer.singleShot(100, self._update_ui)
 
+    def _dl_key(self, name: str) -> str:
+        """将模型名解析为下载目标键，与 _update_ui 中进度条字典的键保持一致。
+        特殊主模型组件(acestep-v15-turbo / ace-step-5Hz-lm-1.7B)统一路由到主模型下载，键为 'main'。"""
+        if name in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
+            return "main"
+        return name
+
     def show_progress(self, text: str = ""):
         model_name = ""
         if self.main_window and hasattr(self.main_window, 'current_operation_model'):
             model_name = self.main_window.current_operation_model or ""
-        if model_name and hasattr(self, '_model_progress_bars') and model_name in self._model_progress_bars:
-            bar, label = self._model_progress_bars[model_name]
+        key = self._dl_key(model_name)
+        if key and hasattr(self, '_model_progress_bars') and key in self._model_progress_bars:
+            bar, label = self._model_progress_bars[key]
             bar.setValue(0)
             label.setText(text or "准备下载...")
         self.progress_bar.setVisible(True)
@@ -2124,7 +2132,13 @@ class ModelManagerDialog(QDialog):
         model_name = ""
         if self.main_window and hasattr(self.main_window, 'current_operation_model'):
             model_name = self.main_window.current_operation_model or ""
-        if model_name and hasattr(self, '_model_progress_bars') and model_name in self._model_progress_bars:
+        key = self._dl_key(model_name)
+        if key and hasattr(self, '_model_progress_bars') and key in self._model_progress_bars:
+            bar, label = self._model_progress_bars[key]
+            bar.setValue(value)
+            if desc:
+                label.setText(desc)
+        elif model_name and hasattr(self, '_model_progress_bars') and model_name in self._model_progress_bars:
             bar, label = self._model_progress_bars[model_name]
             bar.setValue(value)
             if desc:

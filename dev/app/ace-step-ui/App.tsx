@@ -1347,10 +1347,22 @@ function AppContent() {
     setIsVideoModalOpen(true);
   };
 
-  // Handle username setup
+  // Handle username setup (legacy offline fallback — dormant under the UM login gate)
   const handleUsernameSubmit = async (username: string) => {
     await setupUser(username);
     setShowUsernameModal(false);
+  };
+
+  // Sign-in is UM WeChat scan only. Route through the official login page
+  // (mirrors LoginGate). This keeps the app's login judgment based on the
+  // UM scan result, not the legacy local-username flow.
+  const handleUmLogin = () => {
+    const base = (import.meta.env.VITE_UM_LOGIN_URL as string | undefined) || 'https://music.yunjii.cn/login';
+    const url = new URL(base);
+    url.searchParams.set('embed', '1');
+    url.searchParams.set('redirect', window.location.origin + window.location.pathname + window.location.hash);
+    url.searchParams.set('state', Math.random().toString(36).slice(2) + Date.now().toString(36));
+    window.location.href = url.toString();
   };
 
   // Render Layout Logic
@@ -1628,7 +1640,7 @@ function AppContent() {
           theme={theme}
           onToggleTheme={toggleTheme}
           user={user}
-          onLogin={() => setShowUsernameModal(true)}
+          onLogin={handleUmLogin}
           onLogout={logout}
           onOpenSettings={() => setShowSettingsModal(true)}
           isOpen={showLeftSidebar}

@@ -68,10 +68,17 @@ try {
 Write-Output "Starting API server..."
 
 if ($LogFile -ne "") {
-    # Tee stdout to log file AND pipe (launcher reads both). Redirect stderr to separate file to avoid PowerShell error wrapping.
+    # Robust logging:
+    #   - stdout streams to the launcher's pipe (the launcher already logs it),
+    #   - stderr is captured to a separate file for crash diagnosis.
+    # We intentionally AVOID `| Tee-Object` here. Under memory pressure (e.g. while
+    # loading the 4B LLM) Tee-Object's file write can fail on pipeline teardown
+    # with a spurious "out-file : Insufficient system resources" error, which masks the
+    # real Python traceback that lives in api_server_stderr.log.
     $logDir = Split-Path $LogFile -Parent
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
     $errLog = Join-Path $logDir "api_server_stderr.log"
-    & $python_exe acestep/api_server.py $ext_args 2>>"$errLog" | Tee-Object -FilePath $LogFile -Append
+    & $python_exe acestep/api_server.py $ext_args 2>>"$errLog"
 } else {
     & $python_exe acestep/api_server.py $ext_args
 }
