@@ -187,6 +187,14 @@ $candidates = @(
     "https://github.com/yunjii-cn/music/releases/download/wheels/$FA_BASE"
 )
 
+# 码云(Gitee) 镜像占位模板（当前为注释，不参与竞速）：
+#   待用户将 wheel 拖入 Gitee `yunjii/music` 的 `wheels` release（id 758333）后，
+#   把下方直链行的行首 # 去掉即可被竞速自动纳入（成为第 4 个候选源）。
+#   直链二选一（推荐 raw，无需登录即可下载）：
+#     - raw:  https://gitee.com/yunjii/music/raw/main/wheels/$FA_BASE
+#     - 附件: https://gitee.com/yunjii/music/attach_files/<附件id>/download
+# "https://gitee.com/yunjii/music/raw/main/wheels/$FA_BASE",
+
 # ---- GPU 门控：仅 NVIDIA 且算力 >= SM75 (7.5) 才下载/安装 flash_attn ----
 $supportsFA = $false
 $faReason = ""
