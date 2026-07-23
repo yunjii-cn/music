@@ -20,6 +20,11 @@ $Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 $Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
 $Env:UV_CACHE_DIR = Join-Path $data_dir ".uv_cache"
 $Env:HF_HOME = Join-Path $data_dir "huggingface"
+# 以下变量原由 install-uv-qinglong.ps1 设置，合并保留（中国镜像 / CUDA / LFS 友好）
+$Env:HF_ENDPOINT = "https://hf-mirror.com"
+$Env:PIP_DISABLE_IP_VERSION_CHECK = "1"
+$Env:GIT_LFS_SKIP_SMUDGE = "1"
+if ($env:CUDA_PATH) { $Env:CUDA_HOME = $env:CUDA_PATH }
 Write-Output "   PyPI 镜像: https://pypi.tuna.tsinghua.edu.cn/simple/"
 Write-Output "   PyTorch 镜像: https://download.pytorch.org/whl/cu128"
 Write-Output ""

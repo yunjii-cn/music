@@ -23,7 +23,7 @@
 
 依赖文件:
 - launcher/version_manager.py (版本管理器)
-- install-uv-qinglong.ps1 (环境安装)
+- install-env.ps1 (环境安装，已合并原 install-uv-qinglong.ps1 功能)
 - run_gradio.ps1 (Gradio界面启动)
 - run_server.ps1 (API服务启动)
 - run_npmgui.ps1 (青龙前端启动)
@@ -3414,13 +3414,13 @@ class MainWindow(QMainWindow):
                             self._log("✓ 依赖已安装，跳过安装步骤")
         
         if not skip_install:
-            install_script = os.path.join(self.base_dir, "scripts", "install-uv-qinglong.ps1")
+            install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
             if os.path.exists(install_script):
                 try:
 
                     
                     process = hidden_popen(
-                        ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script, "-SkipModels"],
+                        ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
                         cwd=self.base_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
@@ -5252,13 +5252,13 @@ for d in deps:
             if os.path.exists(uv_path):
                 return True
             
-            install_script = os.path.join(self.base_dir, "scripts", "install-uv-qinglong.ps1")
+            install_script = os.path.join(self.base_dir, "scripts", "install-env.ps1")
             if not os.path.exists(install_script):
                 self._log("[错误] uv 安装脚本不存在", "#F44336")
                 return False
             
             result = hidden_run(
-                ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script, "-SkipModels"],
+                ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
                 cwd=self.base_dir,
                 capture_output=True,
                 text=True,
@@ -7882,7 +7882,7 @@ def extract_scripts():
             "install-env.ps1", "start.ps1", "start-all.ps1",
             "run_server.ps1", "run_gradio.ps1", "run_npmgui.ps1",
             "run_qinglong_backend.ps1", "run_qinglong_frontend.ps1",
-            "install-uv-qinglong.ps1", "acestep-sync.ps1",
+            "acestep-sync.ps1",
         ]
         
         for script_name in scripts_to_extract:
