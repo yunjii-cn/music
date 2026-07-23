@@ -2415,10 +2415,26 @@ class MainWindow(QMainWindow):
         
         deploy_layout.addStretch()
         
-        self.deploy_progress_label = QLabel("")
-        self.deploy_progress_label.setStyleSheet("font-size: 11px; color: #FFA726; background: transparent;")
-        self.deploy_progress_label.setWordWrap(True)
-        deploy_layout.addWidget(self.deploy_progress_label, 1)
+        # 状态进度条：下载源与部署按钮之间，部署运行期显示滚动填充 + 实时状态文字
+        self.deploy_progress_bar = QProgressBar()
+        self.deploy_progress_bar.setRange(0, 100)
+        self.deploy_progress_bar.setValue(0)
+        self.deploy_progress_bar.setTextVisible(True)
+        self.deploy_progress_bar.setFormat("")
+        self.deploy_progress_bar.setFixedHeight(22)
+        self.deploy_progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #1A1A1A; border: 1px solid #2A2A2A;
+                border-radius: 6px; text-align: center;
+                font-size: 11px; color: #FFA726;
+            }
+            QProgressBar::chunk {
+                background-color: #1B5E20; border-radius: 5px;
+            }
+        """)
+        deploy_layout.addWidget(self.deploy_progress_bar, 1)
+        # 兼容旧引用（若其它地方仍引用 label，不报错）
+        self.deploy_progress_label = self.deploy_progress_bar
         
         self.btn_one_click_deploy = QPushButton("🔧 一键部署维护")
         self.btn_one_click_deploy.setFixedWidth(120)
@@ -2847,6 +2863,11 @@ class MainWindow(QMainWindow):
         timestamp = datetime.now().strftime("%H:%M:%S")
         html = f'<span style="color: #888888;">[{timestamp}]</span> <span style="color: {color};">{message}</span>'
         self.log_output.append(html)
+
+        # 部署运行期间：把最新日志同步到状态进度条文字（动态内容）
+        if getattr(self, '_deploy_progress_active', False):
+            self._deploy_progress_text(message)
+
         if hasattr(self, 'auto_scroll_switch') and self.auto_scroll_switch.isChecked():
             scrollbar = self.log_output.verticalScrollBar()
             scrollbar.setValue(scrollbar.maximum())
@@ -3355,6 +3376,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'btn_cancel_deploy'):
             self.btn_cancel_deploy.setVisible(False)
             self.btn_cancel_deploy.setEnabled(True)
+
+        # 停止状态进度条动画并定格为完成态（仅在部署运行过时）
+        if getattr(self, '_deploy_progress_active', False):
+            self._deploy_progress_stop("✅ 部署维护完成")
         
         # 如果是初始化后的自动部署完成，导航到模型管理页面并自动下载主模型
         if getattr(self, '_auto_deploy_initiated', False):
@@ -3364,6 +3389,53 @@ class MainWindow(QMainWindow):
             self._log("[信息] 环境已就绪，正在自动下载完整基础模型包...", "#2196F3")
             QTimer.singleShot(1800, self._auto_download_main_model)
             self._log("[提示] 也可点击「启动」按钮立即运行应用", "#FF9800")
+
+    def _deploy_progress_start(self, text="正在部署维护..."):
+        """启动"下载源与按钮之间"那条状态进度条的滚动动画 + 状态文字。
+        用 QTimer 让进度值循环 0→100，保证可见的动态填充（比不确定态更可靠，
+        不受自定义 chunk 样式影响）。"""
+        if not hasattr(self, 'deploy_progress_bar'):
+            return
+        self._deploy_progress_active = True
+        self._deploy_progress_value = 0
+        self.deploy_progress_bar.setValue(0)
+        self.deploy_progress_bar.setFormat(text)
+        if not hasattr(self, '_deploy_progress_timer'):
+            from PyQt6.QtCore import QTimer
+            self._deploy_progress_timer = QTimer(self)
+            self._deploy_progress_timer.timeout.connect(self._deploy_progress_tick)
+        self._deploy_progress_timer.start(60)
+
+    def _deploy_progress_tick(self):
+        """定时器回调：让进度值循环递增，形成滚动填充动画。"""
+        if not getattr(self, '_deploy_progress_active', False):
+            return
+        if not hasattr(self, 'deploy_progress_bar'):
+            return
+        self._deploy_progress_value = (getattr(self, '_deploy_progress_value', 0) + 2) % 101
+        self.deploy_progress_bar.setValue(self._deploy_progress_value)
+
+    def _deploy_progress_text(self, text):
+        """更新进度条上叠加的状态文字（过长则截断）。"""
+        if not hasattr(self, 'deploy_progress_bar'):
+            return
+        t = str(text).strip()
+        if len(t) > 32:
+            t = t[:32] + "…"
+        self.deploy_progress_bar.setFormat(t if t else "正在部署维护...")
+
+    def _deploy_progress_stop(self, text="✅ 部署维护完成", ok=True):
+        """停止动画并把进度条定格为结束状态。"""
+        self._deploy_progress_active = False
+        if hasattr(self, '_deploy_progress_timer'):
+            try:
+                self._deploy_progress_timer.stop()
+            except Exception:
+                pass
+        if not hasattr(self, 'deploy_progress_bar'):
+            return
+        self.deploy_progress_bar.setValue(100)
+        self.deploy_progress_bar.setFormat(text)
 
     def _auto_download_main_model(self):
         """初始化后自动部署完成时，自动下载完整基础模型包（main）。
@@ -5548,6 +5620,9 @@ for d in deps:
         if hasattr(self, 'btn_cancel_deploy'):
             self.btn_cancel_deploy.setEnabled(True)
             self.btn_cancel_deploy.setVisible(True)
+
+        # 启动状态进度条滚动动画（下载源与按钮之间那条）
+        self._deploy_progress_start("正在部署维护...")
 
         self.deploy_thread = threading.Thread(target=self._deploy_maintenance_thread)
         self.deploy_thread.daemon = True
