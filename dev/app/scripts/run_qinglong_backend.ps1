@@ -34,8 +34,9 @@ if ($nodePath) {
     $npmCmd = "npm"
 }
 
-# 设置 Python 环境变量，使用 uv 虚拟环境中的 Python 用于编译 better-sqlite3
-$venvPython = "$DataDir\.venv\Scripts\python.exe"
+# 设置 Python 环境变量，使用 scripts/.venv 中的 Python 用于编译 better-sqlite3
+# 统一使用 scripts/.venv（与 main.py 保持一致）
+$venvPython = "$ScriptDir\.venv\Scripts\python.exe"
 if (Test-Path $venvPython) {
     Write-Output "Using Python for compilation: $venvPython"
     $env:PYTHON = $venvPython

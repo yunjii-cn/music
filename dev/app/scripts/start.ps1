@@ -5,7 +5,8 @@ Write-Output "  云集智能音乐创意台 - 启动脚本"
 Write-Output "============================================================"
 Write-Output ""
 
-$dataVenv = Join-Path (Split-Path $PSScriptRoot -Parent) "..\data\.venv"
+# 统一使用 scripts/.venv（与 main.py / install-env.ps1 保持一致）
+$dataVenv = Join-Path $PSScriptRoot ".venv"
 if (Test-Path "$dataVenv\Scripts\activate") {
     Write-Output "✅ 激活虚拟环境..."
     . "$dataVenv\Scripts\activate"

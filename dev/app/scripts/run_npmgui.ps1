@@ -50,7 +50,7 @@ if (-not (Test-Path "node_modules")) {
     Write-Output "Dependencies not installed, installing now..."
     
     # 配置 npm 使用项目虚拟环境中的 Python（用于 node-gyp 编译）
-    $venvPython = "$ScriptDir\..\..\data\.venv\Scripts\python.exe"
+    $venvPython = "$ScriptDir\.venv\Scripts\python.exe"
     if (Test-Path $venvPython) {
         Write-Output "[信息] 配置 npm 使用虚拟环境 Python: $venvPython"
         & $npmCmd config set python "$venvPython"
@@ -78,7 +78,7 @@ if (-not (Test-Path "server\node_modules")) {
     Write-Output "Server dependencies not installed, installing now..."
     
     # 配置 npm 使用项目虚拟环境中的 Python（用于 node-gyp 编译）
-    $venvPython = "$ScriptDir\..\..\data\.venv\Scripts\python.exe"
+    $venvPython = "$ScriptDir\.venv\Scripts\python.exe"
     if (Test-Path $venvPython) {
         Write-Output "[信息] 配置 npm 使用虚拟环境 Python: $venvPython"
         & $npmCmd config set python "$venvPython"

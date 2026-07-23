@@ -23,10 +23,10 @@
 
 依赖文件:
 - launcher/version_manager.py (版本管理器)
-- 1、install-uv-qinglong.ps1 (环境安装)
-- 2、run_gradio.ps1 (Gradio界面启动)
-- 3、run_server.ps1 (API服务启动)
-- 4、run_npmgui.ps1 (青龙前端启动)
+- install-uv-qinglong.ps1 (环境安装)
+- run_gradio.ps1 (Gradio界面启动)
+- run_server.ps1 (API服务启动)
+- run_npmgui.ps1 (青龙前端启动)
 
 被调用: 用户直接运行，或被EXE打包后运行
 
@@ -235,7 +235,7 @@ PROJECTS = {
             "api": {
                 "name": "API 服务",
                 "port": 8050,
-                "script": "scripts/3、run_server.ps1",
+                "script": "scripts/run_server.ps1",
                 "url": "http://127.0.0.1:8050/docs",
                 "color": "#E53935",
                 "icon": "🔌",
@@ -244,7 +244,7 @@ PROJECTS = {
             "backend": {
                 "name": "青龙后端",
                 "port": 3060,
-                "script": "scripts/5、run_qinglong_backend.ps1",
+                "script": "scripts/run_qinglong_backend.ps1",
                 "url": "http://localhost:3060",
                 "color": "#E53935",
                 "icon": "⚙️"
@@ -252,7 +252,7 @@ PROJECTS = {
             "frontend": {
                 "name": "青龙前端",
                 "port": 3070,
-                "script": "scripts/6、run_qinglong_frontend.ps1",
+                "script": "scripts/run_qinglong_frontend.ps1",
                 "url": "http://localhost:3070",
                 "color": "#E53935",
                 "icon": "🎨"
@@ -1464,7 +1464,7 @@ class MainWindow(QMainWindow):
                 pass
         else:
             self.base_dir = os.path.dirname(os.path.abspath(__file__))
-            while not os.path.exists(os.path.join(self.base_dir, 'acestep')) and not os.path.exists(os.path.join(self.base_dir, '2、run_gradio.ps1')) and not os.path.exists(os.path.join(self.base_dir, 'scripts', 'install-env.ps1')):
+            while not os.path.exists(os.path.join(self.base_dir, 'acestep')) and not os.path.exists(os.path.join(self.base_dir, 'run_gradio.ps1')) and not os.path.exists(os.path.join(self.base_dir, 'scripts', 'install-env.ps1')):
                 parent_dir = os.path.dirname(self.base_dir)
                 if parent_dir == self.base_dir:
                     break
@@ -1474,6 +1474,7 @@ class MainWindow(QMainWindow):
         self.service_cards: Dict[str, ServiceCard] = {}
         self.api_process = None
         self.is_starting = False
+        self._auto_deploy_initiated = False
         self._running_services_count = 0
         self.current_project = "qinglong"
         self.browsers = {"系统默认": "system"}
@@ -1767,8 +1768,8 @@ class MainWindow(QMainWindow):
         self.system_info_label.setWordWrap(False)
         header_layout.addWidget(self.system_info_label, 1)
         
-        # 自动滚动开关
-        self.auto_scroll_switch = QPushButton("🔄 自动滚动")
+        # 自动滚动开关（改名为「滚动」）
+        self.auto_scroll_switch = QPushButton("🔄 滚动")
         self.auto_scroll_switch.setCheckable(True)
         self.auto_scroll_switch.setChecked(True)
         self.auto_scroll_switch.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1858,6 +1859,19 @@ class MainWindow(QMainWindow):
         """)
         self.btn_clear_log.clicked.connect(self._clear_runtime_log)
         header_layout.addWidget(self.btn_clear_log)
+        
+        self.btn_copy_log = QPushButton("📋 复制")
+        self.btn_copy_log.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy_log.setStyleSheet("""
+            QPushButton {
+                background-color: #2A2A2A; color: #888888;
+                border: 1px solid #3A3A3A; border-radius: 4px;
+                padding: 4px 10px; font-size: 11px;
+            }
+            QPushButton:hover { background-color: #3A3A3A; color: #CCCCCC; }
+        """)
+        self.btn_copy_log.clicked.connect(self._copy_runtime_log)
+        header_layout.addWidget(self.btn_copy_log)
         
         log_layout.addWidget(header_container)
         
@@ -2207,7 +2221,7 @@ class MainWindow(QMainWindow):
 
     
     def _on_auto_scroll_toggled(self, checked):
-        """自动滚动开关切换"""
+        """自动滚动开关切换（显示为「滚动」按钮）"""
         if checked:
             self.auto_scroll_switch.setStyleSheet("""
                 QPushButton {
@@ -2273,6 +2287,17 @@ class MainWindow(QMainWindow):
         """清空运行日志"""
         if hasattr(self, 'log_output') and self.log_output is not None:
             self.log_output.clear()
+    
+    def _copy_runtime_log(self):
+        """复制运行日志到剪贴板"""
+        if not hasattr(self, 'log_output') or self.log_output is None:
+            return
+        try:
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setText(self.log_output.toPlainText())
+            self._log("✓ 日志已复制到剪贴板", "#4CAF50")
+        except Exception as e:
+            self._log(f"[错误] 复制日志失败: {e}", "#F44336")
     
     def _create_version_page(self):
         """创建版本管理器页面"""
@@ -2374,7 +2399,23 @@ class MainWindow(QMainWindow):
         """)
         self.btn_one_click_deploy.clicked.connect(self._deploy_maintenance)
         deploy_layout.addWidget(self.btn_one_click_deploy)
-        
+
+        # 取消按钮：部署运行期间可见，点击后中断当前安装子进程，避免"真卡死只能干等超时"
+        self.btn_cancel_deploy = QPushButton("✖ 取消")
+        self.btn_cancel_deploy.setFixedWidth(80)
+        self.btn_cancel_deploy.setStyleSheet("""
+            QPushButton {
+                background-color: #5C1A1A; color: #FFFFFF;
+                border: 1px solid #7A1E1E; border-radius: 6px;
+                padding: 6px 12px; font-size: 12px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #7A1E1E; }
+            QPushButton:disabled { background-color: #1A1A1A; color: #555555; border-color: #222222; }
+        """)
+        self.btn_cancel_deploy.clicked.connect(self._cancel_deploy)
+        self.btn_cancel_deploy.setVisible(False)
+        deploy_layout.addWidget(self.btn_cancel_deploy)
+
         layout.addWidget(deploy_frame)
         
         content_row = QHBoxLayout()
@@ -2564,7 +2605,7 @@ class MainWindow(QMainWindow):
         deploy_log_header.addWidget(deploy_log_title)
         deploy_log_header.addStretch()
         
-        self.deploy_auto_scroll_switch = QPushButton("🔄 自动滚动")
+        self.deploy_auto_scroll_switch = QPushButton("🔄 滚动")
         self.deploy_auto_scroll_switch.setCheckable(True)
         self.deploy_auto_scroll_switch.setChecked(True)
         self.deploy_auto_scroll_switch.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -2607,6 +2648,18 @@ class MainWindow(QMainWindow):
         """)
         clear_deploy_log_btn.clicked.connect(lambda: self.deploy_log_output.clear())
         deploy_log_header.addWidget(clear_deploy_log_btn)
+        
+        copy_deploy_log_btn = QPushButton("📋 复制")
+        copy_deploy_log_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2A2A2A; color: #888888;
+                border: 1px solid #3A3A3A; border-radius: 4px;
+                padding: 4px 10px; font-size: 11px;
+            }
+            QPushButton:hover { background-color: #3A3A3A; color: #CCCCCC; }
+        """)
+        copy_deploy_log_btn.clicked.connect(self._copy_deploy_log)
+        deploy_log_header.addWidget(copy_deploy_log_btn)
         
         save_deploy_log_btn = QPushButton("💾 保存")
         save_deploy_log_btn.setStyleSheet("""
@@ -2806,8 +2859,19 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self._log(f"[错误] 保存日志失败: {e}", "#F44336")
     
+    def _copy_deploy_log(self):
+        """复制部署维护日志到剪贴板"""
+        if not hasattr(self, 'deploy_log_output') or self.deploy_log_output is None:
+            return
+        try:
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setText(self.deploy_log_output.toPlainText())
+            self._log("✓ 部署日志已复制到剪贴板", "#4CAF50")
+        except Exception as e:
+            self._log(f"[错误] 复制日志失败: {e}", "#F44336")
+    
     def _on_deploy_auto_scroll_toggled(self, checked):
-        """部署维护自动滚动开关切换"""
+        """部署维护自动滚动开关切换（显示为「滚动」按钮）"""
         if checked:
             self.deploy_auto_scroll_switch.setStyleSheet("""
                 QPushButton {
@@ -3042,7 +3106,7 @@ class MainWindow(QMainWindow):
                     
                     if not api_running:
                         self._log("核心 API 服务未运行，正在启动...")
-                        api_script = os.path.join(self.base_dir, "scripts", "3、run_server.ps1")
+                        api_script = os.path.join(self.base_dir, "scripts", "run_server.ps1")
                         if not os.path.exists(api_script):
                             self._log(f"[错误] API 服务脚本不存在: {api_script}", "#F44336")
                             self.is_starting = False
@@ -3254,6 +3318,17 @@ class MainWindow(QMainWindow):
         
         if hasattr(self, 'btn_one_click_deploy'):
             self.btn_one_click_deploy.setEnabled(True)
+        if hasattr(self, 'btn_cancel_deploy'):
+            self.btn_cancel_deploy.setVisible(False)
+            self.btn_cancel_deploy.setEnabled(True)
+        
+        # 如果是初始化后的自动部署完成，导航到模型管理页面下载主模型
+        if getattr(self, '_auto_deploy_initiated', False):
+            self._auto_deploy_initiated = False
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(800, lambda: self._switch_page(1))
+            self._log("[信息] 环境已就绪，请到模型管理中下载主模型", "#4CAF50")
+            self._log("[提示] 也可点击「启动」按钮立即运行应用", "#FF9800")
     
     def _check_environment(self):
         """环境检测"""
@@ -3339,13 +3414,13 @@ class MainWindow(QMainWindow):
                             self._log("✓ 依赖已安装，跳过安装步骤")
         
         if not skip_install:
-            install_script = os.path.join(self.base_dir, "scripts", "1、install-uv-qinglong.ps1")
+            install_script = os.path.join(self.base_dir, "scripts", "install-uv-qinglong.ps1")
             if os.path.exists(install_script):
                 try:
 
                     
                     process = hidden_popen(
-                        ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                        ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script, "-SkipModels"],
                         cwd=self.base_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
@@ -3371,9 +3446,9 @@ class MainWindow(QMainWindow):
         
         self._log("3. 检查启动脚本...")
         scripts = [
-            "2、run_gradio.ps1",
-            "3、run_server.ps1",
-            "4、run_npmgui.ps1"
+            "run_gradio.ps1",
+            "run_server.ps1",
+            "run_npmgui.ps1"
         ]
         for script in scripts:
             script_path = os.path.join(self.base_dir, "scripts", script)
@@ -4060,7 +4135,7 @@ class MainWindow(QMainWindow):
         
         try:
             # 1. 检查并修复 PowerShell
-            self._log("1. 检查 PowerShell...")
+            self._log("  1. 检查 PowerShell...")
             powershell_available = False
             
             try:
@@ -4113,7 +4188,7 @@ class MainWindow(QMainWindow):
                 return
             
             # 2. 检查 Node.js
-            self._log("2. 检查 Node.js...")
+            self._log("  2. 检查 Node.js...")
             self.deploy_step_signal.emit("nodejs", "running")
             node_available = False
             
@@ -4153,7 +4228,7 @@ class MainWindow(QMainWindow):
                 return
             
             # 3. 检查并安装 uv
-            self._log("3. 检查并安装 uv...")
+            self._log("  3. 检查并安装 uv...")
             uv_path = os.path.expanduser("~/.local/bin/uv.exe")
             
             if not os.path.exists(uv_path):
@@ -4225,7 +4300,7 @@ class MainWindow(QMainWindow):
                 self._log("✓ uv 已安装")
             
             # 4. 检查并创建虚拟环境
-            self._log("4. 检查并创建虚拟环境...")
+            self._log("  4. 检查并创建虚拟环境...")
             scripts_dir = os.path.join(self.base_dir, "scripts")
             venv_path = os.path.join(scripts_dir, ".venv")
             
@@ -4265,7 +4340,7 @@ class MainWindow(QMainWindow):
                 self._log("✓ 虚拟环境已存在")
             
             # 5. 安装项目依赖
-            self._log("5. 检查项目依赖...")
+            self._log("  5. 检查项目依赖...")
             try:
                 venv_python = self._find_venv_python()
                 
@@ -4283,7 +4358,7 @@ class MainWindow(QMainWindow):
             self._verify_dependencies(venv_python)
             
             # 6. 检查 Web 前端（可选）
-            self._log("6. 检查 Web 前端（可选）...")
+            self._log("  6. 检查 Web 前端（可选）...")
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
             
             if not os.path.exists(ace_step_ui_path):
@@ -4319,7 +4394,7 @@ class MainWindow(QMainWindow):
                     self._log("✓ git子模块已初始化")
             
             # 7. 安装/修复前端依赖（可选）
-            self._log("7. 安装/修复前端依赖（可选）...")
+            self._log("  7. 安装/修复前端依赖（可选）...")
             if os.path.exists(ace_step_ui_path):
                 package_json_path = os.path.join(ace_step_ui_path, "package.json")
                 if os.path.exists(package_json_path):
@@ -4517,12 +4592,12 @@ try {
                 self._log("○ ace-step-ui 目录不存在，跳过（可选 Web 前端）")
             
             # 8. 检查启动脚本
-            self._log("8. 检查启动脚本...")
+            self._log("  8. 检查启动脚本...")
             scripts = [
-                "2、run_gradio.ps1",
-                "3、run_server.ps1",
-                "5、run_qinglong_backend.ps1",
-                "6、run_qinglong_frontend.ps1"
+                "run_gradio.ps1",
+                "run_server.ps1",
+                "run_qinglong_backend.ps1",
+                "run_qinglong_frontend.ps1"
             ]
             missing_scripts = []
             for script in scripts:
@@ -4538,7 +4613,7 @@ try {
                 self._log("请确保这些脚本存在或从原始项目中复制", "#FF9800")
             
             # 9. 检查环境变量
-            self._log("9. 检查环境变量...")
+            self._log("  9. 检查环境变量...")
             try:
                 # 检查 PATH 环境变量是否包含 uv 的路径
                 path_env = os.environ.get("PATH", "")
@@ -4584,7 +4659,7 @@ try {
                 self._log(f"[错误] 检查环境变量失败: {e}", "#F44336")
             
             # 10. 检查模型目录
-            self._log("10. 检查模型目录...")
+            self._log(" 10. 检查模型目录...")
             models_dir = os.path.join(self.base_dir, "models")
             if not os.path.exists(models_dir):
                 self._log("[信息] 模型目录不存在，正在创建...")
@@ -4597,7 +4672,7 @@ try {
                 self._log("✓ 模型目录已存在")
             
             # 11. 检查配置文件
-            self._log("11. 检查配置文件...")
+            self._log(" 11. 检查配置文件...")
             env_example_path = os.path.join(self.base_dir, "scripts", ".env.example")
             env_path = os.path.join(self.base_dir, "scripts", ".env")
             if not os.path.exists(env_path) and os.path.exists(env_example_path):
@@ -4614,7 +4689,7 @@ try {
                 self._log("[警告] scripts/.env.example 文件不存在，无法创建 .env 文件", "#FF9800")
             
             # 11. 最终检查
-            self._log("11. 最终环境检查...")
+            self._log(" 12. 最终环境检查...")
             
             # 检查 uv 是否可用
             try:
@@ -4698,7 +4773,9 @@ try {
         scripts_dir = work_dir / "scripts"
         scripts_dir.mkdir(exist_ok=True)
         
-        scripts_to_check = ["install-env.ps1", "start.ps1", "3、run_server.ps1"]
+        scripts_to_check = ["install-env.ps1", "start.ps1", "run_server.ps1",
+                            "run_gradio.ps1", "run_npmgui.ps1",
+                            "run_qinglong_backend.ps1", "run_qinglong_frontend.ps1"]
         
         for script_name in scripts_to_check:
             script_path = scripts_dir / script_name
@@ -4860,9 +4937,9 @@ try {
         
         try:
             scripts = [
-                "2、run_gradio.ps1",
-                "3、run_server.ps1",
-                "4、run_npmgui.ps1"
+                "run_gradio.ps1",
+                "run_server.ps1",
+                "run_npmgui.ps1"
             ]
             scripts_ok = True
             for script in scripts:
@@ -5175,13 +5252,13 @@ for d in deps:
             if os.path.exists(uv_path):
                 return True
             
-            install_script = os.path.join(self.base_dir, "scripts", "1、install-uv-qinglong.ps1")
+            install_script = os.path.join(self.base_dir, "scripts", "install-uv-qinglong.ps1")
             if not os.path.exists(install_script):
                 self._log("[错误] uv 安装脚本不存在", "#F44336")
                 return False
             
             result = hidden_run(
-                ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
+                ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script, "-SkipModels"],
                 cwd=self.base_dir,
                 capture_output=True,
                 text=True,
@@ -5407,14 +5484,103 @@ for d in deps:
         
         self.is_starting = True
         self._update_bottom_bar()
-        
+
+        # 复位取消标志 + 显示取消按钮（D：支持中断，避免真卡死只能干等超时）
+        self._deploy_cancel = False
+        self._deploy_proc = None
         if hasattr(self, 'btn_one_click_deploy'):
             self.btn_one_click_deploy.setEnabled(False)
-        
+        if hasattr(self, 'btn_cancel_deploy'):
+            self.btn_cancel_deploy.setEnabled(True)
+            self.btn_cancel_deploy.setVisible(True)
+
         self.deploy_thread = threading.Thread(target=self._deploy_maintenance_thread)
         self.deploy_thread.daemon = True
         self.deploy_thread.start()
-    
+
+    def _cancel_deploy(self):
+        """中断正在运行的部署维护：置取消标志并终止当前子进程。"""
+        self._deploy_cancel = True
+        self._log("[信息] 正在取消部署维护...", "#FF9800")
+        proc = getattr(self, "_deploy_proc", None)
+        if proc is not None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+        if hasattr(self, 'btn_cancel_deploy'):
+            self.btn_cancel_deploy.setEnabled(False)
+
+    def _stream_powershell(self, script_path, cwd, timeout=1800):
+        """流式运行 PowerShell 脚本：逐行把输出实时喂到部署日志，支持取消。
+
+        返回值：脚本 returncode；取消返回 -2；超时返回 -1；启动失败返回 -3。
+        （历史坑：曾用 subprocess.run(capture_output=False)+-WindowStyle Hidden，
+         输出进了被隐藏的控制台、界面全程零反馈，用户无法区分"在跑"还是"卡死"。）
+        """
+        import time as _t
+        # 用 -Command 强制 UTF-8 输出，避免中文/emoji 乱码；再 & 调用脚本
+        safe_path = str(script_path).replace("'", "''")
+        ps_inline = (
+            "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; "
+            "$OutputEncoding=[System.Text.Encoding]::UTF8; "
+            "& '%s'" % safe_path
+        )
+        cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_inline]
+        try:
+            proc = hidden_popen(
+                cmd, cwd=cwd,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace", bufsize=1,
+            )
+        except Exception as e:
+            self._log(f"[错误] 无法启动安装脚本进程: {e}", "#F44336")
+            return -3
+
+        self._deploy_proc = proc
+        start = _t.time()
+        try:
+            while True:
+                if getattr(self, "_deploy_cancel", False):
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    return -2
+                line = proc.stdout.readline()
+                if not line:
+                    if proc.poll() is not None:
+                        break
+                    _t.sleep(0.05)
+                    continue
+                text = line.rstrip("\r\n")
+                if text.strip():
+                    color = "#DDDDDD"
+                    if any(k in text for k in ("❌", "错误", "失败", "Error", "error", "Traceback")):
+                        color = "#F44336"
+                    elif any(k in text for k in ("✅", "完成", "已安装", "成功")):
+                        color = "#4CAF50"
+                    elif any(k in text for k in ("⚠", "警告", "Warning", "warning")):
+                        color = "#FF9800"
+                    self._log(text, color)
+                if timeout and (_t.time() - start) > timeout:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    return -1
+            try:
+                rest = proc.stdout.read()
+                if rest:
+                    for ln in rest.splitlines():
+                        if ln.strip():
+                            self._log(ln.rstrip())
+            except Exception:
+                pass
+            return proc.returncode if proc.returncode is not None else proc.wait()
+        finally:
+            self._deploy_proc = None
+
     def _deploy_maintenance_thread(self):
         """部署维护线程函数"""
         self._log("========================================")
@@ -5652,20 +5818,29 @@ for d in deps:
             uv_path = os.path.expanduser("~/.local/bin/uv.exe")
             venv_path = os.path.join(self.base_dir, "scripts", ".venv")
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
-            
+
+            # 判定"venv 是否完整"：不仅文件夹存在，还需有 python.exe + 已装 torch。
+            # （历史坑：仅判文件夹存在 -> 半残 venv[安装被超时/取消杀掉]也判 True ->
+            #  跳过重装 -> 坏环境长期存在。）
+            venv_python_exe = os.path.join(venv_path, "Scripts", "python.exe")
+            torch_pkg = os.path.join(venv_path, "Lib", "site-packages", "torch")
+            venv_complete = bool(os.path.exists(venv_python_exe) and os.path.exists(torch_pkg))
+
             self.deploy_step_signal.emit("uv", "running")
             if os.path.exists(uv_path):
                 self.deploy_step_signal.emit("uv", "done")
             else:
                 self.deploy_step_signal.emit("uv", "fail")
-            
+
             self.deploy_step_signal.emit("venv", "running")
-            if os.path.exists(venv_path):
+            if venv_complete:
                 self.deploy_step_signal.emit("venv", "done")
             else:
                 self.deploy_step_signal.emit("venv", "fail")
-            
-            environment_installed = bool(os.path.exists(uv_path) and os.path.exists(venv_path))
+                if os.path.exists(venv_path):
+                    self._log("[信息] 检测到虚拟环境不完整（缺 torch 等核心包），将重新安装...", "#FF9800")
+
+            environment_installed = bool(os.path.exists(uv_path) and venv_complete)
             if environment_installed:
                 ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
                 if os.path.exists(ace_step_ui_path):
@@ -5684,30 +5859,29 @@ for d in deps:
                 if os.path.exists(install_script):
                     try:
                         self._log("4. 执行环境安装脚本...")
-                        self._log("[信息] 这可能需要几分钟，请稍候...")
-                        
+                        self._log("[信息] 首次安装需下载 PyTorch(约2-3GB)等依赖，可能十几分钟。")
+                        self._log("[信息] 下方将实时显示安装进度，如需中断可点「取消」。", "#FF9800")
 
-                        
-                        # 使用 subprocess.run 不捕获输出，避免阻塞
-                        result = hidden_run(
-                            ["powershell.exe", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", install_script],
-                            cwd=self.base_dir,
-                            capture_output=False,
-                            text=True,
-                            timeout=1800
-                        )
-                        
-                        if result.returncode == 0:
+                        # 流式执行：逐行把 install-env.ps1 输出喂到 UI 日志，支持取消
+                        rc = self._stream_powershell(install_script, cwd=self.base_dir, timeout=1800)
+
+                        if rc == 0:
                             self._log("✅ 环境安装完成", "#4CAF50")
                             self.deploy_step_signal.emit("python_deps", "done")
                             self.deploy_step_signal.emit("frontend_deps", "done")
-                        else:
-                            self._log(f"[错误] 环境安装失败，返回码: {result.returncode}", "#F44336")
+                            # 更新标志：install-env 成功后环境已就绪，
+                            # 后续步骤5走快速验证而非完整智能修复
+                            environment_installed = True
+                        elif rc == -2:
+                            self._log("[信息] 环境安装已被取消", "#FF9800")
                             return
-                    except subprocess.TimeoutExpired:
-                        self._log("[错误] 环境安装超时(30分钟)，请手动运行安装脚本", "#F44336")
-                        self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
-                        return
+                        elif rc == -1:
+                            self._log("[错误] 环境安装超时(30分钟)，请手动运行安装脚本", "#F44336")
+                            self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
+                            return
+                        else:
+                            self._log(f"[错误] 环境安装失败，返回码: {rc}", "#F44336")
+                            return
                     except Exception as e:
                         self._log(f"[错误] 运行安装脚本失败: {e}", "#F44336")
                         self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
@@ -6179,9 +6353,21 @@ for d in deps:
             self.log_output.append("")
             # 刷新系统信息显示
             self._load_system_info()
+            # 初始化完成后，1秒后自动触发一键部署维护（新手引导）
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(1000, self._auto_deploy_after_init)
         else:
             self.log_output.append(f"❌ 初始化失败：{message}")
         self.log_output.append("=" * 60)
+    
+    def _auto_deploy_after_init(self):
+        """初始化完成后自动执行环境部署维护，完成后导航到模型管理"""
+        self._auto_deploy_initiated = True
+        self._log("[信息] 初始化完成，自动执行环境部署维护...", "#FF9800")
+        self._log("[信息] 部署完成后将自动跳转到模型管理页面下载主模型", "#FF9800")
+        # 切换到部署维护页面，让用户看到部署进度
+        self._switch_page(3)
+        self._deploy_maintenance()
     
     def _load_system_info(self):
         """加载并显示系统信息（高度紧凑）"""
@@ -6690,7 +6876,7 @@ for d in deps:
         <h3>日志查看</h3>
         <ul>
             <li>底部日志区域实时显示启动、运行、错误信息</li>
-            <li>可开启/关闭自动滚动以便查看历史日志</li>
+            <li>可开启/关闭「滚动」以便查看历史日志</li>
         </ul>
         """)
         layout.addWidget(help_text)
@@ -7690,7 +7876,14 @@ def extract_scripts():
         scripts_dir = app_dir / "scripts"
         scripts_dir.mkdir(exist_ok=True)
         
-        scripts_to_extract = ["install-env.ps1", "start.ps1"]
+        # 与 _ensure_scripts_available 的 scripts_to_check 对齐：把运行时会用到的
+        # 全部 ps1 都从 _MEI(base_path) 释放到 app/scripts/，避免"脚本不存在"。
+        scripts_to_extract = [
+            "install-env.ps1", "start.ps1", "start-all.ps1",
+            "run_server.ps1", "run_gradio.ps1", "run_npmgui.ps1",
+            "run_qinglong_backend.ps1", "run_qinglong_frontend.ps1",
+            "install-uv-qinglong.ps1", "acestep-sync.ps1",
+        ]
         
         for script_name in scripts_to_extract:
             src_path = base_path / script_name

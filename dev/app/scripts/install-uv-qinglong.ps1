@@ -1,3 +1,4 @@
+param([switch]$SkipModels)
 Set-Location $PSScriptRoot
 $projectRoot = $PSScriptRoot
 $data_dir = Join-Path $projectRoot "..\..\data"
@@ -78,13 +79,13 @@ if ($env:OS -ilike "*windows*") {
             $Env:UV_CACHE_DIR = ".cache"
         }
     }
-    $dataVenv = Join-Path $PSScriptRoot "..\..\data\.venv"
+    $dataVenv = Join-Path $PSScriptRoot ".venv"
     if (Test-Path "$dataVenv\Scripts\activate") {
-        Write-Output "Windows data\.venv"
+        Write-Output "Windows scripts\.venv"
         . "$dataVenv\Scripts\activate"
     }
     else {
-        Write-Output "Create data\.venv"
+        Write-Output "Create scripts\.venv"
         $dataDir = Join-Path $PSScriptRoot "..\..\data"
         if (-not (Test-Path $dataDir)) {
             New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
@@ -94,11 +95,11 @@ if ($env:OS -ilike "*windows*") {
     }
 }
 elseif (Test-Path "$dataVenv/bin/activate") {
-    Write-Output "Linux data\.venv"
+    Write-Output "Linux scripts\.venv"
     . "$dataVenv/bin/activate.ps1"
 }
 else {
-    Write-Output "Create data\.venv (Linux)"
+    Write-Output "Create scripts\.venv (Linux)"
     $dataDir = Join-Path $PSScriptRoot "..\..\data"
     if (-not (Test-Path $dataDir)) {
         New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
@@ -122,7 +123,7 @@ else {
 
 # ============= Step 1: Select DiT Model | 第一步：选择 DiT 模型 =====================
 Write-Output "`n=== DiT 模型下载 / DiT Model Download ==="
-$dit_choice = Read-Host "请选择要下载的 DiT 模型 [1/2/3/4/5/6/a/n] (默认为 n)
+if ($SkipModels) { $dit_choice = "n" } else { $dit_choice = Read-Host "请选择要下载的 DiT 模型 [1/2/3/4/5/6/a/n] (默认为 n)
 1: acestep-v15-turbo
 2: acestep-v15-base
 3: acestep-v15-sft
@@ -132,6 +133,7 @@ $dit_choice = Read-Host "请选择要下载的 DiT 模型 [1/2/3/4/5/6/a/n] (默
 a: 下载全部 DiT 模型 / Download all DiT models
 n: 跳过 DiT 下载 / Skip DiT download
 Please select DiT model [1/2/3/4/5/6/a/n] (default is n)"
+}
 
 $dit_models = @()
 if ($dit_choice -eq "1") {
@@ -166,13 +168,14 @@ elseif ($dit_choice -eq "" -or $dit_choice -eq "n") {
 
 # ============= Step 2: Select LM Model | 第二步：选择 LM 模型 =====================
 Write-Output "`n=== LM 模型下载 / LM Model Download ==="
-$lm_choice = Read-Host "请选择要下载的 LM 模型 [1/2/3/a/n] (默认为 n)
+if ($SkipModels) { $lm_choice = "n" } else { $lm_choice = Read-Host "请选择要下载的 LM 模型 [1/2/3/a/n] (默认为 n)
 1: acestep-5Hz-lm-1.7B
 2: acestep-5Hz-lm-0.6B (低显存 / Low VRAM)
 3: acestep-5Hz-lm-4B (高质量 / High Quality)
 a: 下载全部 LM 模型 / Download all LM models
 n: 跳过 LM 下载 / Skip LM download
 Please select LM model [1/2/3/a/n] (default is n)"
+}
 
 $lm_models = @()
 if ($lm_choice -eq "1") {

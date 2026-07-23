@@ -101,7 +101,8 @@ if ($AuthPassword -ne "none") {
 }
 
 # Directly use virtual environment python to avoid uv issues
-$venv_dir = Join-Path $project_root "..\data\.venv"
+# 统一使用 scripts/.venv（与 install-env.ps1 / main.py 保持一致）
+$venv_dir = Join-Path $PSScriptRoot ".venv"
 $python_exe = Join-Path $venv_dir "Scripts\python.exe"
 
 if (-not (Test-Path $python_exe)) {

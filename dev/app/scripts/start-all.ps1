@@ -16,7 +16,7 @@ Write-Host "\n[1/2] 启动 API 服务器..." -ForegroundColor Yellow
 $ApiServerJob = Start-Job -ScriptBlock {
     param($Root, $ScriptDir)
     Set-Location $Root
-    & "$ScriptDir\3、run_server.ps1"
+    & "$ScriptDir\run_server.ps1"
 } -ArgumentList $ProjectRoot, $ScriptDir
 
 # 等待API服务器启动

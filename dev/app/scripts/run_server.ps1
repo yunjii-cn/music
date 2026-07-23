@@ -42,7 +42,8 @@ $ext_args = [System.Collections.ArrayList]::new()
 [void]$ext_args.Add($ServerHost)
 
 # Directly use virtual environment python to avoid uv pyproject.toml checks
-$venv_dir = Join-Path (Split-Path $PSScriptRoot -Parent) "..\data\.venv"
+# 统一使用 scripts/.venv（与 install-env.ps1 / main.py 保持一致）
+$venv_dir = Join-Path $PSScriptRoot ".venv"
 $python_exe = Join-Path $venv_dir "Scripts\python.exe"
 
 if (-not (Test-Path $python_exe)) {

@@ -73,7 +73,10 @@ Write-Output "  步骤 3: 创建/激活虚拟环境"
 Write-Output "============================================================"
 Write-Output ""
 
-$venv_dir = Join-Path $PSScriptRoot "..\..\data\.venv"
+# 虚拟环境统一建在 scripts\.venv（与 main.py 的 find_venv_python / 各处检查一致）。
+# 历史坑：曾建在 ..\..\data\.venv，而 main.py 全程找 scripts\.venv，两者永不相交，
+# 导致每次都判"环境未安装"并重复跑十几分钟的安装。切勿再改回 data\.venv。
+$venv_dir = Join-Path $PSScriptRoot ".venv"
 $venv_activate = Join-Path $venv_dir "Scripts\Activate.ps1"
 
 # 检查现有虚拟环境的 PyTorch 版本
@@ -128,15 +131,11 @@ if (Test-Path $venv_activate) {
 
 # 创建或使用虚拟环境
 if (-not (Test-Path $venv_activate)) {
-    Write-Output "📦 创建新虚拟环境 (data\.venv)"
-    $data_dir = Join-Path $PSScriptRoot "..\..\data"
-    if (-not (Test-Path $data_dir)) {
-        New-Item -ItemType Directory -Path $data_dir -Force | Out-Null
-    }
+    Write-Output "📦 创建新虚拟环境 (scripts\.venv)"
     ~/.local/bin/uv venv -p 3.12 --seed $venv_dir
     . $venv_activate
 } else {
-    Write-Output "✅ 使用现有虚拟环境 (data\.venv)"
+    Write-Output "✅ 使用现有虚拟环境 (scripts\.venv)"
     . $venv_activate
 }
 
@@ -161,8 +160,9 @@ Write-Output "✅ PyTorch 生态系统安装完成"
 
 Write-Output ""
 Write-Output "📦 安装项目依赖..."
-Write-Output "   正在安装 transformers, diffusers, gradio 等核心依赖..."
-~/.local/bin/uv pip install transformers diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba peft lycoris-lora lightning tensorboard modelscope huggingface_hub safetensors vector-quantize-pytorch
+Write-Output "   正在安装 transformers, diffusers, gradio 等���心依赖..."
+Write-Output "   ⚠ 锁定 transformers<4.58.0 避免版本不兼容降级"
+~/.local/bin/uv pip install "transformers>=4.51.0,<4.58.0" diffusers gradio matplotlib scipy soundfile loguru einops accelerate fastapi diskcache uvicorn numba peft lycoris-lora lightning tensorboard modelscope huggingface_hub safetensors vector-quantize-pytorch
 if ($LASTEXITCODE -eq 0) {
     Write-Output "✅ 项目依赖安装完成"
 }
@@ -171,6 +171,38 @@ Write-Output ""
 Write-Output "📦 安装 flash_attn (性能优化)..."
 $flash_attn_wheel = "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl"
 $flash_attn_path = Join-Path $PSScriptRoot $flash_attn_wheel
+# 如果本地 wheel 不存在，尝试从下载页面获取
+if (-not (Test-Path $flash_attn_path)) {
+    $flash_attn_url = "https://github.com/yunjii-cn/music/releases/download/wheels/$flash_attn_wheel"
+    Write-Output "  本地 wheel 不存在，尝试从 URL 下载..."
+    Write-Output "  $flash_attn_url"
+    try {
+        # 使用 bitsadmin 或 curl 下载
+        $downloaded = $false
+        if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) {
+            $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
+            curl.exe -L -o "$temp_wheel" "$flash_attn_url" 2>$null
+            if ((Test-Path $temp_wheel) -and ((Get-Item $temp_wheel).Length -gt 1MB)) {
+                Move-Item $temp_wheel $flash_attn_path -Force
+                $downloaded = $true
+                Write-Output "  ✅ 下载完成"
+            }
+        }
+        if (-not $downloaded -and (Get-Command "bitsadmin" -ErrorAction SilentlyContinue)) {
+            bitsadmin /transfer "flash_attn_download" /download /priority high $flash_attn_url $flash_attn_path
+            if ((Test-Path $flash_attn_path) -and ((Get-Item $flash_attn_path).Length -gt 1MB)) {
+                $downloaded = $true
+                Write-Output "  ✅ 下载完成"
+            }
+        }
+        if (-not $downloaded) {
+            Write-Warning "⚠️ 无法下载 flash_attn wheel，跳过安装（不影响核心功能）"
+        }
+    } catch {
+        Write-Warning "⚠️ 下载 flash_attn 失败: $_"
+        Write-Output "   跳过 flash_attn 安装（不影响核心功能）"
+    }
+}
 if (Test-Path $flash_attn_path) {
     Write-Output "   正在安装 flash_attn..."
     ~/.local/bin/uv pip install $flash_attn_path
