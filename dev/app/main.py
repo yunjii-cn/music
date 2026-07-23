@@ -3356,14 +3356,32 @@ class MainWindow(QMainWindow):
             self.btn_cancel_deploy.setVisible(False)
             self.btn_cancel_deploy.setEnabled(True)
         
-        # 如果是初始化后的自动部署完成，导航到模型管理页面下载主模型
+        # 如果是初始化后的自动部署完成，导航到模型管理页面并自动下载主模型
         if getattr(self, '_auto_deploy_initiated', False):
             self._auto_deploy_initiated = False
             from PyQt6.QtCore import QTimer
             QTimer.singleShot(800, lambda: self._switch_page(1))
-            self._log("[信息] 环境已就绪，请到模型管理中下载主模型", "#4CAF50")
+            self._log("[信息] 环境已就绪，正在自动下载完整基础模型包...", "#2196F3")
+            QTimer.singleShot(1800, self._auto_download_main_model)
             self._log("[提示] 也可点击「启动」按钮立即运行应用", "#FF9800")
-    
+
+    def _auto_download_main_model(self):
+        """初始化后自动部署完成时，自动下载完整基础模型包（main）。
+
+        仅在主模型尚不存在、且当前无其它模型操作（下载/删除/校验）时才触发，
+        避免与用户手动操作冲突。失败仅告警，不阻断主流程。
+        """
+        try:
+            if getattr(self, 'is_downloading', False) or getattr(self, 'is_deleting', False) or getattr(self, 'is_verifying', False):
+                return
+            if self._check_main_model_exists():
+                self._log("[信息] 完整基础模型包已存在，跳过自动下载", "#4CAF50")
+                return
+            self._log("[信息] 正在自动下载完整基础模型包（文件较大，请耐心等待）...", "#2196F3")
+            self._download_model("main")
+        except Exception as e:
+            self._log(f"[警告] 自动下载基础模型包失败，请到模型管理手动下载: {e}", "#FF9800")
+
     def _check_environment(self):
         """环境检测"""
         self._log("========================================")
