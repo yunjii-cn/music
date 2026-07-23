@@ -173,42 +173,114 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 Write-Output ""
-Write-Output "📦 安装 flash_attn (性能优化)..."
+Write-Output "📦 安装 flash_attn (性能优化，仅 NVIDIA 显卡加速)..."
 $flash_attn_wheel = "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl"
 $flash_attn_path = Join-Path $PSScriptRoot $flash_attn_wheel
-# 如果本地 wheel 不存在，尝试从下载页面获取
-if (-not (Test-Path $flash_attn_path)) {
-    $flash_attn_url = "https://github.com/yunjii-cn/music/releases/download/wheels/$flash_attn_wheel"
-    Write-Output "  本地 wheel 不存在，尝试从 URL 下载..."
-    Write-Output "  $flash_attn_url"
-    try {
-        # 使用 bitsadmin 或 curl 下载
-        $downloaded = $false
-        if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) {
+
+# 候选下载源：GitHub 官方 + 国内可达镜像（ghproxy.net / mirror.ghproxy.com）
+# 安装时自动竞速：先探测各源首字节延迟，选最快可达源；失败自动顺延下一个。
+# 注：码云镜像待上传后，把对应 raw 地址追加进下方 $candidates 即可，竞速会自动纳入。
+$FA_BASE = $flash_attn_wheel
+$candidates = @(
+    "https://ghproxy.net/https://github.com/yunjii-cn/music/releases/download/wheels/$FA_BASE",
+    "https://mirror.ghproxy.com/https://github.com/yunjii-cn/music/releases/download/wheels/$FA_BASE",
+    "https://github.com/yunjii-cn/music/releases/download/wheels/$FA_BASE"
+)
+
+# ---- GPU 门控：仅 NVIDIA 且算力 >= SM75 (7.5) 才下载/安装 flash_attn ----
+$supportsFA = $false
+$faReason = ""
+try {
+    $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+    if ($smi) {
+        $gpuInfo = & nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader,nounits 2>$null
+        if ($LASTEXITCODE -eq 0 -and $gpuInfo) {
+            $line = ($gpuInfo -split "`n")[0]
+            $parts = $line -split ","
+            $gpuName = $parts[0].Trim()
+            $capStr = $parts[-1].Trim()
+            if ($capStr -match '^(\d+)\.(\d+)$') {
+                $major = [int]$Matches[1]; $minor = [int]$Matches[2]
+                $cap = $major + $minor / 10.0
+                if ($cap -ge 7.5) {
+                    $supportsFA = $true
+                    Write-Output "  ✅ 检测到兼容显卡: $gpuName (算力 $($cap.ToString('0.0')))"
+                } else {
+                    $faReason = "当前显卡 $gpuName 算力 $($cap.ToString('0.0')) 低于 SM75(7.5)，不支持 Flash Attention"
+                }
+            } else {
+                $faReason = "无法解析显卡算力: $capStr"
+            }
+        } else {
+            $faReason = "nvidia-smi 未返回显卡信息"
+        }
+    } else {
+        $faReason = "未检测到 NVIDIA 显卡驱动 (nvidia-smi 不存在)"
+    }
+} catch {
+    $supportsFA = $true   # 探测异常时保守允许尝试
+    $faReason = "显卡探测异常: $_（仍尝试安装）"
+}
+
+function Get-FastestMirror {
+    param([string[]]$Urls)
+    $ranked = @()
+    foreach ($u in $Urls) {
+        try {
+            $out = & curl.exe -s -m 8 -o NUL -r 0-0 -w "%{time_starttransfer}" $u 2>$null
+            if ($LASTEXITCODE -eq 0 -and $out -match '^[0-9]') {
+                $t = [double]::Parse($out, [System.Globalization.CultureInfo]::InvariantCulture)
+                $ranked += [PSCustomObject]@{Url=$u; T=$t}
+            }
+        } catch {}
+    }
+    # 若探测全部失败（如 curl 不支持 -r），退回原始顺序
+    if ($ranked.Count -eq 0) {
+        foreach ($u in $Urls) { $ranked += [PSCustomObject]@{Url=$u; T=0} }
+    }
+    return ($ranked | Sort-Object T | ForEach-Object { $_.Url })
+}
+
+if (-not $supportsFA) {
+    Write-Warning "⚠️ $faReason"
+    Write-Output "   跳过 flash_attn 安装，将使用标准推理（SDPA / eager attention，速度略慢但不影响功能）"
+    Write-Output "   如需 Flash Attention 加速，请使用 NVIDIA RTX 20/30/40 系及以上显卡，并确保驱动支持 CUDA 12.8"
+}
+if ($supportsFA -and -not (Test-Path $flash_attn_path)) {
+    Write-Output "  本地 wheel 不存在，开始竞速选择最快下载源..."
+    $ordered = Get-FastestMirror $candidates
+    $downloaded = $false
+    foreach ($u in $ordered) {
+        try {
+            Write-Output "  🏁 尝试源: $u"
             $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
-            curl.exe -L -o "$temp_wheel" "$flash_attn_url" 2>$null
+            & curl.exe -L -m 600 -o "$temp_wheel" "$u" 2>$null
             if ((Test-Path $temp_wheel) -and ((Get-Item $temp_wheel).Length -gt 1MB)) {
                 Move-Item $temp_wheel $flash_attn_path -Force
                 $downloaded = $true
-                Write-Output "  ✅ 下载完成"
+                Write-Output "  ✅ 下载完成 (源: $u)"
+                break
             }
+        } catch {
+            Write-Warning "  ⚠️ 该源下载失败，尝试下一个"
         }
-        if (-not $downloaded -and (Get-Command "bitsadmin" -ErrorAction SilentlyContinue)) {
-            bitsadmin /transfer "flash_attn_download" /download /priority high $flash_attn_url $flash_attn_path
+    }
+    if (-not $downloaded -and (Get-Command "bitsadmin" -ErrorAction SilentlyContinue)) {
+        Write-Output "  curl 全部失败，bitsadmin 兜底..."
+        foreach ($u in $ordered) {
+            bitsadmin /transfer "flash_attn_dl" /download /priority high $u $flash_attn_path 2>$null
             if ((Test-Path $flash_attn_path) -and ((Get-Item $flash_attn_path).Length -gt 1MB)) {
                 $downloaded = $true
-                Write-Output "  ✅ 下载完成"
+                Write-Output "  ✅ 下载完成 (bitsadmin)"
+                break
             }
         }
-        if (-not $downloaded) {
-            Write-Warning "⚠️ 无法下载 flash_attn wheel，跳过安装（不影响核心功能）"
-        }
-    } catch {
-        Write-Warning "⚠️ 下载 flash_attn 失败: $_"
-        Write-Output "   跳过 flash_attn 安装（不影响核心功能）"
+    }
+    if (-not $downloaded) {
+        Write-Warning "⚠️ 无法下载 flash_attn wheel，跳过安装（不影响核心功能）"
     }
 }
-if (Test-Path $flash_attn_path) {
+if ($supportsFA -and (Test-Path $flash_attn_path)) {
     Write-Output "   正在安装 flash_attn..."
     ~/.local/bin/uv pip install $flash_attn_path
     if ($LASTEXITCODE -eq 0) {

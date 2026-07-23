@@ -138,6 +138,40 @@ def hidden_popen(*args, **kwargs):
             kwargs['creationflags'] = _HIDDEN_FLAGS
     return subprocess.Popen(*args, **kwargs)
 
+
+def _gpu_supports_flash_attn():
+    """检测当前机器是否支持 flash_attn（需 NVIDIA 显卡，算力 >= SM75 / 7.5）。
+
+    返回 (supported: bool, reason: str)。
+    探测失败时不阻断：保守返回 (True, 说明)，由后续安装失败兜底逻辑处理。
+    """
+    import shutil as _shutil
+    try:
+        nvidia_smi = _shutil.which("nvidia-smi") or _shutil.which("nvidia-smi.exe")
+        if not nvidia_smi:
+            return False, "未检测到 NVIDIA 显卡驱动（nvidia-smi 不存在）"
+        out = subprocess.run(
+            [nvidia_smi, "--query-gpu=name,compute_cap", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if out.returncode != 0 or not out.stdout.strip():
+            return False, "nvidia-smi 未返回显卡信息"
+        line = out.stdout.strip().splitlines()[0]
+        parts = [p.strip() for p in line.split(",")]
+        name = parts[0] if parts else "未知显卡"
+        cap_str = parts[-1] if len(parts) > 1 else ""
+        m = re.search(r"(\d+)\.(\d+)", cap_str)
+        if not m:
+            return False, f"无法解析显卡算力: {cap_str}"
+        major, minor = int(m.group(1)), int(m.group(2))
+        cap = major + minor / 10.0
+        if cap < 7.5:
+            return False, f"当前显卡 {name} 算力 {cap:.1f} 低于 SM75 (7.5)，不支持 Flash Attention"
+        return True, f"检测到兼容显卡: {name} (算力 {cap:.1f})"
+    except Exception as e:
+        return True, f"显卡探测异常({e})，仍尝试安装"
+
+
 # PyQt6 imports
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -3926,7 +3960,7 @@ class MainWindow(QMainWindow):
         ]
         # 可选加速 - 缺失只影响性能，不影响功能（部署维护时会自动安装）
         optional_deps = [
-            ("flash_attn", "Flash Attention 加速推理（推荐安装）"),
+            ("flash_attn", "Flash Attention 加速推理（推荐 NVIDIA 显卡）"),
         ]
         
         all_ok = True
@@ -5414,7 +5448,10 @@ for d in deps:
                 process.communicate(timeout=600)
                 
                 flash_attn_wheel = os.path.join(self.base_dir, "scripts", "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl")
-                if os.path.exists(flash_attn_wheel):
+                _fa_ok, _fa_reason = _gpu_supports_flash_attn()
+                if os.path.exists(flash_attn_wheel) and not _fa_ok:
+                    self._log(f"[信息] 跳过 flash_attn 安装：{_fa_reason}（将使用标准推理，不影响功能）", "#FF9800")
+                if os.path.exists(flash_attn_wheel) and _fa_ok:
                     self._log("[信息] 安装 flash_attn 加速库...")
                     process = hidden_popen(
                         [uv_path, "pip", "install", "--python", venv_python, "--reinstall-package", "flash-attn", "--refresh", flash_attn_wheel],
@@ -5900,10 +5937,13 @@ for d in deps:
                 self._log("5. 执行智能修复（安装前端依赖等）...")
                 self._smart_fix_environment()
             
-            # 6. 安装 flash_attn 加速库（如果有 wheel 文件）
+            # 6. 安装 flash_attn 加速库（需 NVIDIA 显卡，算力 >= SM75 / 7.5）
             venv_python = self._find_venv_python()
             flash_attn_wheel = os.path.join(self.base_dir, "scripts", "flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl")
-            if os.path.exists(venv_python) and os.path.exists(flash_attn_wheel):
+            _fa_ok, _fa_reason = _gpu_supports_flash_attn()
+            if os.path.exists(venv_python) and os.path.exists(flash_attn_wheel) and not _fa_ok:
+                self._log(f"[信息] 跳过 flash_attn 安装：{_fa_reason}（将使用标准推理 SDPA，不影响功能）", "#FF9800")
+            if os.path.exists(venv_python) and os.path.exists(flash_attn_wheel) and _fa_ok:
                 try:
                     process = hidden_popen(
                         [venv_python, "-c", "import flash_attn; print(flash_attn.__version__)"],
