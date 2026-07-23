@@ -187,13 +187,15 @@ $candidates = @(
     "https://github.com/yunjii-cn/music/releases/download/wheels/$FA_BASE"
 )
 
-# 码云(Gitee) 镜像占位模板（当前为注释，不参与竞速）：
-#   待用户将 wheel 拖入 Gitee `yunjii/music` 的 `wheels` release（id 758333）后，
-#   把下方直链行的行首 # 去掉即可被竞速自动纳入（成为第 4 个候选源）。
-#   直链二选一（推荐 raw，无需登录即可下载）：
-#     - raw:  https://gitee.com/yunjii/music/raw/main/wheels/$FA_BASE
-#     - 附件: https://gitee.com/yunjii/music/attach_files/<附件id>/download
-# "https://gitee.com/yunjii/music/raw/main/wheels/$FA_BASE",
+# 码云(Gitee) 镜像：Gitee 单附件上限 100MB，wheel 250MB 无法整包上传，
+# 故切成 3 个分卷（part1=90MiB, part2=90MiB, part3≈59MiB）上传到 `wheels` release。
+# 作为国内兜底源：仅当上方 GitHub 单文件竞速全部失败时，才下载 3 片并拼接还原。
+$giteeParts = @(
+    "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part1",
+    "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part2",
+    "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part3"
+)
+$faExpectedSize = 250851873
 
 # ---- GPU 门控：仅 NVIDIA 且算力 >= SM75 (7.5) 才下载/安装 flash_attn ----
 $supportsFA = $false
@@ -249,6 +251,47 @@ function Get-FastestMirror {
     return ($ranked | Sort-Object T | ForEach-Object { $_.Url })
 }
 
+# 码云分卷下载+拼接：Gitee 单文件 100MB 上限，wheel 分 3 片上传，这里下载后流式拼接还原。
+function Download-GiteeMultipart {
+    param([string]$DestPath, [string[]]$PartUrls, [int64]$ExpectedSize)
+    $partFiles = @()
+    $ok = $true
+    for ($i = 0; $i -lt $PartUrls.Count; $i++) {
+        $u = $PartUrls[$i]
+        $tmp = Join-Path $env:TEMP "flash_attn_wheel.part$($i + 1)"
+        Write-Output "  🏁 码云分卷 ($($i + 1)/$($PartUrls.Count)): $u"
+        & curl.exe -L -m 600 -o "$tmp" "$u" 2>$null
+        if (-not (Test-Path $tmp) -or (Get-Item $tmp).Length -lt 1MB) {
+            Write-Warning "  ⚠️ 分卷 $($i + 1) 下载失败"
+            $ok = $false
+            break
+        }
+        $partFiles += $tmp
+    }
+    if ($ok) {
+        try {
+            $out = [System.IO.File]::Create($DestPath)
+            foreach ($p in $partFiles) {
+                $in = [System.IO.File]::OpenRead($p)
+                $in.CopyTo($out)
+                $in.Close()
+            }
+            $out.Close()
+            $finalLen = (Get-Item $DestPath).Length
+            if ($ExpectedSize -gt 0 -and $finalLen -ne $ExpectedSize) {
+                Write-Warning "  ⚠️ 拼接后大小 $finalLen 与预期 $ExpectedSize 不符，可能损坏"
+                return $false
+            }
+            Write-Output "  ✅ 码云分卷下载并拼接完成 ($finalLen 字节)"
+            return $true
+        } catch {
+            Write-Warning "  ⚠️ 拼接失败: $_"
+            return $false
+        }
+    }
+    return $false
+}
+
 if (-not $supportsFA) {
     Write-Warning "⚠️ $faReason"
     Write-Output "   跳过 flash_attn 安装，将使用标准推理（SDPA / eager attention，速度略慢但不影响功能）"
@@ -283,6 +326,10 @@ if ($supportsFA -and -not (Test-Path $flash_attn_path)) {
                 break
             }
         }
+    }
+    if (-not $downloaded) {
+        Write-Output "  单文件源均失败，尝试码云分卷兜底..."
+        $downloaded = Download-GiteeMultipart $flash_attn_path $giteeParts $faExpectedSize
     }
     if (-not $downloaded) {
         Write-Warning "⚠️ 无法下载 flash_attn wheel，跳过安装（不影响核心功能）"
