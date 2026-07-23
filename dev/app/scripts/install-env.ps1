@@ -179,7 +179,7 @@ $flash_attn_path = Join-Path $PSScriptRoot $flash_attn_wheel
 
 # 候选下载源：GitHub 官方 + 国内可达镜像（ghproxy.net / mirror.ghproxy.com）
 # 安装时自动竞速：先探测各源首字节延迟，选最快可达源；失败自动顺延下一个。
-# 注：码云镜像待上传后，把对应 raw 地址追加进下方 $candidates 即可，竞速会自动纳入。
+# 若单文件源竞速全部失败，则走码云(Gitee)分卷（国内本地源，可靠更快），最后才用 bitsadmin 直连 GitHub 兜底。
 $FA_BASE = $flash_attn_wheel
 $candidates = @(
     "https://ghproxy.net/https://github.com/yunjii-cn/music/releases/download/wheels/$FA_BASE",
@@ -189,7 +189,7 @@ $candidates = @(
 
 # 码云(Gitee) 镜像：Gitee 单附件上限 100MB，wheel 250MB 无法整包上传，
 # 故切成 3 个分卷（part1=90MiB, part2=90MiB, part3≈59MiB）上传到 `wheels` release。
-# 作为国内兜底源：仅当上方 GitHub 单文件竞速全部失败时，才下载 3 片并拼接还原。
+# 作为国内优先兜底：GitHub 单文件竞速全部失败后，立即下载 3 片拼接还原（比 bitsadmin 直连 GitHub 快）。
 $giteeParts = @(
     "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part1",
     "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part2",
@@ -236,17 +236,15 @@ function Get-FastestMirror {
     param([string[]]$Urls)
     $ranked = @()
     foreach ($u in $Urls) {
+        # 探测失败（如 GitHub 重定向拒绝 range 请求）不丢弃，仅排到最后仍尝试真实下载
+        $t = 999.0
         try {
             $out = & curl.exe -s -m 8 -o NUL -r 0-0 -w "%{time_starttransfer}" $u 2>$null
             if ($LASTEXITCODE -eq 0 -and $out -match '^[0-9]') {
                 $t = [double]::Parse($out, [System.Globalization.CultureInfo]::InvariantCulture)
-                $ranked += [PSCustomObject]@{Url=$u; T=$t}
             }
         } catch {}
-    }
-    # 若探测全部失败（如 curl 不支持 -r），退回原始顺序
-    if ($ranked.Count -eq 0) {
-        foreach ($u in $Urls) { $ranked += [PSCustomObject]@{Url=$u; T=0} }
+        $ranked += [PSCustomObject]@{Url=$u; T=$t}
     }
     return ($ranked | Sort-Object T | ForEach-Object { $_.Url })
 }
@@ -316,8 +314,14 @@ if ($supportsFA -and -not (Test-Path $flash_attn_path)) {
             Write-Warning "  ⚠️ 该源下载失败，尝试下一个"
         }
     }
+    # 单文件竞速全部失败 → 先试码云分卷（国内本地源，可靠更快）
+    if (-not $downloaded) {
+        Write-Output "  单文件源竞速均失败，尝试码云分卷兜底（国内源）..."
+        $downloaded = Download-GiteeMultipart $flash_attn_path $giteeParts $faExpectedSize
+    }
+    # 码云也失败 → bitsadmin 直连 GitHub 作为绝对兜底（国内可能较慢）
     if (-not $downloaded -and (Get-Command "bitsadmin" -ErrorAction SilentlyContinue)) {
-        Write-Output "  curl 全部失败，bitsadmin 兜底..."
+        Write-Output "  bitsadmin 直连 GitHub 兜底..."
         foreach ($u in $ordered) {
             bitsadmin /transfer "flash_attn_dl" /download /priority high $u $flash_attn_path 2>$null
             if ((Test-Path $flash_attn_path) -and ((Get-Item $flash_attn_path).Length -gt 1MB)) {
@@ -326,10 +330,6 @@ if ($supportsFA -and -not (Test-Path $flash_attn_path)) {
                 break
             }
         }
-    }
-    if (-not $downloaded) {
-        Write-Output "  单文件源均失败，尝试码云分卷兜底..."
-        $downloaded = Download-GiteeMultipart $flash_attn_path $giteeParts $faExpectedSize
     }
     if (-not $downloaded) {
         Write-Warning "⚠️ 无法下载 flash_attn wheel，跳过安装（不影响核心功能）"
