@@ -277,6 +277,24 @@ def build_exe():
     scripts_dir = ROOT_DIR / "scripts"
     if scripts_dir.exists():
         ps1_scripts = list(scripts_dir.glob("*.ps1"))
+        # 打包前强制校验所有 .ps1 语法（历史教训：try/catch 括号配对错，
+        # ParserError 会让整个部署脚本一行都不执行；宁可拒绝构建也不出坏包）
+        if ps1_scripts:
+            import subprocess as _sp
+            _paths = ";".join(str(p) for p in ps1_scripts)
+            _check = (
+                "$bad=0; '" + _paths + "'.Split(';') | ForEach-Object { "
+                "$e=$null; $t=$null; "
+                "[System.Management.Automation.Language.Parser]::ParseFile($_, [ref]$t, [ref]$e) | Out-Null; "
+                "if ($e) { $bad=1; Write-Output (\"PS1-SYNTAX-ERROR: \" + $_ + \" -> \" + $e[0].Message) } }; exit $bad"
+            )
+            _r = _sp.run(["powershell", "-NoProfile", "-Command", _check],
+                         capture_output=True, text=True)
+            if _r.returncode != 0:
+                print("  ❌ PowerShell 脚本语法校验失败，终止构建：")
+                print((_r.stdout or "") + (_r.stderr or ""))
+                sys.exit(1)
+            print(f"  ✓ {len(ps1_scripts)} 个 .ps1 语法校验通过")
         for ps1 in ps1_scripts:
             pyinstaller_args.extend(["--add-data", f"{str(ps1)};."])
             print(f"  已添加脚本: {ps1.name}")

@@ -377,9 +377,9 @@ if ($supportsFA -and -not (Test-Path $flash_attn_path)) {
         Write-Output "   应用将以标准注意力(SDPA)运行，功能完整、仅生成速度略慢。"
         Write-Output "   如需 Flash Attention 加速，可在网络通畅后重跑一键部署，或手动下载安装。"
     }
-}
-} catch {
+ } catch {
     Write-Warning "⚠️ flash_attn 下载过程发生异常（已忽略，不影响环境安装）: $_"
+ }
 }
 if ($supportsFA -and (Test-Path $flash_attn_path)) {
     Write-Output "   正在安装 flash_attn..."
