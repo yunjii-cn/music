@@ -17,7 +17,11 @@ Write-Output ""
 
 Write-Output "🔧 配置国内镜像源..."
 $Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
-$Env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu128"
+# ⚠️ 千万不要全局设置 UV_EXTRA_INDEX_URL=download.pytorch.org！
+# 历史坑(2026-07-26)：全局 extra-index 会让 uv 连装 pip/wheel-stub 这类纯 PyPI 包
+# 都先去 download.pytorch.org 查询；该官源在国内时通时断(tls handshake eof)，
+# 一断则 venv 种子包/基础依赖第一步就失败，整个部署直接挂掉。
+# PyTorch CUDA 轮子只在"安装 torch"那一条命令里显式指定索引（国内镜像优先+官方兜底）。
 $Env:UV_CACHE_DIR = Join-Path $data_dir ".uv_cache"
 $Env:HF_HOME = Join-Path $data_dir "huggingface"
 # 以下变量原由 install-uv-qinglong.ps1 设置，合并保留（中国镜像 / CUDA / LFS 友好）
@@ -26,7 +30,7 @@ $Env:PIP_DISABLE_IP_VERSION_CHECK = "1"
 $Env:GIT_LFS_SKIP_SMUDGE = "1"
 if ($env:CUDA_PATH) { $Env:CUDA_HOME = $env:CUDA_PATH }
 Write-Output "   PyPI 镜像: https://pypi.tuna.tsinghua.edu.cn/simple/"
-Write-Output "   PyTorch 镜像: https://download.pytorch.org/whl/cu128"
+Write-Output "   PyTorch 源: 阿里云镜像优先，官方 cu128 兜底（仅安装 torch 时使用）"
 Write-Output ""
 
 # Function to check last command and exit on failure
@@ -138,6 +142,7 @@ if (Test-Path $venv_activate) {
 if (-not (Test-Path $venv_activate)) {
     Write-Output "📦 创建新虚拟环境 (scripts\.venv)"
     ~/.local/bin/uv venv -p 3.12 --seed $venv_dir
+    Check "❌ 创建虚拟环境失败（种子包下载失败，请检查网络后重跑一键部署）"
     . $venv_activate
 } else {
     Write-Output "✅ 使用现有虚拟环境 (scripts\.venv)"
@@ -159,8 +164,15 @@ Check "❌ 安装基础依赖失败"
 Write-Output ""
 Write-Output "📦 安装 PyTorch 生态系统..."
 Write-Output "   正在安装 torch 2.9.0, torchaudio 2.9.0 (CUDA 12.8)..."
-~/.local/bin/uv pip install torch==2.9.0 torchaudio==2.9.0
-Check "❌ PyTorch 安装失败"
+# ① 优先阿里云 PyTorch 轮子镜像（国内直连稳定；--find-links 平铺目录，依赖仍走清华 PyPI）
+Write-Output "   ① 尝试阿里云 PyTorch 镜像..."
+~/.local/bin/uv pip install "torch==2.9.0+cu128" "torchaudio==2.9.0+cu128" --find-links "https://mirrors.aliyun.com/pytorch-wheels/cu128/"
+if ($LASTEXITCODE -ne 0) {
+    # ② 兜底：PyTorch 官方 cu128 索引（仅此一条命令使用，失败不影响其它步骤的 PyPI 源）
+    Write-Warning "⚠️ 阿里云镜像不可用，回退 PyTorch 官方源..."
+    ~/.local/bin/uv pip install torch==2.9.0 torchaudio==2.9.0 --extra-index-url "https://download.pytorch.org/whl/cu128"
+}
+Check "❌ PyTorch 安装失败（阿里云镜像与官方源均不可达，请检查网络后重跑一键部署）"
 Write-Output "✅ PyTorch 生态系统安装完成"
 
 Write-Output ""

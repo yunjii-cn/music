@@ -3408,25 +3408,30 @@ class MainWindow(QMainWindow):
             self.btn_cancel_deploy.setVisible(False)
             self.btn_cancel_deploy.setEnabled(True)
 
-        # 停止状态进度条动画并定格为完成态（仅在部署运行过时）
+        # 部署是否真正成功（install-env.ps1 exit 0）——由部署线程结尾写入实例属性。
+        # 注意：environment_installed 是部署线程的局部变量，不能在此直接引用，
+        # 必须用实例属性，否则会 NameError 导致进程闪退（2026-07-25 血泪教训）。
+        deploy_ok = getattr(self, '_env_installed_in_last_deploy', False)
+
+        # 停止状态进度条动画并按真实结果定格（失败绝不显示"✅ 完成"误导用户）
         if getattr(self, '_deploy_progress_active', False):
-            self._deploy_progress_stop("✅ 部署维护完成")
-        
-        # 如果是初始化后的自动部署完成，导航到模型管理页面并自动下载主模型
+            if deploy_ok:
+                self._deploy_progress_stop("✅ 部署维护完成")
+            else:
+                self._deploy_progress_stop("❌ 部署未完成，请查看日志后重跑")
+
+        # 如果是初始化后的自动部署：仅当环境真正就绪才跳转模型管理并自动下载主模型；
+        # 失败时留在部署页，让用户直接看到错误日志（此前失败也无条件跳走，用户误以为部署已完成）。
         if getattr(self, '_auto_deploy_initiated', False):
             self._auto_deploy_initiated = False
             from PyQt6.QtCore import QTimer
-            QTimer.singleShot(800, lambda: self._switch_page(1))
-            # 仅当环境真正就绪（install-env 成功）才自动下载模型；
-            # 否则（超时/失败）绝不假装"环境已就绪"去下模型，避免下到半残环境里报错。
-            # 注意：environment_installed 是部署线程的局部变量，不能在此直接引用，
-            # 必须用实例属性（部署线程结尾写入 self._env_installed_in_last_deploy），否则会 NameError 导致进程闪退。
-            if getattr(self, '_env_installed_in_last_deploy', False):
+            if deploy_ok:
+                QTimer.singleShot(800, lambda: self._switch_page(1))
                 self._log("[信息] 环境已就绪，正在自动下载完整基础模型包...", "#2196F3")
                 QTimer.singleShot(1800, self._auto_download_main_model)
                 self._log("[提示] 也可点击「启动」按钮立即运行应用", "#FF9800")
             else:
-                self._log("[警告] 环境未完全就绪，已跳过自动下载；请手动重跑「一键部署维护」或查看上方日志", "#FF9800")
+                self._log("[警告] 环境未完全就绪，已跳过自动下载和页面跳转；请查看上方日志排错后重跑「一键部署维护」", "#FF9800")
 
     def _deploy_progress_start(self, text="正在部署维护..."):
         """启动"下载源与按钮之间"那条状态进度条的滚动动画 + 状态文字。
@@ -6047,7 +6052,7 @@ for d in deps:
                             self._log("[信息] 环境安装已被取消", "#FF9800")
                             return
                         elif rc == -1:
-                            self._log("[错误] 环境安装超时(30分钟)，请手动运行安装脚本", "#F44336")
+                            self._log("[错误] 环境安装超时(90分钟)，请手动运行安装脚本", "#F44336")
                             self._log("[建议] 请手动运行 scripts/install-env.ps1 脚本", "#FF9800")
                             return
                         else:
