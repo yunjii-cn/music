@@ -585,6 +585,39 @@ def find_venv_python(base_dir: str) -> str:
     return os.path.normpath(os.path.join(base_dir, "scripts", ".venv", "Scripts", "python.exe"))
 
 
+def resolve_acestep_syspath(start_dir: str) -> str:
+    """解析包含 acestep 包的目录（应加入 PYTHONPATH，以便 `python -m acestep.model_downloader`）。
+
+    start_dir 通常为 base_dir（app/）。为兼容各种目录布局（如 base_dir 落到
+    app/scripts、或 acestep 处在更上层），向上遍历 start_dir 及其祖先目录，
+    寻找含 acestep/__init__.py 或 acestep/model_downloader.py 的目录，
+    返回该目录（acestep 包的父目录）。找不到则返回 start_dir 本身。
+    """
+    import glob as _glob
+    roots = []
+    d = os.path.abspath(start_dir)
+    for _ in range(6):
+        if d not in roots:
+            roots.append(d)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    for root in roots:
+        acp = os.path.join(root, "acestep")
+        if os.path.isdir(acp) and (
+            os.path.isfile(os.path.join(acp, "__init__.py"))
+            or os.path.isfile(os.path.join(acp, "model_downloader.py"))
+        ):
+            return root
+    # 兜底：任意层级 glob 查找 acestep/model_downloader.py
+    for root in roots:
+        hits = _glob.glob(os.path.join(root, "**", "acestep", "model_downloader.py"), recursive=True)
+        if hits:
+            return os.path.dirname(os.path.dirname(os.path.abspath(hits[0])))
+    return os.path.abspath(start_dir)
+
+
 # 下载器子进程输出中属于“进度刷新”的行（tqdm 进度条 / 速度 / 百分比等），
 # 这类行刷新极快（约每秒一条）。运行日志只按固定间隔记录，避免刷屏。
 _DOWNLOAD_PROGRESS_RE = re.compile(
@@ -646,16 +679,32 @@ class ModelDownloadThread(QThread):
                 cmd_args.append("--force")
             
             cmd_str = " ".join(f'"{arg}"' if ' ' in arg else arg for arg in cmd_args)
-            
+
+            # 解析 acestep 包所在父目录（兼容 base_dir 落点偏差 / 不同目录布局），
+            # 否则 venv 里 `python -m acestep.model_downloader` 会报
+            # ModuleNotFoundError: No module named 'acestep'。
+            acestep_parent = resolve_acestep_syspath(self.base_dir)
+            if not os.path.isdir(os.path.join(acestep_parent, "acestep")):
+                self.log_received.emit(
+                    "[错误] 未找到 acestep 推理模块（预期位于 "
+                    f"{os.path.join(self.base_dir, 'acestep')}）。\n"
+                    "        通常是部署目录不完整所致：请使用 build-version.py 生成的「完整发布文件夹」\n"
+                    "        （内含 app/acestep、app/ace-step-ui、app/scripts 等），不要只复制 exe 与部分 app 文件。\n"
+                    "        若您有项目源码，可将 dev/app/acestep 整个文件夹复制到 "
+                    f"{self.base_dir}/acestep 后重试。"
+                )
+                self.download_finished.emit(False, "缺少 acestep 模块")
+                return
+
             cmd = [
                 "powershell.exe",
                 "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
                 "-NoProfile",
-                # 注入 PYTHONPATH=base_dir（与 run_gradio.ps1 / run_server.ps1 一致），
+                # 注入 acestep 包父目录到 PYTHONPATH 并 cd 过去（与 run_gradio.ps1 一致），
                 # 否则 venv 里 `python -m acestep.model_downloader` 会报
                 # ModuleNotFoundError: No module named 'acestep'。
-                "-Command", f"$env:PYTHONPATH = '{self.base_dir}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{self.base_dir}'; {cmd_str}"
+                "-Command", f"$env:PYTHONPATH = '{acestep_parent}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{acestep_parent}'; {cmd_str}"
             ]
             
             self.current_progress = 15
@@ -774,16 +823,29 @@ class ModelDeleteThread(QThread):
             
             cmd_args = [venv_python, "-m", "acestep.model_downloader", "--delete", self.model_name]
             cmd_str = " ".join(f'"{arg}"' if ' ' in arg else arg for arg in cmd_args)
-            
+
+            # 解析 acestep 包所在父目录（兼容 base_dir 落点偏差 / 不同目录布局），
+            # 否则 venv 里 `python -m acestep.model_downloader` 会报
+            # ModuleNotFoundError: No module named 'acestep'。
+            acestep_parent = resolve_acestep_syspath(self.base_dir)
+            if not os.path.isdir(os.path.join(acestep_parent, "acestep")):
+                self.log_received.emit(
+                    "[错误] 未找到 acestep 推理模块（预期位于 "
+                    f"{os.path.join(self.base_dir, 'acestep')}），无法执行删除。\n"
+                    "        请使用 build-version.py 生成的「完整发布文件夹」（内含 app/acestep 等）。"
+                )
+                self.delete_finished.emit(False, "缺少 acestep 模块")
+                return
+
             cmd = [
                 "powershell.exe",
                 "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
                 "-NoProfile",
-                # 注入 PYTHONPATH=base_dir（与 run_gradio.ps1 / run_server.ps1 一致），
+                # 注入 acestep 包父目录到 PYTHONPATH 并 cd 过去，
                 # 否则 venv 里 `python -m acestep.model_downloader` 会报
                 # ModuleNotFoundError: No module named 'acestep'。
-                "-Command", f"$env:PYTHONPATH = '{self.base_dir}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{self.base_dir}'; {cmd_str}"
+                "-Command", f"$env:PYTHONPATH = '{acestep_parent}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{acestep_parent}'; {cmd_str}"
             ]
             
 
@@ -832,7 +894,7 @@ class ModelVerifyThread(QThread):
         """使用官方严格验证逻辑 - 与 API 端点 /api/generate/models/verify 一致"""
         try:
             import sys
-            sys.path.insert(0, os.path.join(self.base_dir))
+            sys.path.insert(0, resolve_acestep_syspath(self.base_dir))
             
             try:
                 from acestep.model_downloader import verify_model, get_checkpoints_dir
@@ -7112,7 +7174,7 @@ for d in deps:
         """获取模型验证信息 - 与青龙训练器前端 /api/generate/models 保持一致"""
         try:
             import sys
-            sys.path.insert(0, self.base_dir)
+            sys.path.insert(0, resolve_acestep_syspath(self.base_dir))
             from acestep.model_downloader import check_model_exists, verify_model, get_checkpoints_dir
             checkpoints_dir = get_checkpoints_dir()
             is_installed = check_model_exists(model_name, checkpoints_dir)
@@ -7310,7 +7372,7 @@ for d in deps:
         """检查主模型是否存在 - 使用与model_downloader.py相同的逻辑"""
         try:
             import sys
-            sys.path.insert(0, self.base_dir)
+            sys.path.insert(0, resolve_acestep_syspath(self.base_dir))
             from acestep.model_downloader import check_main_model_exists, get_checkpoints_dir
             return check_main_model_exists(get_checkpoints_dir())
         except Exception as e:
@@ -7336,7 +7398,7 @@ for d in deps:
         """检查模型是否存在 - 使用与model_downloader.py相同的逻辑"""
         try:
             import sys
-            sys.path.insert(0, self.base_dir)
+            sys.path.insert(0, resolve_acestep_syspath(self.base_dir))
             from acestep.model_downloader import check_model_exists, get_checkpoints_dir
             return check_model_exists(model_name, get_checkpoints_dir())
         except Exception as e:

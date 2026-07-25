@@ -333,51 +333,57 @@ if ($supportsFA -and -not (Test-Path $flash_attn_path)) {
         return (((Get-Date) - $faStart).TotalSeconds -lt $faBudgetSec)
     }
 
-    # 1) 优先：码云(Gitee)分卷（国内源，已上传验证，通常最快最稳）
+    # 统一下载函数：成功返回 $true，失败返回 $false。
+    # 关键：内部吞掉一切异常（curl 失败/网络抖动都不抛出），确保某个源失败
+    # 后绝不中断后续源的尝试 —— 历史坑：Gitee 失败时若异常外溢会跳过 GitHub 兜底。
+    function Invoke-FaDownload {
+        param([string]$Url, [string]$OutPath, [int]$TimeoutSec)
+        try {
+            & curl.exe -sSL --connect-timeout 20 -m $TimeoutSec -o "$OutPath" "$Url" 2>$null
+        } catch {}
+        if ((Test-Path $OutPath) -and ((Get-Item $OutPath).Length -gt 1MB)) {
+            return $true
+        }
+        # 可能是 Gitee 返回的 HTML 错误页（过小），清理避免误判
+        if (Test-Path $OutPath) { Remove-Item $OutPath -Force -ErrorAction SilentlyContinue }
+        return $false
+    }
+
+    # ① 优先：码云(Gitee)分卷（国内源，已上传验证，通常最快最稳）
     if (Test-FaBudget) {
         Write-Output "  优先尝试码云分卷（国内源）..."
         $downloaded = Download-GiteeMultipart $flash_attn_path $giteeParts $faExpectedSize
     }
 
-    # 2) 兜底：GitHub 镜像竞速（连接超时 + 每源上限 + 总预算）
-    if (-not $downloaded) {
+    # ② 兜底：GitHub 镜像竞速（ghproxy.net / mirror.ghproxy.com / 官方源），逐个尝试
+    if (-not $downloaded -and (Test-FaBudget)) {
         $ordered = Get-FastestMirror $candidates
         foreach ($u in $ordered) {
             if (-not (Test-FaBudget)) {
                 Write-Warning "  ⏱️ 已达总预算 $faBudgetSec`s，放弃 flash_attn 下载"
                 break
             }
-            try {
-                Write-Output "  🏁 尝试源: $u"
-                $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
-                & curl.exe -L --connect-timeout 20 -m 180 -o "$temp_wheel" "$u" 2>$null
-                if ((Test-Path $temp_wheel) -and ((Get-Item $temp_wheel).Length -gt 1MB)) {
-                    $sz = (Get-Item $temp_wheel).Length
-                    Write-Output "  ⬇️ 已下载 $([math]::Round($sz/1MB, 1)) MB"
-                    Move-Item $temp_wheel $flash_attn_path -Force
-                    $downloaded = $true
-                    Write-Output "  ✅ 下载完成 (源: $u)"
-                    break
-                } else {
-                    Write-Warning "  ⚠️ 该源未返回有效文件，尝试下一个"
-                }
-            } catch {
-                Write-Warning "  ⚠️ 该源下载异常，尝试下一个"
+            Write-Output "  🏁 尝试源: $u"
+            $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
+            if (Invoke-FaDownload $u $temp_wheel 180) {
+                $sz = (Get-Item $temp_wheel).Length
+                Write-Output "  ⬇️ 已下载 $([math]::Round($sz/1MB, 1)) MB"
+                Move-Item $temp_wheel $flash_attn_path -Force
+                $downloaded = $true
+                Write-Output "  ✅ 下载完成 (源: $u)"
+                break
+            } else {
+                Write-Warning "  ⚠️ 该源未返回有效文件，尝试下一个"
             }
         }
     }
 
-    # 3) 绝对兜底：GitHub 官方源直连（仍带超时，绝不无限挂起）
+    # ③ 绝对兜底：GitHub 官方源直连（仍带超时，绝不无限挂起）
     if (-not $downloaded -and (Test-FaBudget)) {
         $gh = $candidates[-1]
         Write-Output "  ⏳ 最后尝试 GitHub 官方源直连（带超时）..."
         $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
-        try {
-            & curl.exe -L --connect-timeout 20 -m 300 -o "$temp_wheel" "$gh" 2>$null
-        } catch {
-            Write-Warning "  ⚠️ GitHub 官方源下载异常，跳过 flash_attn: $_"
-        }
-        if ((Test-Path $temp_wheel) -and ((Get-Item $temp_wheel).Length -gt 1MB)) {
+        if (Invoke-FaDownload $gh $temp_wheel 300) {
             Move-Item $temp_wheel $flash_attn_path -Force
             $downloaded = $true
             Write-Output "  ✅ 下载完成 (GitHub 官方源)"
