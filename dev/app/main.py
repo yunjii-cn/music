@@ -569,6 +569,19 @@ def find_venv_python(base_dir: str) -> str:
         norm = os.path.normpath(candidate)
         if os.path.exists(norm):
             return norm
+    # 兜底：在 base_dir 及其一级子目录下搜索任意 .venv/Scripts/python.exe，
+    # 防止目录结构微调（如 relocate 后 base_dir 指向偏差）导致漏判“环境未就绪”。
+    try:
+        import glob as _glob
+        for root in (base_dir,
+                     os.path.join(base_dir, "app"),
+                     os.path.dirname(base_dir),
+                     os.path.join(os.path.dirname(base_dir), "app")):
+            hits = _glob.glob(os.path.join(root, "**", ".venv", "Scripts", "python.exe"), recursive=True)
+            if hits:
+                return os.path.normpath(hits[0])
+    except Exception:
+        pass
     return os.path.normpath(os.path.join(base_dir, "scripts", ".venv", "Scripts", "python.exe"))
 
 
@@ -639,7 +652,10 @@ class ModelDownloadThread(QThread):
                 "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
                 "-NoProfile",
-                "-Command", f"cd '{self.base_dir}'; {cmd_str}"
+                # 注入 PYTHONPATH=base_dir（与 run_gradio.ps1 / run_server.ps1 一致），
+                # 否则 venv 里 `python -m acestep.model_downloader` 会报
+                # ModuleNotFoundError: No module named 'acestep'。
+                "-Command", f"$env:PYTHONPATH = '{self.base_dir}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{self.base_dir}'; {cmd_str}"
             ]
             
             self.current_progress = 15
@@ -764,7 +780,10 @@ class ModelDeleteThread(QThread):
                 "-WindowStyle", "Hidden",
                 "-ExecutionPolicy", "Bypass",
                 "-NoProfile",
-                "-Command", f"cd '{self.base_dir}'; {cmd_str}"
+                # 注入 PYTHONPATH=base_dir（与 run_gradio.ps1 / run_server.ps1 一致），
+                # 否则 venv 里 `python -m acestep.model_downloader` 会报
+                # ModuleNotFoundError: No module named 'acestep'。
+                "-Command", f"$env:PYTHONPATH = '{self.base_dir}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{self.base_dir}'; {cmd_str}"
             ]
             
 
@@ -1540,7 +1559,7 @@ class MainWindow(QMainWindow):
         self._setup_ui_skeleton()
         
         self.log_signal.connect(self._append_log_to_ui)
-        self.enable_buttons_signal.connect(self._enable_buttons)
+        self.enable_buttons_signal.connect(self._safe_enable_buttons)
         self.deploy_step_signal.connect(self._update_deploy_step)
         
         self.resize(1200, 1100)
@@ -3076,7 +3095,7 @@ class MainWindow(QMainWindow):
             if not os.path.exists(uv_path):
                 self._log("[错误] uv 未安装，请先运行环境检测", "#F44336")
                 self.is_starting = False
-                self._enable_buttons()
+                self.enable_buttons_signal.emit()
                 return
             
             if project_id == "qinglong":
@@ -3084,7 +3103,7 @@ class MainWindow(QMainWindow):
                 if not os.path.exists(venv_path):
                     self._log("[错误] 虚拟环境不存在，请先运行部署维护", "#F44336")
                     self.is_starting = False
-                    self._enable_buttons()
+                    self.enable_buttons_signal.emit()
                     return
                 
                 # 检查虚拟环境中是否有 loguru 模块，确保依赖已安装
@@ -3165,7 +3184,7 @@ class MainWindow(QMainWindow):
                         if not os.path.exists(api_script):
                             self._log(f"[错误] API 服务脚本不存在: {api_script}", "#F44336")
                             self.is_starting = False
-                            self._enable_buttons()
+                            self.enable_buttons_signal.emit()
                             return
                         
                         
@@ -3226,7 +3245,7 @@ class MainWindow(QMainWindow):
                         if not api_ready:
                             self._log("[错误] 核心 API 服务启动超时", "#F44336")
                             self.is_starting = False
-                            self._enable_buttons()
+                            self.enable_buttons_signal.emit()
                             return
                         self._log("✓ 核心 API 服务已就绪")
                     else:
@@ -3236,7 +3255,7 @@ class MainWindow(QMainWindow):
                     import traceback
                     self._log(f"错误详情: {traceback.format_exc()}", "#F44336")
                     self.is_starting = False
-                    self._enable_buttons()
+                    self.enable_buttons_signal.emit()
                     return
             
             if project_id == "qinglong":
@@ -3362,10 +3381,22 @@ class MainWindow(QMainWindow):
         finally:
             self.is_starting = False
             try:
-                self._enable_buttons()
+                self.enable_buttons_signal.emit()
             except:
                 pass
     
+    def _safe_enable_buttons(self):
+        """线程安全的按钮恢复（吞掉任何异常，避免跨线程槽异常导致进程静默闪退）"""
+        try:
+            self._enable_buttons()
+        except Exception as e:
+            import traceback
+            print("[_safe_enable_buttons 异常] " + traceback.format_exc())
+            try:
+                self._log(f"[错误] 恢复按钮状态异常: {e}", "#F44336")
+            except Exception:
+                pass
+
     def _enable_buttons(self):
         """启用所有按钮"""
         self.is_starting = False
@@ -3386,9 +3417,16 @@ class MainWindow(QMainWindow):
             self._auto_deploy_initiated = False
             from PyQt6.QtCore import QTimer
             QTimer.singleShot(800, lambda: self._switch_page(1))
-            self._log("[信息] 环境已就绪，正在自动下载完整基础模型包...", "#2196F3")
-            QTimer.singleShot(1800, self._auto_download_main_model)
-            self._log("[提示] 也可点击「启动」按钮立即运行应用", "#FF9800")
+            # 仅当环境真正就绪（install-env 成功）才自动下载模型；
+            # 否则（超时/失败）绝不假装"环境已就绪"去下模型，避免下到半残环境里报错。
+            # 注意：environment_installed 是部署线程的局部变量，不能在此直接引用，
+            # 必须用实例属性（部署线程结尾写入 self._env_installed_in_last_deploy），否则会 NameError 导致进程闪退。
+            if getattr(self, '_env_installed_in_last_deploy', False):
+                self._log("[信息] 环境已就绪，正在自动下载完整基础模型包...", "#2196F3")
+                QTimer.singleShot(1800, self._auto_download_main_model)
+                self._log("[提示] 也可点击「启动」按钮立即运行应用", "#FF9800")
+            else:
+                self._log("[警告] 环境未完全就绪，已跳过自动下载；请手动重跑「一键部署维护」或查看上方日志", "#FF9800")
 
     def _deploy_progress_start(self, text="正在部署维护..."):
         """启动"下载源与按钮之间"那条状态进度条的滚动动画 + 状态文字。
@@ -5324,9 +5362,8 @@ for d in deps:
                 self._log(f"[错误] 安装 {component} 失败: {e}", "#F44336")
             finally:
                 self.is_starting = False
-                if hasattr(self, 'btn_one_click_deploy'):
-                    self.btn_one_click_deploy.setEnabled(True)
-                self._update_bottom_bar()
+                # 后台线程中恢复按钮必须走信号（跨线程直接操作 widget 会原生崩溃）
+                self.enable_buttons_signal.emit()
         
         t = threading.Thread(target=_install, daemon=True)
         t.start()
@@ -5641,7 +5678,7 @@ for d in deps:
         if hasattr(self, 'btn_cancel_deploy'):
             self.btn_cancel_deploy.setEnabled(False)
 
-    def _stream_powershell(self, script_path, cwd, timeout=1800):
+    def _stream_powershell(self, script_path, cwd, timeout=5400):
         """流式运行 PowerShell 脚本：逐行把输出实时喂到部署日志，支持取消。
 
         返回值：脚本 returncode；取消返回 -2；超时返回 -1；启动失败返回 -3。
@@ -5971,6 +6008,7 @@ for d in deps:
                     self._log("[信息] 检测到虚拟环境不完整（缺 torch 等核心包），将重新安装...", "#FF9800")
 
             environment_installed = bool(os.path.exists(uv_path) and venv_complete)
+            self._env_installed_in_last_deploy = environment_installed
             if environment_installed:
                 ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
                 if os.path.exists(ace_step_ui_path):
@@ -5993,7 +6031,9 @@ for d in deps:
                         self._log("[信息] 下方将实时显示安装进度，如需中断可点「取消」。", "#FF9800")
 
                         # 流式执行：逐行把 install-env.ps1 输出喂到 UI 日志，支持取消
-                        rc = self._stream_powershell(install_script, cwd=self.base_dir, timeout=1800)
+                        # 超时放宽到 90 分钟：torch 2.7GB 在国内慢速网络下实测需 40+ 分钟，
+                        # 原 30 分钟(1800s)会把正常安装误杀，导致环境装到一半就判失败、后续依赖/校验全没跑。
+                        rc = self._stream_powershell(install_script, cwd=self.base_dir, timeout=5400)
 
                         if rc == 0:
                             self._log("✅ 环境安装完成", "#4CAF50")
@@ -6002,6 +6042,7 @@ for d in deps:
                             # 更新标志：install-env 成功后环境已就绪，
                             # 后续步骤5走快速验证而非完整智能修复
                             environment_installed = True
+                            self._env_installed_in_last_deploy = True
                         elif rc == -2:
                             self._log("[信息] 环境安装已被取消", "#FF9800")
                             return
@@ -7087,8 +7128,49 @@ for d in deps:
         except Exception as e:
             return {"integrity_status": "missing", "integrity_details": None}
 
+    def _get_model_size_bytes(self, model_name, checkpoints_dir):
+        """计算模型在磁盘上的占用字节数（main 为主模型 4 个组件之和）。"""
+        try:
+            from acestep.model_downloader import MAIN_MODEL_COMPONENTS, _get_directory_size
+        except Exception:
+            return 0
+        total = 0
+        try:
+            if model_name == "main":
+                for comp in MAIN_MODEL_COMPONENTS:
+                    p = checkpoints_dir / comp
+                    if p.exists():
+                        total += _get_directory_size(p)
+            else:
+                p = checkpoints_dir / model_name
+                if p.exists():
+                    total += _get_directory_size(p)
+        except Exception:
+            return total
+        return total
+
+    @staticmethod
+    def _format_size(n):
+        """把字节数格式化为易读字符串。"""
+        if not n or n <= 0:
+            return "未下载"
+        gb = n / (1024 ** 3)
+        if gb >= 1:
+            return f"{gb:.2f} GB"
+        mb = n / (1024 ** 2)
+        if mb >= 1:
+            return f"{mb:.1f} MB"
+        return f"{n / 1024:.0f} KB"
+
     def _load_model_list(self):
-        """加载模型列表 - 与青龙训练器前端模型描述保持同步"""
+        """加载模型列表 - 与青龙训练器前端模型描述保���同步"""
+        # 计算各模型磁盘占用所需的 checkpoints 目录
+        try:
+            from acestep.model_downloader import get_checkpoints_dir
+            _ckpt_dir = Path(get_checkpoints_dir())
+        except Exception:
+            _ckpt_dir = Path(self.base_dir) / "data" / "models"
+
         MODEL_SHORT_NAMES = {
             "acestep-v15-base": "1.5B",
             "acestep-v15-sft": "1.5S",
@@ -7214,7 +7296,11 @@ for d in deps:
                 "integrity_status": verify_info["integrity_status"],
                 "integrity_details": verify_info["integrity_details"],
             })
-    
+
+        # 填充磁盘占用大小（用于模型管理表格的「大小」项）
+        for _m in self.model_list:
+            _m["size_bytes"] = self._get_model_size_bytes(_m["name"], _ckpt_dir)
+
     def _check_main_model_exists(self):
         """检查主模型是否存在 - 使用与model_downloader.py相同的逻辑"""
         try:
@@ -7683,7 +7769,13 @@ for d in deps:
                 status_label = QLabel(status_text)
                 status_label.setStyleSheet(f"font-size: 11px; color: {status_color}; font-weight: bold;")
                 row1.addWidget(status_label)
-                
+
+                # 文件大小项（用户反馈：模型管理表格此前缺这一列）
+                size_text = self._format_size(model.get("size_bytes", 0))
+                size_label = QLabel(f"💾 {size_text}")
+                size_label.setStyleSheet("font-size: 11px; color: #66BB6A;")
+                row1.addWidget(size_label)
+
                 # 按钮区域
                 btn_layout = QHBoxLayout()
                 btn_layout.setSpacing(4)
@@ -8022,7 +8114,10 @@ def extract_scripts():
             src_path = base_path / script_name
             dest_path = scripts_dir / script_name
             
-            if src_path.exists() and not dest_path.exists():
+            # 始终用打包版本覆盖磁盘上的旧脚本：确保 install-env.ps1 等修复能随新 exe 生效，
+            # 避免"旧脚本不更新导致同样的 bug 反复出现"（曾因 not dest_path.exists() 判定，
+            # 首次解压后旧 bug 脚本永远不被覆盖，部署卡死问题无法靠换 exe 修复）。
+            if src_path.exists():
                 try:
                     shutil.copy2(src_path, dest_path)
                 except Exception:
@@ -8161,6 +8256,46 @@ def _force_close_splash(window, splash):
         pass
 
 
+class SafeApplication(QApplication):
+    """捕获事件分发（含跨线程信号槽）中的未处理异常，避免 PyQt6 静默闪退。
+    任何在事件循环里抛出的 Python 异常（例如后台线程经信号槽回调主线程时
+    未捕获的异常）都会被这里兜住：记录到 crash_log.txt + 标准错误，
+    并让程序继续运行，而不是悄无声息地消失。"""
+    def notify(self, receiver, event):
+        try:
+            return super().notify(receiver, event)
+        except Exception:
+            import traceback as _tb
+            _msg = "[SafeApplication.notify] 已捕获未处理异常并阻止闪退:\n" + _tb.format_exc()
+            sys.stderr.write(_msg + "\n")
+            _write_crash_log(_msg)
+            return False
+
+
+def _write_crash_log(msg):
+    """把崩溃级异常追加写到 exe 同目录的 crash_log.txt，便于排查。"""
+    try:
+        import os as _os
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            _base = _os.path.dirname(sys.executable)
+        else:
+            _base = _os.getcwd()
+        _path = _os.path.join(_base, "crash_log.txt")
+        from datetime import datetime as _dt
+        with open(_path, "a", encoding="utf-8") as _f:
+            _f.write(_dt.now().strftime("%Y-%m-%d %H:%M:%S") + "\n" + msg + "\n\n")
+    except Exception:
+        pass
+
+
+def _global_excepthook(exc_type, exc_value, exc_tb):
+    """主线程未捕获异常的兜底：记录而非直接崩。"""
+    import traceback as _tb
+    _msg = "".join(_tb.format_exception(exc_type, exc_value, exc_tb))
+    sys.stderr.write("[global_excepthook] " + _msg)
+    _write_crash_log("[主线程未捕获异常]\n" + _msg)
+
+
 def main(app=None, splash=None):
     # 解析自部署清理参数：删除首次运行前的原始（便携）exe
     cleanup_target = None
@@ -8178,10 +8313,13 @@ def main(app=None, splash=None):
     if "--no-dedup" not in sys.argv:
         _kill_old_instances_sync()
 
+    # 安全网：捕获主线程未处理异常，避免静默崩溃（与 SafeApplication.notify 双保险）
+    sys.excepthook = _global_excepthook
+    
     extract_scripts()
     
     if app is None:
-        app = QApplication(sys.argv)
+        app = SafeApplication(sys.argv)
 
     app.setQuitOnLastWindowClosed(False)
     app.setStyle('Fusion')

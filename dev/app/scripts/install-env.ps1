@@ -179,7 +179,9 @@ $flash_attn_path = Join-Path $PSScriptRoot $flash_attn_wheel
 
 # 候选下载源：GitHub 官方 + 国内可达镜像（ghproxy.net / mirror.ghproxy.com）
 # 安装时自动竞速：先探测各源首字节延迟，选最快可达源；失败自动顺延下一个。
-# 若单文件源竞速全部失败，则走码云(Gitee)分卷（国内本地源，可靠更快），最后才用 bitsadmin 直连 GitHub 兜底。
+# 下载顺序：① 优先码云(Gitee)分卷（国内本地源，已上传验证，通常最快最稳）；
+# ② 失败再竞速 GitHub 镜像（ghproxy.net / mirror.ghproxy.com / 官方源）；③ 仍失败则 GitHub 官方源直连兜底。
+# 全程受 $faBudgetSec 总预算约束，任何一步都不会无限挂起。
 $FA_BASE = $flash_attn_wheel
 $candidates = @(
     "https://ghproxy.net/https://github.com/yunjii-cn/music/releases/download/wheels/$FA_BASE",
@@ -189,13 +191,15 @@ $candidates = @(
 
 # 码云(Gitee) 镜像：Gitee 单附件上限 100MB，wheel 250MB 无法整包上传，
 # 故切成 3 个分卷（part1=90MiB, part2=90MiB, part3≈59MiB）上传到 `wheels` release。
-# 作为国内优先兜底：GitHub 单文件竞速全部失败后，立即下载 3 片拼接还原（比 bitsadmin 直连 GitHub 快）。
+# 作为国内优先下载源：GitHub 单文件竞速全部失败后，立即下载 3 片拼接还原（国内源通常比直连 GitHub 快）。
 $giteeParts = @(
     "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part1",
     "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part2",
     "https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part3"
 )
 $faExpectedSize = 250851873
+# flash_attn 仅为性能优化包，绝不允许它把整个部署卡死。给一个硬性总时间预算（秒），超时即放弃并继续部署。
+$faBudgetSec = 600
 
 # ---- GPU 门控：仅 NVIDIA 且算力 >= SM75 (7.5) 才下载/安装 flash_attn ----
 $supportsFA = $false
@@ -250,20 +254,34 @@ function Get-FastestMirror {
 }
 
 # 码云分卷下载+拼接：Gitee 单文件 100MB 上限，wheel 分 3 片上传，这里下载后流式拼接还原。
+# 每片带连接超时与单片上限；整体受 $faBudgetSec 总预算约束，绝不会无限挂起。
 function Download-GiteeMultipart {
     param([string]$DestPath, [string[]]$PartUrls, [int64]$ExpectedSize)
     $partFiles = @()
     $ok = $true
     for ($i = 0; $i -lt $PartUrls.Count; $i++) {
-        $u = $PartUrls[$i]
-        $tmp = Join-Path $env:TEMP "flash_attn_wheel.part$($i + 1)"
-        Write-Output "  🏁 码云分卷 ($($i + 1)/$($PartUrls.Count)): $u"
-        & curl.exe -L -m 600 -o "$tmp" "$u" 2>$null
-        if (-not (Test-Path $tmp) -or (Get-Item $tmp).Length -lt 1MB) {
-            Write-Warning "  ⚠️ 分卷 $($i + 1) 下载失败"
+        if (((Get-Date) - $faStart).TotalSeconds -ge $faBudgetSec) {
+            Write-Warning "  ⏱️ 码云下载已超总预算，放弃"
             $ok = $false
             break
         }
+        $u = $PartUrls[$i]
+        $tmp = Join-Path $env:TEMP "flash_attn_wheel.part$($i + 1)"
+        Write-Output "  🏁 码云分卷 ($($i + 1)/$($PartUrls.Count)): $u"
+        try {
+            & curl.exe -L --connect-timeout 20 -m 300 -o "$tmp" "$u" 2>$null
+        } catch {
+            Write-Warning "  ⚠️ 分卷 $($i + 1) 下载异常，跳过: $_"
+            $ok = $false
+            break
+        }
+        if (-not (Test-Path $tmp) -or (Get-Item $tmp).Length -lt 1MB) {
+            Write-Warning "  ⚠️ 分卷 $($i + 1) 下载失败或过小"
+            $ok = $false
+            break
+        }
+        $sz = (Get-Item $tmp).Length
+        Write-Output "  ⬇️ 分卷 $($i + 1) 已下载 $([math]::Round($sz/1MB, 1)) MB"
         $partFiles += $tmp
     }
     if ($ok) {
@@ -296,48 +314,80 @@ if (-not $supportsFA) {
     Write-Output "   如需 Flash Attention 加速，请使用 NVIDIA RTX 20/30/40 系及以上显卡，并确保驱动支持 CUDA 12.8"
 }
 if ($supportsFA -and -not (Test-Path $flash_attn_path)) {
-    Write-Output "  本地 wheel 不存在，开始竞速选择最快下载源..."
-    $ordered = Get-FastestMirror $candidates
+ try {
+    $faStart = Get-Date
     $downloaded = $false
-    foreach ($u in $ordered) {
-        try {
-            Write-Output "  🏁 尝试源: $u"
-            $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
-            & curl.exe -L -m 600 -o "$temp_wheel" "$u" 2>$null
-            if ((Test-Path $temp_wheel) -and ((Get-Item $temp_wheel).Length -gt 1MB)) {
-                Move-Item $temp_wheel $flash_attn_path -Force
-                $downloaded = $true
-                Write-Output "  ✅ 下载完成 (源: $u)"
-                break
-            }
-        } catch {
-            Write-Warning "  ⚠️ 该源下载失败，尝试下一个"
-        }
+    function Test-FaBudget {
+        return (((Get-Date) - $faStart).TotalSeconds -lt $faBudgetSec)
     }
-    # 单文件竞速全部失败 → 先试码云分卷（国内本地源，可靠更快）
-    if (-not $downloaded) {
-        Write-Output "  单文件源竞速均失败，尝试码云分卷兜底（国内源）..."
+
+    # 1) 优先：码云(Gitee)分卷（国内源，已上传验证，通常最快最稳）
+    if (Test-FaBudget) {
+        Write-Output "  优先尝试码云分卷（国内源）..."
         $downloaded = Download-GiteeMultipart $flash_attn_path $giteeParts $faExpectedSize
     }
-    # 码云也失败 → bitsadmin 直连 GitHub 作为绝对兜底（国内可能较慢）
-    if (-not $downloaded -and (Get-Command "bitsadmin" -ErrorAction SilentlyContinue)) {
-        Write-Output "  bitsadmin 直连 GitHub 兜底..."
+
+    # 2) 兜底：GitHub 镜像竞速（连接超时 + 每源上限 + 总预算）
+    if (-not $downloaded) {
+        $ordered = Get-FastestMirror $candidates
         foreach ($u in $ordered) {
-            bitsadmin /transfer "flash_attn_dl" /download /priority high $u $flash_attn_path 2>$null
-            if ((Test-Path $flash_attn_path) -and ((Get-Item $flash_attn_path).Length -gt 1MB)) {
-                $downloaded = $true
-                Write-Output "  ✅ 下载完成 (bitsadmin)"
+            if (-not (Test-FaBudget)) {
+                Write-Warning "  ⏱️ 已达总预算 $faBudgetSec`s，放弃 flash_attn 下载"
                 break
+            }
+            try {
+                Write-Output "  🏁 尝试源: $u"
+                $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
+                & curl.exe -L --connect-timeout 20 -m 180 -o "$temp_wheel" "$u" 2>$null
+                if ((Test-Path $temp_wheel) -and ((Get-Item $temp_wheel).Length -gt 1MB)) {
+                    $sz = (Get-Item $temp_wheel).Length
+                    Write-Output "  ⬇️ 已下载 $([math]::Round($sz/1MB, 1)) MB"
+                    Move-Item $temp_wheel $flash_attn_path -Force
+                    $downloaded = $true
+                    Write-Output "  ✅ 下载完成 (源: $u)"
+                    break
+                } else {
+                    Write-Warning "  ⚠️ 该源未返回有效文件，尝试下一个"
+                }
+            } catch {
+                Write-Warning "  ⚠️ 该源下载异常，尝试下一个"
             }
         }
     }
-    if (-not $downloaded) {
-        Write-Warning "⚠️ 无法下载 flash_attn wheel，跳过安装（不影响核心功能）"
+
+    # 3) 绝对兜底：GitHub 官方源直连（仍带超时，绝不无限挂起）
+    if (-not $downloaded -and (Test-FaBudget)) {
+        $gh = $candidates[-1]
+        Write-Output "  ⏳ 最后尝试 GitHub 官方源直连（带超时）..."
+        $temp_wheel = Join-Path $env:TEMP $flash_attn_wheel
+        try {
+            & curl.exe -L --connect-timeout 20 -m 300 -o "$temp_wheel" "$gh" 2>$null
+        } catch {
+            Write-Warning "  ⚠️ GitHub 官方源下载异常，跳过 flash_attn: $_"
+        }
+        if ((Test-Path $temp_wheel) -and ((Get-Item $temp_wheel).Length -gt 1MB)) {
+            Move-Item $temp_wheel $flash_attn_path -Force
+            $downloaded = $true
+            Write-Output "  ✅ 下载完成 (GitHub 官方源)"
+        }
     }
+
+    if (-not $downloaded) {
+        Write-Warning "⚠️ 无法在 $faBudgetSec`s 内下载 flash_attn wheel，跳过安装"
+        Write-Output "   应用将以标准注意力(SDPA)运行，功能完整、仅生成速度略慢。"
+        Write-Output "   如需 Flash Attention 加速，可在网络通畅后重跑一键部署，或手动下载安装。"
+    }
+}
+} catch {
+    Write-Warning "⚠️ flash_attn 下载过程发生异常（已忽略，不影响环境安装）: $_"
 }
 if ($supportsFA -and (Test-Path $flash_attn_path)) {
     Write-Output "   正在安装 flash_attn..."
-    ~/.local/bin/uv pip install $flash_attn_path
+    try {
+        ~/.local/bin/uv pip install $flash_attn_path
+    } catch {
+        Write-Warning "⚠️ flash_attn 安装异常，继续: $_"
+    }
     if ($LASTEXITCODE -eq 0) {
         Write-Output "✅ flash_attn 安装完成"
     } else {
@@ -359,3 +409,6 @@ Write-Output ""
 Write-Output "下一步："
 Write-Output "1. 点击启动按钮运行服务"
 Write-Output "2. 在模型管理中下载所需模型"
+
+# flash_attn 仅为可选性能优化；无论其成功与否，环境安装均视为成功（exit 0）。
+exit 0

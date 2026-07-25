@@ -29,3 +29,10 @@
 ## 文件/目录约定
 - `dev/app/` = 应用源码（git 管理）；`dev/dist/` = 裸单文件 exe（gitignore）；`dev/_build/` = 发布文件夹（含 exe+app/+data/，gitignore）；`dev/data/` = 用户数据（gitignore）。
 - `BAK/` 下是备份（含被改名的旧 `build-version.py`），现行用 `dev/app/` 下的。
+
+## flash_attn wheel 分发（2026-07-24 定稿）
+- wheel = `flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl`（250,851,873 字节，250MB）。**不打包进 exe**（exe 仅 37MB），走运行时下载。
+- **GPU 门控**：仅 NVIDIA 且算力 ≥ SM75（RTX 20/30/40 系）才装 flash_attn；非 N 卡/老卡/CPU 跳过并提示用标准推理（SDPA）。门控在 `main.py` 两处 + `install-env.ps1` 主路径（`_gpu_supports_flash_attn` / `$supportsFA`）。
+- **下载源（install-env.ps1）**：① GitHub 官方 release（`yunjii-cn/music` 的 `wheels`）+ ② `ghproxy.net` 镜像 + ③ `mirror.ghproxy.com` 镜像 → 安装时 `Get-FastestMirror` 竞速选最快 → bitsadmin 兜底 → ④ **码云分卷兜底**。
+- **码云关键坑**：① 上传端点是 **`attach_files`** 不是 `attachments`（后者 404）；② Gitee 单附件 **100MB 硬上限**，250MB 整包传会被 400 拒；③ Git LFS 免费版报 `paid or trial enterprise` 不可用。**解法 = 分卷**：切 3 片（90MiB+90MiB+59MiB）逐片 `attach_files` 上传到 `yunjii/music` 的 `wheels` release，直链 `https://gitee.com/yunjii/music/releases/download/wheels/flash_attn_wheel.part{1,2,3}`；`Download-GiteeMultipart` 流式下载+`FileStream` 拼接+校验总字节 250851873。
+- Gitee 账号 `ifany`（id 5702327）名下 `yunjii/music`；`wheels` release id=758333。

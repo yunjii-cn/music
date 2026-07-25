@@ -896,6 +896,17 @@ export const translations = {
     hideTensorboard: 'Hide TensorBoard',
     openInNewTab: 'Open in New Tab',
 
+    // One-click Data Preparation
+    oneClickDataPrep: 'One-click Data Preparation',
+    oneClickDataPrepHint: 'Scan → Transcribe lyrics → Auto-label → Preprocess, all in one go',
+    dataPrepAudioFolder: 'Audio Folder',
+    dataPrepDatasetName: 'Dataset Name',
+    dataPrepTag: 'Activation Tag (optional)',
+    dataPrepHasVocals: 'Songs contain vocals (transcribe lyrics)',
+    startDataPrep: 'Prepare Data',
+    dataPrepTensorReady: 'Tensor dir (ready for training)',
+    dataPrepFolderRequired: 'Please enter the audio folder path',
+
     // Training Status Messages
     scanning: 'Scanning...',
     autoLabeling: 'Auto-labeling...',
@@ -1821,6 +1832,17 @@ export const translations = {
     hideTensorboard: '隐藏 TensorBoard',
     openInNewTab: '在新标签页打开',
 
+    // One-click Data Preparation
+    oneClickDataPrep: '训练数据一键准备',
+    oneClickDataPrepHint: '扫描 → 歌词转写 → 自动标注 → 预处理，一步到位',
+    dataPrepAudioFolder: '音频文件夹',
+    dataPrepDatasetName: '数据集名称',
+    dataPrepTag: '激活标签（可选）',
+    dataPrepHasVocals: '歌曲含人声（自动转写歌词）',
+    startDataPrep: '一键准备',
+    dataPrepTensorReady: '张量目录（可直接训练）',
+    dataPrepFolderRequired: '请输入音频文件夹路径',
+
     // Training Status Messages
     scanning: '扫描中...',
     autoLabeling: '自动标注中...',
@@ -2745,6 +2767,15 @@ export const translations = {
     openInNewTab: '新しいタブで開く',
 
     // Training Status Messages
+    oneClickDataPrep: '学習データワンクリック準備',
+    oneClickDataPrepHint: 'スキャン → 歌詞書き起こし → 自動ラベル → 前処理を一括実行',
+    dataPrepAudioFolder: 'オーディオフォルダ',
+    dataPrepDatasetName: 'データセット名',
+    dataPrepTag: 'アクティベーションタグ（任意）',
+    dataPrepHasVocals: 'ボーカルあり（歌詞を自動書き起こし）',
+    startDataPrep: 'ワンクリック準備',
+    dataPrepTensorReady: 'テンソルディレクトリ（学習可能）',
+    dataPrepFolderRequired: 'オーディオフォルダのパスを入力してください',
     scanning: 'スキャン中...',
     autoLabeling: '自動ラベル付け中...',
     autoLabelPreparing: '準備中...',
@@ -3658,6 +3689,15 @@ export const translations = {
     trainingLog: '훈련 로그',
 
     // Training Status Messages
+    oneClickDataPrep: '학습 데이터 원클릭 준비',
+    oneClickDataPrepHint: '스캔 → 가사 전사 → 자동 라벨링 → 전처리를 한 번에',
+    dataPrepAudioFolder: '오디오 폴더',
+    dataPrepDatasetName: '데이터셋 이름',
+    dataPrepTag: '활성화 태그 (선택)',
+    dataPrepHasVocals: '보컬 포함 (가사 자동 전사)',
+    startDataPrep: '원클릭 준비',
+    dataPrepTensorReady: '텐서 디렉터리 (학습 가능)',
+    dataPrepFolderRequired: '오디오 폴더 경로를 입력하세요',
     scanning: '스캔 중...',
     autoLabeling: '자동 라벨링 중...',
     autoLabelPreparing: '준비 중...',

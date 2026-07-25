@@ -959,6 +959,39 @@ export const trainingApi = {
 
   cancelQuickTrain: (id: string, token: string): Promise<any> =>
     api(`/api/training/quick-cancel/${id}`, { method: 'POST', token }),
+
+  // One-click data preparation (训练数据一键准备)
+  dataPrep: (params: {
+    folder: string;
+    name: string;
+    tag?: string;
+    tagPosition?: 'prepend' | 'append' | 'replace';
+    hasVocals?: boolean;
+    skipMetas?: boolean;
+    onlyUnlabeled?: boolean;
+    outputDir?: string;
+  }, token: string): Promise<{
+    id: string;
+    stage: string;
+    progress: number;
+    message: string;
+    status: string;
+  }> => api('/api/training/data-prep', { method: 'POST', body: params, token }),
+
+  getDataPrepStatus: (id: string, token: string): Promise<{
+    id: string;
+    stage: string;
+    progress: number;
+    message: string;
+    status: string;
+    dataset_json?: string;
+    tensor_dir?: string;
+    sample_count?: number;
+    error?: string;
+  }> => api(`/api/training/data-prep-status/${id}`, { token }),
+
+  cancelDataPrep: (id: string, token: string): Promise<any> =>
+    api(`/api/training/data-prep-cancel/${id}`, { method: 'POST', token }),
 };
 
 // Presets API

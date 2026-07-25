@@ -69,6 +69,24 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
   const [labelProgress, setLabelProgress] = useState('');
   const [labelStatus, setLabelStatus] = useState<{ current: number; total: number; status: string } | null>(null);
   const labelPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // One-click data preparation (训练数据一键准备) state
+  const [prepFolder, setPrepFolder] = useState('');
+  const [prepName, setPrepName] = useState('my_dataset');
+  const [prepTag, setPrepTag] = useState('');
+  const [prepHasVocals, setPrepHasVocals] = useState(true);
+  const [prepTask, setPrepTask] = useState<{
+    id: string;
+    stage: string;
+    progress: number;
+    message: string;
+    status: string;
+    dataset_json?: string;
+    tensor_dir?: string;
+    sample_count?: number;
+    error?: string;
+  } | null>(null);
+  const prepPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [selectedSampleIndex, setSelectedSampleIndex] = useState(0);
   const [savePath, setSavePath] = useState('./datasets/my_lora_dataset.json');
   const [saveStatus, setSaveStatus] = useState('');
@@ -178,6 +196,10 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
         clearInterval(labelPollRef.current);
         labelPollRef.current = null;
       }
+      if (prepPollRef.current) {
+        clearInterval(prepPollRef.current);
+        prepPollRef.current = null;
+      }
     };
   }, []);
 
@@ -257,6 +279,67 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
     } catch (error: any) {
       setLoadJsonStatus(`${t('error')}: ${error?.message || t('failedToLoadDataset')}`);
     }
+  };
+
+  const handleDataPrep = async () => {
+    if (!token) return;
+    if (!prepFolder.trim()) {
+      setPrepTask({ id: '', stage: 'failed', progress: 0, message: t('dataPrepFolderRequired'), status: 'failed' });
+      return;
+    }
+    try {
+      const task = await trainingApi.dataPrep({
+        folder: prepFolder.trim(),
+        name: prepName.trim() || 'my_dataset',
+        tag: prepTag.trim(),
+        tagPosition: 'append',
+        hasVocals: prepHasVocals,
+      }, token);
+      setPrepTask(task);
+
+      if (prepPollRef.current) clearInterval(prepPollRef.current);
+      const poll = setInterval(async () => {
+        try {
+          const st = await trainingApi.getDataPrepStatus(task.id, token);
+          setPrepTask(st);
+          if (st.status === 'completed') {
+            clearInterval(poll);
+            prepPollRef.current = null;
+            // Auto-fill downstream paths so the user can train immediately.
+            if (st.dataset_json) {
+              setLoadJsonPath(st.dataset_json);
+              setSavePath(st.dataset_json);
+            }
+            if (st.tensor_dir) {
+              setPreprocessOutputDir(st.tensor_dir);
+              setTrainingTensorDir(st.tensor_dir);
+            }
+            // Refresh sample table with the labeled dataset.
+            try {
+              const updated = await trainingApi.getSamples(token);
+              setAudioFiles(transformSamples(updated.samples || []));
+            } catch { /* non-fatal */ }
+          } else if (st.status === 'failed') {
+            clearInterval(poll);
+            prepPollRef.current = null;
+          }
+        } catch (e: any) {
+          clearInterval(poll);
+          prepPollRef.current = null;
+          setPrepTask((prev) => prev ? { ...prev, status: 'failed', stage: 'failed', message: `${t('error')}: ${e?.message || ''}` } : prev);
+        }
+      }, 2000);
+      prepPollRef.current = poll;
+    } catch (error: any) {
+      setPrepTask({ id: '', stage: 'failed', progress: 0, message: `${t('error')}: ${error?.message || ''}`, status: 'failed' });
+    }
+  };
+
+  const handleCancelDataPrep = async () => {
+    if (!token || !prepTask?.id) return;
+    try {
+      await trainingApi.cancelDataPrep(prepTask.id, token);
+    } catch { /* ignore */ }
   };
 
   const handleScanDirectory = async () => {
@@ -589,6 +672,101 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
       <div className="flex-1 overflow-y-auto p-6 pb-24 lg:pb-32 space-y-6 bg-white dark:bg-zinc-900">
         {activeTab === 'dataset' ? (
           <>
+            {/* One-click Data Preparation */}
+            <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-950/30 dark:to-fuchsia-950/30 rounded-xl p-5 border-2 border-purple-200 dark:border-purple-800 space-y-3 hover:shadow-lg transition-shadow">
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="text-purple-600 dark:text-purple-400" size={20} />
+                <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100">{t('oneClickDataPrep')}</h4>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">{t('oneClickDataPrepHint')}</span>
+              </div>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+                <div className="xl:col-span-2">
+                  <label className="block text-xs text-zinc-600 dark:text-zinc-400 mb-1">{t('dataPrepAudioFolder')}</label>
+                  <input
+                    type="text"
+                    value={prepFolder}
+                    onChange={(e) => setPrepFolder(e.target.value)}
+                    placeholder="D:\my_music\training_songs"
+                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-purple-300 dark:border-purple-700 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-600 dark:text-zinc-400 mb-1">{t('dataPrepDatasetName')}</label>
+                  <input
+                    type="text"
+                    value={prepName}
+                    onChange={(e) => setPrepName(e.target.value)}
+                    placeholder="my_dataset"
+                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-purple-300 dark:border-purple-700 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-zinc-600 dark:text-zinc-400 mb-1">{t('dataPrepTag')}</label>
+                  <input
+                    type="text"
+                    value={prepTag}
+                    onChange={(e) => setPrepTag(e.target.value)}
+                    placeholder="my_style"
+                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-purple-300 dark:border-purple-700 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 whitespace-nowrap pb-2">
+                  <input
+                    type="checkbox"
+                    checked={prepHasVocals}
+                    onChange={(e) => setPrepHasVocals(e.target.checked)}
+                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  {t('dataPrepHasVocals')}
+                </label>
+                {prepTask && prepTask.status === 'running' ? (
+                  <button
+                    onClick={handleCancelDataPrep}
+                    className="px-4 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-md whitespace-nowrap"
+                  >
+                    <Square size={16} />
+                    {t('cancel')}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleDataPrep}
+                    className="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+                  >
+                    <Zap size={16} />
+                    {t('startDataPrep')}
+                  </button>
+                )}
+              </div>
+              {prepTask && (
+                <div className="space-y-2">
+                  {prepTask.status === 'running' && (
+                    <div className="w-full h-2 bg-purple-100 dark:bg-purple-950 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 transition-all duration-500"
+                        style={{ width: `${prepTask.progress}%` }}
+                      />
+                    </div>
+                  )}
+                  <div className={`rounded-lg px-3 py-2 text-xs border-2 ${
+                    prepTask.status === 'failed'
+                      ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+                      : prepTask.status === 'completed'
+                        ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
+                        : 'bg-purple-50 dark:bg-purple-950/30 text-zinc-700 dark:text-zinc-300 border-purple-200 dark:border-purple-800'
+                  }`}>
+                    {prepTask.status === 'running' && `${prepTask.progress}% · `}{prepTask.message}
+                    {prepTask.status === 'completed' && prepTask.tensor_dir && (
+                      <div className="mt-1 text-zinc-500 dark:text-zinc-400 break-all">
+                        {t('dataPrepTensorReady')}: {prepTask.tensor_dir}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Load & Scan */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {/* Load Existing Dataset Card */}
