@@ -592,33 +592,146 @@ def resolve_acestep_syspath(start_dir: str) -> str:
     app/scripts、或 acestep 处在更上层），向上遍历 start_dir 及其祖先目录，
     寻找含 acestep/__init__.py 或 acestep/model_downloader.py 的目录，
     返回该目录（acestep 包的父目录）。找不到则返回 start_dir 本身。
+
+    ⚠️ 绝不做递归 glob 扫描——从盘根 `D:\\**` 递归搜索会冻结主线程十几分钟
+    （2026-07-26 血泪教训）。只做 O(1) 的直接祖先目录检查。
     """
-    import glob as _glob
-    roots = []
     d = os.path.abspath(start_dir)
     for _ in range(6):
-        if d not in roots:
-            roots.append(d)
-        parent = os.path.dirname(d)
-        if parent == d:
-            break
-        d = parent
-    for root in roots:
-        acp = os.path.join(root, "acestep")
+        acp = os.path.join(d, "acestep")
         if os.path.isdir(acp) and (
             os.path.isfile(os.path.join(acp, "__init__.py"))
             or os.path.isfile(os.path.join(acp, "model_downloader.py"))
         ):
-            return root
-    # 兜底：任意层级 glob 查找 acestep/model_downloader.py
-    for root in roots:
-        hits = _glob.glob(os.path.join(root, "**", "acestep", "model_downloader.py"), recursive=True)
-        if hits:
-            return os.path.dirname(os.path.dirname(os.path.abspath(hits[0])))
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
     return os.path.abspath(start_dir)
 
 
-# 下载器子进程输出中属于“进度刷新”的行（tqdm 进度条 / 速度 / 百分比等），
+# ---------------------------------------------------------------------------
+# 纯文件系统模型检查（不 import acestep / torch，不在主线程冻结 GUI）
+# 2026-07-26 血泪教训：主线程 `from acestep.model_downloader import ...` 会
+# ① 冷加载 torch/transformers 冻结 30-60s；② 若 acestep 缺失则
+# resolve_acestep_syspath 旧版从盘根递归 glob 扫全盘 → 19 分钟冻结。
+# 以下函数用内联常量 + os.path 精确复刻 model_downloader.py 的检查逻辑，
+# 保证 O(1) 文件系统操作、零 import、零 glob 扫描。
+# ---------------------------------------------------------------------------
+_FS_MAIN_MODEL_COMPONENTS = [
+    "acestep-v15-turbo",
+    "vae",
+    "Qwen3-Embedding-0.6B",
+    "acestep-5Hz-lm-1.7B",
+]
+
+_FS_MODEL_VALIDATION_INFO = {
+    "acestep-v15-turbo": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"], "min_size": 1.5e9},
+    "vae": {"files": ["config.json", "diffusion_pytorch_model.safetensors"], "min_size": 100e6},
+    "Qwen3-Embedding-0.6B": {"files": ["config.json", "model.safetensors"], "min_size": 600e6},
+    "acestep-5Hz-lm-1.7B": {"files": ["config.json", "model.safetensors"], "min_size": 1.7e9},
+    "acestep-5Hz-lm-0.6B": {"files": ["config.json", "model.safetensors"], "min_size": 600e6},
+    "acestep-5Hz-lm-4B": {"files": ["config.json", "model.safetensors.index.json"], "min_size": 4e9},
+    "acestep-v15-base": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_base.py"], "min_size": 1.5e9},
+    "acestep-v15-sft": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_base.py"], "min_size": 1.5e9},
+    "acestep-v15-turbo-shift1": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"], "min_size": 1.5e9},
+    "acestep-v15-turbo-shift3": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"], "min_size": 1.5e9},
+    "acestep-v15-turbo-continuous": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"], "min_size": 1.5e9},
+    "acestep-v15-xl-turbo": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"], "min_size": 3.5e9},
+    "acestep-v15-xl-sft": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"], "min_size": 3.5e9},
+    "acestep-v15-xl-base": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"], "min_size": 3.5e9},
+}
+
+
+def _fs_get_checkpoints_dir(base_dir: str) -> str:
+    """纯文件系统计算 checkpoints 目录（复刻 model_downloader.get_checkpoints_dir 的 fallback 路径）。
+
+    model_downloader.py 在 app/acestep/ 下，project_root = app 的上级。
+    checkpoints_dir = project_root / data / models。
+    """
+    app_dir = os.path.abspath(base_dir)
+    project_root = os.path.dirname(app_dir)
+    return os.path.join(project_root, "data", "models")
+
+
+def _fs_get_directory_size(path: str) -> int:
+    """递归计算目录总字节数（复刻 model_downloader._get_directory_size）。"""
+    total = 0
+    try:
+        for entry in os.scandir(path):
+            if entry.is_file():
+                total += entry.stat().st_size
+            elif entry.is_dir():
+                total += _fs_get_directory_size(entry.path)
+    except Exception:
+        pass
+    return total
+
+
+def _fs_required_file_present(model_path: str, required_file: str) -> bool:
+    """检查必需文件是否存在（复刻 model_downloader._required_file_present，容忍分片/变体命名）。"""
+    if os.path.isfile(os.path.join(model_path, required_file)):
+        return True
+    try:
+        if required_file.endswith(".safetensors") and not required_file.endswith(".index.json"):
+            index_json = os.path.join(model_path, required_file + ".index.json")
+            import glob as _g
+            shards = _g.glob(os.path.join(model_path, "*-of-*.safetensors"))
+            if os.path.isfile(index_json) and shards:
+                return True
+            if _g.glob(os.path.join(model_path, "*.safetensors")):
+                return True
+        if required_file.endswith(".index.json"):
+            import glob as _g
+            if _g.glob(os.path.join(model_path, "*.index.json")):
+                return True
+        if required_file.startswith("modeling_") and required_file.endswith(".py"):
+            import glob as _g
+            if _g.glob(os.path.join(model_path, "modeling_*.py")):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _fs_check_main_model_exists(base_dir: str) -> bool:
+    """纯文件系统检查主模型是否完整（复刻 model_downloader.check_main_model_exists）。"""
+    ckpt = _fs_get_checkpoints_dir(base_dir)
+    for comp in _FS_MAIN_MODEL_COMPONENTS:
+        comp_path = os.path.join(ckpt, comp)
+        if not os.path.isdir(comp_path):
+            return False
+        try:
+            if not os.listdir(comp_path):
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def _fs_check_model_exists(model_name: str, base_dir: str) -> bool:
+    """纯文件系统检查单个模型是否完整（复刻 model_downloader.check_model_exists）。"""
+    if not model_name:
+        return False
+    ckpt = _fs_get_checkpoints_dir(base_dir)
+    model_path = os.path.join(ckpt, model_name)
+    if not os.path.isdir(model_path):
+        return False
+    try:
+        if not os.listdir(model_path):
+            return False
+    except Exception:
+        return False
+    info = _FS_MODEL_VALIDATION_INFO.get(model_name)
+    if info:
+        for rf in info.get("files", []):
+            if not _fs_required_file_present(model_path, rf):
+                return False
+        dir_size = _fs_get_directory_size(model_path)
+        if dir_size < info.get("min_size", 0):
+            return False
+    return True
 # 这类行刷新极快（约每秒一条）。运行日志只按固定间隔记录，避免刷屏。
 _DOWNLOAD_PROGRESS_RE = re.compile(
     r"(\d+%|\bit/s\b|\bB/s\b|\bMB/s\b|\bkB/s\b|\bs/it\b|\[.*?<\s*.*?\])"
@@ -7171,47 +7284,52 @@ for d in deps:
                 self.qinglong_group.show()
     
     def _get_model_verify_info(self, model_name):
-        """获取模型验证信息 - 与青龙训练器前端 /api/generate/models 保持一致"""
+        """获取模型验证信息 - 纯文件系统检查（不 import acestep/torch，不冻结 GUI）。
+
+        ⚠️ 旧版 `from acestep.model_downloader import check_model_exists, verify_model`
+        在主线程会导致冻结（同 _check_main_model_exists 根因）。
+        """
         try:
-            import sys
-            sys.path.insert(0, resolve_acestep_syspath(self.base_dir))
-            from acestep.model_downloader import check_model_exists, verify_model, get_checkpoints_dir
-            checkpoints_dir = get_checkpoints_dir()
-            is_installed = check_model_exists(model_name, checkpoints_dir)
-            if is_installed:
+            ckpt = _fs_get_checkpoints_dir(self.base_dir)
+            model_path = os.path.join(ckpt, model_name)
+            if not os.path.isdir(model_path):
+                return {"integrity_status": "missing", "integrity_details": None}
+            # 检查完整性
+            if _fs_check_model_exists(model_name, self.base_dir):
                 return {"integrity_status": "complete", "integrity_details": None}
-            model_path = checkpoints_dir / model_name if hasattr(checkpoints_dir, '__truediv__') else None
-            if model_path and model_path.exists():
-                _, _, details = verify_model(model_name, checkpoints_dir)
-                integrity_details = {
-                    "files_found": details.get("files_found", []),
-                    "files_missing": details.get("files_missing", []),
-                    "total_size_mb": round(details.get("total_size", 0) / 1e6, 2),
-                    "expected_size_mb": round(details.get("expected_size", 0) / 1e6, 2),
-                    "size_ok": details.get("size_ok", False),
-                }
-                return {"integrity_status": "incomplete", "integrity_details": integrity_details}
-            return {"integrity_status": "missing", "integrity_details": None}
-        except Exception as e:
+            # 不完整：收集缺失文件信息
+            info = _FS_MODEL_VALIDATION_INFO.get(model_name, {})
+            required_files = info.get("files", [])
+            files_found = [f for f in required_files if _fs_required_file_present(model_path, f)]
+            files_missing = [f for f in required_files if f not in files_found]
+            dir_size = _fs_get_directory_size(model_path)
+            expected_size = info.get("min_size", 0)
+            return {
+                "integrity_status": "incomplete",
+                "integrity_details": {
+                    "files_found": files_found,
+                    "files_missing": files_missing,
+                    "total_size_mb": round(dir_size / 1e6, 2),
+                    "expected_size_mb": round(expected_size / 1e6, 2),
+                    "size_ok": dir_size >= expected_size,
+                },
+            }
+        except Exception:
             return {"integrity_status": "missing", "integrity_details": None}
 
     def _get_model_size_bytes(self, model_name, checkpoints_dir):
-        """计算模型在磁盘上的占用字节数（main 为主模型 4 个组件之和）。"""
-        try:
-            from acestep.model_downloader import MAIN_MODEL_COMPONENTS, _get_directory_size
-        except Exception:
-            return 0
+        """计算模型在磁盘上的占用字节数（纯文件系统，不 import acestep）。"""
         total = 0
         try:
             if model_name == "main":
-                for comp in MAIN_MODEL_COMPONENTS:
-                    p = checkpoints_dir / comp
-                    if p.exists():
-                        total += _get_directory_size(p)
+                for comp in _FS_MAIN_MODEL_COMPONENTS:
+                    p = os.path.join(str(checkpoints_dir), comp)
+                    if os.path.isdir(p):
+                        total += _fs_get_directory_size(p)
             else:
-                p = checkpoints_dir / model_name
-                if p.exists():
-                    total += _get_directory_size(p)
+                p = os.path.join(str(checkpoints_dir), model_name)
+                if os.path.isdir(p):
+                    total += _fs_get_directory_size(p)
         except Exception:
             return total
         return total
@@ -7232,11 +7350,8 @@ for d in deps:
     def _load_model_list(self):
         """加载模型列表 - 与青龙训练器前端模型描述保���同步"""
         # 计算各模型磁盘占用所需的 checkpoints 目录
-        try:
-            from acestep.model_downloader import get_checkpoints_dir
-            _ckpt_dir = Path(get_checkpoints_dir())
-        except Exception:
-            _ckpt_dir = Path(self.base_dir) / "data" / "models"
+        # ⚠️ 纯文件系统计算，不 import acestep（旧版会冷加载 torch 冻结 GUI）
+        _ckpt_dir = Path(_fs_get_checkpoints_dir(self.base_dir))
 
         MODEL_SHORT_NAMES = {
             "acestep-v15-base": "1.5B",
@@ -7369,54 +7484,21 @@ for d in deps:
             _m["size_bytes"] = self._get_model_size_bytes(_m["name"], _ckpt_dir)
 
     def _check_main_model_exists(self):
-        """检查主模型是否存在 - 使用与model_downloader.py相同的逻辑"""
-        try:
-            import sys
-            sys.path.insert(0, resolve_acestep_syspath(self.base_dir))
-            from acestep.model_downloader import check_main_model_exists, get_checkpoints_dir
-            return check_main_model_exists(get_checkpoints_dir())
-        except Exception as e:
-            print(f"[check_main_model_exists] Error: {e}")
-            # Fallback: 简单检查
-            try:
-                checkpoints_dir = os.path.join(self.base_dir, "models")
-                if not os.path.exists(checkpoints_dir):
-                    checkpoints_dir = os.path.join(self.base_dir, "checkpoints")
-                components = ["acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B", "acestep-5Hz-lm-1.7B"]
-                for component in components:
-                    component_path = os.path.join(checkpoints_dir, component)
-                    if not os.path.exists(component_path):
-                        return False
-                    # 检查目录是否有文件
-                    if not os.listdir(component_path):
-                        return False
-                return True
-            except Exception:
-                return False
+        """检查主模型是否存在 - 纯文件系统检查（不 import acestep/torch，不冻结 GUI）。
+
+        ⚠️ 2026-07-26：旧版 `from acestep.model_downloader import check_main_model_exists`
+        在主线程执行会导致 ① acestep 缺失时 resolve_acestep_syspath 从盘根递归 glob
+        扫全盘（19 分钟冻结）；② acestep 存在时冷加载 torch（30-60s 冻结）。
+        改用 _fs_check_main_model_exists 精确复刻同等逻辑、零 import。
+        """
+        return _fs_check_main_model_exists(self.base_dir)
     
     def _check_model_exists(self, model_name):
-        """检查模型是否存在 - 使用与model_downloader.py相同的逻辑"""
-        try:
-            import sys
-            sys.path.insert(0, resolve_acestep_syspath(self.base_dir))
-            from acestep.model_downloader import check_model_exists, get_checkpoints_dir
-            return check_model_exists(model_name, get_checkpoints_dir())
-        except Exception as e:
-            print(f"[check_model_exists] Error: {e}")
-            # Fallback: 简单检查
-            try:
-                checkpoints_dir = os.path.join(self.base_dir, "models")
-                if not os.path.exists(checkpoints_dir):
-                    checkpoints_dir = os.path.join(self.base_dir, "checkpoints")
-                model_path = os.path.join(checkpoints_dir, model_name)
-                if not os.path.exists(model_path):
-                    return False
-                # 检查目录是否有文件
-                if not os.listdir(model_path):
-                    return False
-                return True
-            except Exception:
-                return False
+        """检查模型是否存在 - 纯文件系统检查（不 import acestep/torch，不冻结 GUI）。
+
+        ⚠️ 同 _check_main_model_exists，旧版 import 会导致主线程冻结。
+        """
+        return _fs_check_model_exists(model_name, self.base_dir)
     
     def _download_model(self, model_name, force: bool = False):
         """下载模型 - 使用异步线程避免UI阻塞
