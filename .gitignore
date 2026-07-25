@@ -36,6 +36,9 @@ Folder.jpg
 
 # Model files and large directories
 data/
+# 白名单：前端源码里的 data/ 目录（qualityPresets.ts 等），不是用户数据
+!dev/app/ace-step-ui/data/
+!dev/app/ace-step-ui/server/src/data/
 models/
 checkpoints/
 checkpoints_legacy/

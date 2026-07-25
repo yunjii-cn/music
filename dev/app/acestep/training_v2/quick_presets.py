@@ -75,13 +75,18 @@ VARIANT_DEFAULTS: Dict[str, Dict] = {
     "turbo": {"shift": 3.0, "steps": 8},
     "base": {"shift": 1.0, "steps": 50},
     "sft": {"shift": 1.0, "steps": 50},
+    # XL (4B DiT) family: xl = 8-step distilled turbo, xl-sft/xl-base full schedule
+    "xl": {"shift": 3.0, "steps": 8},
+    "xl-sft": {"shift": 1.0, "steps": 50},
+    "xl-base": {"shift": 1.0, "steps": 50},
 }
 
 #: Preference order when auto-selecting the best downloaded variant.
-_VARIANT_PREFERENCE: List[str] = ["sft", "base", "turbo"]
+#: XL variants outrank their 1.5B counterparts at the same quality tier.
+_VARIANT_PREFERENCE: List[str] = ["xl-sft", "sft", "xl-base", "base", "xl", "turbo"]
 
 # Known variants (used to compute ``missing_variants``).
-ALL_VARIANTS: List[str] = ["turbo", "base", "sft"]
+ALL_VARIANTS: List[str] = ["turbo", "base", "sft", "xl", "xl-sft", "xl-base"]
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +128,7 @@ def resolve_training_params(
     quality: str,
     advanced: Optional[Dict] = None,
     variant: Optional[str] = None,
+    tier: str = "full",
 ) -> Dict:
     """Merge the quality preset with optional advanced overrides + variant defaults.
 

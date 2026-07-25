@@ -14,10 +14,15 @@ import sys
 _DEFAULT_NUM_WORKERS = 0 if sys.platform == "win32" else 4
 
 # Model variant -> checkpoint subdirectory mapping
+# NOTE: keep in sync with training_v2/model_loader.py:_VARIANT_DIR
 VARIANT_DIR_MAP = {
     "turbo": "acestep-v15-turbo",
     "base": "acestep-v15-base",
     "sft": "acestep-v15-sft",
+    # XL (4B DiT) family
+    "xl": "acestep-v15-xl-turbo",
+    "xl-sft": "acestep-v15-xl-sft",
+    "xl-base": "acestep-v15-xl-base",
 }
 
 

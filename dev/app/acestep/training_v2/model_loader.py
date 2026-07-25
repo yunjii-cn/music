@@ -55,6 +55,12 @@ _VARIANT_DIR = {
     "turbo": "acestep-v15-turbo",
     "base": "acestep-v15-base",
     "sft": "acestep-v15-sft",
+    # XL (4B DiT) family — must be registered explicitly: the
+    # load_silence_latent fallback would otherwise resolve bare "xl"
+    # to the non-existent "acestep-v15-xl" directory.
+    "xl": "acestep-v15-xl-turbo",  # default XL = 8-step distilled turbo
+    "xl-sft": "acestep-v15-xl-sft",
+    "xl-base": "acestep-v15-xl-base",
 }
 
 

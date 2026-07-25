@@ -228,8 +228,11 @@ def register_training_api_routes(
 
         ckpt_dir = os.path.join(data_root, "models")
         models = scan_models(ckpt_dir) if os.path.isdir(ckpt_dir) else []
-        downloaded = sorted({m.base_model for m in models if m.base_model in ("turbo", "base", "sft")})
+        from acestep.training_v2.quick_presets import ALL_VARIANTS
+        downloaded = sorted({m.base_model for m in models if m.base_model in ALL_VARIANTS})
         recommended = pick_variant(downloaded, tier)
+        # Only the 1.5B family is "expected"; XL variants are optional extras
+        # and should not trigger the missing-variants download prompt.
         missing = [v for v in ("turbo", "base", "sft") if v not in downloaded]
 
         return wrap_response({

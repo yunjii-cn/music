@@ -25,6 +25,10 @@ _BASE_DEFAULTS: Dict[str, Dict] = {
     "turbo": {"is_turbo": True, "timestep_mu": -0.4, "timestep_sigma": 1.0, "shift": 3.0, "num_inference_steps": 8},
     "base":  {"is_turbo": False, "timestep_mu": -0.4, "timestep_sigma": 1.0, "shift": 1.0, "num_inference_steps": 50},
     "sft":   {"is_turbo": False, "timestep_mu": -0.4, "timestep_sigma": 1.0, "shift": 1.0, "num_inference_steps": 50},
+    # XL (4B DiT) family
+    "xl":      {"is_turbo": True, "timestep_mu": -0.4, "timestep_sigma": 1.0, "shift": 3.0, "num_inference_steps": 8},
+    "xl-sft":  {"is_turbo": False, "timestep_mu": -0.4, "timestep_sigma": 1.0, "shift": 1.0, "num_inference_steps": 50},
+    "xl-base": {"is_turbo": False, "timestep_mu": -0.4, "timestep_sigma": 1.0, "shift": 1.0, "num_inference_steps": 50},
 }
 
 
@@ -107,14 +111,25 @@ def detect_base_model(config: Dict, dir_name: str = "") -> str:
     """Infer which base variant a model descends from.
 
     Uses ``is_turbo`` flag and directory name heuristics.  Returns one
-    of ``"turbo"``, ``"base"``, ``"sft"``, or ``"unknown"``.
+    of ``"turbo"``, ``"base"``, ``"sft"``, ``"xl"``, ``"xl-sft"``,
+    ``"xl-base"``, or ``"unknown"``.
     """
+    name_lower = dir_name.lower()
+
+    # XL (4B) family must be matched BEFORE the is_turbo check, otherwise
+    # acestep-v15-xl-turbo (is_turbo=True) would be misdetected as "turbo".
+    if "xl" in name_lower:
+        if "sft" in name_lower:
+            return "xl-sft"
+        if "base" in name_lower:
+            return "xl-base"
+        return "xl"  # acestep-v15-xl-turbo and any other xl-* dirs
+
     # Explicit is_turbo flag
     if config.get("is_turbo", False):
         return "turbo"
 
     # Match by directory name for official models
-    name_lower = dir_name.lower()
     for variant in ("turbo", "base", "sft"):
         if variant in name_lower:
             return variant

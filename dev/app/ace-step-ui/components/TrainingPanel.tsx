@@ -126,7 +126,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
   const handleModelVariantChange = (v: string) => {
     setModelVariant(v);
     localStorage.setItem('ace-trainingModelVariant', v);
-    const shiftDefaults: Record<string, number> = { turbo: 3.0, sft: 1.0, base: 1.0 };
+    const shiftDefaults: Record<string, number> = { turbo: 3.0, sft: 1.0, base: 1.0, xl: 3.0, 'xl-sft': 1.0, 'xl-base': 1.0 };
     setTP({ trainingShift: shiftDefaults[v] ?? 3.0 });
   };
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -1168,18 +1168,23 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = () => {
                   {t('modelVariant')}
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
-                  {['turbo', 'sft', 'base'].map((v) => (
+                  {['turbo', 'sft', 'base', 'xl'].map((v) => (
                     <button key={v} onClick={() => handleModelVariantChange(v)}
                       className={`py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${
                         modelVariant === v
                           ? 'border-indigo-500 bg-indigo-500 text-white'
                           : 'border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:border-indigo-300'
                       }`}>
-                      <div className="font-semibold">acestep-v15-{v}</div>
-                      <div className="text-[10px] opacity-80">{v === 'turbo' ? t('fastModel') || '快速' : v === 'sft' ? 'SFT ' + (t('fineTuned') || '微调') : t('baseModel') || '基础'}</div>
+                      <div className="font-semibold">{v === 'xl' ? 'acestep-v15-xl-turbo' : `acestep-v15-${v}`}</div>
+                      <div className="text-[10px] opacity-80">{v === 'turbo' ? t('fastModel') || '快速' : v === 'sft' ? 'SFT ' + (t('fineTuned') || '微调') : v === 'xl' ? 'XL 4B · ' + (t('xlVariantHint') || '高质量·需18.8GB权重') : t('baseModel') || '基础'}</div>
                     </button>
                   ))}
                 </div>
+                {modelVariant === 'xl' && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                    ⚠️ {t('xlVariantWarning') || 'XL(4B) 底座需先在「模型管理」下载 acestep-v15-xl-turbo 权重(约18.8GB)；显存建议 ≥16GB。1.5B 上训练的 LoRA 不能复用到 XL，需重新训练。'}
+                  </div>
+                )}
               </div>
 
               {/* Mode Toggle: Simple / Standard */}

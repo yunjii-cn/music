@@ -1,6 +1,8 @@
 # 改造方案：支持在 XL (acestep-v15-xl-turbo) 底座上训练 LoRA
 
-> 状态：**方案文档（未实施）**。用户已确认先出方案、暂不改动代码、暂不下载权重。
+> 状态：**代码侧已实施（2026-07-26）**。§3.1–§3.5 变体注册全部完成并通过静态断言测试；
+> 冒烟校验脚本 `dev/app/verify_xl_training.py` 已就绪。**待办：下载 18.8GB 权重后在训练机实跑 §4.2 校验**，通过后方可宣布正式支持。
+> 实施时额外发现并修复：`train_api_service.py` env-profile 变体白名单硬编码（XL 下载了也不出现在下拉）、`cli/args.py:VARIANT_DIR_MAP` 第二份映射表（方案未列出）、`quick_presets.resolve_training_params` 存量 NameError（`tier` 未定义）、前端底座下拉写死（非 API 动态渲染，已直接补 XL 按钮+警示条）。
 > 调研日期：2026-07-19。训练机显存：**24GB**（宽裕，见 §5）。
 
 ---
