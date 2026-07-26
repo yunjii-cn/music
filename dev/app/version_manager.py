@@ -1711,12 +1711,13 @@ class ModelManagerDialog(QDialog):
 
         top_bar.addStretch()
 
-        self.verify_result_label = QLabel("")
+        self.verify_result_label = QLabel("未验证")
         self.verify_result_label.setStyleSheet("font-size: 11px; color: #AAAAAA;")
         top_bar.addWidget(self.verify_result_label)
 
         self.verify_time_label = QLabel("")
         self.verify_time_label.setStyleSheet("font-size: 11px; color: #666666; margin-left: 10px;")
+        self.verify_time_label.setVisible(False)  # 验证前隐藏时间占位，避免空槽残留
         top_bar.addWidget(self.verify_time_label)
 
         download_source_label = QLabel("下载源:")

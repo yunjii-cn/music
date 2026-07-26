@@ -252,6 +252,13 @@ def build_exe():
         pyinstaller_args.extend(["--add-data", f"{str(main_py)};."])
         print(f"  已打包应用主体: {main_py}")
 
+    # 模型管理器 UI 在 version_manager.py，由 main.py 懒加载导入（PyInstaller 静态分析
+    # 不会收集），单独 --add-data 打进 exe，确保 UI 修复随 exe 分发、不依赖磁盘松文件。
+    version_manager_py = ROOT_DIR / "version_manager.py"
+    if version_manager_py.exists():
+        pyinstaller_args.extend(["--add-data", f"{str(version_manager_py)};."])
+        print(f"  已打包模型管理器: {version_manager_py}")
+
     ico_png = str(ROOT_DIR / "ico.png")
     if os.path.exists(ico_png):
         pyinstaller_args.extend(["--add-data", f"{ico_png};."])

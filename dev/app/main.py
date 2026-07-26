@@ -5389,7 +5389,16 @@ try {
         }
         
         text, color = status_map.get(status, ("❓ 未知", "#888888"))
-        
+
+        # 前端依赖为可选组件：未安装/检测中不视为失败，使用中性灰，避免刺眼“未就绪”
+        if key == "frontend_deps":
+            if status == "done":
+                text, color = "✅ 已就绪", "#66BB6A"
+            elif status == "running":
+                text, color = "⏳ 检测中...", "#888888"
+            else:
+                text, color = "⬜ 未安装（可选）", "#888888"
+
         if key == "python_deps" and status == "fail" and hasattr(self, '_failed_deps_cache') and self._failed_deps_cache:
             failed = ", ".join(self._failed_deps_cache)
             text = f"❌ 缺失: {failed}"
@@ -5794,37 +5803,91 @@ for d in deps:
             self._log(f"[错误] 安装 Python 依赖失败: {e}", "#F44336")
             return False
     
+    def _find_npm(self):
+        """探测可用的 npm 可执行文件：优先便携 Node，其次系统 PATH"""
+        import shutil
+        # 1) 便携 Node（随发布物携带，离线可用）
+        portable_candidates = [
+            os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64", "npm.cmd"),
+            os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64", "npm.cmd"),
+        ]
+        for cand in portable_candidates:
+            if os.path.exists(cand):
+                return cand
+        # 2) 系统 PATH 中的 npm / node
+        for exe in ("npm.cmd", "npm", "npm.ps1", "node"):
+            p = shutil.which(exe)
+            if p:
+                if exe == "node":
+                    # node 在 PATH 时，npm 通常同目录
+                    npm_same = os.path.join(os.path.dirname(p), "npm.cmd")
+                    if os.path.exists(npm_same):
+                        return npm_same
+                    npm_ps1 = os.path.join(os.path.dirname(p), "npm.ps1")
+                    if os.path.exists(npm_ps1):
+                        return npm_ps1
+                    return p  # 退化为用 node 跑（下方会拼 npm-cli.js）
+                return p
+        return None
+
     def _install_frontend_deps(self):
-        """安装前端 npm 依赖"""
+        """安装前端 npm 依赖（根治：自动探测 node/npm，必要时先装 Node.js 便携版）"""
         try:
             ace_step_ui_path = os.path.join(self.base_dir, "ace-step-ui")
             node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
-            
+
+            if not os.path.exists(ace_step_ui_path):
+                # ace-step-ui 不存在：可选组件，视为就绪，无需安装
+                self._log("[信息] 未找到 ace-step-ui 目录，前端依赖为可选组件，跳过", "#FFA726")
+                return True
             if os.path.exists(node_modules_path):
                 return True
-            
-            portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-            portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
-            
-            npm_path = None
-            for node_dir in [portable_node24_dir, portable_node22_dir]:
-                candidate = os.path.join(node_dir, "npm.cmd")
-                if os.path.exists(candidate):
-                    npm_path = candidate
-                    break
-            
+
+            # 1) 探测 npm
+            npm_path = self._find_npm()
             if not npm_path:
-                npm_path = "npm"
-            
-            self._log(f"[信息] 正在运行 npm install...")
+                # 2) 没有 node/npm，先尝试下载安装 Node.js 便携版（需联网）
+                self._log("[信息] 未检测到 npm，尝试安装 Node.js 便携版...", "#FFA726")
+                if self._install_nodejs():
+                    npm_path = self._find_npm()
+
+            if not npm_path:
+                self._log("[警告] 无法获取 npm（无 Node.js 且无法下载），前端依赖为可选组件，跳过安装", "#FFA726")
+                return False
+
+            # 若探测到的是 node 可执行文件，则改用 npm-cli.js 运行
+            npm_cmd = [npm_path, "install"]
+            if os.path.basename(npm_path).lower() in ("node", "node.exe"):
+                npm_cli = os.path.join(os.path.dirname(npm_path), "node_modules", "npm", "bin", "npm-cli.js")
+                if os.path.exists(npm_cli):
+                    npm_cmd = [npm_path, npm_cli, "install"]
+                else:
+                    self._log("[警告] 未找到 npm-cli.js，前端依赖为可选组件，跳过安装", "#FFA726")
+                    return False
+
+            self._log(f"[信息] 使用 npm: {npm_path}，开始安装前端依赖...", "#4CAF50")
             process = hidden_popen(
-                [npm_path, "install"],
+                npm_cmd,
                 cwd=ace_step_ui_path,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
-            process.communicate(timeout=600)
-            
-            return os.path.exists(node_modules_path)
+            try:
+                out, err = process.communicate(timeout=900)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                out, err = process.communicate()
+                self._log("[警告] npm install 超时（900s），前端依赖可能未完整安装", "#FFA726")
+            for line in (out or "").strip().splitlines()[-15:]:
+                self._log(f"  npm> {line}")
+            for line in (err or "").strip().splitlines()[-10:]:
+                self._log(f"  npm! {line}", "#FFA726")
+
+            ok = os.path.exists(node_modules_path)
+            if ok:
+                self._log("✅ 前端依赖安装完成", "#4CAF50")
+            else:
+                self._log("[警告] npm install 后仍未生成 node_modules，前端依赖为可选组件", "#FFA726")
+            return ok
         except Exception as e:
             self._log(f"[错误] 安装前端依赖失败: {e}", "#F44336")
             return False
@@ -6335,6 +6398,12 @@ for d in deps:
                     if os.path.exists(venv_python):
                         self._install_missing_dependencies(venv_python, os.path.join(self.base_dir, "scripts"))
                 
+                if not final_checks.get("frontend_deps"):
+                    self._log("[修复] 正在安装 Web 前端依赖（npm install）...", "#FF9800")
+                    self._install_frontend_deps()
+                    if os.path.exists(os.path.join(self.base_dir, "ace-step-ui", "node_modules")):
+                        self.deploy_step_signal.emit("frontend_deps", "done")
+                
                 self._log("[信息] 修复完成，重新验证...")
                 retry_checks = self._check_deploy_env()
                 
@@ -6363,7 +6432,7 @@ for d in deps:
                     if failed_items:
                         self._log(f"[错误] 以下环境项仍未通过: {', '.join(failed_items)}", "#F44336")
                     else:
-                        self._log("⚠ 环境核心项已通过（Web 前端等可选组件未就绪）", "#FF9800")
+                        self._log("⚠ 环境核心项已通过（Web 前端等可选组件未安装，不影响核心功能）", "#FF9800")
                         all_green = True
             
             if all_green:
@@ -7746,6 +7815,7 @@ for d in deps:
                 self.model_manager_widget.last_verify_result = (total_models, installed_models)
                 # 更新标签
                 self.model_manager_widget.verify_time_label.setText(f"⏱ 上次验证: {verify_time}")
+                self.model_manager_widget.verify_time_label.setVisible(True)
                 result_text = f"✅ {installed_models}/{total_models} 模型已安装"
                 self.model_manager_widget.verify_result_label.setText(result_text)
                 self.model_manager_widget.verify_result_label.setStyleSheet("color: #4CAF50; font-size: 11px; font-weight: bold;")
