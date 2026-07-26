@@ -124,6 +124,19 @@ if (-not (Test-Path $nodeExe)) {
     exit 1
 }
 
+# 保险：确保 server/public（人声分离/音频静态资源）与 server/data（SQLite 库目录）存在，
+# 避免 Node 后端相关路由因目录缺失而 404。server/data 即便为空，server 启动时也会自动建库。
+$serverPublic = Join-Path $BaseDir "app/ace-step-ui/server/public"
+$serverData = Join-Path $BaseDir "app/ace-step-ui/server/data"
+if (-not (Test-Path $serverPublic)) {
+    New-Item -ItemType Directory -Force -Path $serverPublic | Out-Null
+    Write-Output "[前端] 已补齐 server/public 目录"
+}
+if (-not (Test-Path $serverData)) {
+    New-Item -ItemType Directory -Force -Path $serverData | Out-Null
+    Write-Output "[前端] 已补齐 server/data 目录"
+}
+
 # 清理临时文件
 Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
 for ($i = 1; $i -le $giteeParts.Count; $i++) {

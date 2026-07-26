@@ -2112,6 +2112,10 @@ class MainWindow(QMainWindow):
         
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
+        # 显式开启文本交互，确保可被鼠标/键盘选中并复制（防御个别 Qt 样式误关）
+        self.log_output.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
         self.log_output.setMinimumHeight(180)
         self.log_output.setStyleSheet("""
             QTextEdit {
@@ -2521,8 +2525,13 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'log_output') or self.log_output is None:
             return
         try:
+            text = self.log_output.toPlainText()
+            if not text.strip():
+                self._log("日志为空，无需复制", "#FF9800")
+                return
             from PyQt6.QtWidgets import QApplication
-            QApplication.clipboard().setText(self.log_output.toPlainText())
+            from PyQt6.QtCore import QClipboard
+            QApplication.clipboard().setText(text, QClipboard.Mode.Clipboard)
             self._log("✓ 日志已复制到剪贴板", "#4CAF50")
         except Exception as e:
             self._log(f"[错误] 复制日志失败: {e}", "#F44336")
@@ -2921,6 +2930,10 @@ class MainWindow(QMainWindow):
         
         self.deploy_log_output = QTextEdit()
         self.deploy_log_output.setReadOnly(True)
+        # 显式开启文本交互，确保可被鼠标/键盘选中并复制
+        self.deploy_log_output.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
         self.deploy_log_output.setStyleSheet("""
             QTextEdit {
                 background-color: #0A0A0A; color: #BBBBBB;
@@ -3113,8 +3126,13 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'deploy_log_output') or self.deploy_log_output is None:
             return
         try:
+            text = self.deploy_log_output.toPlainText()
+            if not text.strip():
+                self._log("部署日志为空，无需复制", "#FF9800")
+                return
             from PyQt6.QtWidgets import QApplication
-            QApplication.clipboard().setText(self.deploy_log_output.toPlainText())
+            from PyQt6.QtCore import QClipboard
+            QApplication.clipboard().setText(text, QClipboard.Mode.Clipboard)
             self._log("✓ 部署日志已复制到剪贴板", "#4CAF50")
         except Exception as e:
             self._log(f"[错误] 复制日志失败: {e}", "#F44336")

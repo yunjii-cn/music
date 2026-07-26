@@ -205,9 +205,12 @@ def _self_relocate():
     # 分离式拉起固定名入口，并删除原始便携 exe
     if entry_exe and os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
         try:
+            # 注意：此处不能用 CREATE_NO_WINDOW 拉起最终 app 进程！
+            # 该标志会让子进程在部分 Windows 会话下无法打开系统剪贴板
+            #（OpenClipboard 返回 ACCESS_DENIED），导致日志"复制"功能彻底失效。
+            # 保持普通控制台子进程，行为与旧版直接双击运行一致（剪贴板正常）。
             subprocess.Popen(
                 [entry_exe, "--cleanup=" + exe],
-                creationflags=subprocess.CREATE_NO_WINDOW,
             )
         except Exception:
             pass
