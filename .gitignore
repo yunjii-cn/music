@@ -381,3 +381,9 @@ nul
 # Local artifacts (not source)
 web-pack.7z
 dev/app/lora_state.json
+
+# Build staging / temp driver scripts (not source)
+_staging/
+_driver_build.py
+dev/app/_driver_build.py
+dev/app/_verify_built.py

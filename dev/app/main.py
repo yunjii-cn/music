@@ -5312,7 +5312,15 @@ try {
             if os.path.exists(ace_step_ui_path):
                 package_json_path = os.path.join(ace_step_ui_path, "package.json")
                 node_modules_path = os.path.join(ace_step_ui_path, "node_modules")
-                checks["frontend_deps"] = os.path.exists(package_json_path) and os.path.exists(node_modules_path)
+                server_nm_path = os.path.join(ace_step_ui_path, "server", "node_modules")
+                # 前端要能显示，需要：① 源码(package.json) ② 前端与 server 各自的 node_modules ③ 一个可用的 Node.js
+                node_ok = self._find_npm() is not None
+                checks["frontend_deps"] = (
+                    os.path.exists(package_json_path)
+                    and os.path.exists(node_modules_path)
+                    and os.path.exists(server_nm_path)
+                    and node_ok
+                )
             else:
                 checks["frontend_deps"] = True  # 可选组件，不存在视为正常
         except:
@@ -5544,8 +5552,8 @@ for d in deps:
                     success = self._install_python_deps()
                 
                 elif component == "frontend_deps":
-                    self._log("正在安装前端 npm 依赖...")
-                    success = self._install_frontend_deps()
+                    self._log("正在拉取预构建前端包...")
+                    success = self._ensure_frontend_bundle()
                 
                 elif component == "scripts":
                     self._log("正在检查启动脚本...")
@@ -5804,10 +5812,16 @@ for d in deps:
             return False
     
     def _find_npm(self):
-        """探测可用的 npm 可执行文件：优先便携 Node，其次系统 PATH"""
+        """探测可用的 npm 可执行文件：优先便携 Node，其次系统 PATH。
+        便携 Node 同时检查 app/tools 与 data/tools（前端脚本 run_qinglong_frontend.ps1
+        实际从 data/tools 读取，此处两处都查，避免"前端能跑但检测报缺失"的错位）。"""
         import shutil
+        # 部署根目录下的 data/tools（前端脚本真正使用的路径）
+        data_tools = os.path.join(os.path.dirname(self.base_dir), "data", "tools")
         # 1) 便携 Node（随发布物携带，离线可用）
         portable_candidates = [
+            os.path.join(data_tools, "node-v24.14.1-win-x64", "node-v24.14.1-win-x64", "npm.cmd"),
+            os.path.join(data_tools, "node-v22.22.2-win-x64", "node-v22.22.2-win-x64", "npm.cmd"),
             os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64", "npm.cmd"),
             os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64", "npm.cmd"),
         ]
@@ -5829,6 +5843,36 @@ for d in deps:
                     return p  # 退化为用 node 跑（下方会拼 npm-cli.js）
                 return p
         return None
+
+    def _ensure_frontend_bundle(self):
+        """部署末尾拉取预构建前端包（ace-step-ui node_modules 两套 + 便携 Node.js）。
+
+        根治「启动后前端空白」：单文件 exe 的 payload 不含 264MB node_modules，
+        运行时 npm install 又依赖 Node/网络。改为部署最后一步从码云拉取已构建好的
+        前端包（download-frontend.ps1 分卷下载+解压），解压后前端离线即可显示。
+        返回 True 表示前端产物已就绪（无论本次是否新下载，只要存在即可）。"""
+        try:
+            scripts_dir = os.path.join(self.base_dir, "scripts")
+            ps1 = os.path.join(scripts_dir, "download-frontend.ps1")
+            if not os.path.exists(ps1):
+                self._log("[警告] 未找到 download-frontend.ps1，退化为 npm install 尝试", "#FF9800")
+                return self._install_frontend_deps()
+            install_root = get_install_root()
+            self._log("[信息] 正在拉取预构建前端包（含 node_modules + 便携 Node）...", "#2196F3")
+            rc = self._stream_powershell(ps1, scripts_dir, timeout=900)
+            if rc == 0:
+                ok = (os.path.exists(os.path.join(self.base_dir, "ace-step-ui", "node_modules"))
+                      and self._find_npm() is not None)
+                if ok:
+                    self._log("[前端] 前端包已就绪，Web 前端可离线显示", "#4CAF50")
+                    return True
+                self._log("[警告] 前端包拉取完成但产物校验失败，前端可能仍不显示", "#FF9800")
+                return False
+            self._log(f"[警告] 前端包拉取返回码 {rc}，前端可能仍不显示（可重跑部署重试）", "#FF9800")
+            return False
+        except Exception as e:
+            self._log(f"[警告] 前端包拉取异常: {e}", "#FF9800")
+            return False
 
     def _install_frontend_deps(self):
         """安装前端 npm 依赖（根治：自动探测 node/npm，必要时先装 Node.js 便携版）"""
@@ -6399,9 +6443,8 @@ for d in deps:
                         self._install_missing_dependencies(venv_python, os.path.join(self.base_dir, "scripts"))
                 
                 if not final_checks.get("frontend_deps"):
-                    self._log("[修复] 正在安装 Web 前端依赖（npm install）...", "#FF9800")
-                    self._install_frontend_deps()
-                    if os.path.exists(os.path.join(self.base_dir, "ace-step-ui", "node_modules")):
+                    self._log("[修复] 正在拉取预构建前端包（Web 前端依赖 + 便携 Node）...", "#FF9800")
+                    if self._ensure_frontend_bundle():
                         self.deploy_step_signal.emit("frontend_deps", "done")
                 
                 self._log("[信息] 修复完成，重新验证...")
@@ -6434,7 +6477,26 @@ for d in deps:
                     else:
                         self._log("⚠ 环境核心项已通过（Web 前端等可选组件未安装，不影响核心功能）", "#FF9800")
                         all_green = True
-            
+
+            # 前端包：部署最后一步拉取（独立于核心环境成败，确保 Web 前端可显示）。
+            # 关键：即便核心环境已就绪、仅前端缺失（all_green 会把它剔除），
+            # 修复循环不会跑，故在此独立补拉，根治"前端无法显示"。
+            try:
+                fe_ready = (os.path.exists(os.path.join(self.base_dir, "ace-step-ui", "node_modules"))
+                            and self._find_npm() is not None)
+                if not fe_ready:
+                    self._log("[信息] 部署末尾拉取前端包（Web 前端依赖 + 便携 Node）...", "#2196F3")
+                    self._ensure_frontend_bundle()
+                # 无论是否刚下载，按最终产物状态点亮前端步骤
+                if (os.path.exists(os.path.join(self.base_dir, "ace-step-ui", "node_modules"))
+                        and self._find_npm() is not None):
+                    self.deploy_step_signal.emit("frontend_deps", "done")
+                else:
+                    self.deploy_step_signal.emit("frontend_deps", "fail")
+            except Exception as e:
+                self._log(f"[警告] 前端包拉取步骤异常: {e}", "#FF9800")
+                self.deploy_step_signal.emit("frontend_deps", "fail")
+
             if all_green:
                 self._log("")
                 self._log("========================================")
