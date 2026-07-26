@@ -299,11 +299,59 @@ def build_exe():
             pyinstaller_args.extend(["--add-data", f"{str(ps1)};."])
             print(f"  已添加脚本: {ps1.name}")
 
+    # ── payload.zip：把 acestep/ 和 ace-step-ui/ 精简源码打包进 exe，
+    #    launcher 首次运行时自动解压到部署目录的 app/ 下。
+    #    这样裸 exe 单独拿出去也能跑（不依赖外部发布文件夹）。
+    #    排除：__pycache__、*.pyc、node_modules、docs、server/public（运行时音频数据）、
+    #    server/data（SQLite DB 等运行时数据）。
+    payload_path = ROOT_DIR / "payload.zip"
+    import zipfile as _zf
+    _EXCLUDE_DIR_NAMES = {"__pycache__", "node_modules", "docs", ".git", ".vscode"}
+    _EXCLUDE_SERVER_SUBDIRS = {"public", "data", "node_modules"}
+    with _zf.ZipFile(str(payload_path), "w", _zf.ZIP_DEFLATED) as zf:
+        # acestep/
+        acestep_src = ROOT_DIR / "acestep"
+        if acestep_src.exists():
+            for root, dirs, files in os.walk(acestep_src):
+                dirs[:] = [d for d in dirs if d not in _EXCLUDE_DIR_NAMES]
+                for f in files:
+                    if f.endswith(".pyc"):
+                        continue
+                    full = os.path.join(root, f)
+                    zf.write(full, os.path.relpath(full, ROOT_DIR))
+            print(f"  已打包 payload: acestep/")
+        # ace-step-ui/（排除重型目录）
+        ui_src = ROOT_DIR / "ace-step-ui"
+        if ui_src.exists():
+            for root, dirs, files in os.walk(ui_src):
+                rel = os.path.relpath(root, ui_src)
+                parts = rel.split(os.sep)
+                # 排除 server/public、server/data、server/node_modules
+                if len(parts) >= 2 and parts[0] == "server" and parts[1] in _EXCLUDE_SERVER_SUBDIRS:
+                    dirs[:] = []
+                    continue
+                dirs[:] = [d for d in dirs if d not in _EXCLUDE_DIR_NAMES]
+                for f in files:
+                    if f.endswith(".pyc"):
+                        continue
+                    full = os.path.join(root, f)
+                    zf.write(full, os.path.relpath(full, ROOT_DIR))
+            print(f"  已打包 payload: ace-step-ui/ (精简)")
+    payload_size_mb = payload_path.stat().st_size / (1024 * 1024)
+    print(f"  payload.zip 大小: {payload_size_mb:.1f} MB")
+    pyinstaller_args.extend(["--add-data", f"{str(payload_path)};."])
+
     pyinstaller_args.append("launcher.py")
     print(f"  使用 launcher.py 作为入口")
 
     print("  运行 PyInstaller (--onefile)...")
     subprocess.run(pyinstaller_args, check=True)
+
+    # 清理临时 payload.zip（已打进 exe，不再需要磁盘松文件）
+    try:
+        payload_path.unlink()
+    except Exception:
+        pass
 
     exe_path = BUILD_DIR / f"{release_name}.exe"
     if exe_path.exists():

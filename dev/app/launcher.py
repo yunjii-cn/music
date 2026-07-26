@@ -214,6 +214,43 @@ def _self_relocate():
     os._exit(0)
 
 
+def _extract_payload():
+    """首次运行时从 exe 内置的 payload.zip 解压 acestep/ 和 ace-step-ui/ 到部署目录 app/。
+
+    裸 exe 单独拿出去也能跑的关键：acestep/（模型下载/推理必需）和 ace-step-ui/
+    （Web 前端）在构建时打包进 exe 的 _MEIPASS/payload.zip，首次运行自动解压。
+    若 app/acestep/ 已存在且含 __init__.py，跳过（不覆盖用户已有文件）。
+    """
+    if not getattr(sys, 'frozen', False):
+        return
+
+    deploy_root = os.environ.get("YUNJI_INSTALL_ROOT")
+    if not deploy_root:
+        return
+
+    app_dir = os.path.join(deploy_root, "app")
+
+    # 已部署且有 acestep → 跳过
+    acestep_dir = os.path.join(app_dir, "acestep")
+    if os.path.isdir(acestep_dir) and os.path.isfile(os.path.join(acestep_dir, "__init__.py")):
+        return
+
+    meipass = getattr(sys, "_MEIPASS", None)
+    if not meipass:
+        return
+
+    payload_zip = os.path.join(meipass, "payload.zip")
+    if not os.path.isfile(payload_zip):
+        return
+
+    import zipfile
+    try:
+        with zipfile.ZipFile(payload_zip, 'r') as z:
+            z.extractall(app_dir)
+    except Exception:
+        pass
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 崩溃日志（写到用户实际 exe 所在目录，而非 PyInstaller 解压的临时 _MEI 路径）
 # ─────────────────────────────────────────────────────────────────────────────
@@ -375,6 +412,12 @@ def _run_supervisor():
         _self_relocate()
     except Exception:
         _write_crash("=== launcher._self_relocate 异常 ===")
+
+    # 首次运行时从 exe 内解压 acestep/ 和 ace-step-ui/ 到部署目录
+    try:
+        _extract_payload()
+    except Exception:
+        _write_crash("=== launcher._extract_payload 异常 ===")
 
     exe = os.path.abspath(sys.executable)
     ppid = os.getpid()
