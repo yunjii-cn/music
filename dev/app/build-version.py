@@ -306,7 +306,7 @@ def build_exe():
     #    server/data（SQLite DB 等运行时数据）。
     payload_path = ROOT_DIR / "payload.zip"
     import zipfile as _zf
-    _EXCLUDE_DIR_NAMES = {"__pycache__", "node_modules", "docs", ".git", ".vscode"}
+    _EXCLUDE_DIR_NAMES = {"__pycache__", "node_modules", "docs", ".git", ".vscode", ".venv", "venv"}
     _EXCLUDE_SERVER_SUBDIRS = {"public", "data", "node_modules"}
     with _zf.ZipFile(str(payload_path), "w", _zf.ZIP_DEFLATED) as zf:
         # acestep/
@@ -337,6 +337,26 @@ def build_exe():
                     full = os.path.join(root, f)
                     zf.write(full, os.path.relpath(full, ROOT_DIR))
             print(f"  已打包 payload: ace-step-ui/ (精简)")
+        # scripts/（受控维护脚本：install-env.ps1 等）：始终随 payload 分发，
+        # 与用户"一键部署维护无法覆盖的目录文件应该打包在 exe 中"的原则一致。
+        # launcher 首次运行会把 scripts/ 从 payload 刷新到 app/scripts/（覆盖式，确保修复可达）。
+        scripts_src = ROOT_DIR / "scripts"
+        if scripts_src.exists():
+            # 只打包维护脚本与小配置，绝不带重型产物：
+            # 排除 .venv(62GB)、lora_data_prepare(2GB 训练数据)、flash_attn wheel(239MB) 等。
+            _SCRIPTS_EXCLUDE_DIRS = _EXCLUDE_DIR_NAMES | {"lora_data_prepare"}
+            _SCRIPTS_EXCLUDE_EXT = {".whl", ".exe", ".zip", ".7z", ".gz",
+                                     ".pt", ".safetensors", ".ckpt", ".bin", ".onnx"}
+            for root, dirs, files in os.walk(scripts_src):
+                dirs[:] = [d for d in dirs if d not in _SCRIPTS_EXCLUDE_DIRS]
+                for f in files:
+                    if f.endswith(".pyc"):
+                        continue
+                    if os.path.splitext(f)[1].lower() in _SCRIPTS_EXCLUDE_EXT:
+                        continue
+                    full = os.path.join(root, f)
+                    zf.write(full, os.path.relpath(full, ROOT_DIR))
+            print(f"  已打包 payload: scripts/ (仅 .ps1 + 维护小文件)")
     payload_size_mb = payload_path.stat().st_size / (1024 * 1024)
     print(f"  payload.zip 大小: {payload_size_mb:.1f} MB")
     pyinstaller_args.extend(["--add-data", f"{str(payload_path)};."])

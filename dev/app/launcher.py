@@ -230,11 +230,6 @@ def _extract_payload():
 
     app_dir = os.path.join(deploy_root, "app")
 
-    # 已部署且有 acestep → 跳过
-    acestep_dir = os.path.join(app_dir, "acestep")
-    if os.path.isdir(acestep_dir) and os.path.isfile(os.path.join(acestep_dir, "__init__.py")):
-        return
-
     meipass = getattr(sys, "_MEIPASS", None)
     if not meipass:
         return
@@ -246,7 +241,18 @@ def _extract_payload():
     import zipfile
     try:
         with zipfile.ZipFile(payload_zip, 'r') as z:
-            z.extractall(app_dir)
+            names = z.namelist()
+            # 1) scripts/ 始终刷新（受控维护脚本，含 install-env.ps1）：
+            #    与用户"维护无法覆盖的文件应打包进 exe"的原则一致，确保修复可达旧部署。
+            for m in [n for n in names if n.startswith("scripts/")]:
+                z.extract(m, app_dir)
+            # 2) acestep/ + ace-step-ui/ 仅在缺失时解压：
+            #    避免每次启动重复解压 390+ 文件，且不覆盖用户已部署内容。
+            acestep_dir = os.path.join(app_dir, "acestep")
+            if not (os.path.isdir(acestep_dir) and os.path.isfile(os.path.join(acestep_dir, "__init__.py"))):
+                for m in names:
+                    if m.startswith("acestep/") or m.startswith("ace-step-ui/"):
+                        z.extract(m, app_dir)
     except Exception:
         pass
 

@@ -269,6 +269,8 @@ function Get-FastestMirror {
 # 每片带连接超时与单片上限；整体受 $faBudgetSec 总预算约束，绝不会无限挂起。
 function Download-GiteeMultipart {
     param([string]$DestPath, [string[]]$PartUrls, [int64]$ExpectedSize)
+    # 各分卷精确预期大小（与上传时一致），用于逐片完整性校验
+    $partExpected = @(94371840, 94371840, 62108193)
     $partFiles = @()
     $ok = $true
     for ($i = 0; $i -lt $PartUrls.Count; $i++) {
@@ -280,19 +282,29 @@ function Download-GiteeMultipart {
         $u = $PartUrls[$i]
         $tmp = Join-Path $env:TEMP "flash_attn_wheel.part$($i + 1)"
         Write-Output "  🏁 码云分卷 ($($i + 1)/$($PartUrls.Count)): $u"
-        try {
-            & curl.exe -L --connect-timeout 20 -m 300 -o "$tmp" "$u" 2>$null
-        } catch {
-            Write-Warning "  ⚠️ 分卷 $($i + 1) 下载异常，跳过: $_"
-            $ok = $false
-            break
-        }
-        if (-not (Test-Path $tmp) -or (Get-Item $tmp).Length -lt 1MB) {
-            Write-Warning "  ⚠️ 分卷 $($i + 1) 下载失败或过小"
+        $errLog = Join-Path $env:TEMP "flash_attn_part$($i + 1).err"
+        # -sS：彻底静默进度条。关键修复：脚本顶部 $ErrorActionPreference="Stop" 下，
+        # 若 curl 进度（写 stderr）未被 -s 抑制，PowerShell 会将其误判为终止异常，
+        # 造成"分卷下载异常"假阳性。-s 后 stderr 不再有进度文本。
+        # 成败改以 $LASTEXITCODE + 文件大小判定，不再依赖 try/catch 捕获原生命令。
+        & curl.exe -sSL --connect-timeout 20 -m 300 --retry 3 --retry-delay 2 -o "$tmp" "$u" 2>"$errLog"
+        $curlExit = $LASTEXITCODE
+        if ($curlExit -ne 0 -or -not (Test-Path $tmp)) {
+            $detail = ""
+            if (Test-Path $errLog) { $detail = (Get-Content $errLog -Raw -ErrorAction SilentlyContinue) }
+            Write-Warning "  ⚠️ 分卷 $($i + 1) 下载失败 (curl exit=$curlExit): $detail"
+            if (Test-Path $tmp) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
             $ok = $false
             break
         }
         $sz = (Get-Item $tmp).Length
+        # 逐片精确大小校验（与上传时一致），容忍 1KB 偏差
+        if ($i -lt $partExpected.Count -and [math]::Abs($sz - $partExpected[$i]) -gt 1024) {
+            Write-Warning "  ⚠️ 分卷 $($i + 1) 大小异常: $sz (预期 $($partExpected[$i]))，可能损坏"
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+            $ok = $false
+            break
+        }
         Write-Output "  ⬇️ 分卷 $($i + 1) 已下载 $([math]::Round($sz/1MB, 1)) MB"
         $partFiles += $tmp
     }
