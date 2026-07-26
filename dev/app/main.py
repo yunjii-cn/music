@@ -5130,7 +5130,48 @@ try {
     def _find_venv_python(self):
         """统一查找虚拟环境 Python 路径（委托给模块级函数，兼容多种目录结构）"""
         return find_venv_python(self.base_dir)
-    
+
+    def _detect_gpu(self):
+        """检测 GPU 信息，返回 '名称 | 显存GB' 字符串；检测不到返回空串。
+
+        优先 torch.cuda.is_available()（能拿到精确显存），失败则用 nvidia-smi 兜底。
+        注意：torch CUDA 初始化可能因显卡驱动版本低于 cu128 要求而返回 False，
+        但 nvidia-smi 仍能识别显卡——两步都做，确保 GPU 项不因 torch 探测失败而误判。
+        """
+        try:
+            venv_python = self._find_venv_python()
+            if os.path.exists(venv_python):
+                try:
+                    result = hidden_run(
+                        [venv_python, "-c",
+                         "import torch; name=torch.cuda.get_device_name(0) if torch.cuda.is_available() else ''; "
+                         "mem=torch.cuda.get_device_properties(0).total_mem//1024//1024//1024 if torch.cuda.is_available() else 0; "
+                         "print(name+'|'+str(mem)+'GB') if name else print('NO_CUDA')"
+                         ],
+                        capture_output=True, text=True, timeout=20
+                    )
+                    output = result.stdout.strip() if result.returncode == 0 else ""
+                    if output and output != "NO_CUDA" and "|" in output:
+                        return output
+                except Exception:
+                    pass
+            # 兜底：nvidia-smi（驱动存在即可识别，不依赖 torch CUDA 初始化）
+            try:
+                result = hidden_run(
+                    ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+                    capture_output=True, text=True, timeout=10
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    line = result.stdout.strip().split("\n")[0]
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) >= 2:
+                        return f"{parts[0]} | {parts[1]}GB"
+            except Exception:
+                pass
+        except Exception:
+            pass
+        return ""
+
     def _check_deploy_env(self):
         """检测部署环境各步骤状态"""
         checks = {}
@@ -5292,6 +5333,11 @@ try {
             checks["scripts"] = scripts_ok
         except:
             checks["scripts"] = False
+
+        try:
+            checks["gpu"] = self._detect_gpu()
+        except Exception:
+            checks["gpu"] = ""
         
         return checks
     
@@ -5307,38 +5353,6 @@ try {
         
         def _do_check():
             checks = self._check_deploy_env()
-            
-            gpu_detected = False
-            try:
-                venv_python = self._find_venv_python()
-                if os.path.exists(venv_python):
-                    result = hidden_run(
-                        [venv_python, "-c",
-                         "import torch; name=torch.cuda.get_device_name(0) if torch.cuda.is_available() else ''; mem=torch.cuda.get_device_properties(0).total_mem//1024//1024//1024 if torch.cuda.is_available() else 0; print(name+'|'+str(mem)+'GB') if name else print('NO_CUDA')"
-                         ],
-                        capture_output=True, text=True, timeout=20
-                    )
-                    output = result.stdout.strip() if result.returncode == 0 else ""
-                    if output and output != "NO_CUDA" and "|" in output:
-                        checks["gpu"] = output
-                        gpu_detected = True
-            except:
-                pass
-            
-            if not gpu_detected:
-                try:
-                    result = hidden_run(
-                        ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
-                        capture_output=True, text=True, timeout=10
-                    )
-                    if result.returncode == 0 and result.stdout.strip():
-                        line = result.stdout.strip().split("\n")[0]
-                        parts = [p.strip() for p in line.split(",")]
-                        if len(parts) >= 2:
-                            checks["gpu"] = f"{parts[0]} | {parts[1]}GB"
-                            gpu_detected = True
-                except:
-                    pass
             
             self.deploy_step_signal.emit("__refresh__", "")
             for key, value in checks.items():
