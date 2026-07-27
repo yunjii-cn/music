@@ -804,8 +804,6 @@ class ModelDownloadThread(QThread):
 
             if self.force:
                 cmd_args.append("--force")
-            
-            cmd_str = " ".join(f'"{arg}"' if ' ' in arg else arg for arg in cmd_args)
 
             # 解析 acestep 包所在父目录（兼容 base_dir 落点偏差 / 不同目录布局），
             # 否则 venv 里 `python -m acestep.model_downloader` 会报
@@ -823,32 +821,34 @@ class ModelDownloadThread(QThread):
                 self.download_finished.emit(False, "缺少 acestep 模块")
                 return
 
-            cmd = [
-                "powershell.exe",
-                "-WindowStyle", "Hidden",
-                "-ExecutionPolicy", "Bypass",
-                "-NoProfile",
-                # 注入 acestep 包父目录到 PYTHONPATH 并 cd 过去（与 run_gradio.ps1 一致），
-                # 否则 venv 里 `python -m acestep.model_downloader` 会报
-                # ModuleNotFoundError: No module named 'acestep'。
-                "-Command", f"$env:PYTHONPATH = '{acestep_parent}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; $env:PYTHONUNBUFFERED = '1'; $env:HF_HUB_DISABLE_PROGRESS_BARS = 'false'; $env:MODELSCOPE_PROGRESS_BARS = 'true'; cd '{acestep_parent}'; {cmd_str}"
-            ]
-            
+            # 直接拉起 venv python（不再包一层 powershell）：
+            # powershell 当 stdout 是管道(非控制台)时采用块缓冲，会把子进程 flush 出的
+            # [DLPROGRESS] 行攒到缓冲区、直到进程结束才一次性吐出，导致进度条全程卡 15%、
+            # 结束时跳 99%。改为 Popen 直接传 env(PYTHONPATH/PYTHONUNBUFFERED/HF 标志)
+            # 与 cwd，配合 python -u，[DLPROGRESS] 行即可逐行实时送达主线程 readline()。
+            dl_env = dict(os.environ)
+            dl_env["PYTHONPATH"] = acestep_parent + os.pathsep + dl_env.get("PYTHONPATH", "")
+            dl_env["PYTHONUNBUFFERED"] = "1"
+            dl_env["HF_HUB_DISABLE_PROGRESS_BARS"] = "false"
+            dl_env["MODELSCOPE_PROGRESS_BARS"] = "true"
+
             self.current_progress = 15
             self.progress_updated.emit(self.current_progress, "连接下载源...")
-
+            
             # 计算进度兜底用的目标目录与预估总大小（基于磁盘真实已下载字节数）
             self._compute_target_and_estimate()
             
 
             self.process = hidden_popen(
-                cmd,
+                cmd_args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                cwd=acestep_parent,
+                env=dl_env,
             )
             
             # 读取输出并解析真实进度（不再使用随机模拟）
