@@ -8,37 +8,38 @@ $ParentDir = Split-Path -Parent $ScriptDir
 $DataDir = Join-Path (Split-Path $ParentDir -Parent) "data"
 Set-Location "$ParentDir\ace-step-ui"
 
+# Node.js 优先级规则（项目硬约定，详见 project_memory.md）：
+#   1. 项目便携 v24（data/tools/node-v24.14.1...）—— 版本与 better-sqlite3
+#      等原生模块的 NODE_MODULE_VERSION 严格匹配，优先级最高
+#   2. 系统安装 v24（D:\Programs\nodejs）—— 用户主动安装，作为兜底
+#   3. PATH 中已有的 node（含 TRAE 内置）—— 最后兜底，避免 TRAE 注入
+#      的 v22 抢占优先级导致原生模块 ABI 不兼容
+# 历史教训：曾因 PATH 中 TRAE 内置 v22 排在第一优先级，导致 better-sqlite3
+# （用 v24 编译，NODE_MODULE_VERSION 137）在 v22（127）下无法加载。
 $nodeExe = $null
 $npmCmd = $null
 $portableNode24Dir = "$DataDir\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64"
-$portableNode22Dir = "$DataDir\nodejs\node-v22.14.0-win-x64"
-$portableNode20Dir = "$ScriptDir\node-v20.20.0-win-x64"
 $systemNodeDir = "D:\Programs\nodejs"
-$nodePath = Get-Command node -ErrorAction SilentlyContinue
-if ($nodePath) {
-    $nodeDir = Split-Path -Parent $nodePath.Path
-    $npmCmd = "$nodeDir\npm.cmd"
-    $env:PATH = "$nodeDir;$env:PATH"
-} elseif (Test-Path "$portableNode24Dir\node.exe") {
+if (Test-Path "$portableNode24Dir\node.exe") {
     Write-Output "Using portable Node.js 24: $portableNode24Dir"
     $npmCmd = "$portableNode24Dir\npm.cmd"
     $env:PATH = "$portableNode24Dir;$env:PATH"
-} elseif (Test-Path "$portableNode22Dir\node.exe") {
-    Write-Output "Using portable Node.js 22: $portableNode22Dir"
-    $npmCmd = "$portableNode22Dir\npm.cmd"
-    $env:PATH = "$portableNode22Dir;$env:PATH"
-} elseif (Test-Path "$portableNode20Dir\node.exe") {
-    Write-Output "Using portable Node.js 20: $portableNode20Dir"
-    $npmCmd = "$portableNode20Dir\npm.cmd"
-    $env:PATH = "$portableNode20Dir;$env:PATH"
 } elseif (Test-Path "$systemNodeDir\node.exe") {
     Write-Output "Using system Node.js: $systemNodeDir"
     $npmCmd = "$systemNodeDir\npm.cmd"
     $env:PATH = "$systemNodeDir;$env:PATH"
 } else {
-    Write-Error "Error: Node.js not found! Please install Node.js or place portable Node.js in scripts/ directory."
-    Read-Host "按回车键退出" | Out-Null
-    exit 1
+    $nodePath = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodePath) {
+        $nodeDir = Split-Path -Parent $nodePath.Path
+        Write-Output "Using Node.js from PATH: $nodeDir"
+        $npmCmd = "$nodeDir\npm.cmd"
+        $env:PATH = "$nodeDir;$env:PATH"
+    } else {
+        Write-Error "Error: Node.js not found! Please install Node.js or place portable Node.js in data/tools/ directory."
+        Read-Host "按回车键退出" | Out-Null
+        exit 1
+    }
 }
 
 Write-Output "Using npm: $npmCmd"

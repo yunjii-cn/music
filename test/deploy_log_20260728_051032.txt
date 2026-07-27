@@ -1,0 +1,837 @@
+[04:56:29] 正在检测环境状态...
+[04:56:32] ✓ 环境状态检测完成
+[04:56:35] ========================================
+[04:56:35] 开始部署维护...
+[04:56:35] ========================================
+[04:56:35] [调试] 当前工作目录: E:\软件开发\云集智能音乐创意台\dev\app
+[04:56:35] ✓ 脚本已存在: install-env.ps1
+[04:56:35] ✓ 脚本已存在: start.ps1
+[04:56:35] ✓ 脚本已存在: run_server.ps1
+[04:56:35] ✓ 脚本已存在: run_gradio.ps1
+[04:56:35] ✓ 脚本已存在: run_npmgui.ps1
+[04:56:35] ✓ 脚本已存在: run_qinglong_backend.ps1
+[04:56:35] ✓ 脚本已存在: run_qinglong_frontend.ps1
+[04:56:35] 1. 检查 PowerShell...
+[04:56:36] ✓ PowerShell 已安装: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+[04:56:36] 2. 检查 Node.js...
+[04:56:36] ✓ Node.js 已安装: v24.14.0
+[04:56:36] 3. 检查环境安装状态...
+[04:56:36] ✓ 环境已完全安装（含 Web 前端）
+[04:56:36] 5. 环境已完全安装，执行快速验证...
+[04:56:36] ========================================
+[04:56:36] 开始快速环境验证...
+[04:56:36] =======================================
+[04:56:36] 1. 检查 PowerShell...
+[04:56:37] 2. 检查 Node.js...
+[04:56:38] ✓ Node.js 已安装: v24.14.0
+[04:56:38] 3. 检查 uv...
+[04:56:38] ✓ uv 已安装
+[04:56:38] 4. 检查虚拟环境...
+[04:56:38] ✓ 虚拟环境已存在
+[04:56:38] 5. 验证关键依赖...
+[04:56:38] [警告] 检测到关键依赖缺失: loguru, psutil, torch, torchaudio, transformers, diffusers, gradio, peft, lycoris, fastapi, uvicorn, accelerate, scipy, soundfile, einops, matplotlib, diskcache, numba, lightning, tensorboard, modelscope, huggingface_hub, safetensors
+[04:56:39] [信息] torch (PyTorch 核心) 缺失，需要安装
+[04:56:39] [信息] torchaudio (音频处理) 缺失，需要安装
+[04:56:39] [信息] transformers (模型加载) 缺失，需要安装
+[04:56:39] [信息] diffusers (扩散模型) 缺失，需要安装
+[04:56:40] [信息] peft (LoRA/训练) 缺失，需要安装
+[04:56:40] [信息] lycoris (LoKr 训练) 缺失，需要安装
+[04:56:40] [信息] uvicorn (ASGI 服务器) 缺失，需要安装
+[04:56:40] [信息] gradio (Web UI) 缺失，需要安装
+[04:56:40] [信息] soundfile (音频文件) 缺失，需要安装
+[04:56:41] [信息] matplotlib (图表绘制) 缺失，需要安装
+[04:56:42] [信息] lightning (训练框架) 缺失，需要安装
+[04:56:42] [信息] modelscope (模型下载) 缺失，需要安装
+[04:56:42] [信息] 共 12 个依赖缺失，开始安装...
+[04:56:42] [信息] 清理 uv 等可能残留的冲突包...
+[04:56:43] [信息] 安装基础依赖: transformers>=4.51.0,=0.18.0, lycoris-lora, uvicorn[standard]>=0.27.0, gradio>=6.2.0,=0.13.1, matplotlib>=3.7.5, lightning>=2.0.0, modelscope
+[04:57:28] [安装] Requirement already satisfied: transformers=4.51.0 in .\.venv\Lib\site-packages (4.57.6)
+[04:57:28] [安装] Requirement already satisfied: diffusers in .\.venv\Lib\site-packages (0.38.0)
+[04:57:28] [安装] Requirement already satisfied: peft>=0.18.0 in .\.venv\Lib\site-packages (0.19.1)
+[04:57:28] [安装] Requirement already satisfied: lycoris-lora in .\.venv\Lib\site-packages (3.4.0)
+[04:57:28] [安装] Requirement already satisfied: uvicorn>=0.27.0 in .\.venv\Lib\site-packages (from uvicorn[standard]>=0.27.0) (0.49.0)
+[04:57:28] [安装] Requirement already satisfied: gradio=6.2.0 in .\.venv\Lib\site-packages (6.17.3)
+[04:57:28] [安装] Requirement already satisfied: soundfile>=0.13.1 in .\.venv\Lib\site-packages (0.14.0)
+[04:57:28] [安装] Requirement already satisfied: matplotlib>=3.7.5 in .\.venv\Lib\site-packages (3.11.0)
+[04:57:28] [安装] Requirement already satisfied: lightning>=2.0.0 in .\.venv\Lib\site-packages (2.6.5)
+[04:57:28] [安装] Requirement already satisfied: modelscope in .\.venv\Lib\site-packages (1.38.0)
+[04:57:28] [安装] Requirement already satisfied: filelock in .\.venv\Lib\site-packages (from transformers=4.51.0) (3.29.4)
+[04:57:28] [安装] Requirement already satisfied: huggingface-hub=0.34.0 in .\.venv\Lib\site-packages (from transformers=4.51.0) (0.36.2)
+[04:57:28] [安装] Requirement already satisfied: numpy>=1.17 in .\.venv\Lib\site-packages (from transformers=4.51.0) (2.4.6)
+[04:57:28] [安装] Requirement already satisfied: packaging>=20.0 in .\.venv\Lib\site-packages (from transformers=4.51.0) (26.2)
+[04:57:28] [安装] Requirement already satisfied: pyyaml>=5.1 in .\.venv\Lib\site-packages (from transformers=4.51.0) (6.0.3)
+[04:57:28] [安装] Requirement already satisfied: regex!=2019.12.17 in .\.venv\Lib\site-packages (from transformers=4.51.0) (2026.6.28)
+[04:57:28] [安装] Requirement already satisfied: requests in .\.venv\Lib\site-packages (from transformers=4.51.0) (2.34.2)
+[04:57:28] [安装] Requirement already satisfied: tokenizers=0.22.0 in .\.venv\Lib\site-packages (from transformers=4.51.0) (0.22.2)
+[04:57:28] [安装] Requirement already satisfied: safetensors>=0.4.3 in .\.venv\Lib\site-packages (from transformers=4.51.0) (0.8.0)
+[04:57:28] [安装] Requirement already satisfied: tqdm>=4.27 in .\.venv\Lib\site-packages (from transformers=4.51.0) (4.68.3)
+[04:57:28] [安装] Collecting anyio=3.0 (from gradio=6.2.0)
+[04:57:28] [安装] Using cached anyio-4.14.2-py3-none-any.whl.metadata (4.6 kB)
+[04:57:28] [安装] Collecting brotli>=1.1.0 (from gradio=6.2.0)
+[04:57:28] [安装] Downloading brotli-1.2.0-cp312-cp312-win_amd64.whl.metadata (6.3 kB)
+[04:57:28] [安装] Requirement already satisfied: fastapi=0.115.2 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.139.0)
+[04:57:28] [安装] Requirement already satisfied: gradio-client==2.5.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2.5.0)
+[04:57:28] [安装] Requirement already satisfied: groovy~=0.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.1.2)
+[04:57:28] [安装] Requirement already satisfied: hf-gradio=0.4.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.4.1)
+[04:57:28] [安装] Requirement already satisfied: httpx=0.24.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.28.1)
+[04:57:28] [安装] Requirement already satisfied: jinja2=6.2.0) (3.1.6)
+[04:57:28] [安装] Requirement already satisfied: markupsafe=2.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (3.0.3)
+[04:57:28] [安装] Requirement already satisfied: orjson~=3.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (3.11.9)
+[04:57:28] [安装] Requirement already satisfied: pandas=1.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (3.0.3)
+[04:57:28] [安装] Requirement already satisfied: pillow=8.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (12.3.0)
+[04:57:28] [安装] Requirement already satisfied: pydantic=2.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2.13.4)
+[04:57:28] [安装] Requirement already satisfied: pydub=6.2.0) (0.25.1)
+[04:57:28] [安装] Requirement already satisfied: python-multipart=0.0.18 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.0.32)
+[04:57:28] [安装] Requirement already satisfied: pytz>=2017.2 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2026.2)
+[04:57:28] [安装] Requirement already satisfied: safehttpx=0.1.7 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.1.7)
+[04:57:28] [安装] Requirement already satisfied: semantic-version~=2.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2.10.0)
+[04:57:28] [安装] Requirement already satisfied: starlette=1.0.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (1.3.1)
+[04:57:28] [安装] Requirement already satisfied: tomlkit=0.12.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.14.0)
+[04:57:28] [安装] Requirement already satisfied: typer=0.12 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.25.1)
+[04:57:28] [安装] Requirement already satisfied: typing-extensions~=4.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (4.16.0)
+[04:57:28] [安装] Requirement already satisfied: fsspec in .\.venv\Lib\site-packages (from gradio-client==2.5.0->gradio=6.2.0) (2026.6.0)
+[04:57:28] [安装] Requirement already satisfied: idna>=2.8 in .\.venv\Lib\site-packages (from anyio=3.0->gradio=6.2.0) (3.18)
+[04:57:28] [安装] Requirement already satisfied: typing-inspection>=0.4.2 in .\.venv\Lib\site-packages (from fastapi=0.115.2->gradio=6.2.0) (0.4.2)
+[04:57:28] [安装] Collecting annotated-doc>=0.0.2 (from fastapi=0.115.2->gradio=6.2.0)
+[04:57:28] [安装] Using cached annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+[04:57:28] [安装] Collecting certifi (from httpx=0.24.1->gradio=6.2.0)
+[04:57:28] [安装] Using cached certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+[04:57:28] [安装] Requirement already satisfied: httpcore==1.* in .\.venv\Lib\site-packages (from httpx=0.24.1->gradio=6.2.0) (1.0.9)
+[04:57:28] [安装] Requirement already satisfied: h11>=0.16 in .\.venv\Lib\site-packages (from httpcore==1.*->httpx=0.24.1->gradio=6.2.0) (0.16.0)
+[04:57:28] [安装] Requirement already satisfied: python-dateutil>=2.8.2 in .\.venv\Lib\site-packages (from pandas=1.0->gradio=6.2.0) (2.9.0.post0)
+[04:57:28] [安装] Requirement already satisfied: tzdata in .\.venv\Lib\site-packages (from pandas=1.0->gradio=6.2.0) (2026.2)
+[04:57:28] [安装] Collecting annotated-types>=0.6.0 (from pydantic=2.0->gradio=6.2.0)
+[04:57:28] [安装] Using cached annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+[04:57:28] [安装] Requirement already satisfied: pydantic-core==2.46.4 in .\.venv\Lib\site-packages (from pydantic=2.0->gradio=6.2.0) (2.46.4)
+[04:57:28] [安装] Collecting click>=8.2.1 (from typer=0.12->gradio=6.2.0)
+[04:57:28] [安装] Using cached click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+[04:57:28] [安装] Requirement already satisfied: shellingham>=1.3.0 in .\.venv\Lib\site-packages (from typer=0.12->gradio=6.2.0) (1.5.4)
+[04:57:28] [安装] Requirement already satisfied: rich>=13.8.0 in .\.venv\Lib\site-packages (from typer=0.12->gradio=6.2.0) (15.0.0)
+[04:57:28] [安装] Requirement already satisfied: psutil in .\.venv\Lib\site-packages (from peft>=0.18.0) (7.2.2)
+[04:57:28] [安装] Requirement already satisfied: torch>=1.13.0 in .\.venv\Lib\site-packages (from peft>=0.18.0) (2.9.0+cu128)
+[04:57:28] [安装] Requirement already satisfied: accelerate>=0.21.0 in .\.venv\Lib\site-packages (from peft>=0.18.0) (1.14.0)
+[04:57:28] [安装] Collecting einops (from lycoris-lora)
+[04:57:28] [安装] Downloading einops-0.8.2-py3-none-any.whl.metadata (13 kB)
+[04:57:28] [安装] Requirement already satisfied: toml in .\.venv\Lib\site-packages (from lycoris-lora) (0.10.2)
+[04:57:28] [安装] Collecting cffi>=1.0 (from soundfile>=0.13.1)
+[04:57:28] [安装] Downloading cffi-2.1.0-cp312-cp312-win_amd64.whl.metadata (2.6 kB)
+[04:57:28] [安装] Collecting contourpy>=1.0.1 (from matplotlib>=3.7.5)
+[04:57:28] [安装] Downloading contourpy-1.3.3-cp312-cp312-win_amd64.whl.metadata (5.5 kB)
+[04:57:28] [安装] Collecting cycler>=0.10 (from matplotlib>=3.7.5)
+[04:57:28] [安装] Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+[04:57:28] [安装] Requirement already satisfied: fonttools>=4.22.0 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (4.63.0)
+[04:57:28] [安装] Requirement already satisfied: kiwisolver>=1.3.1 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (1.5.0)
+[04:57:28] [安装] Requirement already satisfied: pyparsing>=3 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (3.3.2)
+[04:57:28] [安装] Requirement already satisfied: lightning-utilities=0.10.0 in .\.venv\Lib\site-packages (from lightning>=2.0.0) (0.15.3)
+[04:57:28] [安装] Requirement already satisfied: torchmetrics0.7.0 in .\.venv\Lib\site-packages (from lightning>=2.0.0) (1.9.0)
+[04:57:28] [安装] Requirement already satisfied: pytorch-lightning in .\.venv\Lib\site-packages (from lightning>=2.0.0) (2.6.5)
+[04:57:28] [安装] Collecting aiohttp!=4.0.0a0,!=4.0.0a1 (from fsspec[http]=2022.5.0->lightning>=2.0.0)
+[04:57:28] [安装] Downloading aiohttp-3.14.3-cp312-cp312-win_amd64.whl.metadata (8.5 kB)
+[04:57:28] [安装] Requirement already satisfied: sympy>=1.13.3 in .\.venv\Lib\site-packages (from torch>=1.13.0->peft>=0.18.0) (1.14.0)
+[04:57:28] [安装] Requirement already satisfied: networkx>=2.5.1 in .\.venv\Lib\site-packages (from torch>=1.13.0->peft>=0.18.0) (3.6.1)
+[04:57:28] [安装] Requirement already satisfied: setuptools in .\.venv\Lib\site-packages (from torch>=1.13.0->peft>=0.18.0) (81.0.0)
+[04:57:28] [安装] Collecting colorama (from tqdm>=4.27->transformers=4.51.0)
+[04:57:28] [安装] Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+[04:57:28] [安装] Requirement already satisfied: modelscope-hub>=0.0.7 in .\.venv\Lib\site-packages (from modelscope) (0.1.5)
+[04:57:28] [安装] Requirement already satisfied: urllib3>=1.26 in .\.venv\Lib\site-packages (from modelscope) (2.7.0)
+[04:57:28] [安装] Requirement already satisfied: aiohappyeyeballs>=2.5.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (2.7.1)
+[04:57:28] [安装] Requirement already satisfied: aiosignal>=1.4.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (1.4.0)
+[04:57:28] [安装] Collecting attrs>=17.3.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0)
+[04:57:28] [安装] Using cached attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+[04:57:28] [安装] Requirement already satisfied: frozenlist>=1.1.1 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (1.8.0)
+[04:57:28] [安装] Requirement already satisfied: multidict=4.5 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (6.7.1)
+[04:57:28] [安装] Requirement already satisfied: propcache>=0.2.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (0.5.2)
+[04:57:28] [安装] Requirement already satisfied: yarl=1.17.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (1.24.2)
+[04:57:28] [安装] Requirement already satisfied: pycparser in .\.venv\Lib\site-packages (from cffi>=1.0->soundfile>=0.13.1) (3.0)
+[04:57:28] [安装] Requirement already satisfied: six>=1.5 in .\.venv\Lib\site-packages (from python-dateutil>=2.8.2->pandas=1.0->gradio=6.2.0) (1.17.0)
+[04:57:28] [安装] Collecting charset_normalizer=2 (from requests->transformers=4.51.0)
+[04:57:28] [安装] Downloading charset_normalizer-3.4.9-cp312-cp312-win_amd64.whl.metadata (42 kB)
+[04:57:28] [安装] Requirement already satisfied: markdown-it-py>=2.2.0 in .\.venv\Lib\site-packages (from rich>=13.8.0->typer=0.12->gradio=6.2.0) (4.2.0)
+[04:57:28] [安装] Requirement already satisfied: pygments=2.13.0 in .\.venv\Lib\site-packages (from rich>=13.8.0->typer=0.12->gradio=6.2.0) (2.20.0)
+[04:57:28] [安装] Requirement already satisfied: mdurl~=0.1 in .\.venv\Lib\site-packages (from markdown-it-py>=2.2.0->rich>=13.8.0->typer=0.12->gradio=6.2.0) (0.1.2)
+[04:57:28] [安装] Requirement already satisfied: mpmath=1.1.0 in .\.venv\Lib\site-packages (from sympy>=1.13.3->torch>=1.13.0->peft>=0.18.0) (1.3.0)
+[04:57:28] [安装] Requirement already satisfied: httptools>=0.8.0 in .\.venv\Lib\site-packages (from uvicorn[standard]>=0.27.0) (0.8.0)
+[04:57:28] [安装] Requirement already satisfied: python-dotenv>=0.13 in .\.venv\Lib\site-packages (from uvicorn[standard]>=0.27.0) (1.2.2)
+[04:57:28] [安装] Requirement already satisfied: watchfiles>=0.20 in .\.venv\Lib\site-packages (from uvicorn[standard]>=0.27.0) (1.2.0)
+[04:57:28] [安装] Requirement already satisfied: websockets>=10.4 in .\.venv\Lib\site-packages (from uvicorn[standard]>=0.27.0) (16.0)
+[04:57:28] [安装] Using cached anyio-4.14.2-py3-none-any.whl (125 kB)
+[04:57:28] [安装] Downloading aiohttp-3.14.3-cp312-cp312-win_amd64.whl (476 kB)
+[04:57:28] [安装] Using cached annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+[04:57:28] [安装] Using cached annotated_types-0.8.0-py3-none-any.whl (13 kB)
+[04:57:28] [安装] Using cached attrs-26.1.0-py3-none-any.whl (67 kB)
+[04:57:28] [安装] Downloading brotli-1.2.0-cp312-cp312-win_amd64.whl (369 kB)
+[04:57:28] [安装] Downloading cffi-2.1.0-cp312-cp312-win_amd64.whl (185 kB)
+[04:57:28] [安装] Using cached click-8.4.2-py3-none-any.whl (119 kB)
+[04:57:28] [安装] Downloading contourpy-1.3.3-cp312-cp312-win_amd64.whl (226 kB)
+[04:57:28] [安装] Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+[04:57:28] [安装] Downloading charset_normalizer-3.4.9-cp312-cp312-win_amd64.whl (162 kB)
+[04:57:28] [安装] Using cached certifi-2026.7.22-py3-none-any.whl (136 kB)
+[04:57:28] [安装] Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+[04:57:28] [安装] Downloading einops-0.8.2-py3-none-any.whl (65 kB)
+[04:57:28] [安装] Installing collected packages: brotli, einops, cycler, contourpy, colorama, charset_normalizer, cffi, certifi, attrs, anyio, annotated-types, annotated-doc, click, aiohttp
+[04:57:28] [安装] Successfully installed aiohttp-3.14.3 annotated-doc-0.0.4 annotated-types-0.8.0 anyio-4.14.2 attrs-26.1.0 brotli-1.2.0 certifi-2026.7.22 cffi-2.1.0 charset_normalizer-3.4.9 click-8.4.2 colorama-0.4.6 contourpy-1.3.3 cycler-0.12.1 einops-0.8.2
+[04:57:28] ✓ 基础依赖安装完成
+[04:57:28] [信息] 安装 PyTorch 依赖: torch>=2.9.0,=2.9.0,
+[04:57:29] [安装PyTorch] Looking in indexes: https://download.pytorch.org/whl/cu128
+[04:57:29] [安装PyTorch] Requirement already satisfied: torch=2.9.0 in .\.venv\Lib\site-packages (2.9.0+cu128)
+[04:57:29] [安装PyTorch] Requirement already satisfied: torchaudio=2.9.0 in .\.venv\Lib\site-packages (2.9.0+cu128)
+[04:57:29] [安装PyTorch] Requirement already satisfied: filelock in .\.venv\Lib\site-packages (from torch=2.9.0) (3.29.4)
+[04:57:29] [安装PyTorch] Requirement already satisfied: typing-extensions>=4.10.0 in .\.venv\Lib\site-packages (from torch=2.9.0) (4.16.0)
+[04:57:29] [安装PyTorch] Requirement already satisfied: sympy>=1.13.3 in .\.venv\Lib\site-packages (from torch=2.9.0) (1.14.0)
+[04:57:29] [安装PyTorch] Requirement already satisfied: networkx>=2.5.1 in .\.venv\Lib\site-packages (from torch=2.9.0) (3.6.1)
+[04:57:29] [安装PyTorch] Requirement already satisfied: jinja2 in .\.venv\Lib\site-packages (from torch=2.9.0) (3.1.6)
+[04:57:29] [安装PyTorch] Requirement already satisfied: fsspec>=0.8.5 in .\.venv\Lib\site-packages (from torch=2.9.0) (2026.6.0)
+[04:57:29] [安装PyTorch] Requirement already satisfied: setuptools in .\.venv\Lib\site-packages (from torch=2.9.0) (81.0.0)
+[04:57:29] [安装PyTorch] Requirement already satisfied: mpmath=1.1.0 in .\.venv\Lib\site-packages (from sympy>=1.13.3->torch=2.9.0) (1.3.0)
+[04:57:29] [安装PyTorch] Requirement already satisfied: MarkupSafe>=2.0 in .\.venv\Lib\site-packages (from jinja2->torch=2.9.0) (3.0.3)
+[04:57:29] ✓ PyTorch 依赖安装完成
+[04:57:29] [信息] 验证安装结果...
+[04:57:30] [诊断] torch 导入失败: Traceback (most recent call last):
+[04:57:30] [诊断] torch 导入失败: File "", line 1, in 
+[04:57:30] [诊断] torch 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:30] [诊断] torch 导入失败: from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:30] [诊断] torch 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:30] [诊断] Traceback (most recent call last):
+[04:57:30] [诊断] File "", line 3, in 
+[04:57:30] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:30] [诊断] from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:30] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:30] [诊断] torchaudio 导入失败: Traceback (most recent call last):
+[04:57:30] [诊断] torchaudio 导入失败: File "", line 1, in 
+[04:57:30] [诊断] torchaudio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchaudio\__init__.py", line 4, in 
+[04:57:30] [诊断] torchaudio 导入失败: import torch
+[04:57:30] [诊断] torchaudio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:30] [诊断] torchaudio 导入失败: from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:30] [诊断] torchaudio 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:30] [诊断] Traceback (most recent call last):
+[04:57:30] [诊断] File "", line 3, in 
+[04:57:30] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchaudio\__init__.py", line 4, in 
+[04:57:30] [诊断] import torch
+[04:57:30] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:30] [诊断] from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:30] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:30] [诊断] transformers 导入失败: Traceback (most recent call last):
+[04:57:30] [诊断] transformers 导入失败: File "", line 1, in 
+[04:57:30] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[04:57:30] [诊断] transformers 导入失败: from . import dependency_versions_check
+[04:57:30] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 16, in 
+[04:57:30] [诊断] transformers 导入失败: from .utils.versions import require_version, require_version_core
+[04:57:30] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\__init__.py", line 24, in 
+[04:57:30] [诊断] transformers 导入失败: from .auto_docstring import (
+[04:57:30] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\auto_docstring.py", line 30, in 
+[04:57:30] [诊断] transformers 导入失败: from .generic import ModelOutput
+[04:57:30] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\generic.py", line 51, in 
+[04:57:30] [诊断] transformers 导入失败: import torch
+[04:57:30] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:30] [诊断] transformers 导入失败: from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:30] [诊断] transformers 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:31] [诊断] Traceback (most recent call last):
+[04:57:31] [诊断] File "", line 3, in 
+[04:57:31] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[04:57:31] [诊断] from . import dependency_versions_check
+[04:57:31] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 16, in 
+[04:57:31] [诊断] from .utils.versions import require_version, require_version_core
+[04:57:31] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\__init__.py", line 24, in 
+[04:57:31] [诊断] from .auto_docstring import (
+[04:57:31] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\auto_docstring.py", line 30, in 
+[04:57:31] [诊断] from .generic import ModelOutput
+[04:57:31] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\generic.py", line 51, in 
+[04:57:31] [诊断] import torch
+[04:57:31] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:31] [诊断] from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:31] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:31] [诊断] diffusers 导入失败: Traceback (most recent call last):
+[04:57:31] [诊断] diffusers 导入失败: File "", line 1, in 
+[04:57:31] [诊断] diffusers 导入失败: ModuleNotFoundError: No module named 'diffusers'
+[04:57:31] [诊断] Traceback (most recent call last):
+[04:57:31] [诊断] File "", line 3, in 
+[04:57:31] [诊断] ModuleNotFoundError: No module named 'diffusers'
+[04:57:32] [诊断] peft 导入失败: Traceback (most recent call last):
+[04:57:32] [诊断] peft 导入失败: File "", line 1, in 
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\__init__.py", line 17, in 
+[04:57:32] [诊断] peft 导入失败: from .auto import (
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\auto.py", line 21, in 
+[04:57:32] [诊断] peft 导入失败: from transformers import (
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[04:57:32] [诊断] peft 导入失败: from . import dependency_versions_check
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 16, in 
+[04:57:32] [诊断] peft 导入失败: from .utils.versions import require_version, require_version_core
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\__init__.py", line 24, in 
+[04:57:32] [诊断] peft 导入失败: from .auto_docstring import (
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\auto_docstring.py", line 30, in 
+[04:57:32] [诊断] peft 导入失败: from .generic import ModelOutput
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\generic.py", line 51, in 
+[04:57:32] [诊断] peft 导入失败: import torch
+[04:57:32] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:32] [诊断] peft 导入失败: from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:32] [诊断] peft 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:32] [诊断] Traceback (most recent call last):
+[04:57:32] [诊断] File "", line 3, in 
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\__init__.py", line 17, in 
+[04:57:32] [诊断] from .auto import (
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\auto.py", line 21, in 
+[04:57:32] [诊断] from transformers import (
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[04:57:32] [诊断] from . import dependency_versions_check
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 16, in 
+[04:57:32] [诊断] from .utils.versions import require_version, require_version_core
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\__init__.py", line 24, in 
+[04:57:32] [诊断] from .auto_docstring import (
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\auto_docstring.py", line 30, in 
+[04:57:32] [诊断] from .generic import ModelOutput
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\generic.py", line 51, in 
+[04:57:32] [诊断] import torch
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:32] [诊断] from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:32] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:32] [诊断] lycoris 导入失败: Traceback (most recent call last):
+[04:57:32] [诊断] lycoris 导入失败: File "", line 1, in 
+[04:57:32] [诊断] lycoris 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lycoris\__init__.py", line 5, in 
+[04:57:32] [诊断] lycoris 导入失败: from . import (
+[04:57:32] [诊断] lycoris 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lycoris\modules\__init__.py", line 1, in 
+[04:57:32] [诊断] lycoris 导入失败: import torch
+[04:57:32] [诊断] lycoris 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:32] [诊断] lycoris 导入失败: from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:32] [诊断] lycoris 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:32] [诊断] Traceback (most recent call last):
+[04:57:32] [诊断] File "", line 3, in 
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lycoris\__init__.py", line 5, in 
+[04:57:32] [诊断] from . import (
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lycoris\modules\__init__.py", line 1, in 
+[04:57:32] [诊断] import torch
+[04:57:32] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:32] [诊断] from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:32] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:33] [诊断] gradio 导入失败: Traceback (most recent call last):
+[04:57:33] [诊断] gradio 导入失败: File "", line 1, in 
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\__init__.py", line 3, in 
+[04:57:33] [诊断] gradio 导入失败: import gradio._simple_templates
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\__init__.py", line 1, in 
+[04:57:33] [诊断] gradio 导入失败: from .simpledropdown import SimpleDropdown
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\simpledropdown.py", line 7, in 
+[04:57:33] [诊断] gradio 导入失败: from gradio.components.base import Component, FormComponent
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\__init__.py", line 1, in 
+[04:57:33] [诊断] gradio 导入失败: from gradio.components.annotated_image import AnnotatedImage
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\annotated_image.py", line 8, in 
+[04:57:33] [诊断] gradio 导入失败: import gradio_client.utils as client_utils
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio_client\__init__.py", line 1, in 
+[04:57:33] [诊断] gradio 导入失败: from gradio_client.client import Client
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio_client\client.py", line 42, in 
+[04:57:33] [诊断] gradio 导入失败: from gradio_client.data_classes import ParameterInfo
+[04:57:33] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio_client\data_classes.py", line 5, in 
+[04:57:33] [诊断] gradio 导入失败: from typing_extensions import NotRequired
+[04:57:33] [诊断] gradio 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:34] [诊断] Traceback (most recent call last):
+[04:57:34] [诊断] File "", line 3, in 
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\__init__.py", line 3, in 
+[04:57:34] [诊断] import gradio._simple_templates
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\__init__.py", line 1, in 
+[04:57:34] [诊断] from .simpledropdown import SimpleDropdown
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\simpledropdown.py", line 7, in 
+[04:57:34] [诊断] from gradio.components.base import Component, FormComponent
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\__init__.py", line 1, in 
+[04:57:34] [诊断] from gradio.components.annotated_image import AnnotatedImage
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\annotated_image.py", line 8, in 
+[04:57:34] [诊断] import gradio_client.utils as client_utils
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio_client\__init__.py", line 1, in 
+[04:57:34] [诊断] from gradio_client.client import Client
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio_client\client.py", line 42, in 
+[04:57:34] [诊断] from gradio_client.data_classes import ParameterInfo
+[04:57:34] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio_client\data_classes.py", line 5, in 
+[04:57:34] [诊断] from typing_extensions import NotRequired
+[04:57:34] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:34] [诊断] soundfile 导入失败: Traceback (most recent call last):
+[04:57:34] [诊断] soundfile 导入失败: File "", line 1, in 
+[04:57:34] [诊断] soundfile 导入失败: ModuleNotFoundError: No module named 'soundfile'
+[04:57:34] [诊断] Traceback (most recent call last):
+[04:57:34] [诊断] File "", line 3, in 
+[04:57:34] [诊断] ModuleNotFoundError: No module named 'soundfile'
+[04:57:35] [诊断] matplotlib 导入失败: Traceback (most recent call last):
+[04:57:35] [诊断] matplotlib 导入失败: File "", line 1, in 
+[04:57:35] [诊断] matplotlib 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 265, in 
+[04:57:35] [诊断] matplotlib 导入失败: _check_versions()
+[04:57:35] [诊断] matplotlib 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 259, in _check_versions
+[04:57:35] [诊断] matplotlib 导入失败: module = importlib.import_module(modname)
+[04:57:35] [诊断] matplotlib 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[04:57:35] [诊断] matplotlib 导入失败: File "C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\importlib\__init__.py", line 90, in import_module
+[04:57:35] [诊断] matplotlib 导入失败: return _bootstrap._gcd_import(name[level:], package, level)
+[04:57:35] [诊断] matplotlib 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[04:57:35] [诊断] matplotlib 导入失败: ModuleNotFoundError: No module named 'dateutil'
+[04:57:35] [诊断] Traceback (most recent call last):
+[04:57:35] [诊断] File "", line 3, in 
+[04:57:35] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 265, in 
+[04:57:35] [诊断] _check_versions()
+[04:57:35] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 259, in _check_versions
+[04:57:35] [诊断] module = importlib.import_module(modname)
+[04:57:35] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[04:57:35] [诊断] File "C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\importlib\__init__.py", line 90, in import_module
+[04:57:35] [诊断] return _bootstrap._gcd_import(name[level:], package, level)
+[04:57:35] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[04:57:35] [诊断] ModuleNotFoundError: No module named 'dateutil'
+[04:57:36] [诊断] lightning 导入失败: Traceback (most recent call last):
+[04:57:36] [诊断] lightning 导入失败: File "", line 1, in 
+[04:57:36] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\__init__.py", line 18, in 
+[04:57:36] [诊断] lightning 导入失败: from lightning.fabric.fabric import Fabric # noqa: E402
+[04:57:36] [诊断] lightning 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[04:57:36] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\fabric\__init__.py", line 7, in 
+[04:57:36] [诊断] lightning 导入失败: from lightning_utilities.core.imports import package_available
+[04:57:36] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning_utilities\__init__.py", line 6, in 
+[04:57:36] [诊断] lightning 导入失败: from lightning_utilities.core.apply_func import apply_to_collection
+[04:57:36] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning_utilities\core\__init__.py", line 4, in 
+[04:57:36] [诊断] lightning 导入失败: from lightning_utilities.core.enums import StrEnum
+[04:57:36] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning_utilities\core\enums.py", line 9, in 
+[04:57:36] [诊断] lightning 导入失败: from typing_extensions import Literal
+[04:57:36] [诊断] lightning 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:36] [诊断] Traceback (most recent call last):
+[04:57:36] [诊断] File "", line 3, in 
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\__init__.py", line 18, in 
+[04:57:36] [诊断] from lightning.fabric.fabric import Fabric # noqa: E402
+[04:57:36] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\fabric\__init__.py", line 7, in 
+[04:57:36] [诊断] from lightning_utilities.core.imports import package_available
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning_utilities\__init__.py", line 6, in 
+[04:57:36] [诊断] from lightning_utilities.core.apply_func import apply_to_collection
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning_utilities\core\__init__.py", line 4, in 
+[04:57:36] [诊断] from lightning_utilities.core.enums import StrEnum
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning_utilities\core\enums.py", line 9, in 
+[04:57:36] [诊断] from typing_extensions import Literal
+[04:57:36] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:36] [诊断] modelscope 导入失败: Traceback (most recent call last):
+[04:57:36] [诊断] modelscope 导入失败: File "", line 1, in 
+[04:57:36] [诊断] modelscope 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\__init__.py", line 5, in 
+[04:57:36] [诊断] modelscope 导入失败: from modelscope.utils.import_utils import (LazyImportModule,
+[04:57:36] [诊断] modelscope 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\import_utils.py", line 23, in 
+[04:57:36] [诊断] modelscope 导入失败: from modelscope.utils.ast_utils import (INDEX_KEY, MODULE_KEY, REQUIREMENT_KEY,
+[04:57:36] [诊断] modelscope 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\ast_utils.py", line 23, in 
+[04:57:36] [诊断] modelscope 导入失败: from modelscope.utils.file_utils import get_modelscope_cache_dir
+[04:57:36] [诊断] modelscope 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\file_utils.py", line 13, in 
+[04:57:36] [诊断] modelscope 导入失败: logger = get_logger()
+[04:57:36] [诊断] modelscope 导入失败: ^^^^^^^^^^^^
+[04:57:36] [诊断] modelscope 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\logger.py", line 49, in get_logger
+[04:57:36] [诊断] modelscope 导入失败: from modelscope.utils.torch_utils import is_dist, is_master
+[04:57:36] [诊断] modelscope 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\torch_utils.py", line 14, in 
+[04:57:36] [诊断] modelscope 导入失败: import torch
+[04:57:36] [诊断] modelscope 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:36] [诊断] modelscope 导入失败: from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:36] [诊断] modelscope 导入失败: ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:36] [诊断] Traceback (most recent call last):
+[04:57:36] [诊断] File "", line 3, in 
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\__init__.py", line 5, in 
+[04:57:36] [诊断] from modelscope.utils.import_utils import (LazyImportModule,
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\import_utils.py", line 23, in 
+[04:57:36] [诊断] from modelscope.utils.ast_utils import (INDEX_KEY, MODULE_KEY, REQUIREMENT_KEY,
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\ast_utils.py", line 23, in 
+[04:57:36] [诊断] from modelscope.utils.file_utils import get_modelscope_cache_dir
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\file_utils.py", line 13, in 
+[04:57:36] [诊断] logger = get_logger()
+[04:57:36] [诊断] ^^^^^^^^^^^^
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\logger.py", line 49, in get_logger
+[04:57:36] [诊断] from modelscope.utils.torch_utils import is_dist, is_master
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\modelscope\utils\torch_utils.py", line 14, in 
+[04:57:36] [诊断] import torch
+[04:57:36] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torch\__init__.py", line 35, in 
+[04:57:36] [诊断] from typing_extensions import ParamSpec as _ParamSpec, TypeIs as _TypeIs
+[04:57:36] [诊断] ModuleNotFoundError: No module named 'typing_extensions'
+[04:57:36] [警告] 以下依赖仍缺失: torch, torchaudio, transformers, diffusers, peft, lycoris, gradio, soundfile, matplotlib, lightning, modelscope
+[04:57:36] [建议] 请手动运行 scripts/install-env.ps1 安装
+[04:57:36] [信息] 验证必须依赖...
+[04:57:37] ✓ loguru (日志库) 已安装
+[04:57:37] ✓ psutil (系统监控) 已安装
+[04:57:37] ✗ torch (PyTorch 核心) 未安装
+[04:57:37] ✗ torchaudio (音频处理) 未安装
+[04:57:37] ✗ transformers (模型加载) 未安装
+[04:57:37] ✗ diffusers (扩散模型) 未安装
+[04:57:37] ✗ peft (LoRA/训练) 未安装
+[04:57:37] ✗ lycoris (LoKr 训练) 未安装
+[04:57:37] ✓ fastapi (API 框架) 已安装
+[04:57:37] ✓ uvicorn (ASGI 服务器) 已安装
+[04:57:37] ✗ gradio (Web UI) 未安装
+[04:57:37] ✓ accelerate (加速库) 已安装
+[04:57:37] ✓ scipy (科学计算) 已安装
+[04:57:38] ✗ soundfile (音频文件) 未安装
+[04:57:38] ✓ einops (张量操作) 已安装
+[04:57:38] ✗ matplotlib (图表绘制) 未安装
+[04:57:38] ✓ diskcache (磁盘缓存) 已安装
+[04:57:38] ✓ numba (JIT 编译) 已安装
+[04:57:38] ✗ lightning (训练框架) 未安装
+[04:57:38] ✓ tensorboard (训练日志) 已安装
+[04:57:38] ✗ modelscope (模型下载) 未安装
+[04:57:38] ✓ huggingface_hub (HF 下载) 已安装
+[04:57:38] ✓ safetensors (安全张量) 已安装
+[04:57:38] ✗ transformers 版本不兼容: unknown (需要 
+[04:57:38] [信息] 正在自动修复: 降级 transformers...
+[04:57:39] ✓ transformers 已降级到兼容版本
+[04:57:39] [信息] 验证可选加速项...
+[04:57:39] ⚠ flash_attn (Flash Attention 加速推理（推荐 NVIDIA 显卡）) 未安装 - 不影响功能，但推理速度会较慢
+[04:57:39] [警告] 部分必须依赖缺失
+[04:57:39] 6. 检查 Web 前端（可选）...
+[04:57:39] ✓ ace-step-ui git 子模块已初始化
+[04:57:39] ✓ Web 前端依赖已安装
+[04:57:39] ✓ 快速环境验证完成
+[04:57:39] [信息] flash_attn 未安装，正在从本地 wheel 安装...
+[05:02:37] ✓ flash_attn 加速库安装完成
+[05:02:37] 7. 最终检查（重新验证所有环境项）...
+[05:03:01] [警告] 部分环境项未通过，尝试自动修复...
+[05:03:01] [修复] 重新安装 Python 依赖...
+[05:03:07] [信息] torchaudio (音频处理) 缺失，需要安装
+[05:03:12] [信息] transformers (模型加载) 缺失，需要安装
+[05:03:12] [信息] diffusers (扩散模型) 缺失，需要安装
+[05:03:16] [信息] peft (LoRA/训练) 缺失，需要安装
+[05:03:20] [信息] gradio (Web UI) 缺失，需要安装
+[05:03:21] [信息] soundfile (音频文件) 缺失，需要安装
+[05:03:21] [信息] matplotlib (图表绘制) 缺失，需要安装
+[05:03:27] [信息] lightning (训练框架) 缺失，需要安装
+[05:03:30] [信息] 共 8 个依赖缺失，开始安装...
+[05:03:30] [信息] 清理 uv 等可能残留的冲突包...
+[05:03:30] [信息] 安装基础依赖: transformers>=4.51.0,=0.18.0, gradio>=6.2.0,=0.13.1, matplotlib>=3.7.5, lightning>=2.0.0
+[05:03:31] [安装] Requirement already satisfied: transformers=4.51.0 in .\.venv\Lib\site-packages (4.57.6)
+[05:03:31] [安装] Requirement already satisfied: diffusers in .\.venv\Lib\site-packages (0.38.0)
+[05:03:31] [安装] Requirement already satisfied: peft>=0.18.0 in .\.venv\Lib\site-packages (0.19.1)
+[05:03:31] [安装] Requirement already satisfied: gradio=6.2.0 in .\.venv\Lib\site-packages (6.17.3)
+[05:03:31] [安装] Requirement already satisfied: soundfile>=0.13.1 in .\.venv\Lib\site-packages (0.14.0)
+[05:03:31] [安装] Requirement already satisfied: matplotlib>=3.7.5 in .\.venv\Lib\site-packages (3.11.0)
+[05:03:31] [安装] Requirement already satisfied: lightning>=2.0.0 in .\.venv\Lib\site-packages (2.6.5)
+[05:03:31] [安装] Requirement already satisfied: filelock in .\.venv\Lib\site-packages (from transformers=4.51.0) (3.32.0)
+[05:03:31] [安装] Requirement already satisfied: huggingface-hub=0.34.0 in .\.venv\Lib\site-packages (from transformers=4.51.0) (0.36.2)
+[05:03:31] [安装] Requirement already satisfied: numpy>=1.17 in .\.venv\Lib\site-packages (from transformers=4.51.0) (2.4.6)
+[05:03:31] [安装] Requirement already satisfied: packaging>=20.0 in .\.venv\Lib\site-packages (from transformers=4.51.0) (26.2)
+[05:03:31] [安装] Requirement already satisfied: pyyaml>=5.1 in .\.venv\Lib\site-packages (from transformers=4.51.0) (6.0.3)
+[05:03:31] [安装] Requirement already satisfied: regex!=2019.12.17 in .\.venv\Lib\site-packages (from transformers=4.51.0) (2026.6.28)
+[05:03:31] [安装] Requirement already satisfied: requests in .\.venv\Lib\site-packages (from transformers=4.51.0) (2.34.2)
+[05:03:31] [安装] Requirement already satisfied: tokenizers=0.22.0 in .\.venv\Lib\site-packages (from transformers=4.51.0) (0.22.2)
+[05:03:31] [安装] Requirement already satisfied: safetensors>=0.4.3 in .\.venv\Lib\site-packages (from transformers=4.51.0) (0.8.0)
+[05:03:31] [安装] Requirement already satisfied: tqdm>=4.27 in .\.venv\Lib\site-packages (from transformers=4.51.0) (4.68.3)
+[05:03:31] [安装] Requirement already satisfied: anyio=3.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (4.14.2)
+[05:03:31] [安装] Requirement already satisfied: brotli>=1.1.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (1.2.0)
+[05:03:31] [安装] Requirement already satisfied: fastapi=0.115.2 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.139.0)
+[05:03:31] [安装] Requirement already satisfied: gradio-client==2.5.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2.5.0)
+[05:03:31] [安装] Requirement already satisfied: groovy~=0.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.1.2)
+[05:03:31] [安装] Requirement already satisfied: hf-gradio=0.4.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.4.1)
+[05:03:31] [安装] Requirement already satisfied: httpx=0.24.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.28.1)
+[05:03:31] [安装] Requirement already satisfied: jinja2=6.2.0) (3.1.6)
+[05:03:31] [安装] Requirement already satisfied: markupsafe=2.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (3.0.3)
+[05:03:31] [安装] Requirement already satisfied: orjson~=3.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (3.11.9)
+[05:03:31] [安装] Requirement already satisfied: pandas=1.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (3.0.3)
+[05:03:31] [安装] Requirement already satisfied: pillow=8.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (12.3.0)
+[05:03:31] [安装] Requirement already satisfied: pydantic=2.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2.13.4)
+[05:03:31] [安装] Requirement already satisfied: pydub=6.2.0) (0.25.1)
+[05:03:31] [安装] Requirement already satisfied: python-multipart=0.0.18 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.0.32)
+[05:03:31] [安装] Requirement already satisfied: pytz>=2017.2 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2026.2)
+[05:03:31] [安装] Requirement already satisfied: safehttpx=0.1.7 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.1.7)
+[05:03:31] [安装] Requirement already satisfied: semantic-version~=2.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (2.10.0)
+[05:03:31] [安装] Requirement already satisfied: starlette=1.0.1 in .\.venv\Lib\site-packages (from gradio=6.2.0) (1.3.1)
+[05:03:31] [安装] Requirement already satisfied: tomlkit=0.12.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.14.0)
+[05:03:31] [安装] Requirement already satisfied: typer=0.12 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.25.1)
+[05:03:31] [安装] Requirement already satisfied: typing-extensions~=4.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (4.16.0)
+[05:03:31] [安装] Requirement already satisfied: uvicorn>=0.14.0 in .\.venv\Lib\site-packages (from gradio=6.2.0) (0.49.0)
+[05:03:31] [安装] Requirement already satisfied: fsspec in .\.venv\Lib\site-packages (from gradio-client==2.5.0->gradio=6.2.0) (2026.6.0)
+[05:03:31] [安装] Requirement already satisfied: idna>=2.8 in .\.venv\Lib\site-packages (from anyio=3.0->gradio=6.2.0) (3.18)
+[05:03:31] [安装] Requirement already satisfied: typing-inspection>=0.4.2 in .\.venv\Lib\site-packages (from fastapi=0.115.2->gradio=6.2.0) (0.4.2)
+[05:03:31] [安装] Requirement already satisfied: annotated-doc>=0.0.2 in .\.venv\Lib\site-packages (from fastapi=0.115.2->gradio=6.2.0) (0.0.4)
+[05:03:31] [安装] Requirement already satisfied: certifi in .\.venv\Lib\site-packages (from httpx=0.24.1->gradio=6.2.0) (2026.7.22)
+[05:03:31] [安装] Requirement already satisfied: httpcore==1.* in .\.venv\Lib\site-packages (from httpx=0.24.1->gradio=6.2.0) (1.0.9)
+[05:03:31] [安装] Requirement already satisfied: h11>=0.16 in .\.venv\Lib\site-packages (from httpcore==1.*->httpx=0.24.1->gradio=6.2.0) (0.16.0)
+[05:03:31] [安装] Requirement already satisfied: python-dateutil>=2.8.2 in .\.venv\Lib\site-packages (from pandas=1.0->gradio=6.2.0) (2.9.0.post0)
+[05:03:31] [安装] Requirement already satisfied: tzdata in .\.venv\Lib\site-packages (from pandas=1.0->gradio=6.2.0) (2026.2)
+[05:03:31] [安装] Requirement already satisfied: annotated-types>=0.6.0 in .\.venv\Lib\site-packages (from pydantic=2.0->gradio=6.2.0) (0.8.0)
+[05:03:31] [安装] Requirement already satisfied: pydantic-core==2.46.4 in .\.venv\Lib\site-packages (from pydantic=2.0->gradio=6.2.0) (2.46.4)
+[05:03:31] [安装] Requirement already satisfied: click>=8.2.1 in .\.venv\Lib\site-packages (from typer=0.12->gradio=6.2.0) (8.4.2)
+[05:03:31] [安装] Requirement already satisfied: shellingham>=1.3.0 in .\.venv\Lib\site-packages (from typer=0.12->gradio=6.2.0) (1.5.4)
+[05:03:31] [安装] Requirement already satisfied: rich>=13.8.0 in .\.venv\Lib\site-packages (from typer=0.12->gradio=6.2.0) (15.0.0)
+[05:03:31] [安装] Requirement already satisfied: psutil in .\.venv\Lib\site-packages (from peft>=0.18.0) (7.2.2)
+[05:03:31] [安装] Requirement already satisfied: torch>=1.13.0 in .\.venv\Lib\site-packages (from peft>=0.18.0) (2.13.0)
+[05:03:31] [安装] Requirement already satisfied: accelerate>=0.21.0 in .\.venv\Lib\site-packages (from peft>=0.18.0) (1.14.0)
+[05:03:31] [安装] Requirement already satisfied: cffi>=1.0 in .\.venv\Lib\site-packages (from soundfile>=0.13.1) (2.1.0)
+[05:03:31] [安装] Requirement already satisfied: contourpy>=1.0.1 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (1.3.3)
+[05:03:31] [安装] Requirement already satisfied: cycler>=0.10 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (0.12.1)
+[05:03:31] [安装] Requirement already satisfied: fonttools>=4.22.0 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (4.63.0)
+[05:03:31] [安装] Requirement already satisfied: kiwisolver>=1.3.1 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (1.5.0)
+[05:03:31] [安装] Requirement already satisfied: pyparsing>=3 in .\.venv\Lib\site-packages (from matplotlib>=3.7.5) (3.3.2)
+[05:03:31] [安装] Requirement already satisfied: lightning-utilities=0.10.0 in .\.venv\Lib\site-packages (from lightning>=2.0.0) (0.15.3)
+[05:03:31] [安装] Requirement already satisfied: torchmetrics0.7.0 in .\.venv\Lib\site-packages (from lightning>=2.0.0) (1.9.0)
+[05:03:31] [安装] Requirement already satisfied: pytorch-lightning in .\.venv\Lib\site-packages (from lightning>=2.0.0) (2.6.5)
+[05:03:31] [安装] Requirement already satisfied: aiohttp!=4.0.0a0,!=4.0.0a1 in .\.venv\Lib\site-packages (from fsspec[http]=2022.5.0->lightning>=2.0.0) (3.14.3)
+[05:03:31] [安装] Requirement already satisfied: setuptools>=77.0.3 in .\.venv\Lib\site-packages (from torch>=1.13.0->peft>=0.18.0) (83.0.0)
+[05:03:31] [安装] Requirement already satisfied: sympy>=1.13.3 in .\.venv\Lib\site-packages (from torch>=1.13.0->peft>=0.18.0) (1.14.0)
+[05:03:31] [安装] Requirement already satisfied: networkx>=2.5.1 in .\.venv\Lib\site-packages (from torch>=1.13.0->peft>=0.18.0) (3.6.1)
+[05:03:31] [安装] Requirement already satisfied: colorama in .\.venv\Lib\site-packages (from tqdm>=4.27->transformers=4.51.0) (0.4.6)
+[05:03:31] [安装] Requirement already satisfied: aiohappyeyeballs>=2.5.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (2.7.1)
+[05:03:31] [安装] Requirement already satisfied: aiosignal>=1.4.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (1.4.0)
+[05:03:31] [安装] Requirement already satisfied: attrs>=17.3.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (26.1.0)
+[05:03:31] [安装] Requirement already satisfied: frozenlist>=1.1.1 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (1.8.0)
+[05:03:31] [安装] Requirement already satisfied: multidict=4.5 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (6.7.1)
+[05:03:31] [安装] Requirement already satisfied: propcache>=0.2.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (0.5.2)
+[05:03:31] [安装] Requirement already satisfied: yarl=1.17.0 in .\.venv\Lib\site-packages (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]=2022.5.0->lightning>=2.0.0) (1.24.2)
+[05:03:31] [安装] Requirement already satisfied: pycparser in .\.venv\Lib\site-packages (from cffi>=1.0->soundfile>=0.13.1) (3.0)
+[05:03:31] [安装] Requirement already satisfied: six>=1.5 in .\.venv\Lib\site-packages (from python-dateutil>=2.8.2->pandas=1.0->gradio=6.2.0) (1.17.0)
+[05:03:31] [安装] Requirement already satisfied: markdown-it-py>=2.2.0 in .\.venv\Lib\site-packages (from rich>=13.8.0->typer=0.12->gradio=6.2.0) (4.2.0)
+[05:03:31] [安装] Requirement already satisfied: pygments=2.13.0 in .\.venv\Lib\site-packages (from rich>=13.8.0->typer=0.12->gradio=6.2.0) (2.20.0)
+[05:03:31] [安装] Requirement already satisfied: mdurl~=0.1 in .\.venv\Lib\site-packages (from markdown-it-py>=2.2.0->rich>=13.8.0->typer=0.12->gradio=6.2.0) (0.1.2)
+[05:03:31] [安装] Requirement already satisfied: mpmath=1.1.0 in .\.venv\Lib\site-packages (from sympy>=1.13.3->torch>=1.13.0->peft>=0.18.0) (1.3.0)
+[05:03:31] [安装] Requirement already satisfied: charset_normalizer=2 in .\.venv\Lib\site-packages (from requests->transformers=4.51.0) (3.4.9)
+[05:03:31] [安装] Requirement already satisfied: urllib3=1.26 in .\.venv\Lib\site-packages (from requests->transformers=4.51.0) (2.7.0)
+[05:03:31] ✓ 基础依赖安装完成
+[05:03:31] [信息] 安装 PyTorch 依赖: torchaudio>=2.9.0,
+[05:04:40] [安装PyTorch] Looking in indexes: https://download.pytorch.org/whl/cu128
+[05:04:40] [安装PyTorch] Requirement already satisfied: torchaudio=2.9.0 in .\.venv\Lib\site-packages (2.9.0+cu128)
+[05:04:40] [安装PyTorch] Collecting torch==2.9.0 (from torchaudio=2.9.0)
+[05:04:40] [安装PyTorch] Using cached torch-2.9.0%2Bcu128-cp312-cp312-win_amd64.whl.metadata (29 kB)
+[05:04:40] [安装PyTorch] Requirement already satisfied: filelock in .\.venv\Lib\site-packages (from torch==2.9.0->torchaudio=2.9.0) (3.32.0)
+[05:04:40] [安装PyTorch] Requirement already satisfied: typing-extensions>=4.10.0 in .\.venv\Lib\site-packages (from torch==2.9.0->torchaudio=2.9.0) (4.16.0)
+[05:04:40] [安装PyTorch] Requirement already satisfied: sympy>=1.13.3 in .\.venv\Lib\site-packages (from torch==2.9.0->torchaudio=2.9.0) (1.14.0)
+[05:04:40] [安装PyTorch] Requirement already satisfied: networkx>=2.5.1 in .\.venv\Lib\site-packages (from torch==2.9.0->torchaudio=2.9.0) (3.6.1)
+[05:04:40] [安装PyTorch] Requirement already satisfied: jinja2 in .\.venv\Lib\site-packages (from torch==2.9.0->torchaudio=2.9.0) (3.1.6)
+[05:04:40] [安装PyTorch] Requirement already satisfied: fsspec>=0.8.5 in .\.venv\Lib\site-packages (from torch==2.9.0->torchaudio=2.9.0) (2026.6.0)
+[05:04:40] [安装PyTorch] Requirement already satisfied: setuptools in .\.venv\Lib\site-packages (from torch==2.9.0->torchaudio=2.9.0) (83.0.0)
+[05:04:40] [安装PyTorch] Requirement already satisfied: mpmath=1.1.0 in .\.venv\Lib\site-packages (from sympy>=1.13.3->torch==2.9.0->torchaudio=2.9.0) (1.3.0)
+[05:04:40] [安装PyTorch] Requirement already satisfied: MarkupSafe>=2.0 in .\.venv\Lib\site-packages (from jinja2->torch==2.9.0->torchaudio=2.9.0) (3.0.3)
+[05:04:40] [安装PyTorch] Using cached torch-2.9.0%2Bcu128-cp312-cp312-win_amd64.whl (2860.2 MB)
+[05:04:40] [安装PyTorch] Installing collected packages: torch
+[05:04:40] [安装PyTorch] Attempting uninstall: torch
+[05:04:40] [安装PyTorch] Found existing installation: torch 2.13.0
+[05:04:40] [安装PyTorch] Uninstalling torch-2.13.0:
+[05:04:40] [安装PyTorch] Successfully uninstalled torch-2.13.0
+[05:04:40] [安装PyTorch] Successfully installed torch-2.9.0+cu128
+[05:04:40] ✓ PyTorch 依赖安装完成
+[05:04:40] [信息] 验证安装结果...
+[05:04:52] [诊断] transformers 导入失败: Traceback (most recent call last):
+[05:04:52] [诊断] transformers 导入失败: File "", line 1, in 
+[05:04:52] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[05:04:52] [诊断] transformers 导入失败: from . import dependency_versions_check
+[05:04:52] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 54, in 
+[05:04:52] [诊断] transformers 导入失败: if not is_accelerate_available():
+[05:04:52] [诊断] transformers 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:52] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\import_utils.py", line 398, in is_accelerate_available
+[05:04:52] [诊断] transformers 导入失败: return _accelerate_available and version.parse(_accelerate_version) >= version.parse(min_version)
+[05:04:52] [诊断] transformers 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:52] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 122, in parse
+[05:04:52] [诊断] transformers 导入失败: return Version(version)
+[05:04:52] [诊断] transformers 导入失败: ^^^^^^^^^^^^^^^^
+[05:04:52] [诊断] transformers 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 414, in __init__
+[05:04:52] [诊断] transformers 导入失败: if _SIMPLE_VERSION_INDICATORS.issuperset(version):
+[05:04:52] [诊断] transformers 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:52] [诊断] transformers 导入失败: TypeError: 'NoneType' object is not iterable
+[05:04:55] [诊断] Traceback (most recent call last):
+[05:04:55] [诊断] File "", line 3, in 
+[05:04:55] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[05:04:55] [诊断] from . import dependency_versions_check
+[05:04:55] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 54, in 
+[05:04:55] [诊断] if not is_accelerate_available():
+[05:04:55] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:55] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\import_utils.py", line 398, in is_accelerate_available
+[05:04:55] [诊断] return _accelerate_available and version.parse(_accelerate_version) >= version.parse(min_version)
+[05:04:55] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:55] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 122, in parse
+[05:04:55] [诊断] return Version(version)
+[05:04:55] [诊断] ^^^^^^^^^^^^^^^^
+[05:04:55] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 414, in __init__
+[05:04:55] [诊断] if _SIMPLE_VERSION_INDICATORS.issuperset(version):
+[05:04:55] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:55] [诊断] TypeError: 'NoneType' object is not iterable
+[05:04:55] [诊断] diffusers 导入失败: Traceback (most recent call last):
+[05:04:55] [诊断] diffusers 导入失败: File "", line 1, in 
+[05:04:55] [诊断] diffusers 导入失败: ModuleNotFoundError: No module named 'diffusers'
+[05:04:55] [诊断] Traceback (most recent call last):
+[05:04:55] [诊断] File "", line 3, in 
+[05:04:55] [诊断] ModuleNotFoundError: No module named 'diffusers'
+[05:04:58] [诊断] peft 导入失败: Traceback (most recent call last):
+[05:04:58] [诊断] peft 导入失败: File "", line 1, in 
+[05:04:58] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\__init__.py", line 17, in 
+[05:04:58] [诊断] peft 导入失败: from .auto import (
+[05:04:58] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\auto.py", line 21, in 
+[05:04:58] [诊断] peft 导入失败: from transformers import (
+[05:04:58] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[05:04:58] [诊断] peft 导入失败: from . import dependency_versions_check
+[05:04:58] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 54, in 
+[05:04:58] [诊断] peft 导入失败: if not is_accelerate_available():
+[05:04:58] [诊断] peft 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:58] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\import_utils.py", line 398, in is_accelerate_available
+[05:04:58] [诊断] peft 导入失败: return _accelerate_available and version.parse(_accelerate_version) >= version.parse(min_version)
+[05:04:58] [诊断] peft 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:58] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 122, in parse
+[05:04:58] [诊断] peft 导入失败: return Version(version)
+[05:04:58] [诊断] peft 导入失败: ^^^^^^^^^^^^^^^^
+[05:04:58] [诊断] peft 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 414, in __init__
+[05:04:58] [诊断] peft 导入失败: if _SIMPLE_VERSION_INDICATORS.issuperset(version):
+[05:04:58] [诊断] peft 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:04:58] [诊断] peft 导入失败: TypeError: 'NoneType' object is not iterable
+[05:05:01] [诊断] Traceback (most recent call last):
+[05:05:01] [诊断] File "", line 3, in 
+[05:05:01] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\__init__.py", line 17, in 
+[05:05:01] [诊断] from .auto import (
+[05:05:01] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\peft\auto.py", line 21, in 
+[05:05:01] [诊断] from transformers import (
+[05:05:01] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\__init__.py", line 27, in 
+[05:05:01] [诊断] from . import dependency_versions_check
+[05:05:01] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\dependency_versions_check.py", line 54, in 
+[05:05:01] [诊断] if not is_accelerate_available():
+[05:05:01] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:01] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\transformers\utils\import_utils.py", line 398, in is_accelerate_available
+[05:05:01] [诊断] return _accelerate_available and version.parse(_accelerate_version) >= version.parse(min_version)
+[05:05:01] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:01] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 122, in parse
+[05:05:01] [诊断] return Version(version)
+[05:05:01] [诊断] ^^^^^^^^^^^^^^^^
+[05:05:01] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\packaging\version.py", line 414, in __init__
+[05:05:01] [诊断] if _SIMPLE_VERSION_INDICATORS.issuperset(version):
+[05:05:01] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:01] [诊断] TypeError: 'NoneType' object is not iterable
+[05:05:06] [诊断] gradio 导入失败: Traceback (most recent call last):
+[05:05:06] [诊断] gradio 导入失败: File "", line 1, in 
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\__init__.py", line 3, in 
+[05:05:06] [诊断] gradio 导入失败: import gradio._simple_templates
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\__init__.py", line 1, in 
+[05:05:06] [诊断] gradio 导入失败: from .simpledropdown import SimpleDropdown
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\simpledropdown.py", line 7, in 
+[05:05:06] [诊断] gradio 导入失败: from gradio.components.base import Component, FormComponent
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\__init__.py", line 1, in 
+[05:05:06] [诊断] gradio 导入失败: from gradio.components.annotated_image import AnnotatedImage
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\annotated_image.py", line 14, in 
+[05:05:06] [诊断] gradio 导入失败: from gradio import processing_utils, utils
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\processing_utils.py", line 28, in 
+[05:05:06] [诊断] gradio 导入失败: from gradio import utils
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\utils.py", line 66, in 
+[05:05:06] [诊断] gradio 导入失败: from gradio.data_classes import (
+[05:05:06] [诊断] gradio 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\data_classes.py", line 20, in 
+[05:05:06] [诊断] gradio 导入失败: from fastapi import Request
+[05:05:06] [诊断] gradio 导入失败: ImportError: cannot import name 'Request' from 'fastapi' (unknown location)
+[05:05:06] [诊断] Traceback (most recent call last):
+[05:05:06] [诊断] File "", line 3, in 
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\__init__.py", line 3, in 
+[05:05:06] [诊断] import gradio._simple_templates
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\__init__.py", line 1, in 
+[05:05:06] [诊断] from .simpledropdown import SimpleDropdown
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\_simple_templates\simpledropdown.py", line 7, in 
+[05:05:06] [诊断] from gradio.components.base import Component, FormComponent
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\__init__.py", line 1, in 
+[05:05:06] [诊断] from gradio.components.annotated_image import AnnotatedImage
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\components\annotated_image.py", line 14, in 
+[05:05:06] [诊断] from gradio import processing_utils, utils
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\processing_utils.py", line 28, in 
+[05:05:06] [诊断] from gradio import utils
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\utils.py", line 66, in 
+[05:05:06] [诊断] from gradio.data_classes import (
+[05:05:06] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\gradio\data_classes.py", line 20, in 
+[05:05:06] [诊断] from fastapi import Request
+[05:05:06] [诊断] ImportError: cannot import name 'Request' from 'fastapi' (unknown location)
+[05:05:07] [诊断] soundfile 导入失败: Traceback (most recent call last):
+[05:05:07] [诊断] soundfile 导入失败: File "", line 1, in 
+[05:05:07] [诊断] soundfile 导入失败: ModuleNotFoundError: No module named 'soundfile'
+[05:05:07] [诊断] Traceback (most recent call last):
+[05:05:07] [诊断] File "", line 3, in 
+[05:05:07] [诊断] ModuleNotFoundError: No module named 'soundfile'
+[05:05:07] [诊断] matplotlib 导入失败: Traceback (most recent call last):
+[05:05:07] [诊断] matplotlib 导入失败: File "", line 1, in 
+[05:05:07] [诊断] matplotlib 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 265, in 
+[05:05:07] [诊断] matplotlib 导入失败: _check_versions()
+[05:05:07] [诊断] matplotlib 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 259, in _check_versions
+[05:05:07] [诊断] matplotlib 导入失败: module = importlib.import_module(modname)
+[05:05:07] [诊断] matplotlib 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:07] [诊断] matplotlib 导入失败: File "C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\importlib\__init__.py", line 90, in import_module
+[05:05:07] [诊断] matplotlib 导入失败: return _bootstrap._gcd_import(name[level:], package, level)
+[05:05:07] [诊断] matplotlib 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:07] [诊断] matplotlib 导入失败: ModuleNotFoundError: No module named 'dateutil'
+[05:05:08] [诊断] Traceback (most recent call last):
+[05:05:08] [诊断] File "", line 3, in 
+[05:05:08] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 265, in 
+[05:05:08] [诊断] _check_versions()
+[05:05:08] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 259, in _check_versions
+[05:05:08] [诊断] module = importlib.import_module(modname)
+[05:05:08] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:08] [诊断] File "C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\importlib\__init__.py", line 90, in import_module
+[05:05:08] [诊断] return _bootstrap._gcd_import(name[level:], package, level)
+[05:05:08] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:08] [诊断] ModuleNotFoundError: No module named 'dateutil'
+[05:05:13] [诊断] lightning 导入失败: Traceback (most recent call last):
+[05:05:13] [诊断] lightning 导入失败: File "", line 1, in 
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\__init__.py", line 20, in 
+[05:05:13] [诊断] lightning 导入失败: from lightning.pytorch.callbacks import Callback # noqa: E402
+[05:05:13] [诊断] lightning 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\__init__.py", line 27, in 
+[05:05:13] [诊断] lightning 导入失败: from lightning.pytorch.callbacks import Callback # noqa: E402
+[05:05:13] [诊断] lightning 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\callbacks\__init__.py", line 14, in 
+[05:05:13] [诊断] lightning 导入失败: from lightning.pytorch.callbacks.batch_size_finder import BatchSizeFinder
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\callbacks\batch_size_finder.py", line 26, in 
+[05:05:13] [诊断] lightning 导入失败: from lightning.pytorch.callbacks.callback import Callback
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\callbacks\callback.py", line 22, in 
+[05:05:13] [诊断] lightning 导入失败: from lightning.pytorch.utilities.types import STEP_OUTPUT
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\utilities\types.py", line 36, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics import Metric
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\__init__.py", line 37, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics import functional # noqa: E402
+[05:05:13] [诊断] lightning 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\functional\__init__.py", line 14, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics.functional.audio._deprecated import _permutation_invariant_training as permutation_invariant_training
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\functional\audio\__init__.py", line 14, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics.functional.audio.pit import permutation_invariant_training, pit_permutate
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\functional\audio\pit.py", line 22, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics.utilities import rank_zero_warn
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\utilities\__init__.py", line 14, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics.utilities.checks import check_forward_full_state_property
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\utilities\checks.py", line 26, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics.metric import Metric
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\metric.py", line 43, in 
+[05:05:13] [诊断] lightning 导入失败: from torchmetrics.utilities.plot import _AX_TYPE, _PLOT_OUT_TYPE, plot_single_or_multi_val
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\utilities\plot.py", line 26, in 
+[05:05:13] [诊断] lightning 导入失败: import matplotlib
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 265, in 
+[05:05:13] [诊断] lightning 导入失败: _check_versions()
+[05:05:13] [诊断] lightning 导入失败: File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 259, in _check_versions
+[05:05:13] [诊断] lightning 导入失败: module = importlib.import_module(modname)
+[05:05:13] [诊断] lightning 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:13] [诊断] lightning 导入失败: File "C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\importlib\__init__.py", line 90, in import_module
+[05:05:13] [诊断] lightning 导入失败: return _bootstrap._gcd_import(name[level:], package, level)
+[05:05:13] [诊断] lightning 导入失败: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:13] [诊断] lightning 导入失败: ModuleNotFoundError: No module named 'dateutil'
+[05:05:18] [诊断] Traceback (most recent call last):
+[05:05:18] [诊断] File "", line 3, in 
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\__init__.py", line 20, in 
+[05:05:18] [诊断] from lightning.pytorch.callbacks import Callback # noqa: E402
+[05:05:18] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\__init__.py", line 27, in 
+[05:05:18] [诊断] from lightning.pytorch.callbacks import Callback # noqa: E402
+[05:05:18] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\callbacks\__init__.py", line 14, in 
+[05:05:18] [诊断] from lightning.pytorch.callbacks.batch_size_finder import BatchSizeFinder
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\callbacks\batch_size_finder.py", line 26, in 
+[05:05:18] [诊断] from lightning.pytorch.callbacks.callback import Callback
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\callbacks\callback.py", line 22, in 
+[05:05:18] [诊断] from lightning.pytorch.utilities.types import STEP_OUTPUT
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\lightning\pytorch\utilities\types.py", line 36, in 
+[05:05:18] [诊断] from torchmetrics import Metric
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\__init__.py", line 37, in 
+[05:05:18] [诊断] from torchmetrics import functional # noqa: E402
+[05:05:18] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\functional\__init__.py", line 14, in 
+[05:05:18] [诊断] from torchmetrics.functional.audio._deprecated import _permutation_invariant_training as permutation_invariant_training
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\functional\audio\__init__.py", line 14, in 
+[05:05:18] [诊断] from torchmetrics.functional.audio.pit import permutation_invariant_training, pit_permutate
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\functional\audio\pit.py", line 22, in 
+[05:05:18] [诊断] from torchmetrics.utilities import rank_zero_warn
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\utilities\__init__.py", line 14, in 
+[05:05:18] [诊断] from torchmetrics.utilities.checks import check_forward_full_state_property
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\utilities\checks.py", line 26, in 
+[05:05:18] [诊断] from torchmetrics.metric import Metric
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\metric.py", line 43, in 
+[05:05:18] [诊断] from torchmetrics.utilities.plot import _AX_TYPE, _PLOT_OUT_TYPE, plot_single_or_multi_val
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\torchmetrics\utilities\plot.py", line 26, in 
+[05:05:18] [诊断] import matplotlib
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 265, in 
+[05:05:18] [诊断] _check_versions()
+[05:05:18] [诊断] File "E:\软件开发\云集智能音乐创意台\dev\app\scripts\.venv\Lib\site-packages\matplotlib\__init__.py", line 259, in _check_versions
+[05:05:18] [诊断] module = importlib.import_module(modname)
+[05:05:18] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:18] [诊断] File "C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\importlib\__init__.py", line 90, in import_module
+[05:05:18] [诊断] return _bootstrap._gcd_import(name[level:], package, level)
+[05:05:18] [诊断] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[05:05:18] [诊断] ModuleNotFoundError: No module named 'dateutil'
+[05:05:21] [警告] 以下依赖仍缺失: transformers, diffusers, peft, gradio, soundfile, matplotlib, lightning
+[05:05:21] [建议] 请手动运行 scripts/install-env.ps1 安装
+[05:05:21] [信息] 修复完成，重新验证...
+[05:05:31] [错误] 以下环境项仍未通过: python_deps
+[05:05:31] 
+[05:05:31] ========================================
+[05:05:31] ❌ 部署维护未完全成功，请查看上方日志
+[05:05:31] ========================================
+[05:10:18] ✓ 部署日志已复制到剪贴板

@@ -1817,30 +1817,6 @@ class ModelManagerDialog(QDialog):
         scroll_area.setWidget(self.models_container)
         layout.addWidget(scroll_area, stretch=1)
 
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                background-color: #1A1A1A;
-                border: 1px solid #333333;
-                border-radius: 4px;
-                height: 20px;
-                text-align: center;
-                color: #FFFFFF;
-                font-size: 11px;
-            }
-            QProgressBar::chunk {
-                background-color: #1976D2;
-                border-radius: 3px;
-            }
-        """)
-        layout.addWidget(self.progress_bar)
-
-        self.progress_label = QLabel("")
-        self.progress_label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
-        self.progress_label.setVisible(False)
-        layout.addWidget(self.progress_label)
-
     def _on_download_source_changed(self, index):
         if self.main_window:
             source_key = self.download_source_combo.itemData(index)
@@ -2063,7 +2039,15 @@ class ModelManagerDialog(QDialog):
                     progress_bar = QProgressBar()
                     progress_bar.setMinimum(0)
                     progress_bar.setMaximum(100)
-                    progress_bar.setValue(0)
+                    # 重建进度条时恢复当前下载线程的进度值，避免 _update_ui 重建后
+                    # 进度条被重置为 0%（点击下载后 100ms 会触发 _update_ui 重建，
+                    # 此时下载线程可能已推进到 15%+，重置为 0 会导致进度条回退）。
+                    _cur_progress = 0
+                    if self.main_window and hasattr(self.main_window, 'model_download_thread'):
+                        _dt = self.main_window.model_download_thread
+                        if _dt is not None:
+                            _cur_progress = getattr(_dt, 'current_progress', 0)
+                    progress_bar.setValue(_cur_progress)
                     progress_bar.setFixedHeight(16)
                     progress_bar.setStyleSheet("""
                         QProgressBar {
@@ -2080,7 +2064,7 @@ class ModelManagerDialog(QDialog):
                         }
                     """)
                     progress_row.addWidget(progress_bar, 1)
-                    progress_label = QLabel("准备下载...")
+                    progress_label = QLabel("下载中..." if _cur_progress > 0 else "准备下载...")
                     progress_label.setStyleSheet("color: #AAAAAA; font-size: 10px; min-width: 80px;")
                     progress_row.addWidget(progress_label)
                     model_item_layout.addLayout(progress_row)
@@ -2116,6 +2100,13 @@ class ModelManagerDialog(QDialog):
         return name
 
     def show_progress(self, text: str = ""):
+        """显示下载进度条。
+
+        注意：点击下载后 100ms 会触发 _update_ui 重建模型列表，此时卡片内进度条
+        会被重新创建。show_progress 可能在重建前调用（_model_progress_bars 尚无
+        对应 key），这种情况下进度条会在 _update_ui 重建时通过 current_progress
+        恢复当前进度值，无需在此处兜底。
+        """
         model_name = ""
         if self.main_window and hasattr(self.main_window, 'current_operation_model'):
             model_name = self.main_window.current_operation_model or ""
@@ -2124,29 +2115,31 @@ class ModelManagerDialog(QDialog):
             bar, label = self._model_progress_bars[key]
             bar.setValue(0)
             label.setText(text or "准备下载...")
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
-        self.progress_label.setVisible(True)
-        self.progress_label.setText(text)
 
     def update_progress(self, value: int, desc: str = ""):
+        """更新下载进度条。
+
+        优先按 current_operation_model 解析的 key 匹配卡片内进度条；
+        若 key 不匹配（如 _update_ui 尚未重建、进度条尚未创建），
+        fallback 到 _model_progress_bars 中第一个条目，确保进度不会丢失。
+        """
         model_name = ""
         if self.main_window and hasattr(self.main_window, 'current_operation_model'):
             model_name = self.main_window.current_operation_model or ""
         key = self._dl_key(model_name)
+        target = None
         if key and hasattr(self, '_model_progress_bars') and key in self._model_progress_bars:
-            bar, label = self._model_progress_bars[key]
-            bar.setValue(value)
-            if desc:
-                label.setText(desc)
+            target = self._model_progress_bars[key]
         elif model_name and hasattr(self, '_model_progress_bars') and model_name in self._model_progress_bars:
-            bar, label = self._model_progress_bars[model_name]
+            target = self._model_progress_bars[model_name]
+        elif hasattr(self, '_model_progress_bars') and len(self._model_progress_bars) == 1:
+            # fallback：只有一个下载进度条时直接使用，避免因 key 解析偏差导致进度不更新
+            target = next(iter(self._model_progress_bars.values()))
+        if target is not None:
+            bar, label = target
             bar.setValue(value)
             if desc:
                 label.setText(desc)
-        self.progress_bar.setValue(value)
-        if desc:
-            self.progress_label.setText(desc)
 
     def hide_progress(self):
         if hasattr(self, '_model_progress_bars'):
@@ -2154,9 +2147,6 @@ class ModelManagerDialog(QDialog):
                 bar.setValue(0)
                 label.setText("")
             self._model_progress_bars.clear()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setValue(0)
-        self.progress_label.setVisible(False)
 
 
 VersionManagerDialog = HybridVersionManagerDialog

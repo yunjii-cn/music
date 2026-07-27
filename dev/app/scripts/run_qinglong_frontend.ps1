@@ -11,27 +11,28 @@ $RootDir = Split-Path -Parent $ScriptDir
 $DataDir = Split-Path -Parent $RootDir | Join-Path -ChildPath "data"
 Set-Location "$RootDir\ace-step-ui"
 
+# Node.js 优先级规则（项目硬约定，详见 project_memory.md）：
+#   1. 项目便携 v24 → 2. 系统 v24 → 3. PATH 中已有（含 TRAE 内置）
+# 不让 TRAE 内置 v22 抢占第一优先级，避免 better-sqlite3 ABI 不兼容。
 $portableNode24Dir = "$DataDir\tools\node-v24.14.1-win-x64\node-v24.14.1-win-x64"
-$portableNode22Dir = "$DataDir\nodejs\node-v22.14.0-win-x64"
-$nodePath = Get-Command node -ErrorAction SilentlyContinue
-if ($nodePath) {
-    $nodeDir = Split-Path -Parent $nodePath.Path
-    $npmCmd = "$nodeDir\npm.cmd"
-} elseif (Test-Path "$portableNode24Dir\node.exe") {
-    # 使用便携版 Node.js 24
-    Write-Output "Using portable Node.js: $portableNode24Dir"
+$systemNodeDir = "D:\Programs\nodejs"
+if (Test-Path "$portableNode24Dir\node.exe") {
+    Write-Output "Using portable Node.js 24: $portableNode24Dir"
     $npmCmd = "$portableNode24Dir\npm.cmd"
-    # 将便携版 Node.js 添加到 PATH，确保子进程也能找到
     $env:PATH = "$portableNode24Dir;$env:PATH"
-} elseif (Test-Path "$portableNode22Dir\node.exe") {
-    # 使用便携版 Node.js 22
-    Write-Output "Using portable Node.js: $portableNode22Dir"
-    $npmCmd = "$portableNode22Dir\npm.cmd"
-    # 将便携版 Node.js 添加到 PATH，确保子进程也能找到
-    $env:PATH = "$portableNode22Dir;$env:PATH"
+} elseif (Test-Path "$systemNodeDir\node.exe") {
+    Write-Output "Using system Node.js: $systemNodeDir"
+    $npmCmd = "$systemNodeDir\npm.cmd"
+    $env:PATH = "$systemNodeDir;$env:PATH"
 } else {
-    # 如果找不到 node，尝试使用系统路径中的 npm
-    $npmCmd = "npm"
+    $nodePath = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodePath) {
+        $nodeDir = Split-Path -Parent $nodePath.Path
+        Write-Output "Using Node.js from PATH: $nodeDir"
+        $npmCmd = "$nodeDir\npm.cmd"
+    } else {
+        $npmCmd = "npm"
+    }
 }
 
 Write-Output "Using npm: $npmCmd"

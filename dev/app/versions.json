@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.07.28.0612",
+    "date": "2026-07-28 06:12",
+    "message": "优化和修复",
+    "changes": [
+      "优化和修复"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0612.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.27.1140",
     "date": "2026-07-27 11:42",
     "message": "本地化Tailwind(去掉运行时外网CDN依赖:部署时拉取tailwind.js本地文件);修复main.py closeEvent的_debug_log_file未定义崩溃;download-frontend.ps1部署时拉取tailwind.js并补齐server/public",

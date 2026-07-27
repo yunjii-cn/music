@@ -403,31 +403,73 @@ def post_build(exe_path: Path):
     shutil.move(str(exe_path), str(release_dir / exe_path.name))
     print(f"  ✓ 移动 EXE -> {release_dir.name}/")
 
-    _IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc")
+    # 发布目录只携带源码与维护脚本，绝不带 venv / 训练数据 / node_modules /
+    # 重型二进制等运行时产物（venv 由 install-env.ps1 在用户机器上创建，
+    # node_modules 由 npm install 创建，模型权重由 model_downloader 下载）。
+    # 历史教训：曾因 _IGNORE 只排除 __pycache__/*.pyc，导致每个发布目录
+    # 携带 5.4G 的 scripts/.venv（含 torch CUDA 库），7 个版本堆积 46G+。
+    _IGNORE_DIRS = {
+        "__pycache__", ".venv", "venv", "node_modules",
+        "lora_data_prepare", ".git", ".vscode", ".next",
+        ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    }
+    _IGNORE_EXTS = {
+        ".pyc", ".pyo", ".whl", ".exe", ".zip", ".7z", ".gz",
+        ".pt", ".safetensors", ".ckpt", ".bin", ".onnx",
+    }
+
+    def _make_ignore(src_dir_name: str):
+        """构造 shutil.copytree 的 ignore 回调。
+        src_dir_name 用于按目录定制排除规则（如 ace-step-ui 排除 server/data）。"""
+        def _ignore(directory, names):
+            ignored = set()
+            for name in names:
+                full = os.path.join(directory, name)
+                if os.path.isdir(full) and name in _IGNORE_DIRS:
+                    ignored.add(name)
+                    continue
+                ext = os.path.splitext(name)[1].lower()
+                if ext in _IGNORE_EXTS:
+                    ignored.add(name)
+                    continue
+            # ace-step-ui/server/public 运行时音频文件（~92MB）与
+            # server/data SQLite 等运行时数据不应打包
+            if src_dir_name == "ace-step-ui":
+                norm = os.path.normpath(directory)
+                if os.sep + "server" + os.sep + "public" in norm + os.sep or \
+                   norm.endswith(os.sep + "server" + os.sep + "public") or \
+                   norm.endswith(os.sep + "server" + os.sep + "public" + os.sep):
+                    ignored.update(names)
+                if os.sep + "server" + os.sep + "data" in norm + os.sep or \
+                   norm.endswith(os.sep + "server" + os.sep + "data") or \
+                   norm.endswith(os.sep + "server" + os.sep + "data" + os.sep):
+                    ignored.update(names)
+            return ignored
+        return _ignore
 
     scripts_src = ROOT_DIR / "scripts"
     scripts_dst = release_dir / "app" / "scripts"
     if scripts_src.exists():
         if scripts_dst.exists():
             shutil.rmtree(str(scripts_dst), ignore_errors=True)
-        shutil.copytree(str(scripts_src), str(scripts_dst), ignore=_IGNORE)
-        print("  ✓ 复制 scripts/")
+        shutil.copytree(str(scripts_src), str(scripts_dst), ignore=_make_ignore("scripts"))
+        print("  ✓ 复制 scripts/ (排除 .venv / lora_data_prepare / 重型二进制)")
 
     acestep_src = ROOT_DIR / "acestep"
     acestep_dst = release_dir / "app" / "acestep"
     if acestep_src.exists():
         if acestep_dst.exists():
             shutil.rmtree(str(acestep_dst), ignore_errors=True)
-        shutil.copytree(str(acestep_src), str(acestep_dst), ignore=_IGNORE)
-        print("  ✓ 复制 acestep/")
+        shutil.copytree(str(acestep_src), str(acestep_dst), ignore=_make_ignore("acestep"))
+        print("  ✓ 复制 acestep/ (排除 __pycache__ / 重型二进制)")
 
     ace_step_ui_src = ROOT_DIR / "ace-step-ui"
     ace_step_ui_dst = release_dir / "app" / "ace-step-ui"
     if ace_step_ui_src.exists():
         if ace_step_ui_dst.exists():
             shutil.rmtree(str(ace_step_ui_dst), ignore_errors=True)
-        shutil.copytree(str(ace_step_ui_src), str(ace_step_ui_dst), ignore=_IGNORE)
-        print("  ✓ 复制 ace-step-ui/")
+        shutil.copytree(str(ace_step_ui_src), str(ace_step_ui_dst), ignore=_make_ignore("ace-step-ui"))
+        print("  ✓ 复制 ace-step-ui/ (排除 node_modules / server/public / server/data)")
 
     data_dir = release_dir / "data"
     for sub in ("outputs", "models", "config"):

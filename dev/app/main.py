@@ -346,7 +346,7 @@ PYTHON_VERSION = "3.12"
 ACE_PIP_DEPS = [
     "torch==2.9.0",
     "torchaudio==2.9.0",
-    "transformers>=4.51.0,<5.0",
+    "transformers>=4.51.0,<4.58.0",
     "diffusers",
     "gradio",
     "peft",
@@ -4142,6 +4142,10 @@ class MainWindow(QMainWindow):
         env["UV_LINK_MODE"] = "copy"
         
         required_deps = [
+            # typing_extensions 必须放在最前：torch/transformers/gradio/lightning 等都
+            # `from typing_extensions import ...`，它一旦缺失会导致整条依赖链连锁 import
+            # 失败，使后续所有依赖被误判为"缺失"并触发无意义的重复安装。
+            ("typing_extensions", "类型扩展（PyTorch 生态底层依赖）"),
             ("loguru", "日志库"),
             ("psutil", "系统监控"),
             ("torch", "PyTorch 核心"),
@@ -4166,7 +4170,7 @@ class MainWindow(QMainWindow):
             ("huggingface_hub", "HF 下载"),
             ("safetensors", "安全张量"),
         ]
-        
+
         missing = []
         for dep, desc in required_deps:
             try:
@@ -4190,7 +4194,8 @@ class MainWindow(QMainWindow):
         self._log(f"[信息] 共 {len(missing)} 个依赖缺失，开始安装...")
         
         version_constraints = {
-            "transformers": "transformers>=4.51.0,<5.0",
+            "typing_extensions": "typing_extensions>=4.12.0",
+            "transformers": "transformers>=4.51.0,<4.58.0",
             "peft": "peft>=0.18.0",
             "diffusers": "diffusers",
             "loguru": "loguru>=0.7.3",
@@ -4213,7 +4218,8 @@ class MainWindow(QMainWindow):
             "safetensors": "safetensors",
         }
         
-        self._log("[信息] 清理 uv 等可能残留的冲突包...")
+        self._log("[信息] 清理残留冲突包并修复底层依赖...")
+        # 1) 卸载已知冲突包（hf-xet 与新版 huggingface_hub 存在 import 冲突）
         for stale_pkg in ["hf-xet"]:
             try:
                 p = hidden_popen(
@@ -4228,6 +4234,26 @@ class MainWindow(QMainWindow):
                     self._log(f"[信息] 已清理残留包: {stale_pkg}")
             except:
                 pass
+
+        # 2) 强制确保 typing_extensions 可用：它是 torch/transformers/gradio/lightning 等
+        #    的底层依赖，缺失会导致整条依赖链连锁 import 失败，使后续所有依赖被误判为"缺失"。
+        #    先单独安装它（即使不在 missing 列表里也强制重装），避免后续批量安装时因它的
+        #    缺失让所有包的 import 验证全部失败。
+        try:
+            p = hidden_popen(
+                [venv_python, "-m", "pip", "install", "typing_extensions>=4.12.0", "--quiet"],
+                cwd=scripts_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            p.communicate(timeout=60)
+            if p.returncode == 0:
+                # 从 missing 中移除 typing_extensions，避免后面重复安装
+                if "typing_extensions" in missing:
+                    missing.remove("typing_extensions")
+        except:
+            pass
         
         pip_deps = []
         for d in missing:
@@ -4355,7 +4381,9 @@ class MainWindow(QMainWindow):
     def _quick_check_dependencies(self, venv_python):
         """快速检查关键依赖是否已安装 - 返回缺失依赖列表（空列表表示全部OK）"""
         
-        deps_to_check = ["loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "lycoris", "fastapi", "uvicorn", "accelerate", "scipy", "soundfile", "einops", "matplotlib", "diskcache", "numba", "lightning", "tensorboard", "modelscope", "huggingface_hub", "safetensors"]
+        # typing_extensions 放在最前：它是 torch/transformers/gradio/lightning 等的底层依赖，
+        # 缺失会导致整条依赖链连锁 import 失败，使后续所有依赖被误判为"缺失"。
+        deps_to_check = ["typing_extensions", "loguru", "psutil", "torch", "torchaudio", "transformers", "diffusers", "gradio", "peft", "lycoris", "fastapi", "uvicorn", "accelerate", "scipy", "soundfile", "einops", "matplotlib", "diskcache", "numba", "lightning", "tensorboard", "modelscope", "huggingface_hub", "safetensors"]
         
         check_code = "import json; results={};\n"
         for dep in deps_to_check:
@@ -4387,6 +4415,10 @@ class MainWindow(QMainWindow):
         
         # 必须依赖 - 缺失则功能不可用
         required_deps = [
+            # typing_extensions 必须放在最前：torch/transformers/gradio/lightning 等都
+            # `from typing_extensions import ...`，它一旦缺失会导致整条依赖链连锁 import
+            # 失败，使后续所有依赖被误判为"缺失"并触发无意义的重复安装。
+            ("typing_extensions", "类型扩展（PyTorch 生态底层依赖）"),
             ("loguru", "日志库"),
             ("psutil", "系统监控"),
             ("torch", "PyTorch 核心"),
@@ -4450,20 +4482,41 @@ class MainWindow(QMainWindow):
             all_ok = False
         
         try:
+            # 用三态返回码区分：0=导入成功且版本<5；1=导入成功但版本≥5（需降级）；
+            # 2=导入失败（typing_extensions/accelerate 等底层依赖损坏，降级 transformers 无意义）
+            check_script = (
+                "try:\n"
+                "    import transformers; v=transformers.__version__\n"
+                "    major=int(v.split('.')[0])\n"
+                "    print(v); exit(0 if major<5 else 1)\n"
+                "except SystemExit:\n"
+                "    raise\n"
+                "except Exception as e:\n"
+                "    print(repr(e)); exit(2)\n"
+            )
             process = hidden_popen(
-                [venv_python, "-c", "import transformers; v=transformers.__version__; major=int(v.split('.')[0]); print(v); exit(0 if major<5 else 1)"],
+                [venv_python, "-c", check_script],
                 cwd=self.base_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
             )
             stdout, stderr = process.communicate(timeout=10)
-            if process.returncode != 0:
-                installed_ver = stdout.strip() if stdout.strip() else "unknown"
-                self._log(f"✗ transformers 版本不兼容: {installed_ver} (需要 <5.0，5.x 会导致模型加载失败)", "#F44336")
+            stdout_strip = stdout.strip() if stdout else ""
+            if process.returncode == 0:
+                self._log(f"✓ transformers 版本兼容: {stdout_strip}")
+            elif process.returncode == 2:
+                # 导入失败：底层依赖（如 typing_extensions / accelerate）损坏，
+                # 此时降级 transformers 无意义（pip 会报 already satisfied），应如实报告错误，
+                # 由 _install_missing_dependencies 统一修复底层依赖。
+                self._log(f"✗ transformers 导入失败: {stdout_strip}", "#F44336")
+                all_ok = False
+            else:
+                # returncode == 1：导入成功但版本 ≥ 5，确实需要降级
+                self._log(f"✗ transformers 版本不兼容: {stdout_strip} (需要 <5.0，5.x 会导致模型加载失败)", "#F44336")
                 self._log("[信息] 正在自动修复: 降级 transformers...", "#FF9800")
                 try:
-                    fix_cmd = [venv_python, "-m", "pip", "install", "transformers>=4.51.0,<5.0", "--quiet"]
+                    fix_cmd = [venv_python, "-m", "pip", "install", "transformers>=4.51.0,<4.58.0", "--quiet"]
                     fix_process = hidden_popen(
                         fix_cmd,
                         cwd=self.base_dir,
@@ -4479,8 +4532,6 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     self._log(f"[警告] transformers 降级失败: {e}", "#FF9800")
                 all_ok = False
-            else:
-                self._log(f"✓ transformers 版本兼容: {stdout.strip()}")
         except Exception as e:
             self._log(f"⚠ 检查 transformers 版本失败: {e}", "#FF9800")
         
@@ -4537,10 +4588,9 @@ class MainWindow(QMainWindow):
             try:
 
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
                     os.path.join(portable_node24_dir, "node.exe"),
-                    os.path.join(portable_node22_dir, "node.exe"),
+                    "D:/Programs/nodejs/node.exe",
                     "node.exe",
                 ]
                 for node_exe in node_paths:
@@ -4683,10 +4733,9 @@ class MainWindow(QMainWindow):
 
                 
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
                     os.path.join(portable_node24_dir, "node.exe"),
-                    os.path.join(portable_node22_dir, "node.exe"),
+                    "D:/Programs/nodejs/node.exe",
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
@@ -4906,15 +4955,10 @@ class MainWindow(QMainWindow):
                             # 尝试用当前 Node.js 测试 better-sqlite3 是否能正常加载
                             self._log("[信息] 检测 better-sqlite3 是否与当前 Node.js 版本匹配...")
                             try:
-                                # 查找 Node.js（优先使用 Node.js 22）
+                                # 查找 Node.js（优先使用便携 Node.js 24（与 better-sqlite3 编译版本一致））
                                 test_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                                test_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
-                                
-                                test_node_exe = None
-                                if os.path.exists(os.path.join(test_node22_dir, "node.exe")):
-                                    test_node_exe = os.path.join(test_node22_dir, "node.exe")
-                                elif os.path.exists(os.path.join(test_node24_dir, "node.exe")):
-                                    test_node_exe = os.path.join(test_node24_dir, "node.exe")
+
+                                test_node_exe = os.path.join(test_node24_dir, "node.exe") if os.path.exists(os.path.join(test_node24_dir, "node.exe")) else None
                                 
                                 if test_node_exe:
                                     # 创建测试脚本
@@ -4975,8 +5019,7 @@ try {
                         try:
                             # 查找 npm 命令路径
                             portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                            portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
-                            
+
                             npm_cmd = None
                             # 先尝试便携版 Node.js 24
                             if os.path.exists(os.path.join(portable_node24_dir, "node.exe")):
@@ -4984,12 +5027,10 @@ try {
                                 npm_cmd = os.path.join(portable_node24_dir, "npm.cmd")
                                 # 更新环境变量 PATH
                                 os.environ["PATH"] = f"{portable_node24_dir};{os.environ.get('PATH', '')}"
-                            # 再尝试便携版 Node.js 22
-                            elif os.path.exists(os.path.join(portable_node22_dir, "node.exe")):
-                                self._log(f"[信息] 使用便携版 Node.js 22: {portable_node22_dir}")
-                                npm_cmd = os.path.join(portable_node22_dir, "npm.cmd")
-                                # 更新环境变量 PATH
-                                os.environ["PATH"] = f"{portable_node22_dir};{os.environ.get('PATH', '')}"
+                            # 再尝试系统 Node.js 24
+                            elif os.path.exists("D:/Programs/nodejs/node.exe"):
+                                npm_cmd = "D:/Programs/nodejs/npm.cmd"
+                                os.environ["PATH"] = f"D:/Programs/nodejs;{os.environ.get('PATH', '')}"
                             # 最后尝试系统 npm
                             else:
                                 try:
@@ -5355,10 +5396,9 @@ try {
         try:
             node_ok = False
             portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-            portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
             node_paths = [
                 os.path.join(portable_node24_dir, "node.exe"),
-                os.path.join(portable_node22_dir, "node.exe"),
+                "D:/Programs/nodejs/node.exe",
                 "node.exe",
             ]
             for node_exe in node_paths:
@@ -5393,11 +5433,14 @@ try {
             venv_python = self._find_venv_python()
             if os.path.exists(venv_python):
                 REQUIRED_DEPS = {
+                    # typing_extensions 放在最前：它是 torch/transformers/gradio/lightning 等的
+                    # 底层依赖，缺失会导致整条依赖链连锁 import 失败，使后续所有依赖被误判为"缺失"。
+                    "typing_extensions": "typing_extensions",
                     "loguru": "loguru",
                     "psutil": "psutil",
                     "torch": "torch>=2.9.0",
                     "torchaudio": "torchaudio>=2.9.0",
-                    "transformers": "transformers>=4.51.0,<5.0",
+                    "transformers": "transformers>=4.51.0,<4.58.0",
                     "diffusers": "diffusers",
                     "gradio": "gradio",
                     "peft": "peft",
@@ -5897,7 +5940,7 @@ for d in deps:
                 
                 self._log("[信息] 安装项目核心依赖...")
                 project_deps = [
-                    "transformers>=4.51.0,<5.0",
+                    "transformers>=4.51.0,<4.58.0",
                     "diffusers",
                     "gradio",
                     "matplotlib",
@@ -5966,9 +6009,8 @@ for d in deps:
         # 1) 便携 Node（随发布物携带，离线可用）
         portable_candidates = [
             os.path.join(data_tools, "node-v24.14.1-win-x64", "node-v24.14.1-win-x64", "npm.cmd"),
-            os.path.join(data_tools, "node-v22.22.2-win-x64", "node-v22.22.2-win-x64", "npm.cmd"),
             os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64", "npm.cmd"),
-            os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64", "npm.cmd"),
+            "D:/Programs/nodejs/npm.cmd",
         ]
         for cand in portable_candidates:
             if os.path.exists(cand):
@@ -6009,6 +6051,8 @@ for d in deps:
                 ok = (os.path.exists(os.path.join(self.base_dir, "ace-step-ui", "node_modules"))
                       and self._find_npm() is not None)
                 if ok:
+                    # 校验 tailwind.js（缺失会导致前端无样式）
+                    self._ensure_tailwind_runtime()
                     self._log("[前端] 前端包已就绪，Web 前端可离线显示", "#4CAF50")
                     return True
                 self._log("[警告] 前端包拉取完成但产物校验失败，前端可能仍不显示", "#FF9800")
@@ -6018,6 +6062,36 @@ for d in deps:
         except Exception as e:
             self._log(f"[警告] 前端包拉取异常: {e}", "#FF9800")
             return False
+
+    def _ensure_tailwind_runtime(self):
+        """确保 Tailwind v4 浏览器运行时（public/tailwind.js）存在。
+
+        index.html 引用 <script src="/tailwind.js">，Vite dev server 从 public/ 映射。
+        此文件由 download-frontend.ps1 从 esm.sh 下载，但开发模式或环境被破坏时可能缺失。
+        缺失会导致前端页面无样式（纯白底文本），用户误以为"前端坏了"。"""
+        try:
+            ace_step_ui = os.path.join(self.base_dir, "ace-step-ui")
+            tailwind_path = os.path.join(ace_step_ui, "public", "tailwind.js")
+            if os.path.exists(tailwind_path) and os.path.getsize(tailwind_path) > 10000:
+                return  # 已存在且大小合理（>10KB），跳过
+            self._log("[信息] Tailwind 运行时缺失，正在下载...", "#FFA726")
+            import urllib.request
+            public_dir = os.path.join(ace_step_ui, "public")
+            os.makedirs(public_dir, exist_ok=True)
+            url = "https://esm.sh/@tailwindcss/browser@4.3.3/es2022/browser.mjs"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = resp.read()
+            with open(tailwind_path, "wb") as f:
+                f.write(data)
+            # 同步到 dist 目录（preview/静态托管场景）
+            dist_dir = os.path.join(ace_step_ui, "dist")
+            if os.path.isdir(dist_dir):
+                import shutil
+                shutil.copy2(tailwind_path, os.path.join(dist_dir, "tailwind.js"))
+            self._log(f"✓ Tailwind 运行时已下载 ({len(data) // 1024} KB)", "#4CAF50")
+        except Exception as e:
+            self._log(f"[警告] Tailwind 运行时下载失败: {e}（前端可能无样式）", "#FF9800")
 
     def _install_frontend_deps(self):
         """安装前端 npm 依赖（根治：自动探测 node/npm，必要时先装 Node.js 便携版）"""
@@ -6073,6 +6147,8 @@ for d in deps:
 
             ok = os.path.exists(node_modules_path)
             if ok:
+                # 校验 tailwind.js（npm install 不包含 public/tailwind.js）
+                self._ensure_tailwind_runtime()
                 self._log("✅ 前端依赖安装完成", "#4CAF50")
             else:
                 self._log("[警告] npm install 后仍未生成 node_modules，前端依赖为可选组件", "#FFA726")
@@ -6265,15 +6341,14 @@ for d in deps:
             self._log("2. 检查 Node.js...")
             node_available = False
             node_path = None
-            
+
             try:
 
-                
+
                 portable_node24_dir = os.path.join(self.base_dir, "tools", "node-v24.14.1-win-x64", "node-v24.14.1-win-x64")
-                portable_node22_dir = os.path.join(self.base_dir, "tools", "node-v22.22.2-win-x64", "node-v22.22.2-win-x64")
                 node_paths = [
                     os.path.join(portable_node24_dir, "node.exe"),
-                    os.path.join(portable_node22_dir, "node.exe"),
+                    "D:/Programs/nodejs/node.exe",
                     "node.exe",
                     "C:/Program Files/nodejs/node.exe",
                     "C:/Program Files (x86)/nodejs/node.exe",
@@ -6326,19 +6401,7 @@ for d in deps:
                             downloaded = True
                         except Exception as e:
                             self._log(f"[警告] Node.js 24 下载失败: {e}", "#FF9800")
-                            self._log("[信息] 尝试下载 Node.js 22 便携版作为备选...", "#FF9800")
-                            
-                            try:
-                                node22_url = "https://nodejs.org/dist/v22.22.2/node-v22.22.2-win-x64.zip"
-                                node22_zip = os.path.join(tools_dir, "node-v22.22.2-win-x64.zip")
-                                urllib.request.urlretrieve(node22_url, node22_zip)
-                                downloaded = True
-                                node24_zip = node22_zip
-                                portable_node24_dir = portable_node22_dir
-                                self._log("✓ Node.js 22 下载完成", "#4CAF50")
-                            except Exception as e2:
-                                self._log(f"[错误] Node.js 22 下载也失败: {e2}", "#F44336")
-                        
+
                         if downloaded:
                             self._log("[信息] 正在解压 Node.js 便携版...")
                             try:
