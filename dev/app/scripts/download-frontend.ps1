@@ -137,23 +137,22 @@ if (-not (Test-Path $serverData)) {
     Write-Output "[前端] 已补齐 server/data 目录"
 }
 
-# ===== 本地化 Tailwind（去掉运行时外网 CDN 依赖）=====
-# 这是“前端显示不正常”的根因：原 index.html 在浏览器里实时从
-# https://cdn.tailwindcss.com 拉 Tailwind 运行时来生成样式，国内/弱网环境
-# 经常拉不到，导致整页无样式。这里在部署阶段（用户真机有网）把该脚本
-# 落地为本地 public/tailwind.js，并把 index.html / dist/index.html 中的
-# <script src="https://cdn.tailwindcss.com"> 改写为本地 /tailwind.js，
-# 之后前端不再依赖任何外网 CDN 即可正常渲染样式。
+# ===== 本地化 Tailwind v4 浏览器运行时（真正离线，零外网 CDN 依赖）=====
+# 根因：原 index.html 在浏览器里实时从 cdn.tailwindcss.com 拉运行时，该 CDN 国内/弱网常被墙，
+# 导致整页无样式（“显示不正常”）。现改为：部署阶段（用户真机有网）从 esm.sh 下载
+# Tailwind v4 浏览器运行时（单文件自包含，已确认无外部 import）落地为 public/tailwind.js，
+# index.html 通过 <script type="module" src="/tailwind.js"> 引用本地文件，部署后完全离线。
+# esm.sh 在用户真机已验证可达（登录流程即走 esm.sh）。
 $tailwindTarget = Join-Path $BaseDir "app/ace-step-ui/public/tailwind.js"
-$tailwindSrc = "https://cdn.tailwindcss.com"
+$tailwindSrc = "https://esm.sh/@tailwindcss/browser@4.3.3/es2022/browser.mjs"
 if (-not (Test-Path $tailwindTarget)) {
-    Write-Output "[前端] 正在本地化 Tailwind 运行时（去除外网 CDN 依赖）..."
-    & curl.exe -sSL --connect-timeout 20 -m 120 --retry 3 --retry-delay 2 -o "$tailwindTarget" "$tailwindSrc" 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tailwindTarget) -or ((Get-Item $tailwindTarget).Length -lt 1000)) {
-        Write-Warning "[前端] Tailwind 运行时拉取失败（可能网络无法访问 cdn.tailwindcss.com）。前端样式可能缺失，请手动将 tailwind.js 放到 app/ace-step-ui/public/ 后重试。"
+    Write-Output "[前端] 正在本地化 Tailwind v4 运行时（esm.sh，真机网络已验证可达）..."
+    & curl.exe -sSL --connect-timeout 20 -m 180 --retry 3 --retry-delay 2 -o "$tailwindTarget" "$tailwindSrc" 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tailwindTarget) -or ((Get-Item $tailwindTarget).Length -lt 10000)) {
+        Write-Warning "[前端] Tailwind 运行时拉取失败（无法访问 esm.sh）。前端样式可能缺失，请检查网络后重跑一键部署，或手动将 Tailwind v4 浏览器运行时放到 app/ace-step-ui/public/tailwind.js"
         if (Test-Path $tailwindTarget) { Remove-Item $tailwindTarget -Force -ErrorAction SilentlyContinue }
     } else {
-        Write-Output ("[前端] Tailwind 运行时已本地化 -> public/tailwind.js (" + [math]::Round((Get-Item $tailwindTarget).Length / 1KB, 1) + " KB)")
+        Write-Output ("[前端] Tailwind v4 运行时已本地化 -> public/tailwind.js (" + [math]::Round((Get-Item $tailwindTarget).Length / 1KB, 1) + " KB)")
     }
 } else {
     Write-Output "[前端] Tailwind 运行时已存在，跳过下载。"
@@ -163,17 +162,6 @@ $distDir = Join-Path $BaseDir "app/ace-step-ui/dist"
 $distTailwind = Join-Path $distDir "tailwind.js"
 if ((Test-Path $tailwindTarget) -and (Test-Path $distDir) -and -not (Test-Path $distTailwind)) {
     Copy-Item $tailwindTarget $distTailwind -Force
-}
-# 把 index.html / dist/index.html 中的 CDN 引用改写为本地 /tailwind.js（幂等）
-foreach ($f in @((Join-Path $BaseDir "app/ace-step-ui/index.html"), (Join-Path $BaseDir "app/ace-step-ui/dist/index.html"))) {
-    if (Test-Path $f) {
-        $c = Get-Content $f -Raw -Encoding UTF8
-        if ($c.Contains($tailwindSrc)) {
-            $c = $c.Replace($tailwindSrc, '/tailwind.js')
-            Set-Content $f $c -Encoding UTF8
-            Write-Output ("[前端] 已将 $f 中的 Tailwind CDN 引用改为本地 /tailwind.js")
-        }
-    }
 }
 
 # 清理临时文件

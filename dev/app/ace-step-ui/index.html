@@ -20,96 +20,69 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <!-- Tailwind 运行时已本地化：部署脚本会把 cdn.tailwindcss.com 拉成 public/tailwind.js，
-         前端改引用本地文件，彻底去掉运行时外网 CDN 依赖（国内/离线也能正常渲染样式）-->
-    <script src="/tailwind.js"></script>
+    <!-- Tailwind 运行时：原 cdn.tailwindcss.com 国内/弱网常被墙，导致整页无样式（“显示不正常”）。
+         现改 Tailwind v4 浏览器运行时（单文件自包含），由一键部署从 esm.sh 下载为本地
+         public/tailwind.js，index.html 用 <script type="module"> 引用，部署后完全离线。
+         配置用 v4 的 <style type="text/tailwindcss"> + @theme 等价表达。 -->
     <script>
-      // 定义关键 CSS 变量，确保 Tailwind 能读取
+      // 定义关键 CSS 变量，供下方 @theme 中的 var() 引用
       document.documentElement.style.setProperty('--color-primary', '#ec4899');
       document.documentElement.style.setProperty('--bg-primary-dark', '#09090b');
       document.documentElement.style.setProperty('--bg-secondary-dark', '#121214');
       document.documentElement.style.setProperty('--bg-tertiary-dark', '#18181b');
       document.documentElement.style.setProperty('--bg-hover-dark', '#27272a');
-
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              /* Suno 主题色 */
-              suno: {
-                DEFAULT: '#09090b',
-                sidebar: '#000000',
-                panel: '#121214',
-                card: '#18181b',
-                hover: '#27272a',
-                border: '#27272a',
-              },
-
-              /* 语义化颜色 */
-              brand: {
-                DEFAULT: 'var(--color-primary)',
-                hover: 'var(--color-primary-hover)',
-                light: 'var(--color-primary-light)',
-              },
-
-              surface: {
-                primary: 'var(--bg-primary)',
-                secondary: 'var(--bg-secondary)',
-                tertiary: 'var(--bg-tertiary)',
-              },
-
-              'surface-dark': {
-                primary: 'var(--bg-primary-dark)',
-                secondary: 'var(--bg-secondary-dark)',
-                tertiary: 'var(--bg-tertiary-dark)',
-                hover: 'var(--bg-hover-dark)',
-              },
-
-              content: {
-                primary: 'var(--text-primary)',
-                secondary: 'var(--text-secondary)',
-                tertiary: 'var(--text-tertiary)',
-              },
-
-              'content-dark': {
-                primary: 'var(--text-primary-dark)',
-                secondary: 'var(--text-secondary-dark)',
-                tertiary: 'var(--text-tertiary-dark)',
-              },
-
-              border: {
-                primary: 'var(--border-primary)',
-                secondary: 'var(--border-secondary)',
-              },
-
-              'border-dark': {
-                primary: 'var(--border-primary-dark)',
-                secondary: 'var(--border-secondary-dark)',
-              },
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
-            animation: {
-              'gradient-x': 'gradient-x 15s ease infinite',
-            },
-            keyframes: {
-              'gradient-x': {
-                '0%, 100%': {
-                  'background-size': '200% 200%',
-                  'background-position': 'left center'
-                },
-                '50%': {
-                  'background-size': '200% 200%',
-                  'background-position': 'right center'
-                },
-              },
-            }
-          }
-        }
-      }
     </script>
+    <script type="module" src="/tailwind.js"></script>
+    <style type="text/tailwindcss">
+      @custom-variant dark (&:where(.dark, .dark *));
+
+      @theme {
+        /* Suno 主题色 */
+        --color-suno: #09090b;
+        --color-suno-sidebar: #000000;
+        --color-suno-panel: #121214;
+        --color-suno-card: #18181b;
+        --color-suno-hover: #27272a;
+        --color-suno-border: #27272a;
+
+        /* 语义化颜色（保留对全局 CSS 变量的引用） */
+        --color-brand: var(--color-primary);
+        --color-brand-hover: var(--color-primary-hover);
+        --color-brand-light: var(--color-primary-light);
+
+        --color-surface-primary: var(--bg-primary);
+        --color-surface-secondary: var(--bg-secondary);
+        --color-surface-tertiary: var(--bg-tertiary);
+
+        --color-surface-dark-primary: var(--bg-primary-dark);
+        --color-surface-dark-secondary: var(--bg-secondary-dark);
+        --color-surface-dark-tertiary: var(--bg-tertiary-dark);
+        --color-surface-dark-hover: var(--bg-hover-dark);
+
+        --color-content-primary: var(--text-primary);
+        --color-content-secondary: var(--text-secondary);
+        --color-content-tertiary: var(--text-tertiary);
+
+        --color-content-dark-primary: var(--text-primary-dark);
+        --color-content-dark-secondary: var(--text-secondary-dark);
+        --color-content-dark-tertiary: var(--text-tertiary-dark);
+
+        --color-border-primary: var(--border-primary);
+        --color-border-secondary: var(--border-secondary);
+
+        --color-border-dark-primary: var(--border-primary-dark);
+        --color-border-dark-secondary: var(--border-secondary-dark);
+
+        --font-sans: 'Inter', sans-serif;
+
+        --animate-gradient-x: gradient-x 15s ease infinite;
+      }
+
+      @keyframes gradient-x {
+        0%, 100% { background-size: 200% 200%; background-position: left center; }
+        50% { background-size: 200% 200%; background-position: right center; }
+      }
+    </style>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
