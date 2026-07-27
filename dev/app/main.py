@@ -743,6 +743,15 @@ _DOWNLOAD_IMPORTANT_KEYWORDS = (
     "ready", "====", "开始", "失败", "错误", "完成", "校验", "✓", "❌",
 )
 _DOWNLOAD_LOG_INTERVAL = 10.0  # 秒：进度类日志最小记录间隔
+# 从下载器日志解析真实目标目录：下载器会打印
+#   "[Model Download] Downloading from HuggingFace: <repo> -> <local_dir>"
+# 用这个 <local_dir> 作为磁盘进度兜底的真实测量目录，
+# 避免与 config_manager 解析出的路径不一致（测错目录→进度永远0%）。
+_DOWNLOAD_TARGET_RE = re.compile(r"->\s*(.+?)\s*$")
+# 从 tqdm 的 "1.2G/2.7G" 这类「当前/总计」尺寸比解析进度（没有 % 也能算）。
+_DOWNLOAD_RATIO_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*([GMK]?B)\s*/\s*(\d+(?:\.\d+)?)\s*([GMK]?B)"
+)
 
 
 class ModelDownloadThread(QThread):
@@ -846,29 +855,34 @@ class ModelDownloadThread(QThread):
             last_log_time = time.time()
             last_disk_check = time.time()
             while self.process.poll() is None and not self._should_stop:
-                line = self.process.stdout.readline()
-                if line:
-                    clean = line.replace('\r', '').strip()
-                    if clean:
-                        now = time.time()
-                        is_progress = bool(_DOWNLOAD_PROGRESS_RE.search(clean))
-                        is_important = any(k in clean.lower() for k in _DOWNLOAD_IMPORTANT_KEYWORDS)
-                        if is_important or not is_progress or (now - last_log_time >= _DOWNLOAD_LOG_INTERVAL):
-                            self.log_received.emit(f"[模型下载] {clean}")
-                            last_log_time = now
-                        # 从运行日志中解析真实进度百分比（如 tqdm 输出的 45%），实时喂给进度条
-                        m = _PROGRESS_PCT_RE.search(clean)
-                        if m:
-                            self._update_progress(int(m.group(1)), f"下载中... {m.group(1)}%")
-                    last_disk_check = time.time()
-                else:
-                    time.sleep(0.1)
-                # 无新输出时，用磁盘真实已下载字节数估算进度，避免进度条冻结（仅增不减）
-                if time.time() - last_disk_check >= 0.8:
-                    disk_pct = self._dir_progress()
-                    if disk_pct is not None:
-                        self._update_progress(disk_pct, "下载中...")
-                    last_disk_check = time.time()
+                raw = self.process.stdout.readline()
+                if not raw:
+                    # 管道暂无新数据（tqdm 用 \r 原地刷新时 readline 会阻塞到下一个 \n）：
+                    # 用磁盘真实已下载字节数估算进度，避免进度条冻结（仅增不减）。
+                    if time.time() - last_disk_check >= 0.8:
+                        disk_pct = self._dir_progress()
+                        if disk_pct is not None:
+                            self._update_progress(disk_pct, "下载中...")
+                        last_disk_check = time.time()
+                    else:
+                        time.sleep(0.05)
+                    continue
+                # tqdm 在非 tty 下用 \r 原地刷新，readline 可能把多帧拼成一个段落；
+                # 同时按 \r 和 \n 拆开逐帧处理，保证每一帧的进度都被解析。
+                frames = raw.replace("\n", "\r").split("\r")
+                for fr in frames:
+                    clean = fr.strip()
+                    if not clean:
+                        continue
+                    now = time.time()
+                    is_progress = bool(_DOWNLOAD_PROGRESS_RE.search(clean))
+                    is_important = any(k in clean.lower() for k in _DOWNLOAD_IMPORTANT_KEYWORDS)
+                    if is_important or not is_progress or (now - last_log_time >= _DOWNLOAD_LOG_INTERVAL):
+                        self.log_received.emit(f"[模型下载] {clean}")
+                        last_log_time = now
+                    # 从运行日志中解析真实进度（% 或 当前/总计 尺寸比），实时喂给进度条
+                    self._parse_frame_progress(clean)
+                last_disk_check = time.time()
             
             # 读取剩余的输出（进程已结束，逐行完整记录）
             if not self._should_stop:
@@ -895,6 +909,60 @@ class ModelDownloadThread(QThread):
             self.log_received.emit(f"错误详情: {error_detail}")
             self.download_finished.emit(False, str(e))
     
+    @staticmethod
+    def _parse_size_to_bytes(num: str, unit: str) -> float:
+        """把 '1.2' + 'G' 之类的尺寸串转成字节数。"""
+        try:
+            v = float(num)
+        except (ValueError, TypeError):
+            return 0.0
+        u = (unit or "").upper()
+        mult = 1.0
+        if u.startswith("K"):
+            mult = 1e3
+        elif u.startswith("M"):
+            mult = 1e6
+        elif u.startswith("G"):
+            mult = 1e9
+        elif u.startswith("T"):
+            mult = 1e12
+        return v * mult
+
+    def _parse_frame_progress(self, clean: str):
+        """从一行真实日志里提取进度并喂给进度条。
+
+        解析顺序：
+          1) 下载器打印的 '... -> <local_dir>' —— 作为磁盘进度兜底的真实测量目录；
+          2) 优先 '%' 正则（tqdm '45%'）；
+          3) 否则 '当前/总计' 尺寸比（tqdm '1.2G/2.7G'，无 % 也能算）。
+        """
+        if not clean:
+            return
+        # 1) 捕获真实目标目录
+        m_tgt = _DOWNLOAD_TARGET_RE.search(clean)
+        if m_tgt and ("download" in clean.lower() or "->" in clean):
+            p = m_tgt.group(1).strip().strip('"').strip("'")
+            if p and (os.path.isdir(p) or os.path.isdir(os.path.dirname(p))):
+                self._target_dir = p
+
+        # 2) 真实进度：优先 %，其次 当前/总计 尺寸比
+        pct = None
+        m_pct = _PROGRESS_PCT_RE.search(clean)
+        if m_pct:
+            try:
+                pct = int(m_pct.group(1))
+            except (ValueError, TypeError):
+                pct = None
+        if pct is None:
+            m_ratio = _DOWNLOAD_RATIO_RE.search(clean)
+            if m_ratio:
+                cur = self._parse_size_to_bytes(m_ratio.group(1), m_ratio.group(2))
+                tot = self._parse_size_to_bytes(m_ratio.group(3), m_ratio.group(4))
+                if tot > 0:
+                    pct = int(min(99, cur / tot * 100))
+        if pct is not None:
+            self._update_progress(pct, f"下载中... {pct}%")
+
     def _update_progress(self, pct: int, desc: str):
         """更新进度条：进度只增不减，保证单调性（多文件顺序下载时单文件百分比会回退）。"""
         pct = max(0, min(99, int(pct)))
