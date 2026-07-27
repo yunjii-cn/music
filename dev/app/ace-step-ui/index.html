@@ -20,7 +20,9 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind 运行时已本地化：部署脚本会把 cdn.tailwindcss.com 拉成 public/tailwind.js，
+         前端改引用本地文件，彻底去掉运行时外网 CDN 依赖（国内/离线也能正常渲染样式）-->
+    <script src="/tailwind.js"></script>
     <script>
       // 定义关键 CSS 变量，确保 Tailwind 能读取
       document.documentElement.style.setProperty('--color-primary', '#ec4899');

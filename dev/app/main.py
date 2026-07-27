@@ -8369,9 +8369,10 @@ for d in deps:
             })
             
             self._debug_logging = False
-            if self._debug_log_file:
+            _dbg = getattr(self, "_debug_log_file", None)
+            if _dbg is not None:
                 try:
-                    self._debug_log_file.close()
+                    _dbg.close()
                 except Exception:
                     pass
                 self._debug_log_file = None

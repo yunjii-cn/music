@@ -137,6 +137,45 @@ if (-not (Test-Path $serverData)) {
     Write-Output "[前端] 已补齐 server/data 目录"
 }
 
+# ===== 本地化 Tailwind（去掉运行时外网 CDN 依赖）=====
+# 这是“前端显示不正常”的根因：原 index.html 在浏览器里实时从
+# https://cdn.tailwindcss.com 拉 Tailwind 运行时来生成样式，国内/弱网环境
+# 经常拉不到，导致整页无样式。这里在部署阶段（用户真机有网）把该脚本
+# 落地为本地 public/tailwind.js，并把 index.html / dist/index.html 中的
+# <script src="https://cdn.tailwindcss.com"> 改写为本地 /tailwind.js，
+# 之后前端不再依赖任何外网 CDN 即可正常渲染样式。
+$tailwindTarget = Join-Path $BaseDir "app/ace-step-ui/public/tailwind.js"
+$tailwindSrc = "https://cdn.tailwindcss.com"
+if (-not (Test-Path $tailwindTarget)) {
+    Write-Output "[前端] 正在本地化 Tailwind 运行时（去除外网 CDN 依赖）..."
+    & curl.exe -sSL --connect-timeout 20 -m 120 --retry 3 --retry-delay 2 -o "$tailwindTarget" "$tailwindSrc" 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tailwindTarget) -or ((Get-Item $tailwindTarget).Length -lt 1000)) {
+        Write-Warning "[前端] Tailwind 运行时拉取失败（可能网络无法访问 cdn.tailwindcss.com）。前端样式可能缺失，请手动将 tailwind.js 放到 app/ace-step-ui/public/ 后重试。"
+        if (Test-Path $tailwindTarget) { Remove-Item $tailwindTarget -Force -ErrorAction SilentlyContinue }
+    } else {
+        Write-Output ("[前端] Tailwind 运行时已本地化 -> public/tailwind.js (" + [math]::Round((Get-Item $tailwindTarget).Length / 1KB, 1) + " KB)")
+    }
+} else {
+    Write-Output "[前端] Tailwind 运行时已存在，跳过下载。"
+}
+# dist 也放一份（若 dist 目录存在，供 preview/静态托管场景）
+$distDir = Join-Path $BaseDir "app/ace-step-ui/dist"
+$distTailwind = Join-Path $distDir "tailwind.js"
+if ((Test-Path $tailwindTarget) -and (Test-Path $distDir) -and -not (Test-Path $distTailwind)) {
+    Copy-Item $tailwindTarget $distTailwind -Force
+}
+# 把 index.html / dist/index.html 中的 CDN 引用改写为本地 /tailwind.js（幂等）
+foreach ($f in @((Join-Path $BaseDir "app/ace-step-ui/index.html"), (Join-Path $BaseDir "app/ace-step-ui/dist/index.html"))) {
+    if (Test-Path $f) {
+        $c = Get-Content $f -Raw -Encoding UTF8
+        if ($c.Contains($tailwindSrc)) {
+            $c = $c.Replace($tailwindSrc, '/tailwind.js')
+            Set-Content $f $c -Encoding UTF8
+            Write-Output ("[前端] 已将 $f 中的 Tailwind CDN 引用改为本地 /tailwind.js")
+        }
+    }
+}
+
 # 清理临时文件
 Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
 for ($i = 1; $i -le $giteeParts.Count; $i++) {
