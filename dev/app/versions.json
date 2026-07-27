@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.07.28.0621",
+    "date": "2026-07-28 06:23",
+    "message": "重新编译前端(dist已更新)并构建新exe；确认build-version.py/launcher.py/main.py/version_manager.py等构建文件未受前端与环境修复影响",
+    "changes": [
+      "重新编译前端(dist已更新)并构建新exe；确认build-version.py/launcher.py/main.py/version_manager.py等构建文件未受前端与环境修复影响"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0621.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.28.0612",
     "date": "2026-07-28 06:12",
     "message": "优化和修复",

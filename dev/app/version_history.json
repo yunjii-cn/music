@@ -1251,5 +1251,13 @@
     ],
     "build_time": "2026-07-28T06:12:40.569585",
     "version_number": "2026.07.28.0612"
+  },
+  "云集智能音乐创意台-v2026.07.28.0621": {
+    "version": "云集智能音乐创意台-v2026.07.28.0621",
+    "changes": [
+      "重新编译前端(dist已更新)并构建新exe；确认build-version.py/launcher.py/main.py/version_manager.py等构建文件未受前端与环境修复影响"
+    ],
+    "build_time": "2026-07-28T06:23:02.539030",
+    "version_number": "2026.07.28.0621"
   }
 }
