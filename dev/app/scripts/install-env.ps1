@@ -16,7 +16,40 @@ Write-Output "📂 工作目录: $PWD"
 Write-Output ""
 
 Write-Output "🔧 配置国内镜像源..."
-$Env:UV_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+
+# ===== PyPI 镜像自动优选（防"单一清华源连不上就整个部署第一步挂"）=====
+# 历史坑(2026-07-27)：脚本硬编码唯一清华源 pypi.tuna.tsinghua.edu.cn；
+# 用户测试机连不上清华(os error 10061 目标计算机积极拒绝)时，uv venv --seed
+# 拉 pip 种子包第一步就失败，整个"一键部署维护"直接挂在步骤3。
+# 修法：候选多镜像逐个探测连通性(HEAD /simple/pip/)，选中第一个可达的作为 UV_INDEX_URL。
+# 顺序：清华 → 阿里云 → 腾讯云 → 中科大 → PyPI 官方。全部不通才用清华兜底并给出网络提示。
+$pypiCandidates = @(
+    "https://pypi.tuna.tsinghua.edu.cn/simple/",
+    "https://mirrors.aliyun.com/pypi/simple/",
+    "https://mirrors.cloud.tencent.com/pypi/simple/",
+    "https://pypi.mirrors.ustc.edu.cn/simple/",
+    "https://pypi.org/simple/"
+)
+$pypiChosen = $null
+foreach ($cand in $pypiCandidates) {
+    try {
+        $probe = $cand.TrimEnd('/') + "/pip/"
+        $resp = Invoke-WebRequest -Uri $probe -Method Head -TimeoutSec 8 -UseBasicParsing -ErrorAction Stop
+        if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 400) {
+            $pypiChosen = $cand
+            Write-Output ("   ✓ PyPI 镜像可达: " + $cand)
+            break
+        }
+    } catch {
+        Write-Output ("   ✗ PyPI 镜像不可达，尝试下一个: " + $cand)
+    }
+}
+if (-not $pypiChosen) {
+    $pypiChosen = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+    Write-Warning "⚠️ 所有 PyPI 镜像探测均失败，仍用清华源兜底。若后续下载失败，请检查网络/代理/防火墙后重跑一键部署。"
+}
+$Env:UV_INDEX_URL = $pypiChosen
+$Env:UV_DEFAULT_INDEX = $pypiChosen
 # ⚠️ 千万不要全局设置 UV_EXTRA_INDEX_URL=download.pytorch.org！
 # 历史坑(2026-07-26)：全局 extra-index 会让 uv 连装 pip/wheel-stub 这类纯 PyPI 包
 # 都先去 download.pytorch.org 查询；该官源在国内时通时断(tls handshake eof)，
@@ -29,7 +62,7 @@ $Env:HF_ENDPOINT = "https://hf-mirror.com"
 $Env:PIP_DISABLE_IP_VERSION_CHECK = "1"
 $Env:GIT_LFS_SKIP_SMUDGE = "1"
 if ($env:CUDA_PATH) { $Env:CUDA_HOME = $env:CUDA_PATH }
-Write-Output "   PyPI 镜像: https://pypi.tuna.tsinghua.edu.cn/simple/"
+Write-Output ("   PyPI 镜像: " + $pypiChosen + " (多镜像自动优选)")
 Write-Output "   PyTorch 源: 阿里云镜像优先，官方 cu128 兜底（仅安装 torch 时使用）"
 Write-Output ""
 

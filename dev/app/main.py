@@ -2530,8 +2530,7 @@ class MainWindow(QMainWindow):
                 self._log("日志为空，无需复制", "#FF9800")
                 return
             from PyQt6.QtWidgets import QApplication
-            from PyQt6.QtCore import QClipboard
-            QApplication.clipboard().setText(text, QClipboard.Mode.Clipboard)
+            QApplication.clipboard().setText(text)
             self._log("✓ 日志已复制到剪贴板", "#4CAF50")
         except Exception as e:
             self._log(f"[错误] 复制日志失败: {e}", "#F44336")
@@ -3131,8 +3130,7 @@ class MainWindow(QMainWindow):
                 self._log("部署日志为空，无需复制", "#FF9800")
                 return
             from PyQt6.QtWidgets import QApplication
-            from PyQt6.QtCore import QClipboard
-            QApplication.clipboard().setText(text, QClipboard.Mode.Clipboard)
+            QApplication.clipboard().setText(text)
             self._log("✓ 部署日志已复制到剪贴板", "#4CAF50")
         except Exception as e:
             self._log(f"[错误] 复制日志失败: {e}", "#F44336")
