@@ -11,6 +11,7 @@ import sys
 import hashlib
 import shutil
 import argparse
+import threading
 from typing import Optional, List, Dict, Tuple
 from pathlib import Path
 
@@ -191,6 +192,103 @@ def _flatten_nested_models_dir(local_dir):
     shutil.rmtree(nested_dir)
 
 
+# ---------------------------------------------------------------------------
+# 结构化下载进度上报（供启动器 GUI 精确解析，不再依赖脆弱的 tqdm 文本）
+# 思路：下载器自己把真实进度打印成固定格式行，GUI 用正则 100% 命中：
+#   [DLTARGET] <local_dir>           —— 下载器实际写入目录（路径 100% 正确）
+#   [DLPROGRESS] <pct>               —— 真实下载百分比（0-99）
+# 任何异常都被吞掉，绝不阻断下载本身。
+# ---------------------------------------------------------------------------
+def _make_hf_progress_reporter(repo_id: str):
+    """返回一个 huggingface_hub 的 progress_callback：打印结构化 [DLPROGRESS] 行。
+
+    聚合多文件进度：用 list_repo_files 拿到文件总数，按「已完成文件数 + 当前文件百分比」
+    估算整体进度，写入 stdout 供启动器读取。"""
+    state = {"completed": 0, "cur_desc": None, "cur_pct": 0.0, "total": 1}
+    try:
+        from huggingface_hub import list_repo_files
+        try:
+            _files = list_repo_files(repo_id)
+            if _files:
+                state["total"] = max(1, len(_files))
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    def _cb(*args, **kwargs):
+        try:
+            progress = None
+            desc = None
+            # 新版本：ProgressInfo 对象（含 .progress / .desc）
+            if args and hasattr(args[0], "progress"):
+                info = args[0]
+                try:
+                    progress = float(getattr(info, "progress", 0) or 0)
+                except Exception:
+                    progress = None
+                try:
+                    desc = str(getattr(info, "desc", "") or "")
+                except Exception:
+                    desc = ""
+            # 旧版本：(progress:int, total:int, unit:str)
+            elif args and isinstance(args[0], (int, float)) and len(args) >= 2:
+                try:
+                    _total = float(args[1]) if args[1] else 0.0
+                    progress = (float(args[0]) / _total * 100.0) if _total > 0 else 0.0
+                except Exception:
+                    progress = None
+            # 文件边界：desc 变化 → 上一个文件下载完成
+            if desc and desc != state["cur_desc"]:
+                if state["cur_desc"] is not None:
+                    state["completed"] += 1
+                state["cur_desc"] = desc
+                state["cur_pct"] = 0.0
+            if progress is not None:
+                state["cur_pct"] = max(0.0, min(100.0, progress))
+            overall = (state["completed"] + state["cur_pct"] / 100.0) / state["total"] * 100.0
+            overall = max(0.0, min(99.0, overall))
+            print(f"[DLPROGRESS] {overall:.1f}", flush=True)
+        except Exception:
+            pass
+    return _cb
+
+
+def _estimate_repo_size(repo_id: str, fallback: float) -> float:
+    """已知仓库近似大小（字节），用于磁盘进度估算；未知则回退兜底值。"""
+    _KNOWN = {
+        "ACE-Step/Ace-Step1.5": 18.0e9,
+    }
+    if repo_id in _KNOWN:
+        return _KNOWN[repo_id]
+    return fallback
+
+
+def _start_disk_progress_monitor(local_dir, est_bytes: float):
+    """子进程内守护线程：按磁盘真实已下载字节数打印 [DLPROGRESS]。
+
+    用于 modelscope（无结构化回调）以及作为 huggingface 的兜底。
+    local_dir 用子进程自己解析出的路径（100% 正确），避免启动器侧路径猜测不一致。
+    返回 (stop_event, thread)，调用方在下载结束后 set 停止。"""
+    stop = threading.Event()
+
+    def _monitor():
+        import time as _t
+        while not stop.is_set():
+            try:
+                cur = _get_directory_size(str(local_dir))
+                pct = (cur / est_bytes * 100.0) if est_bytes and est_bytes > 0 else 0.0
+                pct = max(0.0, min(99.0, pct))
+                print(f"[DLPROGRESS] {pct:.1f}", flush=True)
+            except Exception:
+                pass
+            _t.sleep(1.0)
+
+    t = threading.Thread(target=_monitor, daemon=True)
+    t.start()
+    return stop, t
+
+
 def _download_from_huggingface_internal(
     repo_id: str,
     local_dir: Path,
@@ -210,13 +308,44 @@ def _download_from_huggingface_internal(
     from huggingface_hub import snapshot_download
 
     logger.info(f"[Model Download] Downloading from HuggingFace: {repo_id} -> {local_dir}")
+    # 结构化上报：下载器自己解析出的写入目录（100% 正确），供 GUI 设置测量目录
+    print(f"[DLTARGET] {local_dir}", flush=True)
 
-    snapshot_download(
-        repo_id=repo_id,
-        local_dir=str(local_dir),
-        local_dir_use_symlinks=False,
-        token=token,
-    )
+    reporter = None
+    try:
+        reporter = _make_hf_progress_reporter(repo_id)
+    except Exception:
+        reporter = None
+
+    est = _estimate_repo_size(repo_id, 18.0e9)
+    stop, mon = _start_disk_progress_monitor(local_dir, est)
+    try:
+        # 仅当 snapshot_download 支持 progress_callback 时才传（老版本不支持则回退）
+        try:
+            import inspect
+            _has_cb = "progress_callback" in inspect.signature(snapshot_download).parameters
+        except Exception:
+            _has_cb = True
+        if _has_cb and reporter is not None:
+            snapshot_download(
+                repo_id=repo_id,
+                local_dir=str(local_dir),
+                local_dir_use_symlinks=False,
+                token=token,
+                progress_callback=reporter,
+            )
+        else:
+            snapshot_download(
+                repo_id=repo_id,
+                local_dir=str(local_dir),
+                local_dir_use_symlinks=False,
+                token=token,
+            )
+    finally:
+        try:
+            stop.set()
+        except Exception:
+            pass
 
     _flatten_nested_models_dir(local_dir)
 
@@ -238,11 +367,21 @@ def _download_from_modelscope_internal(
     from modelscope import snapshot_download
 
     logger.info(f"[Model Download] Downloading from ModelScope: {repo_id} -> {local_dir}")
+    # 结构化上报：下载器自己的写入目录（100% 正确）
+    print(f"[DLTARGET] {local_dir}", flush=True)
 
-    snapshot_download(
-        model_id=repo_id,
-        local_dir=str(local_dir),
-    )
+    est = _estimate_repo_size(repo_id, 15.0e9)
+    stop, mon = _start_disk_progress_monitor(local_dir, est)
+    try:
+        snapshot_download(
+            model_id=repo_id,
+            local_dir=str(local_dir),
+        )
+    finally:
+        try:
+            stop.set()
+        except Exception:
+            pass
 
     _flatten_nested_models_dir(local_dir)
 

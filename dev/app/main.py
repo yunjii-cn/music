@@ -743,15 +743,15 @@ _DOWNLOAD_IMPORTANT_KEYWORDS = (
     "ready", "====", "开始", "失败", "错误", "完成", "校验", "✓", "❌",
 )
 _DOWNLOAD_LOG_INTERVAL = 10.0  # 秒：进度类日志最小记录间隔
-# 从下载器日志解析真实目标目录：下载器会打印
-#   "[Model Download] Downloading from HuggingFace: <repo> -> <local_dir>"
-# 用这个 <local_dir> 作为磁盘进度兜底的真实测量目录，
-# 避免与 config_manager 解析出的路径不一致（测错目录→进度永远0%）。
-_DOWNLOAD_TARGET_RE = re.compile(r"->\s*(.+?)\s*$")
 # 从 tqdm 的 "1.2G/2.7G" 这类「当前/总计」尺寸比解析进度（没有 % 也能算）。
 _DOWNLOAD_RATIO_RE = re.compile(
     r"(\d+(?:\.\d+)?)\s*([GMK]?B)\s*/\s*(\d+(?:\.\d+)?)\s*([GMK]?B)"
 )
+# 结构化进度（下载器自己打印，100% 可靠，不依赖外部库脆弱的文本格式）：
+#   [DLTARGET] <local_dir>  —— 下载器实际写入目录（路径 100% 正确）
+#   [DLPROGRESS] <pct>       —— 真实下载百分比（0-99）
+_DLPROGRESS_RE = re.compile(r"\[DLPROGRESS\]\s*(\d{1,3}(?:\.\d+)?)")
+_DLTARGET_RE = re.compile(r"\[DLTARGET\]\s*(.+)")
 
 
 class ModelDownloadThread(QThread):
@@ -874,6 +874,10 @@ class ModelDownloadThread(QThread):
                     clean = fr.strip()
                     if not clean:
                         continue
+                    # 结构化进度/目标行：只喂进度条，不进用户日志（避免刷屏）
+                    if clean.startswith("[DLPROGRESS]") or clean.startswith("[DLTARGET]"):
+                        self._parse_frame_progress(clean)
+                        continue
                     now = time.time()
                     is_progress = bool(_DOWNLOAD_PROGRESS_RE.search(clean))
                     is_important = any(k in clean.lower() for k in _DOWNLOAD_IMPORTANT_KEYWORDS)
@@ -929,21 +933,37 @@ class ModelDownloadThread(QThread):
         return v * mult
 
     def _parse_frame_progress(self, clean: str):
-        """从一行真实日志里提取进度并喂给进度条。
+        """从一行日志/结构化行里提取进度并喂给进度条。
 
-        解析顺序：
-          1) 下载器打印的 '... -> <local_dir>' —— 作为磁盘进度兜底的真实测量目录；
-          2) 优先 '%' 正则（tqdm '45%'）；
-          3) 否则 '当前/总计' 尺寸比（tqdm '1.2G/2.7G'，无 % 也能算）。
+        解析优先级（越靠前越可靠）：
+          0) [DLTARGET] <local_dir> —— 下载器自己解析出的真实写入目录，
+             100% 正确，消除启动器侧路径猜测不一致导致的磁盘兜底失效；
+          1) [DLPROGRESS] <pct> —— 下载器经 huggingface progress_callback /
+             子进程内磁盘监控直接吐出的真实百分比（最高优先级、绝不误判）；
+          2) '%' 正则（tqdm '45%'）；
+          3) '当前/总计' 尺寸比（tqdm '1.2G/2.7G'，无 % 也能算）。
         """
         if not clean:
             return
-        # 1) 捕获真实目标目录
-        m_tgt = _DOWNLOAD_TARGET_RE.search(clean)
-        if m_tgt and ("download" in clean.lower() or "->" in clean):
+        # 0) 真实目标目录（路径 100% 正确，覆盖 _compute_target_and_estimate 的猜测）
+        #    下载器打印的 [DLTARGET] 即它实际写入目录（mkdir 之后才打印），直接信任；
+        #    是否真正可测由 _dir_progress 自行 isdir 判断，避免目录尚未建好时的竞态。
+        m_tgt = _DLTARGET_RE.search(clean)
+        if m_tgt:
             p = m_tgt.group(1).strip().strip('"').strip("'")
-            if p and (os.path.isdir(p) or os.path.isdir(os.path.dirname(p))):
+            if p:
                 self._target_dir = p
+
+        # 1) 结构化进度（最高优先级，绝不误判）
+        m_dl = _DLPROGRESS_RE.search(clean)
+        if m_dl:
+            try:
+                pct = int(float(m_dl.group(1)))
+            except (ValueError, TypeError):
+                pct = None
+            if pct is not None:
+                self._update_progress(pct, f"下载中... {pct}%")
+            return
 
         # 2) 真实进度：优先 %，其次 当前/总计 尺寸比
         pct = None
@@ -971,13 +991,19 @@ class ModelDownloadThread(QThread):
             self.progress_updated.emit(self.current_progress, desc)
 
     def _dir_progress(self):
-        """基于磁盘真实已下载字节数估算进度（目标目录/预估总大小）。"""
-        if not self._target_dir or not os.path.isdir(self._target_dir) or not self._est_total:
+        """基于磁盘真实已下载字节数估算进度（目标目录/预估总大小）。
+
+        目标目录由下载器自己打印的 [DLTARGET] 行设置，路径 100% 正确，
+        不再依赖 main.py 侧对 get_checkpoints_dir 的复刻（曾因 config_manager 解析
+        偏差而测错目录 → 返回 None → 进度条恒 0%）。
+        预估总大小缺失时回退到合理兜底值，保证磁盘兜底始终能产出进度。"""
+        if not self._target_dir or not os.path.isdir(self._target_dir):
             return None
+        est = self._est_total if self._est_total else 15.0e9
         try:
             cur = _fs_get_directory_size(self._target_dir)
-            if self._est_total > 0:
-                return int(min(99, cur / self._est_total * 100))
+            if est > 0:
+                return int(min(99, cur / est * 100))
         except Exception:
             pass
         return None
