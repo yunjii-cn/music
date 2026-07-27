@@ -7754,6 +7754,19 @@ for d in deps:
         except Exception:
             pass
     
+    def _refresh_model_manager_widget(self):
+        """刷新模型管理 widget（模型管理 tab 实际展示的内容）。
+
+        主窗口的 self.model_list 重建后，必须同步刷新 ModelManagerDialog，
+        否则它只在切换到该 tab 时(_on_tab_changed)才调用 _update_ui()，
+        导致下载/删除/验证完成后状态不自动更新（需切走再切回才显示）。
+        """
+        try:
+            if self.model_manager_widget is not None:
+                self.model_manager_widget._update_ui()
+        except Exception as e:
+            self._log(f"[警告] 刷新模型管理界面失败: {str(e)}", "#FF9800")
+
     def _on_download_finished(self, success: bool, model_name: str):
         """下载完成回调"""
         self.is_downloading = False
@@ -7789,6 +7802,7 @@ for d in deps:
                 self._log(f"[警告] 刷新模型列表失败: {str(e)}", "#FF9800")
         try:
             self._update_model_management_ui()
+            self._refresh_model_manager_widget()
         except Exception as e:
             self._log(f"[警告] 更新模型UI失败: {str(e)}", "#FF9800")
         
@@ -7829,6 +7843,7 @@ for d in deps:
             self.model_list = []
             self._load_model_list()
             self._update_model_management_ui()
+            self._refresh_model_manager_widget()
         
         # 重新启用所有按钮
         self._set_model_buttons_enabled(True)
@@ -7881,6 +7896,7 @@ for d in deps:
             self._log(msg, "#FF9800")
         # 更新模型管理UI
         self._update_model_management_ui()
+        self._refresh_model_manager_widget()
     
     def _pause_download(self):
         """暂停下载"""
@@ -7935,6 +7951,7 @@ for d in deps:
             
             # 更新UI
             self._update_model_management_ui()
+            self._refresh_model_manager_widget()
             
             self._log(f"✅ 验证完成！{installed_models}/{total_models} 模型已安装", "#4CAF50")
             
