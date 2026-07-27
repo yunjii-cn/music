@@ -736,6 +736,8 @@ def _fs_check_model_exists(model_name: str, base_dir: str) -> bool:
 _DOWNLOAD_PROGRESS_RE = re.compile(
     r"(\d+%|\bit/s\b|\bB/s\b|\bMB/s\b|\bkB/s\b|\bs/it\b|\[.*?<\s*.*?\])"
 )
+# 从 tqdm 等进度行解析真实百分比（如 "model.safetensors:  45%|...| 1.2G/2.7G"）
+_PROGRESS_PCT_RE = re.compile(r"(\d{1,3})\s*%")
 _DOWNLOAD_IMPORTANT_KEYWORDS = (
     "error", "fail", "warn", "download", "verif", "complete", "success",
     "ready", "====", "开始", "失败", "错误", "完成", "校验", "✓", "❌",
@@ -758,6 +760,9 @@ class ModelDownloadThread(QThread):
         self.process = None
         self._should_stop = False
         self.current_progress = 0
+        # 进度兜底：基于磁盘真实已下载字节数估算（目标目录 + 预估总大小）
+        self._target_dir = None
+        self._est_total = None
     
     def run(self):
         """执行模型下载"""
@@ -780,7 +785,7 @@ class ModelDownloadThread(QThread):
             self.current_progress = 10
             self.progress_updated.emit(self.current_progress, "检查环境...")
             
-            cmd_args = [venv_python, "-m", "acestep.model_downloader"]
+            cmd_args = [venv_python, "-u", "-m", "acestep.model_downloader"]
             if self.model_name in ("main", "acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
                 pass
             else:
@@ -817,11 +822,14 @@ class ModelDownloadThread(QThread):
                 # 注入 acestep 包父目录到 PYTHONPATH 并 cd 过去（与 run_gradio.ps1 一致），
                 # 否则 venv 里 `python -m acestep.model_downloader` 会报
                 # ModuleNotFoundError: No module named 'acestep'。
-                "-Command", f"$env:PYTHONPATH = '{acestep_parent}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{acestep_parent}'; {cmd_str}"
+                "-Command", f"$env:PYTHONPATH = '{acestep_parent}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; $env:PYTHONUNBUFFERED = '1'; $env:HF_HUB_DISABLE_PROGRESS_BARS = 'false'; $env:MODELSCOPE_PROGRESS_BARS = 'true'; cd '{acestep_parent}'; {cmd_str}"
             ]
             
             self.current_progress = 15
             self.progress_updated.emit(self.current_progress, "连接下载源...")
+
+            # 计算进度兜底用的目标目录与预估总大小（基于磁盘真实已下载字节数）
+            self._compute_target_and_estimate()
             
 
             self.process = hidden_popen(
@@ -834,13 +842,9 @@ class ModelDownloadThread(QThread):
                 errors='replace'
             )
             
-            # 模拟下载进度
-            import random
-            start_time = time.time()
-            last_progress = self.current_progress
-            
-            # 读取输出（进度类行按固定间隔节流，关键行始终即时记录）
+            # 读取输出并解析真实进度（不再使用随机模拟）
             last_log_time = time.time()
+            last_disk_check = time.time()
             while self.process.poll() is None and not self._should_stop:
                 line = self.process.stdout.readline()
                 if line:
@@ -852,25 +856,19 @@ class ModelDownloadThread(QThread):
                         if is_important or not is_progress or (now - last_log_time >= _DOWNLOAD_LOG_INTERVAL):
                             self.log_received.emit(f"[模型下载] {clean}")
                             last_log_time = now
-                    # 根据时间模拟进度（仅用于 UI 进度条，不影响日志频率）
-                    elapsed = time.time() - start_time
-                    if elapsed > 0.5:
-                        # 随机增加进度
-                        if self.current_progress < 95:
-                            increment = random.uniform(0.5, 3.0)
-                            self.current_progress = min(95, self.current_progress + increment)
-                            self.progress_updated.emit(int(self.current_progress), "下载中...")
-                        start_time = time.time()
+                        # 从运行日志中解析真实进度百分比（如 tqdm 输出的 45%），实时喂给进度条
+                        m = _PROGRESS_PCT_RE.search(clean)
+                        if m:
+                            self._update_progress(int(m.group(1)), f"下载中... {m.group(1)}%")
+                    last_disk_check = time.time()
                 else:
-                    time.sleep(0.05)
-                    # 即使没有输出也缓慢增加进度
-                    elapsed = time.time() - start_time
-                    if elapsed > 1.0:
-                        if self.current_progress < 95:
-                            increment = random.uniform(0.3, 1.0)
-                            self.current_progress = min(95, self.current_progress + increment)
-                            self.progress_updated.emit(int(self.current_progress), "下载中...")
-                        start_time = time.time()
+                    time.sleep(0.1)
+                # 无新输出时，用磁盘真实已下载字节数估算进度，避免进度条冻结（仅增不减）
+                if time.time() - last_disk_check >= 0.8:
+                    disk_pct = self._dir_progress()
+                    if disk_pct is not None:
+                        self._update_progress(disk_pct, "下载中...")
+                    last_disk_check = time.time()
             
             # 读取剩余的输出（进程已结束，逐行完整记录）
             if not self._should_stop:
@@ -897,6 +895,43 @@ class ModelDownloadThread(QThread):
             self.log_received.emit(f"错误详情: {error_detail}")
             self.download_finished.emit(False, str(e))
     
+    def _update_progress(self, pct: int, desc: str):
+        """更新进度条：进度只增不减，保证单调性（多文件顺序下载时单文件百分比会回退）。"""
+        pct = max(0, min(99, int(pct)))
+        if pct >= self.current_progress:
+            self.current_progress = pct
+            self.progress_updated.emit(self.current_progress, desc)
+
+    def _dir_progress(self):
+        """基于磁盘真实已下载字节数估算进度（目标目录/预估总大小）。"""
+        if not self._target_dir or not os.path.isdir(self._target_dir) or not self._est_total:
+            return None
+        try:
+            cur = _fs_get_directory_size(self._target_dir)
+            if self._est_total > 0:
+                return int(min(99, cur / self._est_total * 100))
+        except Exception:
+            pass
+        return None
+
+    def _compute_target_and_estimate(self):
+        """计算进度兜底用的目标目录与预估总大小。"""
+        ckpt = _fs_get_checkpoints_dir(self.base_dir)
+        main_set = ("main", "acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
+        if self.model_name in main_set:
+            # 主模型下载到 checkpoints 根目录（多处平铺），预估总大小=各组件 min_size 之和*余量
+            self._target_dir = ckpt
+            total = 0.0
+            for comp in _FS_MAIN_MODEL_COMPONENTS:
+                info = _FS_MODEL_VALIDATION_INFO.get(comp)
+                if info:
+                    total += info.get("min_size", 0)
+            self._est_total = total * 1.2 if total > 0 else None
+        else:
+            self._target_dir = os.path.join(ckpt, self.model_name)
+            info = _FS_MODEL_VALIDATION_INFO.get(self.model_name)
+            self._est_total = info.get("min_size", 0) * 1.2 if info else None
+
     def stop(self):
         """停止下载"""
         self._should_stop = True
