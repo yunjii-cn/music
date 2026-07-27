@@ -8495,6 +8495,24 @@ for d in deps:
                     pass
                 self._debug_log_file = None
             
+            # 真正退出前，先安全停止并等待所有后台线程。
+            # 否则窗口 C++ 对象销毁后，模型下载/删除/验证/初始化等线程若仍在跑，
+            # 会继续经信号回调主线程，与 Qt 对象析构产生竞态 → 段错误
+            # （进程直接闪退，SafeApplication.notify 这类 Python 层防护抓不到）。
+            for _t in (getattr(self, 'model_download_thread', None),
+                       getattr(self, 'model_delete_thread', None),
+                       getattr(self, 'model_verify_thread', None),
+                       getattr(self, 'init_worker', None)):
+                if _t is not None and getattr(_t, 'isRunning', lambda: False)():
+                    _stop = getattr(_t, 'stop', None)
+                    if callable(_stop):
+                        try: _stop()
+                        except Exception: pass
+                    try: _t.quit()
+                    except Exception: pass
+                    try: _t.wait(3000)
+                    except Exception: pass
+
             self.monitor.stop()
             self.monitor.wait()
             
