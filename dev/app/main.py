@@ -96,6 +96,7 @@ if sys.platform == 'win32':
 
 import subprocess
 import threading
+import queue
 import socket
 import traceback
 import winreg
@@ -851,50 +852,53 @@ class ModelDownloadThread(QThread):
                 env=dl_env,
             )
             
-            # 读取输出并解析真实进度（不再使用随机模拟）
-            last_log_time = time.time()
-            last_disk_check = time.time()
+            # 读取输出并解析真实进度（不再使用随机模拟）。
+            #
+            # 关键修复（2026-07-28）：原实现用阻塞式 readline() + 「仅 EOF 才走磁盘兜底」，
+            # 只要子进程 stdout 被任何一层缓冲（powershell / Windows 管道 C 运行时 /
+            # python 缓冲），readline() 就一直阻塞、磁盘兜底(_dir_progress)永不触发，
+            # 进度条死锁在初始值，直到进程结束/切页重建界面才显示 99%。
+            # 现改为：独立读取线程阻塞读行入队列，主线程按 0.3s 超时取行；超时期间
+            # 用真实磁盘字节(_dir_progress)驱动进度条。Windows 下 select 不支持管道，
+            # 故用线程 + 队列方案，彻底保证进度条实时爬升、不再依赖子进程 stdout 实时性。
+            _line_q: "queue.Queue" = queue.Queue()
+
+            def _reader():
+                try:
+                    for _ln in self.process.stdout:
+                        _line_q.put(_ln)
+                except Exception:
+                    pass
+                _line_q.put(None)  # EOF 哨兵
+
+            _reader_thread = threading.Thread(target=_reader, daemon=True)
+            _reader_thread.start()
+
+            _last_log_time = time.time()
             while self.process.poll() is None and not self._should_stop:
-                raw = self.process.stdout.readline()
-                if not raw:
-                    # 管道暂无新数据（tqdm 用 \r 原地刷新时 readline 会阻塞到下一个 \n）：
-                    # 用磁盘真实已下载字节数估算进度，避免进度条冻结（仅增不减）。
-                    if time.time() - last_disk_check >= 0.8:
-                        disk_pct = self._dir_progress()
-                        if disk_pct is not None:
-                            self._update_progress(disk_pct, "下载中...")
-                        last_disk_check = time.time()
-                    else:
-                        time.sleep(0.05)
+                try:
+                    _line = _line_q.get(timeout=0.3)
+                except queue.Empty:
+                    # 0.3s 内无新输出（子进程可能在缓冲 / 正在下载）：磁盘真实字节兜底，
+                    # 进度条持续爬升（仅增不减），彻底消除「卡住不动 / 切页才跳 99%」。
+                    _disk_pct = self._dir_progress()
+                    if _disk_pct is not None:
+                        self._update_progress(_disk_pct, "下载中...")
                     continue
-                # tqdm 在非 tty 下用 \r 原地刷新，readline 可能把多帧拼成一个段落；
-                # 同时按 \r 和 \n 拆开逐帧处理，保证每一帧的进度都被解析。
-                frames = raw.replace("\n", "\r").split("\r")
-                for fr in frames:
-                    clean = fr.strip()
-                    if not clean:
-                        continue
-                    # 结构化进度/目标行：只喂进度条，不进用户日志（避免刷屏）
-                    if clean.startswith("[DLPROGRESS]") or clean.startswith("[DLTARGET]"):
-                        self._parse_frame_progress(clean)
-                        continue
-                    now = time.time()
-                    is_progress = bool(_DOWNLOAD_PROGRESS_RE.search(clean))
-                    is_important = any(k in clean.lower() for k in _DOWNLOAD_IMPORTANT_KEYWORDS)
-                    if is_important or not is_progress or (now - last_log_time >= _DOWNLOAD_LOG_INTERVAL):
-                        self.log_received.emit(f"[模型下载] {clean}")
-                        last_log_time = now
-                    # 从运行日志中解析真实进度（% 或 当前/总计 尺寸比），实时喂给进度条
-                    self._parse_frame_progress(clean)
-                last_disk_check = time.time()
-            
-            # 读取剩余的输出（进程已结束，逐行完整记录）
-            if not self._should_stop:
-                for line in self.process.stdout:
-                    if line:
-                        clean = line.replace('\r', '').strip()
-                        if clean:
-                            self.log_received.emit(f"[模型下载] {clean}")
+                if _line is None:
+                    break  # EOF
+                _last_log_time = self._handle_output_line(_line, _last_log_time)
+
+            # 进程结束后，把队列里剩余的输出全部读完并记入日志（不丢任何信息）
+            try:
+                while True:
+                    _line = _line_q.get_nowait()
+                    if _line is None:
+                        break
+                    if _line:
+                        self._handle_output_line(_line, _last_log_time)
+            except queue.Empty:
+                pass
             
             exit_code = self.process.poll()
             if exit_code == 0 and not self._should_stop:
@@ -982,6 +986,31 @@ class ModelDownloadThread(QThread):
                     pct = int(min(99, cur / tot * 100))
         if pct is not None:
             self._update_progress(pct, f"下载中... {pct}%")
+
+    def _handle_output_line(self, raw: str, last_log_time: float) -> float:
+        """处理一行子进程输出：拆帧、解析进度、按间隔记入用户日志。
+
+        返回更新后的 last_log_time。供读取线程 + 队列方案复用（见 run()）。
+        """
+        # tqdm 在非 tty 下用 \r 原地刷新，可能把多帧拼成一个段落；
+        # 同时按 \r 和 \n 拆开逐帧处理，保证每一帧的进度都被解析。
+        for fr in raw.replace("\n", "\r").split("\r"):
+            clean = fr.strip()
+            if not clean:
+                continue
+            # 结构化进度/目标行：只喂进度条，不进用户日志（避免刷屏）
+            if clean.startswith("[DLPROGRESS]") or clean.startswith("[DLTARGET]"):
+                self._parse_frame_progress(clean)
+                continue
+            now = time.time()
+            is_progress = bool(_DOWNLOAD_PROGRESS_RE.search(clean))
+            is_important = any(k in clean.lower() for k in _DOWNLOAD_IMPORTANT_KEYWORDS)
+            if is_important or not is_progress or (now - last_log_time >= _DOWNLOAD_LOG_INTERVAL):
+                self.log_received.emit(f"[模型下载] {clean}")
+                last_log_time = now
+            # 从运行日志中解析真实进度（% 或 当前/总计 尺寸比），实时喂给进度条
+            self._parse_frame_progress(clean)
+        return last_log_time
 
     def _update_progress(self, pct: int, desc: str):
         """更新进度条：进度只增不减，保证单调性（多文件顺序下载时单文件百分比会回退）。"""
