@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.07.28.0800",
+    "date": "2026-07-28 08:01",
+    "message": "根除下载/删除子进程经系统shell拉起导致的管道stdout块缓冲：下载与删除均改为Popen直接拉起venv python，传env(PYTHONPATH/PYTHONUNBUFFERED)与cwd，配合python -u；下载进度条DLPROGRESS行与删除日志均改为逐行实时送达，彻底修复进度条全程卡15%、结束时跳99%的问题",
+    "changes": [
+      "根除下载/删除子进程经系统shell拉起导致的管道stdout块缓冲：下载与删除均改为Popen直接拉起venv python，传env(PYTHONPATH/PYTHONUNBUFFERED)与cwd，配合python -u；下载进度条DLPROGRESS行与删除日志均改为逐行实时送达，彻底修复进度条全程卡15%、结束时跳99%的问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0800.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.28.0756",
     "date": "2026-07-28 07:58",
     "message": "修复模型下载进度条全程卡15%/结束时跳99%：根因是下载子进程经系统shell拉起导致stdout块缓冲，DLPROGRESS行被攒到进程结束才刷出；改为Popen直接拉起venv python并传env+cwd，配合python -u实现进度逐行实时送达",

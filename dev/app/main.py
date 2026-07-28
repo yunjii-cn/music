@@ -1063,8 +1063,7 @@ class ModelDeleteThread(QThread):
                 self.delete_finished.emit(False, "虚拟环境不存在")
                 return
             
-            cmd_args = [venv_python, "-m", "acestep.model_downloader", "--delete", self.model_name]
-            cmd_str = " ".join(f'"{arg}"' if ' ' in arg else arg for arg in cmd_args)
+            cmd_args = [venv_python, "-u", "-m", "acestep.model_downloader", "--delete", self.model_name]
 
             # 解析 acestep 包所在父目录（兼容 base_dir 落点偏差 / 不同目录布局），
             # 否则 venv 里 `python -m acestep.model_downloader` 会报
@@ -1079,26 +1078,23 @@ class ModelDeleteThread(QThread):
                 self.delete_finished.emit(False, "缺少 acestep 模块")
                 return
 
-            cmd = [
-                "powershell.exe",
-                "-WindowStyle", "Hidden",
-                "-ExecutionPolicy", "Bypass",
-                "-NoProfile",
-                # 注入 acestep 包父目录到 PYTHONPATH 并 cd 过去，
-                # 否则 venv 里 `python -m acestep.model_downloader` 会报
-                # ModuleNotFoundError: No module named 'acestep'。
-                "-Command", f"$env:PYTHONPATH = '{acestep_parent}' + [System.IO.Path]::PathSeparator + $env:PYTHONPATH; cd '{acestep_parent}'; {cmd_str}"
-            ]
-            
+            # 直接拉起 venv python（不再包系统shell：shell 对管道 stdout 块缓冲会让
+            # 删除日志攒到进程结束才刷出，表现为"假死"）。env 注入 PYTHONPATH、cwd 切到
+            # acestep 父目录，配合 -u 实现删除日志逐行实时输出。
+            del_env = dict(os.environ)
+            del_env["PYTHONPATH"] = acestep_parent + os.pathsep + del_env.get("PYTHONPATH", "")
+            del_env["PYTHONUNBUFFERED"] = "1"
 
             self.process = hidden_popen(
-                cmd,
+                cmd_args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                cwd=acestep_parent,
+                env=del_env,
             )
             
             for line in iter(self.process.stdout.readline, ''):

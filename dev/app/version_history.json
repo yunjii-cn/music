@@ -1267,5 +1267,13 @@
     ],
     "build_time": "2026-07-28T07:58:03.507523",
     "version_number": "2026.07.28.0756"
+  },
+  "云集智能音乐创意台-v2026.07.28.0800": {
+    "version": "云集智能音乐创意台-v2026.07.28.0800",
+    "changes": [
+      "根除下载/删除子进程经系统shell拉起导致的管道stdout块缓冲：下载与删除均改为Popen直接拉起venv python，传env(PYTHONPATH/PYTHONUNBUFFERED)与cwd，配合python -u；下载进度条DLPROGRESS行与删除日志均改为逐行实时送达，彻底修复进度条全程卡15%、结束时跳99%的问题"
+    ],
+    "build_time": "2026-07-28T08:01:38.318110",
+    "version_number": "2026.07.28.0800"
   }
 }
