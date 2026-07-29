@@ -1,5 +1,13 @@
 [
   {
+    "hash": "3e9418134db1461c080aae4ac835a0299cc53f61",
+    "short_hash": "3e94181",
+    "message": "feat: 发布版本 v2026.07.30.0441",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-30 04:42:49"
+  },
+  {
     "hash": "f7d910560caea78e5f8f045db9824724169ce0e1",
     "short_hash": "f7d9105",
     "message": "feat: 发布版本 v2026.07.29.1022",
@@ -470,13 +478,5 @@
     "author": "yunjii",
     "email": "yi@yunjii.cn",
     "date": "2026-05-12 08:15:31"
-  },
-  {
-    "hash": "1461a7f30ba10445ecf769fb68858ed243d1283c",
-    "short_hash": "1461a7f",
-    "message": "feat: 发布版本 v2026.05.12.0808",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-05-12 08:10:14"
   }
 ]

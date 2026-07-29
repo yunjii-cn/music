@@ -928,6 +928,9 @@ class HybridVersionManagerDialog(QDialog):
 
         # auto_remote=False：仅用 exe 内置静态 versions.json 秒开，不联网、不弹窗。
         # 用户点「🌐 远程获取」时传 True 才会去仓库拉最新列表。
+        # 记录本次是否为「显式远程获取」，供 _on_exe_data_ready 判断是否需要
+        # 再打 Releases API 拉真实下载链接（打开页面时不需要，模板已能算出可用URL）。
+        self._exe_did_remote = auto_remote
         self._exe_worker = _ExeFetchWorker(self, auto_remote=auto_remote)
         self._exe_worker.data_ready.connect(self._on_exe_data_ready)
         self._exe_worker.start()
@@ -1011,8 +1014,10 @@ class HybridVersionManagerDialog(QDialog):
             is_current = version['version'] == current_version
             self._create_exe_version_item(version, is_current)
 
-        # Async fetch release assets for real download URLs
-        if winner_source:
+        # 仅当用户「显式远程获取」时才打 Releases API 拉真实下载链接；
+        # 打开页面（本地静态列表）时不联网——模板已能算出三源可用下载URL（已验证 200），
+        # 避免打开更新栏即产生一连串网络请求/可能的弹窗（对齐视频创意站「本地优先、不自动远程」）。
+        if winner_source and getattr(self, '_exe_did_remote', False):
             self._fetch_release_assets(winner_source, all_versions)
 
     def _on_git_data_ready(self, current, commits, source):
