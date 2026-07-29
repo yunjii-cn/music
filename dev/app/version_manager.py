@@ -189,25 +189,27 @@ UPDATE_SOURCES = {
 }
 
 
-class _ExeFetchWorker(QThread):
-    data_ready = pyqtSignal(object, object, dict, str)
+class _RemoteFetchThread(QThread):
+    """远程获取线程（仅用户点「🌐 远程获取」时启动）。
 
-    def __init__(self, dialog, auto_remote=False):
+    全程 urlopen，零 subprocess、零弹窗（对齐视频创意站「本地优先、远程手动」）。
+    打开页面**不走此线程**——直接同步读 exe 内置静态列表渲染，零线程零网络。
+    合并原 _ExeFetchWorker / _GitCommitsFetchWorker，统一一个线程处理两种模式。
+    """
+    # (mode, current, versions, local, winner)
+    data_ready = pyqtSignal(str, object, object, object, str)
+
+    def __init__(self, dialog, mode, auto_remote=False):
         super().__init__()
         self.dialog = dialog
-        self._cancelled = False
-        self._result_versions = None
-        self._result_winner = None
-        # 是否允许后台自动拉取远程版本列表。
-        # 打开页面时为 False（仅用内置静态文件秒开，零网络零弹窗）；
-        # 用户点「刷新/远程获取」时传 True。
+        self.mode = mode  # "exe" | "git"
         self.auto_remote = auto_remote
+        self._cancelled = False
 
     def cancel(self):
         self._cancelled = True
 
-    def _fetch_url(self, url, is_api=False, timeout=10):
-        """Single URL fetch, returns (data_dict, error)"""
+    def _fetch_url(self, url, is_api=False, timeout=12):
         try:
             req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             resp = urlopen(req, timeout=timeout)
@@ -221,8 +223,7 @@ class _ExeFetchWorker(QThread):
                 content_b64 = file_data.get("content", "")
                 decoded = base64.b64decode(content_b64).decode("utf-8")
                 return json.loads(decoded), None
-            else:
-                return json.loads(raw), None
+            return json.loads(raw), None
         except Exception as e:
             return None, str(e)
 
@@ -231,77 +232,68 @@ class _ExeFetchWorker(QThread):
             current = self.dialog._get_current_exe_version()
             if self._cancelled:
                 return
-
-            # 秒开：先用 exe 内置的 versions.json 立即渲染历史列表，不依赖任何网络。
-            # 内置列表优先秒开；winner 默认用 "github_mirror"（国内走 ghproxy 镜像），
-            # 下载地址按 GitHub Releases 模板确定性生成，导入 GitHub 后下载即自动可用。
-            builtin = self.dialog._get_builtin_versions()
-            if builtin and not self._cancelled:
-                local = self.dialog._get_local_exe_versions()
-                self.data_ready.emit(current, builtin, local, "github_mirror")
-
-            if self._cancelled:
-                return
-
-            # 后台再尝试远程拉取（多源竞速），拿到后再次 emit 覆盖（补充可能新增的版本）
-            # 仅当用户显式点「刷新/远程获取」时才拉取（auto_remote=True），
-            # 避免打开页面即联网/弹窗。
-            if not self.auto_remote:
-                return
-            sources = UPDATE_SOURCES
-            result = None
-            winner = None
-            results_lock = threading.Lock()
-            done_event = threading.Event()
-
-            def try_source(key):
-                nonlocal result, winner
-                if done_event.is_set() or self._cancelled:
-                    return
-                source = sources[key]
-                data, error = self._fetch_url(source["version_url"], source.get("is_api", False))
-                if data is not None and not done_event.is_set() and not self._cancelled:
-                    with results_lock:
-                        if not done_event.is_set():
-                            result = data
-                            winner = key
-                            done_event.set()
-
-            threads = []
-            for key in sources:
-                t = threading.Thread(target=try_source, args=(key,), daemon=True)
-                t.start()
-                threads.append(t)
-
-            for t in threads:
-                t.join(timeout=20)
-
-            if self._cancelled:
-                return
-
-            remote = result if result else self.dialog._fetch_remote_versions(fallback=True)
-            remote = remote if isinstance(remote, list) else []
-            if not remote:
-                # 所有远程源都不可达：保持内置列表（上面已 emit），不再二次兜底
-                return
-
-            if self._cancelled:
-                return
-
-            local = self.dialog._get_local_exe_versions()
-            if self._cancelled:
-                return
-
-            self.data_ready.emit(current, remote, local, winner or "github_mirror")
-        except Exception as e:
-            print(f"EXE版本数据获取失败: {e}")
-            if not self._cancelled:
-                # 出错也尽量用内置兜底显示
+            if self.mode == "exe":
                 builtin = self.dialog._get_builtin_versions()
-                if builtin:
-                    self.data_ready.emit(None, builtin, {}, "gitee")
+                if builtin and not self._cancelled:
+                    self.data_ready.emit("exe", current, builtin, {}, "github_mirror")
+                if not self.auto_remote or self._cancelled:
+                    return
+                # 多源竞速拉远程版本列表
+                sources = UPDATE_SOURCES
+                result, winner = None, None
+                results_lock = threading.Lock()
+                done_event = threading.Event()
+
+                def try_source(key):
+                    nonlocal result, winner
+                    if done_event.is_set() or self._cancelled:
+                        return
+                    source = sources[key]
+                    data, _err = self._fetch_url(source["version_url"], source.get("is_api", False))
+                    if data is not None and not done_event.is_set() and not self._cancelled:
+                        with results_lock:
+                            if not done_event.is_set():
+                                result, winner = data, key
+                                done_event.set()
+
+                threads = []
+                for key in sources:
+                    t = threading.Thread(target=try_source, args=(key,), daemon=True)
+                    t.start()
+                    threads.append(t)
+                for t in threads:
+                    t.join(timeout=20)
+                if self._cancelled:
+                    return
+                remote = result if result else self.dialog._fetch_remote_versions(fallback=True)
+                remote = remote if isinstance(remote, list) else []
+                if remote and not self._cancelled:
+                    self.data_ready.emit("exe", current, remote, {}, winner or "github_mirror")
+            else:  # git
+                builtin = self.dialog._get_builtin_commits()
+                if builtin and not self._cancelled:
+                    self.data_ready.emit("git", current, builtin, None, "builtin")
+                if not self.auto_remote or self._cancelled:
+                    return
+                for url in (GITHUB_COMMITS_MIRROR, GITHUB_COMMITS_URL, GITEE_COMMITS_URL):
+                    if self._cancelled:
+                        return
+                    data, _err = self._fetch_url(url)
+                    if isinstance(data, list):
+                        commits = [self.dialog._normalize_commit(c) for c in data if c]
+                        if commits and not self._cancelled:
+                            self.data_ready.emit("git", current, commits, None, url)
+                            return
+        except Exception as e:
+            print(f"远程获取失败: {e}")
+            if not self._cancelled:
+                if self.mode == "exe":
+                    builtin = self.dialog._get_builtin_versions()
+                    self.data_ready.emit("exe", None, builtin or [], {}, "gitee")
                 else:
-                    self.data_ready.emit(None, [], {}, "")
+                    builtin = self.dialog._get_builtin_commits()
+                    if builtin:
+                        self.data_ready.emit("git", None, builtin, None, "builtin")
 
 
 # ── 远程提交历史源（仅用户手动点「远程获取」时拉取）──
@@ -310,63 +302,7 @@ GITHUB_COMMITS_URL = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}
 GITHUB_COMMITS_MIRROR = f"https://ghproxy.net/https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/commits?per_page=60"
 
 
-class _GitCommitsFetchWorker(QThread):
-    """开发动态（git 提交历史）获取 worker。
-
-    - 秒开：emit exe 内置的 git_commits.json（离线、零网络、零弹窗）；
-    - 仅当用户显式点「远程获取」(auto_remote=True) 时才去仓库 commits API 拉最新提交。
-    全程 urlopen，零 subprocess、零弹窗。
-    """
-    data_ready = pyqtSignal(object, list, str)
-
-    def __init__(self, dialog, auto_remote=False):
-        super().__init__()
-        self.dialog = dialog
-        self._cancelled = False
-        self.auto_remote = auto_remote
-
-    def cancel(self):
-        self._cancelled = True
-
-    def _fetch_one(self, url):
-        try:
-            req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            resp = urlopen(req, timeout=12)
-            raw = json.loads(resp.read().decode("utf-8"))
-            if not isinstance(raw, list):
-                return []
-            return [self.dialog._normalize_commit(c) for c in raw if c]
-        except Exception as e:
-            print(f"远程提交获取失败 ({url}): {e}")
-            return None
-
-    def run(self):
-        try:
-            current = self.dialog._get_current_exe_version()
-            if self._cancelled:
-                return
-            # 秒开：内置 git_commits.json
-            builtin = self.dialog._get_builtin_commits()
-            if builtin and not self._cancelled:
-                self.data_ready.emit(current, builtin, "builtin")
-            # 未要求远程拉取则到此为止（打开页面即此分支，零网络零弹窗）
-            if not self.auto_remote or self._cancelled:
-                return
-            # 远程多源拉取最新提交（仅手动触发）
-            for url in (GITHUB_COMMITS_MIRROR, GITHUB_COMMITS_URL, GITEE_COMMITS_URL):
-                if self._cancelled:
-                    return
-                commits = self._fetch_one(url)
-                if commits:  # 非空即采用（None=出错，重试下一源）
-                    self.data_ready.emit(current, commits, url)
-                    return
-            # 全部失败：保持内置快照（上面已 emit）
-        except Exception as e:
-            print(f"Git提交获取失败: {e}")
-            if not self._cancelled:
-                builtin = self.dialog._get_builtin_commits()
-                if builtin:
-                    self.data_ready.emit(None, builtin, "builtin")
+# 注：原 _GitCommitsFetchWorker 已合并进上方的 _RemoteFetchThread（mode="git"）。
 
 
 
@@ -397,8 +333,7 @@ class HybridVersionManagerDialog(QDialog):
         self._remote_versions_cache = None
         self._detail_widgets = []
         self._all_expanded = True
-        self._exe_worker = None
-        self._git_worker = None
+        self._remote_worker = None
 
         # 多源竞速 / 下载相关
         self._ver_race_winner = ""
@@ -681,14 +616,10 @@ class HybridVersionManagerDialog(QDialog):
         try:
             if new_mode == self.current_mode:
                 return
-            if self._exe_worker and self._exe_worker.isRunning():
-                self._exe_worker.cancel()
-                self._exe_worker.wait(2000)
-                self._exe_worker = None
-            if self._git_worker and self._git_worker.isRunning():
-                self._git_worker.cancel()
-                self._git_worker.wait(2000)
-                self._git_worker = None
+            if self._remote_worker and self._remote_worker.isRunning():
+                self._remote_worker.cancel()
+                self._remote_worker.wait(2000)
+                self._remote_worker = None
             self.current_mode = new_mode
             if new_mode == "exe":
                 self.btn_mode_exe.setChecked(True)
@@ -830,62 +761,6 @@ class HybridVersionManagerDialog(QDialog):
             "date": (author.get("date", "") or "")[:19].replace("T", " "),
         }
 
-    def _get_local_exe_versions(self):
-        """扫描本地 exe 文件，返回 {版本号: {path,size,date,name}}。
-
-        仅 glob + stat 解析文件名版本号，不调用任何子进程，不弹窗。
-        用于在版本列表中标记"已下载"。
-        """
-        local_versions = {}
-        ver_dirs = []
-        ver_dir = Path(self.project_root) / "ver"
-        if ver_dir.exists():
-            ver_dirs.append(ver_dir)
-        dev_dir = Path(self.project_root)
-        alt_ver = dev_dir / "ver"
-        if alt_ver.exists() and alt_ver not in ver_dirs:
-            ver_dirs.append(alt_ver)
-        if hasattr(sys, '_MEIPASS'):
-            meipass_ver = Path(sys._MEIPASS) / "ver"
-            if meipass_ver.exists() and meipass_ver not in ver_dirs:
-                ver_dirs.append(meipass_ver)
-        exe_dir_ver = Path(os.path.dirname(sys.executable)) / "ver"
-        if exe_dir_ver.exists() and exe_dir_ver not in ver_dirs:
-            ver_dirs.append(exe_dir_ver)
-
-        for vd in ver_dirs:
-            for exe_file in vd.glob("*.exe"):
-                match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
-                if match:
-                    version = match.group(1)
-                    if version not in local_versions:
-                        file_size = exe_file.stat().st_size / (1024 * 1024)
-                        mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
-                        local_versions[version] = {
-                            'path': str(exe_file),
-                            'size': f"{file_size:.2f} MB",
-                            'date': mtime.strftime("%Y-%m-%d %H:%M"),
-                            'name': exe_file.name,
-                        }
-
-        if Path(self.project_root).exists():
-            for exe_file in Path(self.project_root).glob("*.exe"):
-                match = re.search(r'v(\d+\.\d+\.\d+\.\d+)', exe_file.name)
-                if match:
-                    version = match.group(1)
-                    if version not in local_versions:
-                        file_size = exe_file.stat().st_size / (1024 * 1024)
-                        mtime = datetime.fromtimestamp(exe_file.stat().st_mtime)
-                        local_versions[version] = {
-                            'path': str(exe_file),
-                            'size': f"{file_size:.2f} MB",
-                            'date': mtime.strftime("%Y-%m-%d %H:%M"),
-                            'name': exe_file.name,
-                        }
-
-        return local_versions
-
-
     def _get_local_version_string(self):
         try:
             if hasattr(sys, 'frozen'):
@@ -900,14 +775,10 @@ class HybridVersionManagerDialog(QDialog):
     def _load_versions(self, force=False, auto_remote=False):
         if self._versions_loaded and not force:
             return
-        if self._exe_worker and self._exe_worker.isRunning():
-            self._exe_worker.cancel()
-            self._exe_worker.wait(2000)
-            self._exe_worker = None
-        if self._git_worker and self._git_worker.isRunning():
-            self._git_worker.cancel()
-            self._git_worker.wait(2000)
-            self._git_worker = None
+        if self._remote_worker and self._remote_worker.isRunning():
+            self._remote_worker.cancel()
+            self._remote_worker.wait(2000)
+            self._remote_worker = None
         self._versions_loaded = True
         self._remote_versions_cache = None
         self._detail_widgets = []
@@ -937,8 +808,9 @@ class HybridVersionManagerDialog(QDialog):
             try:
                 current = self._get_current_exe_version()
                 builtin = self._get_builtin_versions()
-                local = self._get_local_exe_versions()
-                self._on_exe_data_ready(current, builtin, local, "github_mirror")
+                # 严禁任何按文件名搜索目录的代码：版本页只读 exe 内置静态列表，
+                # 不扫描 ver/ 或 工程根目录下的 *.exe；local 永远为空字典。
+                self._on_exe_data_ready(current, builtin, {}, "github_mirror")
             except Exception as e:
                 print(f"本地版本列表加载失败: {e}")
                 self._on_exe_data_ready(None, [], {}, "github_mirror")
@@ -949,13 +821,21 @@ class HybridVersionManagerDialog(QDialog):
         loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.versions_layout.addWidget(loading_label)
 
-        self._exe_worker = _ExeFetchWorker(self, auto_remote=True)
-        self._exe_worker.data_ready.connect(self._on_exe_data_ready)
-        self._exe_worker.start()
+        self._remote_worker = _RemoteFetchThread(self, "exe", auto_remote=True)
+        self._remote_worker.data_ready.connect(self._on_remote_finished)
+        self._remote_worker.start()
 
     def _on_ver_source_changed(self, index):
         key = self._ver_source_combo.itemData(index)
         self._ver_active_source = key
+
+    def _on_remote_finished(self, mode, current, versions, local, winner):
+        """远程获取线程统一回调：按 mode 分发到 exe / git 渲染。
+        全程无 subprocess、无弹窗（线程内只做 urlopen）。"""
+        if mode == "exe":
+            self._on_exe_data_ready(current, versions, local or {}, winner)
+        else:
+            self._on_git_data_ready(current, versions, winner)
 
     def _on_exe_data_ready(self, current, remote_versions, local_versions, winner_source):
         if self.current_mode != "exe":
@@ -1734,12 +1614,12 @@ class HybridVersionManagerDialog(QDialog):
         loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.versions_layout.addWidget(loading_label)
 
-        if self._git_worker and self._git_worker.isRunning():
-            self._git_worker.cancel()
-            self._git_worker.wait(2000)
-        self._git_worker = _GitCommitsFetchWorker(self, auto_remote=True)
-        self._git_worker.data_ready.connect(self._on_git_data_ready)
-        self._git_worker.start()
+        if self._remote_worker and self._remote_worker.isRunning():
+            self._remote_worker.cancel()
+            self._remote_worker.wait(2000)
+        self._remote_worker = _RemoteFetchThread(self, "git", auto_remote=True)
+        self._remote_worker.data_ready.connect(self._on_remote_finished)
+        self._remote_worker.start()
 
 
 

@@ -136,6 +136,46 @@ def _safe_delete(path):
             return
 
 
+def _entry_version(entry_exe):
+    if not os.path.exists(entry_exe):
+        return ""
+    m = VERSIONED_RE.search(os.path.basename(entry_exe))
+    return m.group(1) if m else ""
+
+
+def _ensure_entry_current(deploy_dir, current_exe):
+    """确保固定名入口始终硬链接到当前运行的版本 exe。
+
+    根因修复：旧逻辑只在「入口不存在」时建硬链接，入口一旦存在就永不更新 →
+    首次部署后入口永远停留在那个旧版本，新构建即便下载了也跑旧代码
+    （表现为「重打包也不生效 / 打开软件更新页仍闪窗」）。
+
+    现策略：只要当前运行的版本号与入口不同，就删旧入口、重建硬链接指向当前 exe。
+    入口不是当前进程，删除安全（硬链接另一引用仍在 ver/ 里，文件数据不会丢）。
+    """
+    entry_exe = os.path.join(deploy_dir, ENTRY_EXE_NAME)
+    try:
+        if os.path.abspath(entry_exe) == os.path.abspath(current_exe):
+            return entry_exe if os.path.exists(entry_exe) else None
+        cur_v = (VERSIONED_RE.search(os.path.basename(current_exe)) or [None, None])
+        cur_v = cur_v[1] if cur_v else ""
+        ent_v = _entry_version(entry_exe)
+        need_relink = (not os.path.exists(entry_exe)) or (cur_v and cur_v != ent_v)
+        if need_relink:
+            if os.path.exists(entry_exe):
+                _safe_delete(entry_exe)
+            try:
+                os.link(current_exe, entry_exe)
+            except Exception:
+                try:
+                    shutil.copy2(current_exe, entry_exe)
+                except Exception:
+                    return None
+        return entry_exe if os.path.exists(entry_exe) else None
+    except Exception:
+        return entry_exe if os.path.exists(entry_exe) else None
+
+
 def _self_relocate():
     """首次运行闭环（对应 2309 时代的 launcher._self_relocate）。
 
@@ -164,6 +204,9 @@ def _self_relocate():
         os.path.join(deploy_dir, VERSION_TXT))
     if already:
         os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
+        # 根因修复：即使已部署，也要让固定名入口指向当前运行的版本，
+        # 否则用户经入口/旧快捷方式启动会一直跑旧代码（重打包也不生效）。
+        _ensure_entry_current(deploy_dir, exe)
         if cleanup_target:
             _safe_delete(cleanup_target)
         return
@@ -191,15 +234,7 @@ def _self_relocate():
         pass
 
     # 生成固定名入口（硬链接优先，失败回退复制）
-    entry_exe = os.path.join(deploy_dir, ENTRY_EXE_NAME)
-    if not os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
-        try:
-            os.link(exe, entry_exe)
-        except Exception:
-            try:
-                shutil.copy2(exe, entry_exe)
-            except Exception:
-                entry_exe = None
+    entry_exe = _ensure_entry_current(deploy_dir, exe)
 
     os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
     # 分离式拉起固定名入口，并删除原始便携 exe

@@ -1315,5 +1315,13 @@
     ],
     "build_time": "2026-07-30T06:06:25.261537",
     "version_number": "2026.07.30.0605"
+  },
+  "云集智能音乐创意台-v2026.07.30.0710": {
+    "version": "云集智能音乐创意台-v2026.07.30.0710",
+    "changes": [
+      "根治软件更新页闪窗根因：launcher入口永不重链接导致跑旧exe（_ensure_entry_current按版本号重建硬链接）；版本栏合并两个worker为单个_RemoteFetchThread(纯urlopen,对齐视频创意站)"
+    ],
+    "build_time": "2026-07-30T07:11:37.832623",
+    "version_number": "2026.07.30.0710"
   }
 }
