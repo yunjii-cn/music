@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.07.30.0441",
+    "date": "2026-07-30 04:42",
+    "message": "主模型组件独立下载+独立进度条（acestep-v15-turbo/acestep-5Hz-lm-1.7B 独立下载、各自独立进度条、删除按组件精准）",
+    "changes": [
+      "主模型组件独立下载+独立进度条（acestep-v15-turbo/acestep-5Hz-lm-1.7B 独立下载、各自独立进度条、删除按组件精准）"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.30.0441.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.29.1022",
     "date": "2026-07-29 10:23",
     "message": "软件更新模块整体收尾：更新页零弹窗静态秒开（内置versions.json+git_commits.json），远程获取收归手动按钮；默认下载源GitHub镜像ghproxy.net并多源回退（镜像→GitHub→Gitee）；GitHub资产改ASCII名yunji-music-v版本.exe，客户端按源选文件名；修复build-version.py传参模式跳过构建的缩进bug",

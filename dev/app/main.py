@@ -888,14 +888,17 @@ class ModelDownloadThread(QThread):
             self.progress_updated.emit(0, "检查环境...")
             
             cmd_args = [venv_python, "-u", "-m", "acestep.model_downloader"]
-            if self.model_name in ("main", "acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
+            if self.model_name == "main":
+                # 主模型基础包：不带 --model，下载整个 ACE-Step/Ace-Step1.5 仓库
                 pass
             else:
                 cmd_args.extend(["--model", self.model_name])
-                # 关键修复：子模型下载时必须加 --skip-main，否则 model_downloader.py
-                # 会先检查主模型是否存在，不存在就先下载 18GB 主模型——这不是用户想要的，
-                # 而且主模型下载失败会导致子模型也被标记为失败（即使子模型已下载成功）。
-                cmd_args.append("--skip-main")
+                # 子模型（SUBMODEL_REGISTRY 中、非主仓库组件的模型）必须加 --skip-main，
+                # 否则 model_downloader.py 会先检查主模型是否存在、不存在就先下载 18GB 主包。
+                # 主模型组件（acestep-v15-turbo / acestep-5Hz-lm-1.7B）本身是主仓库子目录，
+                # 由 download_main_component 用 allow_patterns 只取对应子目录，无需 --skip-main。
+                if self.model_name not in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
+                    cmd_args.append("--skip-main")
             if self.download_source != "auto":
                 cmd_args.extend(["--source", self.download_source])
 
@@ -1274,14 +1277,18 @@ class ModelDownloadThread(QThread):
         [DLSIZE] 行到达后会用下载器子进程的准确 est_bytes 覆盖此值。
         """
         ckpt = _fs_get_checkpoints_dir(self.base_dir)
-        main_set = ("main", "acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
-        if self.model_name in main_set:
-            # 主模型下载到 checkpoints 根目录（多处平铺），预估总大小=各组件 download_size 之和
+        if self.model_name == "main":
+            # 主模型基础包下载到 checkpoints 根目录（多处平铺），预估总大小=各组件 download_size 之和
             self._target_dir = ckpt
             total = 0.0
             for comp in _FS_MAIN_MODEL_COMPONENTS:
                 total += _FS_MODEL_DOWNLOAD_SIZE.get(comp, 0)
             self._est_total = total if total > 0 else None
+        elif self.model_name in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
+            # 主模型组件：独立下载各自子目录，目标目录=checkpoints/<组件名>，
+            # 预估总大小=该组件自身 download_size（独立进度，不再与主包同步）。
+            self._target_dir = os.path.join(ckpt, self.model_name)
+            self._est_total = _FS_MODEL_DOWNLOAD_SIZE.get(self.model_name) or None
         else:
             self._target_dir = os.path.join(ckpt, self.model_name)
             # 优先用 download_size，其次用 min_size × 1.2 兜底
@@ -8251,12 +8258,10 @@ for d in deps:
     def _delete_model(self, model_name):
         """删除模型
 
-        主模型组件（acestep-v15-turbo / acestep-5Hz-lm-1.7B）无法单独删除，
-        删除操作统一路由到整包主模型（"main"），与下载侧 dl_target 映射保持一致。
+        主模型组件（acestep-v15-turbo / acestep-5Hz-lm-1.7B）现已支持独立下载，
+        因此删除也按组件名精准删除该组件子目录，不再连带删除整个主包
+        （避免误删用户已单独下载的其它组件）。"main" 仍删除整个主模型包。
         """
-        # 主模型组件名 → 整包主模型删除（避免只删单个组件导致主模型处于半残状态）
-        if model_name in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
-            model_name = "main"
 
         if self.is_deleting or self.is_verifying or self.downloading_models:
             self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
@@ -8596,9 +8601,9 @@ for d in deps:
                 btn_layout = QHBoxLayout()
                 btn_layout.setSpacing(4)
                 
-                # 检查是否是当前正在下载的模型（批量：用集合判定，主模型组件路由到 "main" 键）
+                # 检查是否是当前正在下载的模型（批量：用集合判定，主模型组件独立键、不再路由到 "main"）
                 is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
-                dl_target = "main" if is_main_component else model["name"]
+                dl_target = model["name"]
                 is_downloading = dl_target in self.downloading_models
 
                 if is_downloading:

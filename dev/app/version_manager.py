@@ -1992,17 +1992,14 @@ class ModelManagerDialog(QDialog):
                 row_layout.addWidget(status_label)
 
                 # 下载总大小列（从 main_window 的 _FS_MODEL_DOWNLOAD_SIZE 查询）
-                # 让用户在下载前就知道模型有多大，也作为进度条百分比的参照
+                # 让用户在下载前就知道模型有多大，也作为进度条百分比的参照。
+                # 主模型组件现已独立下载，显示其自身大小（而非整包总和）。
                 size_text = ""
                 try:
                     if self.main_window:
-                        from main import _FS_MODEL_DOWNLOAD_SIZE, _FS_MAIN_MODEL_COMPONENTS
+                        from main import _FS_MODEL_DOWNLOAD_SIZE
                         _model_name = model["name"]
-                        if _model_name in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
-                            # 主模型组件：显示各组件总和
-                            _total = sum(_FS_MODEL_DOWNLOAD_SIZE.get(c, 0) for c in _FS_MAIN_MODEL_COMPONENTS)
-                        else:
-                            _total = _FS_MODEL_DOWNLOAD_SIZE.get(_model_name, 0)
+                        _total = _FS_MODEL_DOWNLOAD_SIZE.get(_model_name, 0)
                         if _total > 0:
                             if _total >= 1e9:
                                 size_text = f"{_total/1e9:.1f}GB"
@@ -2023,10 +2020,10 @@ class ModelManagerDialog(QDialog):
                 btn_layout = QHBoxLayout()
                 btn_layout.setSpacing(4)
 
-                # 下载中判定需同时匹配模型名与下载目标 dl_target：主模型组件实际以
-                # 下载目标 "main" 进行，main.current_operation_model 会是 "main" 而非组件名，
-                # 仅按 model["name"] 比对会让主组件的进度条/暂停按钮永远不显示。
-                _dl_target = "main" if model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B") else model["name"]
+                # 下载中判定需同时匹配模型名与下载目标 dl_target。
+                # 主模型组件现已独立下载，dl_target 即组件自身名（不再路由到 "main"），
+                # 进度条/暂停/取消均独立显示，不再与主包同步。
+                _dl_target = model["name"]
                 # 批量下载：本模型正在下载判定（下载中的卡片只显示暂停/取消+进度条，
                 # 不显示下载类按钮；而其它模型按钮保持可用，支持同时发起多个下载）。
                 is_downloading = _dl_target in getattr(self.main_window, 'downloading_models', set())
@@ -2081,9 +2078,10 @@ class ModelManagerDialog(QDialog):
                     """)
                     cancel_btn.clicked.connect(lambda checked=False, m=_dl_target: self.main_window._pause_download(m))
                     btn_layout.addWidget(cancel_btn)
-                # 主模型组件无法单独下载，统一路由到主模型下载
+                # 主模型组件现已支持独立下载，dl_target 直接用模型自身名（不再路由到 "main"），
+                # 进度条/暂停/取消/下载均独立显示。
                 is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
-                dl_target = "main" if is_main_component else model["name"]
+                dl_target = model["name"]
 
                 if integrity_status == "missing":
                     # 未安装（含完全未下载的模型）：显示下载按钮。
@@ -2114,7 +2112,12 @@ class ModelManagerDialog(QDialog):
                     if not is_downloading:
                         delete_btn = QPushButton("删除")
                         delete_btn.setStyleSheet(DARK_BTN_DANGER)
-                        delete_btn.setToolTip("删除模型文件" + ("（将删除整个主模型）" if is_main_component else ""))
+                        _del_tip = "删除模型文件"
+                        if model["name"] == "main":
+                            _del_tip += "（将删除整个主模型）"
+                        elif is_main_component:
+                            _del_tip += "（仅删除该组件）"
+                        delete_btn.setToolTip(_del_tip)
                         delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
                         btn_layout.addWidget(delete_btn)
 
@@ -2220,9 +2223,7 @@ class ModelManagerDialog(QDialog):
 
     def _dl_key(self, name: str) -> str:
         """将模型名解析为下载目标键，与 _update_ui 中进度条字典的键保持一致。
-        特殊主模型组件(acestep-v15-turbo / ace-step-5Hz-lm-1.7B)统一路由到主模型下载，键为 'main'。"""
-        if name in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
-            return "main"
+        主模型组件现已独立下载，键即模型自身名（不再路由到 'main'）。"""
         return name
 
     def show_progress(self, model_name: str, text: str = ""):

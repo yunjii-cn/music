@@ -200,8 +200,12 @@ def _flatten_nested_models_dir(local_dir):
 #   [DLDESC] <filename> <pct>%       —— 当前下载文件名 + 单文件进度（供 UI 显示）
 # 任何异常都被吞掉，绝不阻断下载本身。
 # ---------------------------------------------------------------------------
-def _make_hf_progress_reporter(repo_id: str, local_dir=None):
+def _make_hf_progress_reporter(repo_id: str, local_dir=None, allowed_prefixes=None):
     """返回一个 huggingface_hub 的 progress_callback：按字节加权打印 [DLPROGRESS]。
+
+    allowed_prefixes: 仅下载主仓库某个组件子目录时（allow_patterns）传入，
+    如 ["acestep-v15-turbo/**"]。元数据只统计该组件文件，使总字节=组件大小、
+    进度真实反映组件下载，避免「组件仅几 GB / 主包 18GB」导致进度被严重低估。
 
     用 HfApi().repo_info(files_metadata=True) 拉取仓库每个文件的 size，
     按「已完成文件累计字节 + 当前文件字节×单文件进度」/「全部文件总字节」计算真实总进度，
@@ -242,6 +246,17 @@ def _make_hf_progress_reporter(repo_id: str, local_dir=None):
                 if size and size > 0 and name:
                     state["file_sizes"][name] = size
                     total += size
+            # 只下载主仓库某个组件子目录时（allow_patterns），元数据应只统计该组件
+            # 的文件：否则 total_bytes=整个主仓库、组件实际仅几 GB / 主包 18GB，
+            # 进度会被严重低估（永远卡在个位数）。
+            if allowed_prefixes:
+                _prefixes = [p.replace("**", "").replace("*", "").rstrip("/")
+                             for p in allowed_prefixes]
+                state["file_sizes"] = {
+                    n: s for n, s in state["file_sizes"].items()
+                    if any(n.startswith(pr) for pr in _prefixes)
+                }
+                total = sum(state["file_sizes"].values())
             state["total_bytes"] = total
             state["meta_ready"] = True
         except Exception:
@@ -401,14 +416,18 @@ def _resolve_cache_dirs(repo_id: str, include_missing: bool = False):
     return [c for c in candidates if c.exists()]
 
 
-def _start_disk_progress_monitor(local_dir, est_bytes: float, repo_id: str = ""):
+def _start_disk_progress_monitor(local_dir, est_bytes: float, repo_id: str = "", scan_subdir=None):
     """子进程内守护线程：按磁盘真实已下载字节数打印 [DLPROGRESS] 和 [DLSIZE]。
 
-    关键：同时扫描 local_dir（最终目录）和缓存目录（下载期间的临时写入目录），
+    关键：同时扫描本地目标目录（最终目录）和缓存目录（下载期间的临时写入目录），
     取两者大小之和作为已下载字节数。
 
     HuggingFace/ModelScope 库会先把文件下载到缓存目录（如 ~/.cache/huggingface/hub/），
     下载完成后才移动/硬链接到 local_dir。如果只读 local_dir，进度条会永远为 0。
+
+    scan_subdir: 组件单独下载时，文件实际落在 local_dir/<组件名>/ 子目录；此时应以
+    该子目录为本地扫描目标（而非整个 local_dir），否则会扫到其它已存在的组件、
+    导致磁盘兜底进度虚高/超 100%。默认等同于 local_dir。
 
     输出两行结构化进度：
       [DLPROGRESS] <pct>           —— 已下载/总大小 × 100，0-99
@@ -422,14 +441,16 @@ def _start_disk_progress_monitor(local_dir, est_bytes: float, repo_id: str = "")
     # → 进度条全程 0% 直到下载完成（2026-07-29 用户实测踩中）。
     # 目录不存在时 _get_directory_size 返回 0，提前加入列表无任何副作用。
     cache_dirs = _resolve_cache_dirs(repo_id, include_missing=True) if repo_id else []
+    # 本地真实扫描目标：组件下载时为子目录，避免把其它组件算进来
+    _scan_local = scan_subdir if scan_subdir is not None else local_dir
 
     def _monitor():
         import time as _t
         while not stop.is_set():
             try:
-                # 同时扫描 local_dir 和缓存目录，取大小之和
-                # 下载期间文件在缓存目录，完成后才移动到 local_dir
-                cur = _get_directory_size(str(local_dir))
+                # 同时扫描本地目标目录和缓存目录，取大小之和
+                # 下载期间文件在缓存目录，完成后才移动到 local_dir（组件下载时为子目录）
+                cur = _get_directory_size(str(_scan_local))
                 for cd in cache_dirs:
                     cur += _get_directory_size(str(cd))
                 pct = (cur / est_bytes * 100.0) if est_bytes and est_bytes > 0 else 0.0
@@ -450,6 +471,9 @@ def _download_from_huggingface_internal(
     repo_id: str,
     local_dir: Path,
     token: Optional[str] = None,
+    allow_patterns=None,
+    est_bytes=None,
+    scan_subdir=None,
 ) -> None:
     """
     Internal function to download from HuggingFace Hub.
@@ -458,6 +482,9 @@ def _download_from_huggingface_internal(
         repo_id: HuggingFace repository ID (e.g., "ACE-Step/Ace-Step1.5")
         local_dir: Local directory to save the model
         token: HuggingFace token for private repos (optional)
+        allow_patterns: 仅下载匹配的文件（组件单独下载时使用），如 ["acestep-v15-turbo/**"]
+        est_bytes: 进度兜底用的预估总字节（组件下载时传组件自身大小，否则用仓库估值）
+        scan_subdir: 本地真实扫描目标子目录（组件下载时为 local_dir/<组件名>）
 
     Raises:
         Exception: If download fails
@@ -465,17 +492,19 @@ def _download_from_huggingface_internal(
     from huggingface_hub import snapshot_download
 
     logger.info(f"[Model Download] Downloading from HuggingFace: {repo_id} -> {local_dir}")
-    # 结构化上报：下载器自己解析出的写入目录（100% 正确），供 GUI 设置测量目录
-    print(f"[DLTARGET] {local_dir}", flush=True)
+    # 结构化上报：真实扫描目标目录（100% 正确），供 GUI 设置测量目录。
+    # 组件下载时 scan_subdir 指向组件子目录，避免 GUI 磁盘兜底误扫整个 local_dir。
+    _dl_target_dir = scan_subdir if scan_subdir is not None else local_dir
+    print(f"[DLTARGET] {_dl_target_dir}", flush=True)
 
     reporter = None
     try:
-        reporter = _make_hf_progress_reporter(repo_id, local_dir)
+        reporter = _make_hf_progress_reporter(repo_id, local_dir, allowed_prefixes=allow_patterns)
     except Exception:
         reporter = None
 
-    est = _estimate_repo_size(repo_id, 18.0e9)
-    stop, mon = _start_disk_progress_monitor(local_dir, est, repo_id)
+    est = est_bytes if est_bytes else _estimate_repo_size(repo_id, 18.0e9)
+    stop, mon = _start_disk_progress_monitor(_dl_target_dir, est, repo_id)
     try:
         # 仅当 snapshot_download 支持 progress_callback 时才传（老版本不支持则回退）
         try:
@@ -483,21 +512,17 @@ def _download_from_huggingface_internal(
             _has_cb = "progress_callback" in inspect.signature(snapshot_download).parameters
         except Exception:
             _has_cb = True
+        _kwargs = dict(
+            repo_id=repo_id,
+            local_dir=str(local_dir),
+            local_dir_use_symlinks=False,
+            token=token,
+        )
+        if allow_patterns is not None:
+            _kwargs["allow_patterns"] = allow_patterns
         if _has_cb and reporter is not None:
-            snapshot_download(
-                repo_id=repo_id,
-                local_dir=str(local_dir),
-                local_dir_use_symlinks=False,
-                token=token,
-                progress_callback=reporter,
-            )
-        else:
-            snapshot_download(
-                repo_id=repo_id,
-                local_dir=str(local_dir),
-                local_dir_use_symlinks=False,
-                token=token,
-            )
+            _kwargs["progress_callback"] = reporter
+        snapshot_download(**_kwargs)
     finally:
         try:
             stop.set()
@@ -510,6 +535,9 @@ def _download_from_huggingface_internal(
 def _download_from_modelscope_internal(
     repo_id: str,
     local_dir: Path,
+    allow_patterns=None,
+    est_bytes=None,
+    scan_subdir=None,
 ) -> None:
     """
     Internal function to download from ModelScope.
@@ -517,6 +545,9 @@ def _download_from_modelscope_internal(
     Args:
         repo_id: ModelScope repository ID (e.g., "ACE-Step/Ace-Step1.5")
         local_dir: Local directory to save the model
+        allow_patterns: 仅下载匹配的文件（组件单独下载时使用）
+        est_bytes: 进度兜底用的预估总字节
+        scan_subdir: 本地真实扫描目标子目录（组件下载时为 local_dir/<组件名>）
 
     Raises:
         Exception: If download fails
@@ -524,16 +555,17 @@ def _download_from_modelscope_internal(
     from modelscope import snapshot_download
 
     logger.info(f"[Model Download] Downloading from ModelScope: {repo_id} -> {local_dir}")
-    # 结构化上报：下载器自己的写入目录（100% 正确）
-    print(f"[DLTARGET] {local_dir}", flush=True)
+    # 结构化上报：真实扫描目标目录（100% 正确）
+    _dl_target_dir = scan_subdir if scan_subdir is not None else local_dir
+    print(f"[DLTARGET] {_dl_target_dir}", flush=True)
 
-    est = _estimate_repo_size(repo_id, 15.0e9)
-    stop, mon = _start_disk_progress_monitor(local_dir, est, repo_id)
+    est = est_bytes if est_bytes else _estimate_repo_size(repo_id, 15.0e9)
+    stop, mon = _start_disk_progress_monitor(_dl_target_dir, est, repo_id)
     try:
-        snapshot_download(
-            model_id=repo_id,
-            local_dir=str(local_dir),
-        )
+        _kwargs = dict(model_id=repo_id, local_dir=str(local_dir))
+        if allow_patterns is not None:
+            _kwargs["allow_patterns"] = allow_patterns
+        snapshot_download(**_kwargs)
     finally:
         try:
             stop.set()
@@ -548,6 +580,9 @@ def _smart_download(
     local_dir: Path,
     token: Optional[str] = None,
     prefer_source: Optional[str] = None,
+    allow_patterns=None,
+    est_bytes=None,
+    scan_subdir=None,
 ) -> Tuple[bool, str]:
     """
     Smart download with automatic fallback between HuggingFace and ModelScope.
@@ -560,6 +595,9 @@ def _smart_download(
         local_dir: Local directory to save the model
         token: HuggingFace token for private repos (optional)
         prefer_source: Preferred download source ("huggingface", "modelscope", "huggingface-cn", or None for auto-detect)
+        allow_patterns: 仅下载匹配的文件（组件单独下载时使用）
+        est_bytes: 进度兜底用的预估总字节（组件下载时传组件自身大小）
+        scan_subdir: 本地真实扫描目标子目录（组件下载时为 local_dir/<组件名>）
 
     Returns:
         Tuple of (success, message)
@@ -594,13 +632,19 @@ def _smart_download(
     if use_huggingface_first:
         logger.info("[Model Download] Using HuggingFace Hub...")
         try:
-            _download_from_huggingface_internal(repo_id, local_dir, token)
+            _download_from_huggingface_internal(
+                repo_id, local_dir, token,
+                allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+            )
             return True, f"Successfully downloaded from HuggingFace: {repo_id}"
         except Exception as e:
             logger.warning(f"[Model Download] HuggingFace download failed: {e}")
             logger.info("[Model Download] Falling back to ModelScope...")
             try:
-                _download_from_modelscope_internal(repo_id, local_dir)
+                _download_from_modelscope_internal(
+                    repo_id, local_dir,
+                    allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+                )
                 return True, f"Successfully downloaded from ModelScope: {repo_id}"
             except Exception as e2:
                 error_msg = f"Both HuggingFace and ModelScope downloads failed. HF: {e}, MS: {e2}"
@@ -609,13 +653,19 @@ def _smart_download(
     else:
         logger.info("[Model Download] Using ModelScope...")
         try:
-            _download_from_modelscope_internal(repo_id, local_dir)
+            _download_from_modelscope_internal(
+                repo_id, local_dir,
+                allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+            )
             return True, f"Successfully downloaded from ModelScope: {repo_id}"
         except Exception as e:
             logger.warning(f"[Model Download] ModelScope download failed: {e}")
             logger.info("[Model Download] Falling back to HuggingFace Hub...")
             try:
-                _download_from_huggingface_internal(repo_id, local_dir, token)
+                _download_from_huggingface_internal(
+                    repo_id, local_dir, token,
+                    allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+                )
                 return True, f"Successfully downloaded from HuggingFace: {repo_id}"
             except Exception as e2:
                 error_msg = f"Both ModelScope and HuggingFace downloads failed. MS: {e}, HF: {e2}"
@@ -1038,6 +1088,96 @@ def download_submodel(
     return success, msg
 
 
+def download_main_component(
+    component_name: str,
+    checkpoints_dir: Optional[Path] = None,
+    force: bool = False,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    单独下载主模型仓库（ACE-Step/Ace-Step1.5）里的某个组件子目录。
+
+    主模型的若干核心组件（acestep-v15-turbo、acestep-5Hz-lm-1.7B 等）物理上
+    只是主仓库的子目录，并非独立仓库。本函数用 snapshot_download 的 allow_patterns
+    只拉取该组件子目录的文件，实现「组件级独立下载」：
+      - 点击组件「下载」只下载该组件自身（约 1.5~3.5GB），而非整个 18GB 主包；
+      - 进度按该组件自身大小计算，独立显示，不再与主包进度同步；
+      - 多次分别下载不同组件最终等价于下载了完整主包（snapshot_download 幂等，
+        已存在的文件不会重复下载），check_main_model_exists 仍据此判定主模型完整性。
+
+    Args:
+        component_name: MAIN_MODEL_COMPONENTS 中的组件名（如 "acestep-v15-turbo"）
+        checkpoints_dir: 自定义 checkpoints 目录（可选）
+        force: 强制重新下载（先移除不完整的该组件子目录）
+        token: HuggingFace token（可选）
+        prefer_source: 首选下载源（可选）
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if component_name not in MAIN_MODEL_COMPONENTS:
+        return False, f"Unknown main component '{component_name}'. Available: {', '.join(MAIN_MODEL_COMPONENTS)}"
+
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    # Ensure checkpoints directory exists
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path = checkpoints_dir / component_name
+
+    if not force and check_model_exists(component_name, checkpoints_dir):
+        return True, f"Component '{component_name}' already exists at {model_path}"
+
+    # 强制重新下载时，先删除该组件现有（可能不完整/损坏）的子目录，确保全新下载。
+    # 只删本组件，不动其它已下载的组件（与「主包整删」区分开）。
+    if force and model_path.exists():
+        try:
+            if model_path.is_dir():
+                shutil.rmtree(model_path)
+            else:
+                model_path.unlink()
+            logger.info(f"[Download] 已移除现有组件以重新下载: {component_name}")
+        except Exception as e:
+            logger.error(f"[Download] 移除现有组件失败: {component_name}: {e}")
+            return False, f"Failed to remove existing component {component_name}: {e}"
+
+    # 仅下载主仓库里该组件子目录的文件（HF/ModelScope 均支持 allow_patterns）
+    allow_patterns = [f"{component_name}/**", f"{component_name}/*"]
+    # 进度兜底用的预估总大小：组件自身 download_size（无则用验证阈值兜底）
+    comp_info = MODEL_VALIDATION_INFO.get(component_name)
+    est_bytes = _FS_COMPONENT_DOWNLOAD_SIZE.get(component_name) or (comp_info.get("min_size", 1.8e9) if comp_info else 1.8e9)
+    # 本地真实扫描目标：组件子目录（避免磁盘兜底误扫整个 checkpoints 目录）
+    scan_subdir = model_path
+
+    print(f"Downloading main component '{component_name}' from {MAIN_MODEL_REPO}...")
+    print(f"Destination: {model_path}")
+
+    success, msg = _smart_download(
+        MAIN_MODEL_REPO, checkpoints_dir, token, prefer_source,
+        allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+    )
+    if success and component_name in _CHECKPOINT_TO_VARIANT:
+        # Sync model code files after successful download
+        synced = _sync_model_code_files(component_name, checkpoints_dir)
+        if synced:
+            logger.info(f"[Model Download] Synced code files for {component_name}: {synced}")
+    return success, msg
+
+
+# 组件独立下载时的预估总大小（与 main.py 的 _FS_MODEL_DOWNLOAD_SIZE 对应，
+# 仅用于进度兜底；真实进度由下载器的字节加权 reporter 驱动）。
+_FS_COMPONENT_DOWNLOAD_SIZE = {
+    "acestep-v15-turbo": 1.8e9,
+    "vae": 300e6,
+    "Qwen3-Embedding-0.6B": 1.2e9,
+    "acestep-5Hz-lm-1.7B": 3.5e9,
+}
+
+
 def download_all_models(
     checkpoints_dir: Optional[Path] = None,
     force: bool = False,
@@ -1359,6 +1499,10 @@ Alternative using huggingface-cli:
                     return 1
             
             success, msg = download_submodel(args.model, checkpoints_dir, args.force, args.token, args.source)
+        elif args.model in MAIN_MODEL_COMPONENTS:
+            # 主模型组件（acestep-v15-turbo / acestep-5Hz-lm-1.7B 等）：用 allow_patterns
+            # 只下载主仓库里对应的组件子目录，而非整个 18GB 主包。
+            success, msg = download_main_component(args.model, checkpoints_dir, args.force, args.token, args.source)
         else:
             print(f"Unknown model: {args.model}")
             print("Use --list to see available models")

@@ -90,6 +90,10 @@ MANIFEST
 # 忽略 dev/ 下的所有EXE，稳定版通过 Release 发布
 dev/*.exe
 
+# 根目录游离构建产物（launcher 部署/运行生成，非源码，勿入库）
+/云集智能音乐创意台.exe
+/version.txt
+
 # dev/data/ - 用户数据目录（Git不管理）
 dev/data/
 
