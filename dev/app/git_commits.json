@@ -1,0 +1,482 @@
+[
+  {
+    "hash": "29a8950c6645355143aee6b1d1d3a09f54736650",
+    "short_hash": "29a8950",
+    "message": "feat: 发布版本 v2026.07.28.0843",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 08:45:13"
+  },
+  {
+    "hash": "47c052d7dbf874ef5ed97d7e20b2c047bae8c00e",
+    "short_hash": "47c052d",
+    "message": "feat: 发布版本 v2026.07.28.0800",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 08:01:40"
+  },
+  {
+    "hash": "aaef940a156983c05038e65ee459ae73300ff364",
+    "short_hash": "aaef940",
+    "message": "feat: 发布版本 v2026.07.28.0756",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 07:58:06"
+  },
+  {
+    "hash": "fdc2dbe3f6eff3df851695cd380a3c2e2f8cca48",
+    "short_hash": "fdc2dbe",
+    "message": "feat: 发布版本 v2026.07.28.0621",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 06:23:02"
+  },
+  {
+    "hash": "95d55e33c748f2460787eedb749f53f55a91acc6",
+    "short_hash": "95d55e3",
+    "message": "feat: 发布版本 v2026.07.28.0612",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 06:12:41"
+  },
+  {
+    "hash": "4ee6856957b3341759702e474d3b3673351dbc7f",
+    "short_hash": "4ee6856",
+    "message": "fix: 模型下载进度条全程0%真正根因——① 磁盘兜底测错目录(main.py侧_fs_get_checkpoints_dir与下载器config_manager解析不一致)→返回None;② huggingface管道模式禁用tqdm进度条→日志无%行正则匹配不到。根治:下载器经huggingface progress_callback+子进程内磁盘监控直接吐结构化[DLPROGRESS]<pct>与[DLTARGET]<真实目录>(路径100%正确),GUI用固定正则100%命中,不再依赖脆弱文本解析",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 03:43:27"
+  },
+  {
+    "hash": "b0e7deaa0cb0124b7f6fa8acfacb0c9b647be542",
+    "short_hash": "b0e7dea",
+    "message": "fix: 下载/删除/验证进行中触发退出时进程闪退(段错误)——closeEvent _force_exit分支在销毁窗口前强制stop+quit+wait所有后台线程(model_download/delete/verify/init),消除线程仍在emit信号与Qt对象析构的竞态;项目已有SafeApplication.notify+sys.excepthook捕获Python层异常写crash_log但segfault绕过该防护",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 02:29:19"
+  },
+  {
+    "hash": "faab7f0a9f4bec12511251c57cc27e55b8fea48f",
+    "short_hash": "faab7f0",
+    "message": "fix: 模型下载进度条仍0%——抓下载器自己打印的'-> <local_dir>'作为磁盘兜底真实测量目录(修config_manager与fs_get_checkpoints_dir解析不一致),并新增current/total尺寸比正则(1.2G/2.7G无%也能算),读取循环按\\r/\\n逐帧拆tqdm进度",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-28 00:44:10"
+  },
+  {
+    "hash": "dccf2664448c5fd7ef2a20c168c0b3bb8eb246cf",
+    "short_hash": "dccf266",
+    "message": "fix: 模型下载/删除/验证完成后状态不自动刷新(须切tab才显示已安装)——新增_refresh_model_manager_widget在4个完成回调里同步刷新ModelManagerDialog._update_ui,因tab内容实际由独立ModelManagerDialog渲染且原只切tab时才_update_ui",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 22:40:19"
+  },
+  {
+    "hash": "7157064df4538f943d5c6c22695b6b32f21d3d8d",
+    "short_hash": "7157064",
+    "message": "fix: 模型管理下载进度条卡0%——子进程加python -u解块缓冲+强制HF进度条,从运行日志解析真实百分比(_PROGRESS_PCT_RE)实时更新进度条,新增磁盘已下载字节数兜底估算(_dir_progress)保证单调不冻结,删除random假模拟",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 22:35:37"
+  },
+  {
+    "hash": "83709a8caddbb4c4a21c78152fa645991a23649f",
+    "short_hash": "83709a8",
+    "message": "fix: 复制按钮崩溃(QClipboard误从QtCore导入,PyQt6中属QtGui)改回clipboard().setText(text) + install-env加PyPI多镜像自动优选(清华/阿里/腾讯/中科大/官方)防单源10061连不上导致部署首步挂",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 21:53:20"
+  },
+  {
+    "hash": "294c3b5abc2be4a8dc82a7958a22a93944e6dc9c",
+    "short_hash": "294c3b5",
+    "message": "fix: Tailwind本地化根治(v4浏览器运行时自包含单文件+esm.sh拉取替代连不上的cdn.tailwindcss.com);index.html/dist配置转v4 @theme等价原tailwind.config;部署后完全离线无外网CDN依赖",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 20:17:44"
+  },
+  {
+    "hash": "288ec25859b355434d2b8f976cd0875ce23872d2",
+    "short_hash": "288ec25",
+    "message": "feat: 发布版本 v2026.07.27.1140",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 11:42:34"
+  },
+  {
+    "hash": "71b06c5c380017a19558ae53129c9651d30d14b3",
+    "short_hash": "71b06c5",
+    "message": "fix: 日志复制失效(launcher去掉CREATE_NO_WINDOW) + 前端server/public|data目录保险 + 复制健壮性",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 07:36:58"
+  },
+  {
+    "hash": "7114ed5b72a9434205320e9f9fddaa2c5dc41396",
+    "short_hash": "7114ed5",
+    "message": "fix: 根治前端无法显示——部署末尾从码云拉取预构建前端包(node_modules+便携Node)，前端离线可显示",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 03:43:32"
+  },
+  {
+    "hash": "dc145a48d29ffc2f01fd3f8ca5abbe2ab0acfd2a",
+    "short_hash": "dc145a4",
+    "message": "fix: 根治前端依赖未就绪——自动探测npm/装Node.js便携版兜底 + UI中性化可选组件",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-27 01:45:56"
+  },
+  {
+    "hash": "0f881bb6fedf3d9003be4678520916aeb0b0c03a",
+    "short_hash": "0f881bb",
+    "message": "fix: flash_attn 下载(进度条误判异常)+ payload 误打包 .venv 撑满盘",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 18:20:58"
+  },
+  {
+    "hash": "2693e83c5bcbba88ade3f8685a47d0a97030d6b4",
+    "short_hash": "2693e83",
+    "message": "fix: 部署最终校验 gpu 项永远误报失败——GPU 探测接入 _check_deploy_env",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 10:09:36"
+  },
+  {
+    "hash": "e0e1f8bf8b838f54f11397f95e82283c6eb252d2",
+    "short_hash": "e0e1f8b",
+    "message": "feat: 单 exe 自包含必要目录（payload.zip 打包 acestep/ace-step-ui，首次运行自动解压）",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 09:17:19"
+  },
+  {
+    "hash": "f576c82d1df13060b32bd782172432dbbc5d7cf4",
+    "short_hash": "f576c82",
+    "message": "fix: 根治部署完成后19分钟冻结——主线程模型检查改用纯文件系统(零import/零glob扫盘)",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 06:30:55"
+  },
+  {
+    "hash": "564ea083d271f4476909140ccd405783be9c4601",
+    "short_hash": "564ea08",
+    "message": "fix: 根治模型下载 acestep 缺失(完整发布包含 app/acestep) + flash_attn Gitee 失败后必走 GitHub 镜像兜底",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 05:05:59"
+  },
+  {
+    "hash": "2310fb204141c93fe003933cae6188c06043a7e9",
+    "short_hash": "2310fb2",
+    "message": "fix: 根治部署对 download.pytorch.org 的致命依赖 + 失败不再假跳模型管理",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 02:26:45"
+  },
+  {
+    "hash": "13587928c4a189c565c7dc14ba46608c1cc3b355",
+    "short_hash": "1358792",
+    "message": "fix: install-env.ps1 try/catch 括号配对错误导致整脚本 ParserError(部署全挂)",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 01:45:56"
+  },
+  {
+    "hash": "f61562b7376e21f8315d98e4fdda6eab64e1c1ea",
+    "short_hash": "f61562b",
+    "message": "feat: XL(4B)底座 LoRA 训练变体注册(P1) — xl/xl-sft/xl-base",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 01:28:36"
+  },
+  {
+    "hash": "bcea938439a2755a7b0b5d0b1304642fdd871c69",
+    "short_hash": "bcea938",
+    "message": "feat: 训练数据一键准备(P0) + flash_attn崩溃根治与venv路径兜底",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-26 01:19:20"
+  },
+  {
+    "hash": "6e17bf2b4a0bc793c279d1df3855b92b7c532ccb",
+    "short_hash": "6e17bf2",
+    "message": "fix: 状态进度条只显示边框无动态内容（换 QLabel 为 QProgressBar）",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-24 06:43:25"
+  },
+  {
+    "hash": "f35ff58befe633b1d05abde4c961ae0cb0b2b99f",
+    "short_hash": "f35ff58",
+    "message": "fix: 一键部署完成后自动下载完整基础模型包(main)",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-24 05:55:18"
+  },
+  {
+    "hash": "66be154bf67dce73581fbc19fe9284d9a951d25f",
+    "short_hash": "66be154",
+    "message": "fix: flash_attn 下载兜底顺序修正（码云分卷提到 bitsadmin 之前）",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-24 05:19:07"
+  },
+  {
+    "hash": "42271d906b86d32a83038b85f564b2026b0ab63b",
+    "short_hash": "42271d9",
+    "message": "feat: 码云(Gitee) 分卷兜底源接入 flash_attn 下载",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-24 04:24:45"
+  },
+  {
+    "hash": "610a2f3fef34228cb824f15b192de14445592a21",
+    "short_hash": "610a2f3",
+    "message": "docs: install-env.ps1 增加码云(Gitee) 镜像占位模板",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-24 03:23:39"
+  },
+  {
+    "hash": "ffb8cb38b29678ee8aba649dd5b7a7726a353633",
+    "short_hash": "ffb8cb3",
+    "message": "feat: flash_attn 增加 GPU 门控（仅 NVIDIA SM75+ 安装）",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-24 02:54:01"
+  },
+  {
+    "hash": "de8b878f4e718599f50fe5b49d7f180328c0d3a4",
+    "short_hash": "de8b878",
+    "message": "refactor: 废弃 install-uv-qinglong.ps1，统一收敛到 install-env.ps1",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-23 18:30:27"
+  },
+  {
+    "hash": "cf36935f8a87bfb6a588f41d15a9838d7d95a7af",
+    "short_hash": "cf36935",
+    "message": "fix: 统一 venv 路径为 scripts/.venv，flash_attn 改走下载而非打包，install-uv-qinglong 加 -SkipModels 防挂起",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-23 18:05:20"
+  },
+  {
+    "hash": "7bc676b9ef6ff27ccf382170a5ac39fbb4e9de27",
+    "short_hash": "7bc676b",
+    "message": "fix(launcher/splash): 启动屏拆独立进程+进度条出现才淡出；部署维护脚本检查一致性",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-23 00:02:52"
+  },
+  {
+    "hash": "1ca27d4a22570016ad5bde9097dda06af00a15f6",
+    "short_hash": "1ca27d4",
+    "message": "fix(model): 修复『重新下载』点击无可见反馈 / 进度条不更新",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-16 01:48:05"
+  },
+  {
+    "hash": "af06f187a3dfe45b4db71fb915035924e1d2ea99",
+    "short_hash": "af06f18",
+    "message": "fix(model): 修复模型管理页『不完整』模型不显示『重新下载』按钮",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-16 01:07:50"
+  },
+  {
+    "hash": "7f27baf92db5e5df957f901b7afa5428721e9298",
+    "short_hash": "7f27baf",
+    "message": "fix(model): 修复启动器模型管理页『下载』按钮不显示（真正的渲染 UI）",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-16 00:58:03"
+  },
+  {
+    "hash": "69be4575d71903bcc5cdfdcafe9aa46b7519d7db",
+    "short_hash": "69be457",
+    "message": "fix(model): 修复模型管理栏目『下载』按钮在模型未安装时不显示",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-16 00:52:47"
+  },
+  {
+    "hash": "543d340487021c1259066efec4936a9a8f15d25a",
+    "short_hash": "543d340",
+    "message": "feat(auth): 启动前端网页增加 UM 登录门控，复用官网登录页逻辑",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-16 00:38:26"
+  },
+  {
+    "hash": "25836277fd4cafaeff5384f2473268ef78e16c4a",
+    "short_hash": "2583627",
+    "message": "feat(web): 提交官网(音乐紫主题)与UM扫码登录对接；补充07-12工作记忆",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-16 00:30:05"
+  },
+  {
+    "hash": "fa8e14083e4dc26763a064693160b2f897660577",
+    "short_hash": "fa8e140",
+    "message": "fix(pack): exe 命名为「项目名+版本号」，放宽版本号解析正则",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-12 08:25:05"
+  },
+  {
+    "hash": "8cc8a8933b4c3f1d4583146373fe945a26230986",
+    "short_hash": "8cc8a89",
+    "message": "fix(model): 修复损坏/不完整模型无法删除与重下载，浏览器设置条改极简扁平",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-12 08:17:46"
+  },
+  {
+    "hash": "4fbf7a1a119bbf8c8717eab084ed750ed636db38",
+    "short_hash": "4fbf7a1",
+    "message": "feat(web): 新增营销官网(dev/web) — 暗黑+CC0000风格、UM扫码登录、竞速下载、多语言(简繁英日韩)",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-12 03:52:37"
+  },
+  {
+    "hash": "b285d936f598a01eb6823c5b612c6d3b0327ce60",
+    "short_hash": "b285d93",
+    "message": "feat(training): 新增模型选择器(turbo/sft/base)+简易/标准模式切换",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-11 18:39:07"
+  },
+  {
+    "hash": "275a507b91b6091d21b27b6aad9654ab4f30968f",
+    "short_hash": "275a507",
+    "message": "fix(browser): 重写浏览器检测，修复仅识别到系统浏览器的缺陷并扩充国产/第三方识别",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-10 05:12:24"
+  },
+  {
+    "hash": "72c8b7b70a69c85a25eba3bdc18c69f14dbf3b6b",
+    "short_hash": "72c8b7b",
+    "message": "成功解决翻唱(cover)模式生成噪音问题；并修复系统浏览器重复识别、增加第三方浏览器识别",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-10 04:52:35"
+  },
+  {
+    "hash": "655d27a602acb655642b92458320099ebd6e3ba1",
+    "short_hash": "655d27a",
+    "message": "fix(ux): 翻唱/音频转音频模式增加源音频引导，避免按钮静默置灰误判产品故障",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-10 04:41:00"
+  },
+  {
+    "hash": "89b6b45b318c775481e818e5ba5342315f93d087",
+    "short_hash": "89b6b45",
+    "message": "fix: 修复翻唱(cover)模式生成杂音——根因源音频未送达",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-10 04:12:25"
+  },
+  {
+    "hash": "3b67a675a0ea6c865a8bf293c4affe5b91cf17f8",
+    "short_hash": "3b67a67",
+    "message": "fix: 修复翻唱(cover)模式生成歌曲为杂音的问题",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-10 02:42:33"
+  },
+  {
+    "hash": "7925b66370b8dbab40bfd0b4a0e1104ece915f78",
+    "short_hash": "7925b66",
+    "message": "chore: 提交修复前基线改动（版本管理器/端口配置/前端）",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-10 02:19:08"
+  },
+  {
+    "hash": "0d511122b366655182b750fb5524f179b29886ee",
+    "short_hash": "0d51112",
+    "message": "chore: 停止跟踪 exe 文件，改为通过 Release 发布",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-04 05:28:52"
+  },
+  {
+    "hash": "3a1f5abe0a75796fc11e4f93bd960b4c1f046ba9",
+    "short_hash": "3a1f5ab",
+    "message": "fix: 修复端口配置、启动脚本和托盘图标名称；点击歌曲开始播放",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-04 05:18:52"
+  },
+  {
+    "hash": "f6c0fb3cb041252c656a61a89acba5e80f2d6401",
+    "short_hash": "f6c0fb3",
+    "message": "feat: 发布版本 v2026.07.03.0635",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-03 06:37:35"
+  },
+  {
+    "hash": "07a04dad5a6389e83e19eafc76e49d33e8e75430",
+    "short_hash": "07a04da",
+    "message": "fix: 修复单实例保护与gradio SOCKS代理问题",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-03 06:33:28"
+  },
+  {
+    "hash": "ea3e4762bc9a7176e3d55981632af4e4f98b3313",
+    "short_hash": "ea3e476",
+    "message": "docs: 添加用户文档",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-05-19 11:20:37"
+  },
+  {
+    "hash": "bbafae99f32fc3c5405f5c465b8b3131564d8f4a",
+    "short_hash": "bbafae9",
+    "message": "chore: 删除无用的output配置项",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-05-13 07:05:26"
+  },
+  {
+    "hash": "54bd4340b09d5b98bfcaac89170d7bfa6d30695c",
+    "short_hash": "54bd434",
+    "message": "feat: 发布版本 v2026.05.12.0918",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-05-12 09:20:11"
+  },
+  {
+    "hash": "430cf1ba2f77166689737e246f25b5d50e633be9",
+    "short_hash": "430cf1b",
+    "message": "feat: 发布版本 v2026.05.12.0813",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-05-12 08:15:31"
+  },
+  {
+    "hash": "1461a7f30ba10445ecf769fb68858ed243d1283c",
+    "short_hash": "1461a7f",
+    "message": "feat: 发布版本 v2026.05.12.0808",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-05-12 08:10:14"
+  },
+  {
+    "hash": "3421d19fb15013af1e990c3f9300392ece3d3a7d",
+    "short_hash": "3421d19",
+    "message": "feat: 发布版本 v2026.05.12.0717",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-05-12 07:19:15"
+  }
+]

@@ -158,6 +158,66 @@ def update_versions_json(version, changes, exe_name):
         return False
 
 
+def update_git_commits_json():
+    """从 git 仓库提取最近 60 条提交，生成内置的 git_commits.json。
+
+    该文件随 exe 打包，开发动态页面离线秒开显示（无需联网/弹窗）。
+    远程最新的提交历史由用户在软件内点「远程获取」按钮手动拉取。
+    """
+    try:
+        # 向上查找 .git 根目录
+        cur = PROJECT_ROOT
+        git_root = None
+        guard = 0
+        while cur.parent != cur and guard < 20:
+            if (cur / ".git").exists():
+                git_root = cur
+                break
+            cur = cur.parent
+            guard += 1
+        if not git_root:
+            print("  ⚠ 未找到 .git，跳过生成 git_commits.json（保留现有文件）")
+            return
+
+        # 紧凑字段分隔（U+001F）：哈希 / 短哈希 / 标题 / 作者 / 邮箱 / 日期
+        fmt = "%H%x1f%h%x1f%s%x1f%an%x1f%ae%x1f%ad"
+        out = subprocess.run(
+            ["git", "-C", str(git_root), "log",
+             f"--pretty=format:{fmt}",
+             "--date=format:%Y-%m-%d %H:%M:%S", "-n", "60"],
+            capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=30
+        )
+        if out.returncode != 0:
+            print(f"  ⚠ git log 失败：{(out.stderr or '').strip()[:200]}")
+            return
+
+        commits = []
+        for line in out.stdout.split("\n"):
+            line = line.strip("\r")
+            if not line:
+                continue
+            parts = line.split("\x1f")
+            if len(parts) < 6:
+                continue
+            h, h_short, subject, author, email, date = parts[:6]
+            commits.append({
+                "hash": h,
+                "short_hash": h_short,
+                "message": subject,
+                "author": author,
+                "email": email,
+                "date": date,
+            })
+
+        target = ROOT_DIR / "git_commits.json"
+        with open(target, "w", encoding="utf-8") as f:
+            json.dump(commits, f, ensure_ascii=False, indent=2)
+        print(f"  ✓ git_commits.json 已生成（{len(commits)} 条提交）")
+    except Exception as e:
+        print(f"  ⚠ 生成 git_commits.json 失败: {e}")
+
+
 def _kill_running_exe():
     current_pid = os.getpid()
     killed = []
@@ -280,6 +340,19 @@ def build_exe():
     if vh_file.exists():
         pyinstaller_args.extend(["--add-data", f"{str(vh_file)};."])
         print(f"  已添加版本历史")
+
+    # 历史版本列表文件：打进 exe 后，即使所有远程源不可达（离线），
+    # 软件版本页也能用内置 versions.json 兜底显示完整历史列表。
+    versions_json = ROOT_DIR / "versions.json"
+    if versions_json.exists():
+        pyinstaller_args.extend(["--add-data", f"{str(versions_json)};."])
+        print(f"  已打包历史版本列表: {versions_json}")
+
+    # 开发动态页内置 git 提交历史：打进 exe 后离线秒开，无需联网/弹窗。
+    git_commits_json = ROOT_DIR / "git_commits.json"
+    if git_commits_json.exists():
+        pyinstaller_args.extend(["--add-data", f"{str(git_commits_json)};."])
+        print(f"  已打包 git 提交历史: {git_commits_json}")
 
     scripts_dir = ROOT_DIR / "scripts"
     if scripts_dir.exists():
@@ -574,6 +647,10 @@ def main():
         print()
 
     try:
+        print("── Step 0: 生成内置 git 提交历史 ──")
+        update_git_commits_json()
+        print()
+
         print("── Step 1: PyInstaller 打包 (--onefile) ──")
         exe_path = build_exe()
         print()

@@ -1283,5 +1283,13 @@
     ],
     "build_time": "2026-07-28T08:45:11.596960",
     "version_number": "2026.07.28.0843"
+  },
+  "云集智能音乐创意台-v2026.07.29.1022": {
+    "version": "云集智能音乐创意台-v2026.07.29.1022",
+    "changes": [
+      "软件更新模块整体收尾：更新页零弹窗静态秒开（内置versions.json+git_commits.json），远程获取收归手动按钮；默认下载源GitHub镜像ghproxy.net并多源回退（镜像→GitHub→Gitee）；GitHub资产改ASCII名yunji-music-v版本.exe，客户端按源选文件名；修复build-version.py传参模式跳过构建的缩进bug"
+    ],
+    "build_time": "2026-07-29T10:23:42.592672",
+    "version_number": "2026.07.29.1022"
   }
 }

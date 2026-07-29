@@ -196,25 +196,90 @@ def _flatten_nested_models_dir(local_dir):
 # 结构化下载进度上报（供启动器 GUI 精确解析，不再依赖脆弱的 tqdm 文本）
 # 思路：下载器自己把真实进度打印成固定格式行，GUI 用正则 100% 命中：
 #   [DLTARGET] <local_dir>           —— 下载器实际写入目录（路径 100% 正确）
-#   [DLPROGRESS] <pct>               —— 真实下载百分比（0-99）
+#   [DLPROGRESS] <pct>               —— 按字节加权的真实总进度百分比（0-99）
+#   [DLDESC] <filename> <pct>%       —— 当前下载文件名 + 单文件进度（供 UI 显示）
 # 任何异常都被吞掉，绝不阻断下载本身。
 # ---------------------------------------------------------------------------
-def _make_hf_progress_reporter(repo_id: str):
-    """返回一个 huggingface_hub 的 progress_callback：打印结构化 [DLPROGRESS] 行。
+def _make_hf_progress_reporter(repo_id: str, local_dir=None):
+    """返回一个 huggingface_hub 的 progress_callback：按字节加权打印 [DLPROGRESS]。
 
-    聚合多文件进度：用 list_repo_files 拿到文件总数，按「已完成文件数 + 当前文件百分比」
-    估算整体进度，写入 stdout 供启动器读取。"""
-    state = {"completed": 0, "cur_desc": None, "cur_pct": 0.0, "total": 1}
-    try:
-        from huggingface_hub import list_repo_files
+    用 HfApi().repo_info(files_metadata=True) 拉取仓库每个文件的 size，
+    按「已完成文件累计字节 + 当前文件字节×单文件进度」/「全部文件总字节」计算真实总进度，
+    彻底消除「9 个小文件几秒下完推到 90%、然后卡住等大文件」的假进度现象。
+
+    同时打印 [DLDESC] 行，让 UI 显示当前下载的文件名 + 单文件进度，
+    满足「实在难以真实实现就同步显示日志进度描述」的兜底需求。
+
+    关键：元数据拉取放在后台守护线程，绝不阻塞 snapshot_download 主流程；
+          拉取失败或超时也只影响进度精度，不影响下载本身。
+    """
+    state = {
+        "completed_bytes": 0,   # 已完成文件累计字节
+        "cur_desc": None,
+        "cur_pct": 0.0,         # 当前文件 0-100 进度
+        "cur_size": 0,          # 当前文件总字节
+        "cur_name": "",         # 当前文件短名（用于 UI 显示）
+        "total_bytes": 0,       # 全部文件总字节
+        "file_sizes": {},       # filename -> size 字典
+        "meta_ready": False,    # 元数据是否就绪
+    }
+
+    # 后台拉取仓库文件元数据（含 LFS size），不阻塞下载主流程
+    def _fetch_meta():
         try:
-            _files = list_repo_files(repo_id)
-            if _files:
-                state["total"] = max(1, len(_files))
+            from huggingface_hub import HfApi
+            # 兼容旧版 huggingface_hub：timeout 参数旧版不支持，用 build_hf_headers 传递
+            try:
+                info = HfApi().repo_info(repo_id, files_metadata=True, timeout=8)
+            except TypeError:
+                # 旧版无 timeout 参数，退回默认调用
+                info = HfApi().repo_info(repo_id, files_metadata=True)
+            siblings = getattr(info, "siblings", []) or []
+            total = 0
+            for sib in siblings:
+                size = getattr(sib, "size", None) or 0
+                name = getattr(sib, "rfilename", "") or ""
+                if size and size > 0 and name:
+                    state["file_sizes"][name] = size
+                    total += size
+            state["total_bytes"] = total
+            state["meta_ready"] = True
         except Exception:
-            pass
-    except Exception:
-        pass
+            # 元数据拉取失败：不影响下载，reporter 退回磁盘兜底
+            state["meta_ready"] = False
+
+    import threading as _th
+    _th.Thread(target=_fetch_meta, daemon=True).start()
+
+    def _match_file_size(desc: str) -> int:
+        """从 desc 中匹配文件大小。desc 可能是文件名、'Downloading <file>' 等。"""
+        if not desc or not state["meta_ready"]:
+            return 0
+        # 直接匹配
+        if desc in state["file_sizes"]:
+            return state["file_sizes"][desc]
+        # 去掉常见前缀后匹配
+        for prefix in ("Downloading ", "Download ", "Fetching ", "Brewing "):
+            if desc.startswith(prefix):
+                name = desc[len(prefix):].strip()
+                if name in state["file_sizes"]:
+                    return state["file_sizes"][name]
+        # 模糊匹配：desc 是文件名一部分
+        for name, size in state["file_sizes"].items():
+            if desc in name or name in desc:
+                return size
+        return 0
+
+    def _short_name(desc: str) -> str:
+        """从 desc 中提取短文件名用于 UI 显示。"""
+        if not desc:
+            return ""
+        name = desc
+        for prefix in ("Downloading ", "Download ", "Fetching ", "Brewing "):
+            if name.startswith(prefix):
+                name = name[len(prefix):].strip()
+                break
+        return name.split("/")[-1]
 
     def _cb(*args, **kwargs):
         try:
@@ -238,48 +303,140 @@ def _make_hf_progress_reporter(repo_id: str):
                     progress = (float(args[0]) / _total * 100.0) if _total > 0 else 0.0
                 except Exception:
                     progress = None
-            # 文件边界：desc 变化 → 上一个文件下载完成
+
+            # 文件边界：desc 变化 → 上一个文件下载完成，累加其完整字节
             if desc and desc != state["cur_desc"]:
                 if state["cur_desc"] is not None:
-                    state["completed"] += 1
+                    state["completed_bytes"] += state["cur_size"]
                 state["cur_desc"] = desc
                 state["cur_pct"] = 0.0
+                state["cur_size"] = _match_file_size(desc)
+                state["cur_name"] = _short_name(desc)
             if progress is not None:
                 state["cur_pct"] = max(0.0, min(100.0, progress))
-            overall = (state["completed"] + state["cur_pct"] / 100.0) / state["total"] * 100.0
+
+            # 按字节加权计算总进度；元数据未就绪时退回 0 让磁盘兜底接管
+            if state["meta_ready"] and state["total_bytes"] > 0:
+                if state["cur_size"] > 0:
+                    cur = state["completed_bytes"] + state["cur_size"] * state["cur_pct"] / 100.0
+                else:
+                    # 兜底1：当前文件 size 匹配失败，用平均文件大小估算
+                    file_count = max(1, len(state["file_sizes"]))
+                    avg_file_size = state["total_bytes"] / file_count
+                    cur = state["completed_bytes"] + avg_file_size * state["cur_pct"] / 100.0
+                overall = cur / state["total_bytes"] * 100.0
+            else:
+                overall = 0.0
             overall = max(0.0, min(99.0, overall))
             print(f"[DLPROGRESS] {overall:.1f}", flush=True)
+            # 同时输出当前文件下载描述（如 "model.safetensors 45%"）
+            if state["cur_name"]:
+                print(f"[DLDESC] {state['cur_name']} {state['cur_pct']:.0f}%", flush=True)
         except Exception:
             pass
     return _cb
 
 
 def _estimate_repo_size(repo_id: str, fallback: float) -> float:
-    """已知仓库近似大小（字节），用于磁盘进度估算；未知则回退兜底值。"""
+    """已知仓库近似大小（字节），用于磁盘进度估算；未知则回退兜底值。
+
+    关键：磁盘监控用此值计算 cur/est*100，若 est 远大于实际大小（如 0.6B 模型
+    实际 1.33GB 但 fallback 15GB），进度会永远卡在个位数；若 est 远小于实际大小，
+    进度会瞬间到 99%。所以必须为每个已知仓库填入准确大小（含 1.2 倍余量）。
+    """
     _KNOWN = {
         "ACE-Step/Ace-Step1.5": 18.0e9,
+        "ACE-Step/acestep-5Hz-lm-0.6B": 1.5e9,    # ~1.33GB，留余量
+        "ACE-Step/acestep-5Hz-lm-1.7B": 3.5e9,    # ~3.4GB，留余量
+        "ACE-Step/acestep-5Hz-lm-4B": 8.0e9,      # ~7.5GB，留余量
+        "ACE-Step/acestep-v15-turbo-shift3": 1.8e9,
+        "ACE-Step/acestep-v15-sft": 1.8e9,
+        "ACE-Step/acestep-v15-base": 1.8e9,
+        "ACE-Step/acestep-v15-turbo-shift1": 1.8e9,
+        "ACE-Step/acestep-v15-turbo-continuous": 1.8e9,
+        "ACE-Step/acestep-v15-xl-turbo": 20.0e9,
+        "ACE-Step/acestep-v15-xl-sft": 20.0e9,
+        "ACE-Step/acestep-v15-xl-base": 20.0e9,
     }
     if repo_id in _KNOWN:
         return _KNOWN[repo_id]
     return fallback
 
 
-def _start_disk_progress_monitor(local_dir, est_bytes: float):
-    """子进程内守护线程：按磁盘真实已下载字节数打印 [DLPROGRESS]。
+def _resolve_cache_dirs(repo_id: str, include_missing: bool = False):
+    """解析 HuggingFace 和 ModelScope 的默认缓存目录。
 
-    用于 modelscope（无结构化回调）以及作为 huggingface 的兜底。
-    local_dir 用子进程自己解析出的路径（100% 正确），避免启动器侧路径猜测不一致。
+    下载器实际写入的是缓存目录（如 ~/.cache/huggingface/hub/models--...--.../blobs/），
+    而非 local_dir（最终目录）。下载完成后库才会把文件移动/硬链接到 local_dir。
+    所以磁盘监控必须同时扫描缓存目录，否则进度条永远为 0。
+
+    Args:
+        repo_id: 仓库 ID（如 "ACE-Step/acestep-5Hz-lm-0.6B"）
+        include_missing: True 时返回全部候选路径（即使目录尚不存在）。
+            关键：磁盘监控在下载**开始前**解析缓存目录，此时缓存目录必然
+            还不存在；若按 exists() 过滤会返回空列表，导致监控全程只扫
+            local_dir、进度条一直 0%。监控场景必须传 True——目录不存在时
+            _get_directory_size 返回 0，无副作用。
+
+    返回一个列表，包含缓存目录路径（Path 对象）。
+    """
+    home = Path.home()
+    candidates = []
+
+    # HuggingFace 缓存：<HF_HUB_CACHE 或 HF_HOME/hub>/models--<org>--<repo>/
+    # repo_id 中的 / 替换为 --，如 ACE-Step/acestep-5Hz-lm-0.6B → models--ACE-Step--acestep-5Hz-lm-0.6B
+    hf_home = Path(os.environ.get("HF_HOME", str(home / ".cache" / "huggingface")))
+    hf_hub_cache = Path(os.environ.get("HF_HUB_CACHE", str(hf_home / "hub")))
+    candidates.append(hf_hub_cache / f"models--{repo_id.replace('/', '--')}")
+
+    # ModelScope 缓存（两代路径都要覆盖）：
+    #   旧版：~/.cache/modelscope/hub/<org>/<repo>/
+    #   新版(>=1.18)：~/.cache/modelscope/hub/models/<org>/<repo>/
+    ms_cache = Path(os.environ.get("MODELSCOPE_CACHE", str(home / ".cache" / "modelscope")))
+    candidates.append(ms_cache / "hub" / repo_id)
+    candidates.append(ms_cache / "hub" / "models" / repo_id)
+
+    if include_missing:
+        return candidates
+    return [c for c in candidates if c.exists()]
+
+
+def _start_disk_progress_monitor(local_dir, est_bytes: float, repo_id: str = ""):
+    """子进程内守护线程：按磁盘真实已下载字节数打印 [DLPROGRESS] 和 [DLSIZE]。
+
+    关键：同时扫描 local_dir（最终目录）和缓存目录（下载期间的临时写入目录），
+    取两者大小之和作为已下载字节数。
+
+    HuggingFace/ModelScope 库会先把文件下载到缓存目录（如 ~/.cache/huggingface/hub/），
+    下载完成后才移动/硬链接到 local_dir。如果只读 local_dir，进度条会永远为 0。
+
+    输出两行结构化进度：
+      [DLPROGRESS] <pct>           —— 已下载/总大小 × 100，0-99
+      [DLSIZE] <downloaded> <total> —— 已下载字节数 + 总字节数，供 UI 显示 "157M/1.33G"
+
     返回 (stop_event, thread)，调用方在下载结束后 set 停止。"""
     stop = threading.Event()
+    # 预解析缓存目录候选路径。必须 include_missing=True：监控启动时下载尚未开始、
+    # 缓存目录（如 ~/.cache/huggingface/hub/models--xxx）还不存在，若按 exists()
+    # 过滤会得到空列表且**之后永远不会重新解析** → [DLSIZE] 只统计 local_dir ≈ 0
+    # → 进度条全程 0% 直到下载完成（2026-07-29 用户实测踩中）。
+    # 目录不存在时 _get_directory_size 返回 0，提前加入列表无任何副作用。
+    cache_dirs = _resolve_cache_dirs(repo_id, include_missing=True) if repo_id else []
 
     def _monitor():
         import time as _t
         while not stop.is_set():
             try:
+                # 同时扫描 local_dir 和缓存目录，取大小之和
+                # 下载期间文件在缓存目录，完成后才移动到 local_dir
                 cur = _get_directory_size(str(local_dir))
+                for cd in cache_dirs:
+                    cur += _get_directory_size(str(cd))
                 pct = (cur / est_bytes * 100.0) if est_bytes and est_bytes > 0 else 0.0
                 pct = max(0.0, min(99.0, pct))
                 print(f"[DLPROGRESS] {pct:.1f}", flush=True)
+                # 同时输出已下载/总大小，供 UI 显示大小比描述
+                print(f"[DLSIZE] {int(cur)} {int(est_bytes)}", flush=True)
             except Exception:
                 pass
             _t.sleep(1.0)
@@ -313,12 +470,12 @@ def _download_from_huggingface_internal(
 
     reporter = None
     try:
-        reporter = _make_hf_progress_reporter(repo_id)
+        reporter = _make_hf_progress_reporter(repo_id, local_dir)
     except Exception:
         reporter = None
 
     est = _estimate_repo_size(repo_id, 18.0e9)
-    stop, mon = _start_disk_progress_monitor(local_dir, est)
+    stop, mon = _start_disk_progress_monitor(local_dir, est, repo_id)
     try:
         # 仅当 snapshot_download 支持 progress_callback 时才传（老版本不支持则回退）
         try:
@@ -371,7 +528,7 @@ def _download_from_modelscope_internal(
     print(f"[DLTARGET] {local_dir}", flush=True)
 
     est = _estimate_repo_size(repo_id, 15.0e9)
-    stop, mon = _start_disk_progress_monitor(local_dir, est)
+    stop, mon = _start_disk_progress_monitor(local_dir, est, repo_id)
     try:
         snapshot_download(
             model_id=repo_id,
@@ -569,18 +726,24 @@ def get_project_root() -> Path:
     return current_file.parent.parent
 
 
-def _get_directory_size(directory: Path) -> int:
+def _get_directory_size(directory) -> int:
     """
     Calculate the total size of a directory in bytes.
-    
+
     Args:
-        directory: Path to the directory
-        
+        directory: Path to the directory (str or Path)
+
     Returns:
-        Total size in bytes
+        Total size in bytes (0 if directory does not exist)
+
+    注意：必须兼容 str 入参。磁盘进度监控以 _get_directory_size(str(dir)) 调用，
+    若直接对 str 调 .iterdir() 会抛 AttributeError 被吞掉 → 永远返回 0 →
+    进度条全程 0%（2026-07-29 踩中）。
     """
     total_size = 0
     try:
+        if isinstance(directory, str):
+            directory = Path(directory)
         for item in directory.iterdir():
             if item.is_file():
                 total_size += item.stat().st_size

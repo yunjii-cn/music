@@ -644,6 +644,74 @@ _FS_MODEL_VALIDATION_INFO = {
     "acestep-v15-xl-base": {"files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"], "min_size": 3.5e9},
 }
 
+# 模型下载总大小（字节）—— 与 model_downloader.py 的 _KNOWN 字典保持一致
+# 用于 UI 显示「下载总大小」列，以及 _dir_progress 计算真实百分比
+# min_size 是「可用性验证阈值」，download_size 是「实际下载总大小」，两者不同
+_FS_MODEL_DOWNLOAD_SIZE = {
+    "acestep-v15-turbo": 1.8e9,
+    "vae": 300e6,
+    "Qwen3-Embedding-0.6B": 1.2e9,
+    "acestep-5Hz-lm-1.7B": 3.5e9,
+    "acestep-5Hz-lm-0.6B": 1.5e9,
+    "acestep-5Hz-lm-4B": 8.0e9,
+    "acestep-v15-base": 1.8e9,
+    "acestep-v15-sft": 1.8e9,
+    "acestep-v15-turbo-shift1": 1.8e9,
+    "acestep-v15-turbo-shift3": 1.8e9,
+    "acestep-v15-turbo-continuous": 1.8e9,
+    "acestep-v15-xl-turbo": 20.0e9,
+    "acestep-v15-xl-sft": 20.0e9,
+    "acestep-v15-xl-base": 20.0e9,
+}
+
+# 模型名 → repo_id 映射（与 model_downloader.py 的 SUBMODEL_REGISTRY 保持一致）
+# 用于主线程磁盘兜底时解析缓存目录
+_FS_MODEL_REPO_ID = {
+    "acestep-5Hz-lm-0.6B": "ACE-Step/acestep-5Hz-lm-0.6B",
+    "acestep-5Hz-lm-4B": "ACE-Step/acestep-5Hz-lm-4B",
+    "acestep-v15-turbo-shift3": "ACE-Step/acestep-v15-turbo-shift3",
+    "acestep-v15-sft": "ACE-Step/acestep-v15-sft",
+    "acestep-v15-base": "ACE-Step/acestep-v15-base",
+    "acestep-v15-turbo-shift1": "ACE-Step/acestep-v15-turbo-shift1",
+    "acestep-v15-turbo-continuous": "ACE-Step/acestep-v15-turbo-continuous",
+    "acestep-v15-xl-turbo": "ACE-Step/acestep-v15-xl-turbo",
+    "acestep-v15-xl-sft": "ACE-Step/acestep-v15-xl-sft",
+    "acestep-v15-xl-base": "ACE-Step/acestep-v15-xl-base",
+    # 主模型组件统一映射到主模型 repo
+    "main": "ACE-Step/Ace-Step1.5",
+    "acestep-v15-turbo": "ACE-Step/Ace-Step1.5",
+    "acestep-5Hz-lm-1.7B": "ACE-Step/Ace-Step1.5",
+    "vae": "ACE-Step/Ace-Step1.5",
+    "Qwen3-Embedding-0.6B": "ACE-Step/Ace-Step1.5",
+}
+
+
+def _fs_resolve_cache_dirs(repo_id: str):
+    """解析 HuggingFace 和 ModelScope 的默认缓存目录（主线程兜底用）。
+
+    下载器子进程的 [DLSIZE] 已包含缓存目录扫描，但主线程 _dir_progress 兜底
+    在子进程无输出 0.3s 时会触发，此时也需要扫描缓存目录才能读到真实进度。
+
+    关键：不能按 exists() 过滤——下载刚启动时缓存目录还不存在，过滤后
+    返回空列表会让磁盘兜底只扫最终目录（下载期间恒 ≈0），进度条全程 0%。
+    _fs_get_directory_size 对不存在的目录返回 0，提前返回候选路径无副作用。
+    同时覆盖 ModelScope 新版(>=1.18)的 hub/models/<org>/<repo> 路径。
+    """
+    import os
+    from pathlib import Path
+    home = Path.home()
+    candidates = []
+    # HuggingFace: <HF_HUB_CACHE 或 HF_HOME/hub>/models--<org>--<repo>/
+    hf_home = Path(os.environ.get("HF_HOME", str(home / ".cache" / "huggingface")))
+    hf_hub_cache = Path(os.environ.get("HF_HUB_CACHE", str(hf_home / "hub")))
+    candidates.append(str(hf_hub_cache / f"models--{repo_id.replace('/', '--')}"))
+    # ModelScope 旧版: ~/.cache/modelscope/hub/<org>/<repo>/
+    # ModelScope 新版: ~/.cache/modelscope/hub/models/<org>/<repo>/
+    ms_cache = Path(os.environ.get("MODELSCOPE_CACHE", str(home / ".cache" / "modelscope")))
+    candidates.append(str(ms_cache / "hub" / repo_id))
+    candidates.append(str(ms_cache / "hub" / "models" / repo_id))
+    return candidates
+
 
 def _fs_get_checkpoints_dir(base_dir: str) -> str:
     """纯文件系统计算 checkpoints 目录（复刻 model_downloader.get_checkpoints_dir 的 fallback 路径）。
@@ -749,10 +817,26 @@ _DOWNLOAD_RATIO_RE = re.compile(
     r"(\d+(?:\.\d+)?)\s*([GMK]?B)\s*/\s*(\d+(?:\.\d+)?)\s*([GMK]?B)"
 )
 # 结构化进度（下载器自己打印，100% 可靠，不依赖外部库脆弱的文本格式）：
-#   [DLTARGET] <local_dir>  —— 下载器实际写入目录（路径 100% 正确）
-#   [DLPROGRESS] <pct>       —— 真实下载百分比（0-99）
+#   [DLTARGET] <local_dir>            —— 下载器实际写入目录（路径 100% 正确）
+#   [DLPROGRESS] <pct>                —— 已下载/总大小 × 100，真实总进度百分比（0-99）
+#   [DLDESC] <filename> <pct>%        —— 当前下载文件名 + 单文件进度（HuggingFace reporter 用）
+#   [DLSIZE] <downloaded> <total>     —— 已下载字节数 + 总字节数，供 UI 显示 "157M/1.33G"
+#                                        同时覆盖 _est_total，修正 _compute_target_and_estimate 的初始猜测
 _DLPROGRESS_RE = re.compile(r"\[DLPROGRESS\]\s*(\d{1,3}(?:\.\d+)?)")
 _DLTARGET_RE = re.compile(r"\[DLTARGET\]\s*(.+)")
+_DLDESC_RE = re.compile(r"\[DLDESC\]\s*(\S+)\s+(\d+(?:\.\d+)?)\s*%")
+_DLSIZE_RE = re.compile(r"\[DLSIZE\]\s*(\d+)\s+(\d+)")
+
+
+def _format_bytes(b: float) -> str:
+    """字节数格式化：1.33G / 157M / 512K / 800B"""
+    if b >= 1e9:
+        return f"{b/1e9:.2f}G"
+    if b >= 1e6:
+        return f"{b/1e6:.0f}M"
+    if b >= 1e3:
+        return f"{b/1e3:.0f}K"
+    return f"{b:.0f}B"
 
 
 class ModelDownloadThread(QThread):
@@ -773,15 +857,24 @@ class ModelDownloadThread(QThread):
         # 进度兜底：基于磁盘真实已下载字节数估算（目标目录 + 预估总大小）
         self._target_dir = None
         self._est_total = None
+        # 当前下载文件描述（由 [DLDESC] 行更新，作为进度条 desc 显示给用户）
+        # 格式如 "model.safetensors 45%"，让用户看到正在下载哪个文件、单文件进度多少
+        self._last_dl_desc = ""
+        # [DLSIZE] 行缓存的准确下载总字节数（来自下载器子进程的 _KNOWN 字典）
+        # 用于 _dir_progress 统一数据源，消除 _est_total 错误猜测导致的闪烁
+        self._last_dl_total = 0
+        self._last_dl_downloaded = 0
     
     def run(self):
         """执行模型下载"""
         try:
             self.log_received.emit(f"开始下载模型: {self.model_name}")
-            
-            # 初始化进度
-            self.current_progress = 5
-            self.progress_updated.emit(self.current_progress, "准备下载...")
+
+            # 初始化阶段：进度条保持 0%，只更新描述文本。
+            # 真实进度完全由 [DLPROGRESS] 日志解析 + 磁盘兜底驱动，避免硬编码假进度
+            # 导致进度条卡在固定值（原 5/10/15 瞬间跳完，之后 _update_progress 单调性
+            # 约束又阻止 [DLPROGRESS] < 15 的真实进度更新，造成“卡 15% 直到 99%”现象）。
+            self.progress_updated.emit(0, "准备下载...")
             
             # 构建下载命令 - 使用虚拟环境中的Python
             venv_python = find_venv_python(self.base_dir)
@@ -792,14 +885,17 @@ class ModelDownloadThread(QThread):
                 self.download_finished.emit(False, "虚拟环境不存在")
                 return
             
-            self.current_progress = 10
-            self.progress_updated.emit(self.current_progress, "检查环境...")
+            self.progress_updated.emit(0, "检查环境...")
             
             cmd_args = [venv_python, "-u", "-m", "acestep.model_downloader"]
             if self.model_name in ("main", "acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
                 pass
             else:
                 cmd_args.extend(["--model", self.model_name])
+                # 关键修复：子模型下载时必须加 --skip-main，否则 model_downloader.py
+                # 会先检查主模型是否存在，不存在就先下载 18GB 主模型——这不是用户想要的，
+                # 而且主模型下载失败会导致子模型也被标记为失败（即使子模型已下载成功）。
+                cmd_args.append("--skip-main")
             if self.download_source != "auto":
                 cmd_args.extend(["--source", self.download_source])
 
@@ -833,8 +929,7 @@ class ModelDownloadThread(QThread):
             dl_env["HF_HUB_DISABLE_PROGRESS_BARS"] = "false"
             dl_env["MODELSCOPE_PROGRESS_BARS"] = "true"
 
-            self.current_progress = 15
-            self.progress_updated.emit(self.current_progress, "连接下载源...")
+            self.progress_updated.emit(0, "连接下载源...")
             
             # 计算进度兜底用的目标目录与预估总大小（基于磁盘真实已下载字节数）
             self._compute_target_and_estimate()
@@ -875,18 +970,28 @@ class ModelDownloadThread(QThread):
             _reader_thread.start()
 
             _last_log_time = time.time()
-            while self.process.poll() is None and not self._should_stop:
+            _got_eof = False
+            while not self._should_stop:
+                # 已收到 EOF 哨兵：主循环退出，转去 wait() 子进程
+                if _got_eof:
+                    break
+                # 子进程已结束（poll 非 None）：主循环退出
+                if self.process.poll() is not None:
+                    break
                 try:
                     _line = _line_q.get(timeout=0.3)
                 except queue.Empty:
                     # 0.3s 内无新输出（子进程可能在缓冲 / 正在下载）：磁盘真实字节兜底，
-                    # 进度条持续爬升（仅增不减），彻底消除「卡住不动 / 切页才跳 99%」。
+                    # 进度条持续爬升。force=True 让磁盘真实进度能覆盖 tqdm 单文件假进度
+                    # （如第一个小文件 100% 导致的 99%）。
+                    # desc 留空 → _update_progress 自动使用最近一次 [DLDESC] 的描述
                     _disk_pct = self._dir_progress()
                     if _disk_pct is not None:
-                        self._update_progress(_disk_pct, "下载中...")
+                        self._update_progress(_disk_pct, force=True)
                     continue
                 if _line is None:
-                    break  # EOF
+                    _got_eof = True  # EOF 哨兵：reader 线程已读完 stdout
+                    break
                 _last_log_time = self._handle_output_line(_line, _last_log_time)
 
             # 进程结束后，把队列里剩余的输出全部读完并记入日志（不丢任何信息）
@@ -899,8 +1004,24 @@ class ModelDownloadThread(QThread):
                         self._handle_output_line(_line, _last_log_time)
             except queue.Empty:
                 pass
-            
-            exit_code = self.process.poll()
+
+            # 关键修复：EOF 只代表子进程关闭了 stdout，不代表进程已完全退出。
+            # Python 解释器在 flush stdout 后可能还在做清理（atexit、__del__、GC 等），
+            # 此时 poll() 仍返回 None。原代码直接用 poll() 判断退出码导致「下载实际成功
+            # 但被误判为失败（退出码 None）」。必须 wait() 等待子进程真正结束。
+            # 超时 30 秒兜底，避免极端情况卡死主线程；超时后强制 terminate。
+            try:
+                exit_code = self.process.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                self.log_received.emit("[警告] 子进程清理超时，强制终止")
+                try:
+                    self.process.kill()
+                    exit_code = self.process.wait(timeout=5)
+                except Exception:
+                    exit_code = -1
+            # 二次确认：若 wait 返回 None（极少数情况），当作成功处理（避免误判失败）
+            if exit_code is None:
+                exit_code = 0
             if exit_code == 0 and not self._should_stop:
                 self.current_progress = 100
                 self.progress_updated.emit(100, "下载完成!")
@@ -939,26 +1060,52 @@ class ModelDownloadThread(QThread):
     def _parse_frame_progress(self, clean: str):
         """从一行日志/结构化行里提取进度并喂给进度条。
 
-        解析优先级（越靠前越可靠）：
-          0) [DLTARGET] <local_dir> —— 下载器自己解析出的真实写入目录，
-             100% 正确，消除启动器侧路径猜测不一致导致的磁盘兜底失效；
-          1) [DLPROGRESS] <pct> —— 下载器经 huggingface progress_callback /
-             子进程内磁盘监控直接吐出的真实百分比（最高优先级、绝不误判）；
-          2) '%' 正则（tqdm '45%'）；
-          3) '当前/总计' 尺寸比（tqdm '1.2G/2.7G'，无 % 也能算）。
+        进度数据源优先级（只信结构化数据，不信 tqdm 文本）：
+          0) [DLTARGET] <local_dir> —— 下载器真实写入目录
+          1) [DLSIZE] <downloaded> <total> —— 已下载字节 + 总字节（最可靠）
+             直接计算 pct = downloaded/total*100，并更新 _est_total 和描述
+          2) [DLPROGRESS] <pct> —— 下载器算好的百分比（字节加权 / 磁盘监控）
+          3) [DLDESC] <filename> <pct>% —— 仅更新描述，不写进度值
+        tqdm 的 % 和 尺寸比只用于更新描述，绝不写进度值，避免单文件 100% 误判。
         """
         if not clean:
             return
-        # 0) 真实目标目录（路径 100% 正确，覆盖 _compute_target_and_estimate 的猜测）
-        #    下载器打印的 [DLTARGET] 即它实际写入目录（mkdir 之后才打印），直接信任；
-        #    是否真正可测由 _dir_progress 自行 isdir 判断，避免目录尚未建好时的竞态。
+        # 清除 ANSI 转义序列（颜色码等），防止进度行匹配失败
+        clean = re.sub(r'\x1b\[[0-9;]*m', '', clean).strip()
+        # 0) 真实目标目录
         m_tgt = _DLTARGET_RE.search(clean)
         if m_tgt:
             p = m_tgt.group(1).strip().strip('"').strip("'")
             if p:
                 self._target_dir = p
 
-        # 1) 结构化进度（最高优先级，绝不误判）
+        # 1) 已下载/总大小（磁盘监控每秒输出）—— 最可靠的进度值来源
+        m_size = _DLSIZE_RE.search(clean)
+        if m_size:
+            try:
+                downloaded = int(m_size.group(1))
+                total = int(m_size.group(2))
+                if total > 0:
+                    self._est_total = float(total)
+                    self._last_dl_downloaded = downloaded
+                    self._last_dl_total = total
+                    pct = int(downloaded / total * 100)
+                    pct = max(0, min(99, pct))
+                    # 防倒退保护：旧版下载器（部署目录里的松文件 acestep/）的磁盘监控
+                    # 可能因缓存目录解析失效而恒报 downloaded=0；此时不能以 force=True
+                    # 把主线程磁盘兜底(_dir_progress)算出的真实进度强制打回 0%。
+                    # downloaded>0 时才允许强制覆盖（含回退，用于纠正高估）。
+                    if downloaded > 0:
+                        self._last_dl_desc = f"{_format_bytes(downloaded)}/{_format_bytes(total)}"
+                        self._update_progress(pct, force=True)
+                    else:
+                        self._update_progress(pct, force=False)
+            except (ValueError, TypeError):
+                pass
+            return
+
+        # 2) [DLPROGRESS] <pct> —— 下载器算好的百分比（HuggingFace 字节加权 reporter）
+        #    注意：磁盘监控也会输出 [DLPROGRESS]，但 [DLSIZE] 优先（含完整字节信息）
         m_dl = _DLPROGRESS_RE.search(clean)
         if m_dl:
             try:
@@ -966,26 +1113,54 @@ class ModelDownloadThread(QThread):
             except (ValueError, TypeError):
                 pct = None
             if pct is not None:
-                self._update_progress(pct, f"下载中... {pct}%")
+                pct = max(0, min(99, pct))
+                self._update_progress(pct, force=True)
             return
 
-        # 2) 真实进度：优先 %，其次 当前/总计 尺寸比
-        pct = None
+        # 3) [DLDESC] —— 仅更新描述
+        m_desc = _DLDESC_RE.search(clean)
+        if m_desc:
+            fname = m_desc.group(1)
+            try:
+                fpct = float(m_desc.group(2))
+            except (ValueError, TypeError):
+                fpct = 0.0
+            if not hasattr(self, '_last_dl_total') or not self._last_dl_total:
+                self._last_dl_desc = f"{fname} {fpct:.0f}%"
+            return
+
+        # 4) tqdm 单文件进度：只更新描述，不写进度值
         m_pct = _PROGRESS_PCT_RE.search(clean)
         if m_pct:
             try:
-                pct = int(m_pct.group(1))
+                file_pct = int(m_pct.group(1))
             except (ValueError, TypeError):
-                pct = None
-        if pct is None:
-            m_ratio = _DOWNLOAD_RATIO_RE.search(clean)
-            if m_ratio:
-                cur = self._parse_size_to_bytes(m_ratio.group(1), m_ratio.group(2))
-                tot = self._parse_size_to_bytes(m_ratio.group(3), m_ratio.group(4))
-                if tot > 0:
-                    pct = int(min(99, cur / tot * 100))
-        if pct is not None:
-            self._update_progress(pct, f"下载中... {pct}%")
+                file_pct = None
+            if file_pct is not None:
+                fname_match = re.match(r"\s*([^\s:]+):\s+\d", clean)
+                fname = fname_match.group(1) if fname_match else ""
+                if fname and fname.lower() not in ("downloading", "download", "fetching"):
+                    if not hasattr(self, '_last_dl_total') or not self._last_dl_total:
+                        self._last_dl_desc = f"{fname} {file_pct}%"
+                return
+
+        # 5) tqdm 当前/总计 尺寸比：只更新描述，不写进度值
+        m_ratio = _DOWNLOAD_RATIO_RE.search(clean)
+        if m_ratio:
+            cur_str = m_ratio.group(1) + m_ratio.group(2)
+            tot_str = m_ratio.group(3) + m_ratio.group(4)
+            fname_match = re.match(r"\s*([^\s:]+):\s+\d", clean)
+            fname = fname_match.group(1) if fname_match else ""
+            if fname and fname.lower() not in ("downloading", "download", "fetching"):
+                if not hasattr(self, '_last_dl_total') or not self._last_dl_total:
+                    cur = self._parse_size_to_bytes(m_ratio.group(1), m_ratio.group(2))
+                    tot = self._parse_size_to_bytes(m_ratio.group(3), m_ratio.group(4))
+                    if tot > 0:
+                        file_pct = int(cur / tot * 100)
+                        self._last_dl_desc = f"{fname} {file_pct}%"
+                    else:
+                        self._last_dl_desc = f"{fname} {cur_str}/{tot_str}"
+            return
 
     def _handle_output_line(self, raw: str, last_log_time: float) -> float:
         """处理一行子进程输出：拆帧、解析进度、按间隔记入用户日志。
@@ -996,10 +1171,13 @@ class ModelDownloadThread(QThread):
         # 同时按 \r 和 \n 拆开逐帧处理，保证每一帧的进度都被解析。
         for fr in raw.replace("\n", "\r").split("\r"):
             clean = fr.strip()
+            # 清除 ANSI 转义序列（颜色码等）
+            clean = re.sub(r'\x1b\[[0-9;]*m', '', clean).strip()
             if not clean:
                 continue
-            # 结构化进度/目标行：只喂进度条，不进用户日志（避免刷屏）
-            if clean.startswith("[DLPROGRESS]") or clean.startswith("[DLTARGET]"):
+            # 结构化进度/目标/描述/大小行：只喂进度条，不进用户日志（避免刷屏）
+            if (clean.startswith("[DLPROGRESS]") or clean.startswith("[DLTARGET]")
+                    or clean.startswith("[DLDESC]") or clean.startswith("[DLSIZE]")):
                 self._parse_frame_progress(clean)
                 continue
             now = time.time()
@@ -1012,25 +1190,76 @@ class ModelDownloadThread(QThread):
             self._parse_frame_progress(clean)
         return last_log_time
 
-    def _update_progress(self, pct: int, desc: str):
-        """更新进度条：进度只增不减，保证单调性（多文件顺序下载时单文件百分比会回退）。"""
+    def _update_progress(self, pct: int, desc: str = None, force: bool = False):
+        """更新进度条。
+
+        进度值只由 [DLPROGRESS]（字节加权 / 磁盘监控）驱动，tqdm 单文件进度
+        只更新 _last_dl_desc 描述文本，不调用此函数——彻底避免「第一个小文件
+        100% 导致进度条跳 99%」的问题。
+
+        - force=False：进度只增不减，保证单调性。
+        - force=True：强制覆盖（[DLPROGRESS] 和磁盘兜底用，允许回退）。
+
+        desc 为 None 时自动使用最近一次 [DLDESC] 行的描述。
+        """
         pct = max(0, min(99, int(pct)))
-        if pct >= self.current_progress:
+        if force or pct >= self.current_progress:
             self.current_progress = pct
-            self.progress_updated.emit(self.current_progress, desc)
+            # desc=None 表示用最近一次 [DLDESC] 行的描述；空字符串则退回默认 "下载中..."
+            actual_desc = desc if desc is not None else (self._last_dl_desc or "下载中...")
+            self.progress_updated.emit(self.current_progress, actual_desc)
 
     def _dir_progress(self):
-        """基于磁盘真实已下载字节数估算进度（目标目录/预估总大小）。
+        """磁盘兜底进度：基于磁盘真实已下载字节数估算。
 
-        目标目录由下载器自己打印的 [DLTARGET] 行设置，路径 100% 正确，
-        不再依赖 main.py 侧对 get_checkpoints_dir 的复刻（曾因 config_manager 解析
-        偏差而测错目录 → 返回 None → 进度条恒 0%）。
-        预估总大小缺失时回退到合理兜底值，保证磁盘兜底始终能产出进度。"""
-        if not self._target_dir or not os.path.isdir(self._target_dir):
+        关键：同时扫描最终目录（_target_dir）和缓存目录（HuggingFace/ModelScope 的
+        临时下载目录），取两者大小之和。下载期间文件在缓存目录，完成后才移动到最终目录。
+
+        优先用 [DLSIZE] 行缓存的 total（来自下载器子进程，100% 准确）；
+        若 [DLSIZE] 未到（子进程刚启动），用 _est_total 估算。
+        """
+        # 解析缓存目录（基于 model_name → repo_id 映射）
+        cache_dirs = []
+        repo_id = _FS_MODEL_REPO_ID.get(self.model_name)
+        if repo_id:
+            cache_dirs = _fs_resolve_cache_dirs(repo_id)
+
+        def _scan_all():
+            """扫描最终目录 + 所有缓存目录，返回总字节数"""
+            total_bytes = 0
+            # 最终目录
+            if self._target_dir and os.path.isdir(self._target_dir):
+                try:
+                    total_bytes += _fs_get_directory_size(self._target_dir)
+                except Exception:
+                    pass
+            # 缓存目录（下载期间文件在此）
+            for cd in cache_dirs:
+                if os.path.isdir(cd):
+                    try:
+                        total_bytes += _fs_get_directory_size(cd)
+                    except Exception:
+                        pass
+            return total_bytes
+
+        # 优先用 [DLSIZE] 缓存的准确 total
+        if hasattr(self, '_last_dl_total') and self._last_dl_total:
+            try:
+                cur = _scan_all()
+                total = self._last_dl_total
+                if total > 0:
+                    pct = int(cur / total * 100)
+                    pct = max(0, min(99, pct))
+                    self._last_dl_desc = f"{_format_bytes(cur)}/{_format_bytes(total)}"
+                    return pct
+            except Exception:
+                pass
+        # 兜底：[DLSIZE] 未到，用 _est_total 估算
+        if not self._target_dir and not cache_dirs:
             return None
         est = self._est_total if self._est_total else 15.0e9
         try:
-            cur = _fs_get_directory_size(self._target_dir)
+            cur = _scan_all()
             if est > 0:
                 return int(min(99, cur / est * 100))
         except Exception:
@@ -1038,22 +1267,30 @@ class ModelDownloadThread(QThread):
         return None
 
     def _compute_target_and_estimate(self):
-        """计算进度兜底用的目标目录与预估总大小。"""
+        """计算进度兜底用的目标目录与预估总大小。
+
+        优先用 _FS_MODEL_DOWNLOAD_SIZE（真实下载总大小），
+        其次用 _FS_MODEL_VALIDATION_INFO.min_size（验证阈值）× 1.2 兜底。
+        [DLSIZE] 行到达后会用下载器子进程的准确 est_bytes 覆盖此值。
+        """
         ckpt = _fs_get_checkpoints_dir(self.base_dir)
         main_set = ("main", "acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
         if self.model_name in main_set:
-            # 主模型下载到 checkpoints 根目录（多处平铺），预估总大小=各组件 min_size 之和*余量
+            # 主模型下载到 checkpoints 根目录（多处平铺），预估总大小=各组件 download_size 之和
             self._target_dir = ckpt
             total = 0.0
             for comp in _FS_MAIN_MODEL_COMPONENTS:
-                info = _FS_MODEL_VALIDATION_INFO.get(comp)
-                if info:
-                    total += info.get("min_size", 0)
-            self._est_total = total * 1.2 if total > 0 else None
+                total += _FS_MODEL_DOWNLOAD_SIZE.get(comp, 0)
+            self._est_total = total if total > 0 else None
         else:
             self._target_dir = os.path.join(ckpt, self.model_name)
-            info = _FS_MODEL_VALIDATION_INFO.get(self.model_name)
-            self._est_total = info.get("min_size", 0) * 1.2 if info else None
+            # 优先用 download_size，其次用 min_size × 1.2 兜底
+            dl_size = _FS_MODEL_DOWNLOAD_SIZE.get(self.model_name)
+            if dl_size:
+                self._est_total = dl_size
+            else:
+                info = _FS_MODEL_VALIDATION_INFO.get(self.model_name)
+                self._est_total = info.get("min_size", 0) * 1.2 if info else None
 
     def stop(self):
         """停止下载"""
@@ -1871,13 +2108,14 @@ class MainWindow(QMainWindow):
         self.selected_download_source = "auto"
         self.model_list = []
         self._model_list_loaded = False
-        self.model_download_thread = None
-        self.is_downloading = False
+        # 批量下载：每个模型独立线程，状态用集合/字典维护（取代原先单机 is_downloading + current_operation_model）
+        self.downloading_models = set()          # 正在下载的模型名集合（dl_target 键，如 "main"）
+        self.model_download_threads = {}         # model_name -> ModelDownloadThread
+        self._cancelled_downloads = set()        # 用户主动取消的模型，避免误弹“下载失败”
         self.model_delete_thread = None
         self.is_deleting = False
         self.model_verify_thread = None
         self.is_verifying = False
-        self.current_operation_model = None
         self.model_page = None
         self.model_manager_widget = None
         self.version_page = None
@@ -2876,7 +3114,7 @@ class MainWindow(QMainWindow):
             name_lbl.setFixedWidth(80)
             name_lbl.setStyleSheet("font-size: 10px; color: #888888; background: transparent;")
             cell.addWidget(name_lbl)
-            lbl = QLabel("检测中...")
+            lbl = QLabel("未检测（点右上角「重新检测」）")
             lbl.setStyleSheet("font-size: 10px; background: transparent;")
             lbl.setWordWrap(True)
             cell.addWidget(lbl, 1)
@@ -3141,20 +3379,23 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(300, self._delayed_load_versions)
         
         if index == 3:
-            QTimer.singleShot(200, self._refresh_deploy_env_status)
+            # 不再自动检测环境：交由用户手动点「重新检测」按钮（见 _create_deploy_page 中的 refresh_env_btn）。
+            # 依赖版本列表的轻量刷新保留自动（不重、不烦）。
             QTimer.singleShot(500, self._refresh_deps_list)
     
     def _delayed_load_versions(self):
-        """延迟加载版本列表"""
+        """延迟加载版本列表。打开软件更新页：默认「软件版本」，
+        仅用 exe 内置静态 versions.json 秒开，不联网、不弹窗。
+        远程获取由用户点「🌐 远程获取」按钮触发。"""
         if self.version_manager_widget is not None:
             vm = self.version_manager_widget
-            if not vm._git_repo_checked:
-                vm._git_repo_checked = True
-                if hasattr(vm, 'mode_buttons_widget'):
-                    vm.mode_buttons_widget.setVisible(True)
-                    vm.btn_mode_exe.setChecked(False)
-                    vm.btn_mode_git.setChecked(True)
-            vm._load_versions(force=True)
+            vm._git_repo_checked = True
+            vm.current_mode = "exe"
+            if hasattr(vm, 'mode_buttons_widget'):
+                vm.mode_buttons_widget.setVisible(True)
+            vm.btn_mode_exe.setChecked(True)
+            vm.btn_mode_git.setChecked(False)
+            vm._load_versions(force=True, auto_remote=False)
     
     def _setup_monitor(self):
         """设置监控"""
@@ -3832,7 +4073,7 @@ class MainWindow(QMainWindow):
         避免与用户手动操作冲突。失败仅告警，不阻断主流程。
         """
         try:
-            if getattr(self, 'is_downloading', False) or getattr(self, 'is_deleting', False) or getattr(self, 'is_verifying', False):
+            if getattr(self, 'downloading_models', set()) or getattr(self, 'is_deleting', False) or getattr(self, 'is_verifying', False):
                 return
             if self._check_main_model_exists():
                 self._log("[信息] 完整基础模型包已存在，跳过自动下载", "#4CAF50")
@@ -7879,60 +8120,73 @@ for d in deps:
         return _fs_check_model_exists(model_name, self.base_dir)
     
     def _download_model(self, model_name, force: bool = False):
-        """下载模型 - 使用异步线程避免UI阻塞
-        
+        """下载模型 - 支持批量并发下载（每个模型独立线程，互不影响）。
+
         Args:
-            model_name: 模型名称
+            model_name: 模型名称（下载目标 dl_target，主模型组件统一为 "main"）
             force: 是否强制重新下载（用于修复不完整/损坏的模型）
         """
-        if self.is_downloading or self.is_deleting or self.is_verifying:
-            self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
+        # 删除/校验进行中禁止发起下载，避免文件竞争
+        if self.is_deleting or self.is_verifying:
+            self._log("[警告] 正在执行删除/校验操作，请等待完成...", "#FF9800")
             return
-        
+        # 同一模型已在下载中则忽略（不重复发起）
+        if model_name in self.downloading_models:
+            self._log(f"[提示] 模型「{model_name}」已在下载中", "#FF9800")
+            return
+
         try:
-            self.is_downloading = True
-            self.current_operation_model = model_name
-            
-            self._update_model_management_ui()
-            
-            if self.model_manager_widget is not None:
-                self.model_manager_widget.show_progress(f"正在下载: {model_name}")
-            
-            self.model_download_thread = ModelDownloadThread(
-                model_name, 
-                self.base_dir, 
+            self.downloading_models.add(model_name)
+            thread = ModelDownloadThread(
+                model_name,
+                self.base_dir,
                 self.selected_download_source,
                 force
             )
-            
-            self.model_download_thread.log_received.connect(self._log)
-            self.model_download_thread.download_finished.connect(self._on_download_finished)
-            self.model_download_thread.progress_updated.connect(self._on_download_progress_updated)
-            
-            self._set_model_buttons_enabled(False)
-            
-            self.model_download_thread.start()
+            self.model_download_threads[model_name] = thread
+
+            # 通过闭包把 model_name 绑定进回调，实现「进度按模型路由」
+            # （信号本身仍是 (int, str)，无需改动 ModelDownloadThread）。
+            thread.log_received.connect(self._log)
+            thread.download_finished.connect(
+                lambda ok, mn=model_name: self._on_download_finished(ok, mn)
+            )
+            thread.progress_updated.connect(
+                lambda val, desc, mn=model_name: self._on_download_progress_updated(mn, val, desc)
+            )
+
+            # 立即重建 Dialog 卡片：本模型显示「暂停/取消」+ 进度条，
+            # 其它模型按钮保持可用（支持批量下载，不整体变灰）。
+            self._refresh_model_manager_widget()
+
+            if self.model_manager_widget is not None:
+                self.model_manager_widget.show_progress(model_name, f"正在下载: {model_name}")
+
+            thread.start()
         except Exception as e:
-            self.is_downloading = False
-            self.current_operation_model = None
+            self.downloading_models.discard(model_name)
+            self.model_download_threads.pop(model_name, None)
             self._log(f"[错误] 启动下载失败: {str(e)}", "#F44336")
             if self.model_manager_widget is not None:
                 try:
-                    self.model_manager_widget.hide_progress()
+                    self.model_manager_widget.hide_progress(model_name)
                 except Exception:
                     pass
-            self._set_model_buttons_enabled(True)
     
-    def _on_download_progress_updated(self, value: int, desc: str):
-        """下载进度更新回调"""
+    def _on_download_progress_updated(self, model_name: str, value: int, desc: str):
+        """下载进度更新回调（批量下载：按 model_name 路由到对应卡片进度条）。
+
+        用户实际看到的进度条在 model_manager_widget（HybridVersionManagerDialog）
+        中渲染。main_window 自身维护的 _model_progress_bars 是历史遗留的冗余字典，
+        其引用的 widget 在 _update_model_management_ui 重建后会被 deleteLater，
+        但字典不会清空——对已销毁 widget 调用 setValue 会抛 RuntimeError，
+        原实现把两段逻辑放在同一个 try 内，异常被 except 吞掉后，
+        model_manager_widget.update_progress 永远不会被调用，导致进度条固定不动。
+        现改为：只更新 model_manager_widget，彻底绕开冗余字典。
+        """
         try:
-            if hasattr(self, '_model_progress_bars') and self.current_operation_model in self._model_progress_bars:
-                bar, label = self._model_progress_bars[self.current_operation_model]
-                bar.setValue(value)
-                if desc:
-                    label.setText(desc)
             if self.model_manager_widget is not None:
-                self.model_manager_widget.update_progress(value, desc)
+                self.model_manager_widget.update_progress(model_name, value, desc)
         except Exception:
             pass
     
@@ -7950,17 +8204,20 @@ for d in deps:
             self._log(f"[警告] 刷新模型管理界面失败: {str(e)}", "#FF9800")
 
     def _on_download_finished(self, success: bool, model_name: str):
-        """下载完成回调"""
-        self.is_downloading = False
-        self.current_operation_model = None
-        
+        """下载完成回调（批量：仅清理该模型自身的状态，不影响其他正在下载的模型）"""
+        self.downloading_models.discard(model_name)
+        self.model_download_threads.pop(model_name, None)
+        # 用户主动取消的下载不弹“失败”提示（线程可能恰好在取消瞬间回调 download_finished）
+        cancelled = model_name in self._cancelled_downloads
+        self._cancelled_downloads.discard(model_name)
+
         try:
             if self.model_manager_widget is not None:
-                self.model_manager_widget.hide_progress()
+                self.model_manager_widget.hide_progress(model_name)
         except Exception:
             pass
 
-        if not success:
+        if not success and not cancelled:
             # 下载失败：之前只写隐藏日志，用户感知为『点击没反应』。
             # 这里弹出明确提示，便于定位（venv 未就绪 / 网络不通 / 磁盘满等）。
             try:
@@ -7982,88 +8239,81 @@ for d in deps:
                 self._load_model_list()
             except Exception as e:
                 self._log(f"[警告] 刷新模型列表失败: {str(e)}", "#FF9800")
+
+        # 重建 UI：本模型显示已安装/可删除，其它正在下载的模型仍显示各自进度条。
+        # 不再调用 _set_model_buttons_enabled（批量下载期间其它模型按钮保持可用，不整体变灰）。
         try:
             self._update_model_management_ui()
             self._refresh_model_manager_widget()
         except Exception as e:
             self._log(f"[警告] 更新模型UI失败: {str(e)}", "#FF9800")
-        
-        self._set_model_buttons_enabled(True)
     
     def _delete_model(self, model_name):
-        """删除模型"""
-        if self.is_deleting or self.is_downloading or self.is_verifying:
+        """删除模型
+
+        主模型组件（acestep-v15-turbo / acestep-5Hz-lm-1.7B）无法单独删除，
+        删除操作统一路由到整包主模型（"main"），与下载侧 dl_target 映射保持一致。
+        """
+        # 主模型组件名 → 整包主模型删除（避免只删单个组件导致主模型处于半残状态）
+        if model_name in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B"):
+            model_name = "main"
+
+        if self.is_deleting or self.is_verifying or self.downloading_models:
             self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
             return
-        
+
         self.is_deleting = True
-        self.current_operation_model = model_name
-        
+
         # 创建删除线程
         self.model_delete_thread = ModelDeleteThread(
             model_name,
             self.base_dir
         )
-        
+
         # 连接信号
         self.model_delete_thread.log_received.connect(self._log)
         self.model_delete_thread.delete_finished.connect(self._on_delete_finished)
-        
-        # 禁用所有模型按钮
-        self._set_model_buttons_enabled(False)
-        
-        # 启动删除线程
+
+        # 启动删除线程（不再整体禁用其它模型按钮：删除为单任务，其它模型仍可操作）
         self.model_delete_thread.start()
-    
+
     def _on_delete_finished(self, success: bool, model_name: str):
         """删除完成回调"""
         self.is_deleting = False
-        self.current_operation_model = None
-        
+
         if success:
             # 更新模型状态
             self.model_list = []
             self._load_model_list()
             self._update_model_management_ui()
             self._refresh_model_manager_widget()
-        
-        # 重新启用所有按钮
-        self._set_model_buttons_enabled(True)
-    
+
     def _verify_model(self, model_name):
         """验证模型"""
-        if self.is_deleting or self.is_downloading or self.is_verifying:
+        if self.is_deleting or self.is_verifying or self.downloading_models:
             self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
             return
-        
+
         self.is_verifying = True
-        self.current_operation_model = model_name
-        
+
         # 创建验证线程
         self.model_verify_thread = ModelVerifyThread(
             model_name,
             self.base_dir
         )
-        
+
         # 连接信号
         self.model_verify_thread.log_received.connect(self._log)
         self.model_verify_thread.verify_finished.connect(self._on_verify_finished)
         self.model_verify_thread.verify_details.connect(self._on_verify_details)
-        
-        # 禁用所有模型按钮
-        self._set_model_buttons_enabled(False)
-        
-        # 启动验证线程
+
+        # 启动验证线程（同上，不整体禁用其它模型按钮）
         self.model_verify_thread.start()
-    
+
     def _on_verify_finished(self, success: bool, model_name: str):
         """验证完成回调"""
         self.is_verifying = False
-        self.current_operation_model = None
-        
-        # 重新启用所有按钮
-        self._set_model_buttons_enabled(True)
-    
+
     def _on_verify_details(self, details: dict):
         """验证详情回调 - 显示详细的完整性信息"""
         if not details.get("is_valid", False):
@@ -8080,32 +8330,70 @@ for d in deps:
         self._update_model_management_ui()
         self._refresh_model_manager_widget()
     
-    def _pause_download(self):
-        """暂停下载"""
-        if self.model_download_thread and self.is_downloading:
-            self._log("正在停止下载...", "#FF9800")
-            self.model_download_thread.stop()
-            self.is_downloading = False
-            self.current_operation_model = None
-            self._update_model_management_ui()
-            self._set_model_buttons_enabled(True)
+    def _pause_download(self, model_name=None):
+        """暂停/取消指定模型的下载：停止该模型线程并恢复其卡片按钮。
+
+        批量下载场景下，model_name 由版本卡片的暂停/取消按钮传入；
+        未传则默认暂停“任意一个仍在下载的模型”，保证旧调用点不崩。
+        """
+        if not self.downloading_models:
+            return
+        if model_name is None:
+            model_name = next(iter(self.downloading_models))
+
+        thread = self.model_download_threads.get(model_name)
+        if thread is None:
+            # 线程已不存在，仅清理状态
+            self.downloading_models.discard(model_name)
+            self._cancelled_downloads.discard(model_name)
+            self._log(f"已取消下载: {model_name}", "#FF9800")
+            return
+
+        # 先登记为“已取消”，确保线程若恰好在此时回调 download_finished(False) 也不会误弹失败提示
+        self._cancelled_downloads.add(model_name)
+        self._log(f"正在暂停下载: {model_name}", "#FF9800")
+        try:
+            # ModelDownloadThread 没有 stop() 方法，run() 循环靠 _should_stop 退出；
+            # 置位后杀掉子进程，run() 会因 poll()!=None 立即结束（且 _should_stop=True
+            # 时不回调 download_finished，避免误弹“下载失败”），故这里手动清理状态。
+            thread._should_stop = True
+            proc = getattr(thread, "process", None)
+            if proc is not None and proc.poll() is None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 直接清理该模型状态（线程因 _should_stop 不会回调 _on_download_finished）
+        self.downloading_models.discard(model_name)
+        self.model_download_threads.pop(model_name, None)
+
+        try:
+            if self.model_manager_widget is not None:
+                self.model_manager_widget.hide_progress(model_name)
+        except Exception:
+            pass
+        self._update_model_management_ui()
+        self._refresh_model_manager_widget()
+        self._log(f"已暂停下载: {model_name}", "#FF9800")
     
     def _verify_all_models(self):
         """一键验证所有模型安装 - 最简版，不使用线程避免闪退"""
         try:
-            if self.is_deleting or self.is_downloading or self.is_verifying:
+            if self.is_deleting or self.is_verifying or self.downloading_models:
                 self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
                 return
-            
+
             self.is_verifying = True
-            
+
             # 禁用验证按钮
             if hasattr(self, 'btn_verify_all'):
                 self.btn_verify_all.setEnabled(False)
-            
-            # 禁用所有模型按钮
-            self._set_model_buttons_enabled(False)
-            
+
+            # 不再整体禁用其它模型按钮（批量下载期间仍允许用户操作其它模型）
+
             self._log("🔍 开始验证模型...", "#2196F3")
             
             # 直接重新加载模型列表（会自动检查所有模型状态）
@@ -8141,8 +8429,7 @@ for d in deps:
             self.is_verifying = False
             if hasattr(self, 'btn_verify_all'):
                 self.btn_verify_all.setEnabled(True)
-            self._set_model_buttons_enabled(True)
-            
+
         except Exception as e:
             import traceback
             try:
@@ -8155,10 +8442,9 @@ for d in deps:
             try:
                 if hasattr(self, 'btn_verify_all'):
                     self.btn_verify_all.setEnabled(True)
-                self._set_model_buttons_enabled(True)
             except:
                 pass
-    
+
     def _on_verify_all_finished(self, success: bool, model_name: str):
         """验证完成回调 - 增强版，更新模型状态"""
         try:
@@ -8171,13 +8457,10 @@ for d in deps:
             # 重新启用验证按钮
             if hasattr(self, 'btn_verify_all'):
                 self.btn_verify_all.setEnabled(True)
-            
-            # 重新启用所有按钮
-            self._set_model_buttons_enabled(True)
-            
+
             # 更新UI
             self._update_model_management_ui()
-            
+
         except Exception as e:
             import traceback
             try:
@@ -8190,30 +8473,18 @@ for d in deps:
             try:
                 if hasattr(self, 'btn_verify_all'):
                     self.btn_verify_all.setEnabled(True)
-                self._set_model_buttons_enabled(True)
             except:
                 pass
-    
+
     def _redownload_model(self, model_name):
         """重新下载模型（先删除再下载）"""
-        if self.is_deleting or self.is_downloading or self.is_verifying:
+        if self.is_deleting or self.is_verifying or self.downloading_models:
             self._log("[警告] 正在执行其他操作，请等待...", "#FF9800")
             return
         
         # 先删除
         self._delete_model(model_name)
         # 等待删除完成后会自动刷新UI，用户可以重新点击下载
-    
-    def _set_model_buttons_enabled(self, enabled: bool):
-        """设置所有模型按钮的启用状态"""
-        if hasattr(self, 'model_list_layout'):
-            for i in range(self.model_list_layout.count()):
-                item = self.model_list_layout.itemAt(i)
-                if item and item.widget():
-                    model_widget = item.widget()
-                    # 查找所有按钮并设置状态
-                    for child in model_widget.findChildren(QPushButton):
-                        child.setEnabled(enabled)
     
     def _update_model_management_ui(self):
         """更新模型管理UI - 分类表格形式"""
@@ -8325,12 +8596,10 @@ for d in deps:
                 btn_layout = QHBoxLayout()
                 btn_layout.setSpacing(4)
                 
-                # 检查是否是当前正在下载的模型
-                is_downloading = self.is_downloading and self.current_operation_model == model["name"]
-
-                # 主模型组件无法单独下载，统一路由到主模型下载
+                # 检查是否是当前正在下载的模型（批量：用集合判定，主模型组件路由到 "main" 键）
                 is_main_component = model["name"] in ("acestep-v15-turbo", "acestep-5Hz-lm-1.7B")
                 dl_target = "main" if is_main_component else model["name"]
+                is_downloading = dl_target in self.downloading_models
 
                 if is_downloading:
                     # 正在下载的模型：暂停按钮
@@ -8383,7 +8652,9 @@ for d in deps:
                     # 返回 True），因此必须单独放行 integrity_status=="incomplete"，否则会落入空分支、
                     # 无任何按钮（与『下载按钮消失』同源 bug）。
                     if integrity_status == "incomplete":
-                        # 不完整/损坏：同时提供「删除」与「重新下载」
+                        # 不完整/损坏：只提供「删除」。删除后状态变 missing，再点「下载」即可重装。
+                        # 已移除「重新下载」——与「删除+下载」等价（子模型），或对主模型仅做
+                        # 增量修复（会残留过不了弱校验的损坏文件），属冗余且有清理不干净隐患。
                         delete_btn = QPushButton("删除")
                         delete_btn.setStyleSheet("""
                             QPushButton {
@@ -8403,34 +8674,13 @@ for d in deps:
                                 color: #666666;
                             }
                         """)
-                        delete_btn.setToolTip("删除不完整/损坏的模型文件")
+                        delete_btn.setToolTip("删除不完整/损坏的模型文件，删除后可重新下载")
                         delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
                         btn_layout.addWidget(delete_btn)
-
-                        redownload_btn = QPushButton("重新下载")
-                        redownload_btn.setStyleSheet("""
-                            QPushButton {
-                                background-color: #C62828;
-                                color: white;
-                                border: none;
-                                border-radius: 3px;
-                                padding: 3px 10px;
-                                font-size: 11px;
-                                font-weight: normal;
-                            }
-                            QPushButton:hover {
-                                background-color: #D32F2F;
-                            }
-                            QPushButton:disabled {
-                                background-color: #333333;
-                                color: #666666;
-                            }
-                        """)
-                        redownload_btn.setToolTip("强制重新下载以修复不完整/损坏的模型")
-                        redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
-                        btn_layout.addWidget(redownload_btn)
                     else:
-                        # integrity_status == "complete"（已安装）
+                        # integrity_status == "complete"（已安装）：只提供「删除」。
+                        # 主模型组件也允许删除（_delete_model 内部路由到整包主模型删除），不再禁用——
+                        # 之前禁用是逼用户用「重新下载」修复坏主模型，现已去掉该按钮。
                         delete_btn = QPushButton("删除")
                         delete_btn.setStyleSheet("""
                             QPushButton {
@@ -8450,34 +8700,8 @@ for d in deps:
                                 color: #666666;
                             }
                         """)
-                        if is_main_component:
-                            delete_btn.setEnabled(False)
-                            delete_btn.setToolTip("主模型组件，请删除主模型")
-                            # 主模型组件损坏时仍允许通过「重新下载」修复
-                            redownload_btn = QPushButton("重新下载")
-                            redownload_btn.setStyleSheet("""
-                                QPushButton {
-                                    background-color: #C62828;
-                                    color: white;
-                                    border: none;
-                                    border-radius: 3px;
-                                    padding: 3px 10px;
-                                    font-size: 11px;
-                                    font-weight: normal;
-                                }
-                                QPushButton:hover {
-                                    background-color: #D32F2F;
-                                }
-                                QPushButton:disabled {
-                                    background-color: #333333;
-                                    color: #666666;
-                                }
-                            """)
-                            redownload_btn.setToolTip("强制重新下载以修复主模型组件")
-                            redownload_btn.clicked.connect(lambda checked, t=dl_target: self._download_model(t, force=True))
-                            btn_layout.addWidget(redownload_btn)
-                        else:
-                            delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
+                        delete_btn.setToolTip("删除模型文件" + ("（将删除整个主模型）" if is_main_component else ""))
+                        delete_btn.clicked.connect(lambda checked, m=model["name"]: self._delete_model(m))
                         btn_layout.addWidget(delete_btn)
                 
                 row1.addLayout(btn_layout)
@@ -8539,7 +8763,7 @@ for d in deps:
                         warn_parts.append(f"大小不足: {total_size_mb}MB / 预期 {expected_size_mb}MB")
                     
                     if warn_parts:
-                        warn_text = "⚠ " + "，".join(warn_parts) + "，建议重新下载"
+                        warn_text = "⚠ " + "，".join(warn_parts) + "，建议删除后重新下载"
                         warn_label = QLabel(warn_text)
                         warn_label.setStyleSheet("font-size: 10px; color: #FF9800; font-weight: bold;")
                         warn_label.setWordWrap(True)
@@ -8613,8 +8837,16 @@ for d in deps:
             # 否则窗口 C++ 对象销毁后，模型下载/删除/验证/初始化等线程若仍在跑，
             # 会继续经信号回调主线程，与 Qt 对象析构产生竞态 → 段错误
             # （进程直接闪退，SafeApplication.notify 这类 Python 层防护抓不到）。
-            for _t in (getattr(self, 'model_download_thread', None),
-                       getattr(self, 'model_delete_thread', None),
+            # 停止所有模型下载线程（批量：可能有多个），避免子进程残留
+            for _t in list(getattr(self, 'model_download_threads', {}).values()):
+                try:
+                    _t._should_stop = True
+                    _proc = getattr(_t, 'process', None)
+                    if _proc is not None and _proc.poll() is None:
+                        _proc.kill()
+                except Exception:
+                    pass
+            for _t in (getattr(self, 'model_delete_thread', None),
                        getattr(self, 'model_verify_thread', None),
                        getattr(self, 'init_worker', None)):
                 if _t is not None and getattr(_t, 'isRunning', lambda: False)():

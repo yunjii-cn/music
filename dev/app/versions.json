@@ -1,5 +1,55 @@
 [
   {
+    "version": "2026.07.29.1022",
+    "date": "2026-07-29 10:23",
+    "message": "软件更新模块整体收尾：更新页零弹窗静态秒开（内置versions.json+git_commits.json），远程获取收归手动按钮；默认下载源GitHub镜像ghproxy.net并多源回退（镜像→GitHub→Gitee）；GitHub资产改ASCII名yunji-music-v版本.exe，客户端按源选文件名；修复build-version.py传参模式跳过构建的缩进bug",
+    "changes": [
+      "软件更新模块整体收尾：更新页零弹窗静态秒开（内置versions.json+git_commits.json），远程获取收归手动按钮；默认下载源GitHub镜像ghproxy.net并多源回退（镜像→GitHub→Gitee）；GitHub资产改ASCII名yunji-music-v版本.exe，客户端按源选文件名；修复build-version.py传参模式跳过构建的缩进bug"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.1022.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.1015",
+    "date": "2026-07-29 10:15",
+    "message": "GitHub Releases 资产改用 ASCII 文件名 yunji-music-v版本.exe（GitHub 会静默丢弃中文资产名），客户端下载按源自动选择文件名：GitHub/镜像用 ASCII 名、Gitee 用中文名",
+    "changes": [
+      "GitHub Releases 资产改用 ASCII 文件名 yunji-music-v版本.exe（GitHub 会静默丢弃中文资产名），客户端下载按源自动选择文件名：GitHub/镜像用 ASCII 名、Gitee 用中文名"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.1015.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.0911",
+    "date": "2026-07-29 09:11",
+    "message": "默认下载源切换为 GitHub 镜像（ghproxy.net，替换已失效的 ghgo.xyz），版本清单与 exe 下载均走镜像；下载增加多源自动回退：GitHub镜像→GitHub直连→Gitee，任一源失败自动切换下一源",
+    "changes": [
+      "默认下载源切换为 GitHub 镜像（ghproxy.net，替换已失效的 ghgo.xyz），版本清单与 exe 下载均走镜像；下载增加多源自动回退：GitHub镜像→GitHub直连→Gitee，任一源失败自动切换下一源"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.0911.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.0852",
+    "date": "2026-07-29 08:52",
+    "message": "开发动态页静态化：git 提交历史生成 git_commits.json 内置 exe，打开页面秒出最近60条提交，远程拉取仅通过手动按钮触发（走 Gitee/GitHub commits API，零弹窗）",
+    "changes": [
+      "开发动态页静态化：git 提交历史生成 git_commits.json 内置 exe，打开页面秒出最近60条提交，远程拉取仅通过手动按钮触发（走 Gitee/GitHub commits API，零弹窗）"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.0852.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.0748",
+    "date": "2026-07-29 07:48",
+    "message": "修复打开软件更新页面弹出一堆运行窗口：根因是打开即强制切 git 模式触发 git 子进程；改为打开只显示内置静态版本列表秒开，远程拉取收归手动按钮（urlopen 实现，不再调用 git，零弹窗）",
+    "changes": [
+      "修复打开软件更新页面弹出一堆运行窗口：根因是打开即强制切 git 模式触发 git 子进程；改为打开只显示内置静态版本列表秒开，远程拉取收归手动按钮（urlopen 实现，不再调用 git，零弹窗）"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.0748.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.28.0843",
     "date": "2026-07-28 08:45",
     "message": "彻底修复模型下载进度条卡死与切页才跳99%：根因是主线程阻塞式readline读取子进程stdout且磁盘兜底仅在EOF触发，一旦子进程输出被缓冲readline一直阻塞导致进度条死锁在初始值；改为独立读取线程加队列、主线程按0.3秒超时取行、超时期间用真实磁盘字节驱动进度条（Windows下select不支持管道故采用线程方案），进度条现可实时爬升且不依赖子进程输出实时性",
