@@ -829,6 +829,13 @@ class HybridVersionManagerDialog(QDialog):
             "email": author.get("email", ""),
             "date": (author.get("date", "") or "")[:19].replace("T", " "),
         }
+
+    def _get_local_exe_versions(self):
+        """扫描本地 exe 文件，返回 {版本号: {path,size,date,name}}。
+
+        仅 glob + stat 解析文件名版本号，不调用任何子进程，不弹窗。
+        用于在版本列表中标记"已下载"。
+        """
         local_versions = {}
         ver_dirs = []
         ver_dir = Path(self.project_root) / "ver"
@@ -920,18 +927,29 @@ class HybridVersionManagerDialog(QDialog):
     def _load_exe_versions(self, auto_remote=False):
         self.current_mode_label.setText("软件版本")
         self.current_info_label.setText("⏳ 正在加载版本信息...")
+        self._exe_did_remote = auto_remote
 
-        loading_label = QLabel("⏳ 正在读取内置版本列表...")
+        # 打开页面（auto_remote=False）：同步直接读 exe 内置静态 versions.json
+        # 渲染列表——零线程、零网络、零子进程、零弹窗（对齐视频创意站「本地优先、
+        # 打开即静态列表」）。仅用户显式点「🌐 远程获取」(auto_remote=True) 时
+        # 才启动 worker 联网拉取最新列表。
+        if not auto_remote:
+            try:
+                current = self._get_current_exe_version()
+                builtin = self._get_builtin_versions()
+                local = self._get_local_exe_versions()
+                self._on_exe_data_ready(current, builtin, local, "github_mirror")
+            except Exception as e:
+                print(f"本地版本列表加载失败: {e}")
+                self._on_exe_data_ready(None, [], {}, "github_mirror")
+            return
+
+        loading_label = QLabel("⏳ 正在远程获取版本列表...")
         loading_label.setStyleSheet("color: #888888; padding: 20px;")
         loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.versions_layout.addWidget(loading_label)
 
-        # auto_remote=False：仅用 exe 内置静态 versions.json 秒开，不联网、不弹窗。
-        # 用户点「🌐 远程获取」时传 True 才会去仓库拉最新列表。
-        # 记录本次是否为「显式远程获取」，供 _on_exe_data_ready 判断是否需要
-        # 再打 Releases API 拉真实下载链接（打开页面时不需要，模板已能算出可用URL）。
-        self._exe_did_remote = auto_remote
-        self._exe_worker = _ExeFetchWorker(self, auto_remote=auto_remote)
+        self._exe_worker = _ExeFetchWorker(self, auto_remote=True)
         self._exe_worker.data_ready.connect(self._on_exe_data_ready)
         self._exe_worker.start()
 
@@ -1696,20 +1714,30 @@ class HybridVersionManagerDialog(QDialog):
 
     def _load_git_versions(self, auto_remote=False):
         self.current_mode_label.setText("开发动态")
-        self.current_info_label.setText("⏳ 正在读取内置提交历史...")
+        self.current_info_label.setText("⏳ 正在加载提交历史...")
 
-        loading_label = QLabel("⏳ 正在读取内置提交历史...")
+        # 打开页面（auto_remote=False）：同步直接读 exe 内置静态 git_commits.json
+        # 渲染——零线程、零网络、零子进程、零弹窗（与软件版本对称）。
+        # 仅用户显式点「🌐 远程获取」时才启动 worker 联网。
+        if not auto_remote:
+            try:
+                current = self._get_current_exe_version()
+                builtin = self._get_builtin_commits()
+                self._on_git_data_ready(current, builtin, "builtin")
+            except Exception as e:
+                print(f"本地提交历史加载失败: {e}")
+                self._on_git_data_ready(None, [], "builtin")
+            return
+
+        loading_label = QLabel("⏳ 正在远程获取提交历史...")
         loading_label.setStyleSheet("color: #888888; padding: 20px;")
         loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.versions_layout.addWidget(loading_label)
 
-        # auto_remote=False：仅用 exe 内置静态 git_commits.json 秒开，
-        # 不联网、不弹窗（开发动态与软件版本对称，都是静态页面内置）。
-        # 用户点「🌐 远程获取」时传 True 才会去仓库 commits API 拉最新提交。
         if self._git_worker and self._git_worker.isRunning():
             self._git_worker.cancel()
             self._git_worker.wait(2000)
-        self._git_worker = _GitCommitsFetchWorker(self, auto_remote=auto_remote)
+        self._git_worker = _GitCommitsFetchWorker(self, auto_remote=True)
         self._git_worker.data_ready.connect(self._on_git_data_ready)
         self._git_worker.start()
 
