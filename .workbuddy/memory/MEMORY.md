@@ -13,6 +13,14 @@
 - **版本号格式（用户指定）**：日期+时间 `v2026.07.21.1734`，正则 `v(\d+\.\d+\.\d+(?:\.\d+)?)`。
 - **入口程序是 `launcher.py`（非 main.py）**；单实例靠 `_kill_old_instances()` 按品牌前缀杀旧进程。`-v` 标记由文件名携带（如 `云集智能音乐创意台-v2026.07.21.1734.exe`），`main.py` 的 `get_version_from_filename()` 解析。
 
+## 发布到双仓库下载页（Gitee + GitHub Releases）
+- **构建 ≠ 发布！** `build-version.py` 只做：本地打包 exe + `git commit/push` 源码 + 往 `versions.json` 插一条记录（**不写 `download_url`**）。出现在「软件更新」下载按钮 + 双仓库下载页，必须另外跑发布脚本。
+- `dev/app/_publish_releases.py`：把 `dev/ver/*.exe` 上传到 Gitee(`yunjii/music`) + GitHub(`yunjii-cn/music`) Releases，并把直链回写 `versions.json` 的 `download_url`（应用据此点亮下载按钮）。
+- ⚠️ **默认全量发布**：`main()` 不传参时 glob `dev/ver/*.exe` **全部上传**（按 mtime 倒序）。**必须加 `--version 2026.07.31.0518` 才只发指定版本**，否则会把 `dev/ver/` 里一堆历史 exe 全传上去（很危险）。也支持 `--exe <路径>`、`--skip-gitee`/`--skip-github`、`--dry-run`。
+- 前置：`dev/app/.gitee_token` + `dev/app/.github_token`（已存在，32/40 字节）、需 `requests`；exe 须先落在 `dev/ver/`（build-version.py 自动拷过去）。
+- 应用侧口径：`versions.json` 某版本有 `download_url` 才在「软件更新」显示下载按钮；截至 2026-07-31 历史仅 **2 条**带链接（`2026.07.03.0635`、`2026.05.26.0336`），其余均 `download_url` 为空 → 显示「未提供」无下载按钮（非 bug，是没发布）。
+- 发布时 body 文案：脚本用 `KNOWN_BODIES` 字典按 version 取，缺省回退 `云集智能音乐创意台 v{version} 发布`（较简略）；若要详细 release notes 需往 `KNOWN_BODIES` 加条目或扩展 `--body` 参数。
+
 ## 历史废弃/踩坑方案（勿复用）
 - **self-deploy / 固定名入口 / ver/ 派发 launcher 三分支（2026-07-21 我误加）**：参考「云集智能文件清理专家」项目时过度设计。致命问题：`_resolve_deploy_dir()` 算错会把 deploy_dir 算成自身子文件夹 → 无限嵌套自部署 → 反复弹启动屏 → 路径超 260 字符 `WinError 206`；以及"固定名入口打不开版本号exe"。本项目的 `main.py`/`version_manager` 根本不依赖这套运行时派发，**纯属画蛇添足把能用的版本搞坏**。已回滚到 07a04da 极简版。
 - **7z SFX 外壳（2026-07-21 早）**：`build_sfx_7z.py` 套 `7zS.sfx`。致命：7zS 9.20 只认 `InstallPath="."`（解压 `%TEMP%` 自动清理），launcher 靠探测父进程才建文件夹，探测失败即不建 → 用户"解压后没文件夹"。弃用。

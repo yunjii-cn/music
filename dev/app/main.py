@@ -2409,6 +2409,12 @@ class MainWindow(QMainWindow):
                 pass
             self._splash.reached_full.connect(self._finish_splash_once)
             self._splash.set_progress(1.0, "加载完成！")
+            # 兜底收屏：不依赖 reached_full 异步信号（7bc676b 引入的脆弱依赖）。
+            # 短延时后强制收起置顶启动屏并显示主窗口，防止该信号因时序/环境差异
+            # 未触发而导致启动屏(WindowStaysOnTopHint)永久遮挡主窗口——
+            # 现象即「托盘有图标、但界面不显示、且无崩溃日志」。reached_full 先到
+            # 则由它收屏，本兜底再触发时 _finished 保护使其无副作用。
+            QTimer.singleShot(800, self._finish_splash_once)
         if app:
             app.processEvents()
     
@@ -9275,7 +9281,7 @@ def main(app=None, splash=None):
 
     # 安全网：极端情况下若初始化异常未能关闭启动屏，60s 后强制收尾
     if splash:
-        QTimer.singleShot(60000, lambda: _force_close_splash(window, splash))
+        QTimer.singleShot(10000, lambda: _force_close_splash(window, splash))
 
     if cleanup_target:
         QTimer.singleShot(1500, lambda: _do_startup_cleanup(cleanup_target))

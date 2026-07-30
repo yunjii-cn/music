@@ -1381,5 +1381,13 @@
     ],
     "build_time": "2026-07-31T05:19:47.320260",
     "version_number": "2026.07.31.0518"
+  },
+  "云集智能音乐创意台-v2026.07.31.0600": {
+    "version": "云集智能音乐创意台-v2026.07.31.0600",
+    "changes": [
+      "修复主窗口被启动屏置顶遮挡导致界面不显示(托盘在但无窗口、无崩溃日志)：7bc676b将同步show+finish收屏改为仅依赖reached_full异步信号，信号未触发时BrandedSplash(WindowStaysOnTopHint置顶)永久盖住主窗口。MainWindow._deferred_init末尾增加800ms不依赖信号的兜底收屏；main()最后防线由60s缩至10s"
+    ],
+    "build_time": "2026-07-31T06:01:27.557660",
+    "version_number": "2026.07.31.0600"
   }
 }
