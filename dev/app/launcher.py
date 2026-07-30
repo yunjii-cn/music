@@ -234,6 +234,18 @@ def _self_relocate():
         os.path.join(deploy_dir, VERSION_TXT))
     if already:
         os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
+        ver_dir = os.path.join(deploy_dir, "ver")
+        # 若当前运行的版本号 exe 不在 ver/ 中（从新发布文件夹直接运行升级），
+        # 先归档一份进 ver/，保证入口稳定指向 ver/ 内副本（删除发布文件夹也不致失效）。
+        cur_m = VERSIONED_RE.search(os.path.basename(exe))
+        if cur_m:
+            os.makedirs(ver_dir, exist_ok=True)
+            ver_target = os.path.join(ver_dir, os.path.basename(exe))
+            if not os.path.exists(ver_target):
+                try:
+                    shutil.copy2(exe, ver_target)
+                except Exception:
+                    pass
         newest = _find_newest_versioned_exe(deploy_dir, exe)
         if newest is None:
             if cleanup_target:
