@@ -21,7 +21,7 @@ from urllib.parse import quote, urlparse, urlunparse
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTextEdit, QScrollArea, QWidget, QMessageBox, QFrame, QApplication,
-    QComboBox, QTabWidget, QProgressBar, QGraphicsDropShadowEffect
+    QComboBox, QTabWidget, QProgressBar, QGraphicsDropShadowEffect, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QUrl, QPropertyAnimation, QEasingCurve, QPointF
 from PyQt6.QtGui import QFont, QDesktopServices, QColor
@@ -179,7 +179,8 @@ BTN_GITEE_STYLE = (
 # 「加载更多」按钮（底部懒加载触发）
 LOAD_MORE_STYLE = (
     "QPushButton { background-color: #1A1A1A; color: #888888; border: 1px solid #2A2A2A; border-radius: 6px;"
-    " font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; font-size: 9pt; font-weight: bold; }"
+    " font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; font-size: 9pt; font-weight: bold;"
+    " min-height: 34px; padding: 8px 16px; text-align: center; }"
     " QPushButton:hover { background-color: #222222; color: #BBBBBB; border-color: #3A3A3A; }"
     " QPushButton:pressed { background-color: #151515; }"
 )
@@ -1130,7 +1131,7 @@ class HybridVersionManagerDialog(QWidget):
         if end < len(self._data_cache):
             remaining = len(self._data_cache) - end
             btn = QPushButton(f"加载更多（{remaining} 条剩余）")
-            btn.setFixedHeight(34)
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setStyleSheet(LOAD_MORE_STYLE)
             btn.clicked.connect(self._load_more)
