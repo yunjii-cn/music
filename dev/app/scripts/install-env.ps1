@@ -121,6 +121,13 @@ Write-Output ""
 $venv_dir = Join-Path $PSScriptRoot ".venv"
 $venv_activate = Join-Path $venv_dir "Scripts\Activate.ps1"
 
+# pythonw 是无控制台窗口版本：用它在脚本内部跑 `python -c` 检查，避免每个检查都弹一个
+# 可见的 python.exe 控制台窗口（app 通过 hidden powershell 拉起本脚本，但脚本内部再 spawn
+# 的 console python 不会继承 CREATE_NO_WINDOW，会拿到自己的窗口）。
+$pythonExe = Join-Path $venv_dir "Scripts\python.exe"
+$pythonwExe = Join-Path $venv_dir "Scripts\pythonw.exe"
+if (-not (Test-Path $pythonwExe)) { $pythonwExe = $pythonExe }
+
 # 检查现有虚拟环境的 PyTorch 版本
 $needs_reinstall = $false
 if (Test-Path $venv_activate) {
@@ -130,7 +137,7 @@ if (Test-Path $venv_activate) {
     # 检查 PyTorch 版本
     $torch_ok = $false
     try {
-        $torch_version = python -c "import torch; print(torch.__version__)" 2>&1
+        $torch_version = & $pythonwExe -c "import torch; print(torch.__version__)" 2>&1
         if ($LASTEXITCODE -eq 0 -and $torch_version -like "*2.9.0*") {
             Write-Output "✅ PyTorch 版本正确: $torch_version"
             $torch_ok = $true
@@ -144,7 +151,7 @@ if (Test-Path $venv_activate) {
     # 检查 torchaudio
     $torchaudio_ok = $false
     try {
-        $torchaudio_version = python -c "import torchaudio; print(torchaudio.__version__)" 2>&1
+        $torchaudio_version = & $pythonwExe -c "import torchaudio; print(torchaudio.__version__)" 2>&1
         if ($LASTEXITCODE -eq 0 -and $torchaudio_version -like "*2.9.0*") {
             Write-Output "✅ torchaudio 版本正确: $torchaudio_version"
             $torchaudio_ok = $true
@@ -467,7 +474,7 @@ Write-Output "  环境安装完成！"
 Write-Output "============================================================"
 Write-Output ""
 Write-Output "✅ 虚拟环境位置: $venv_dir/"
-Write-Output "✅ Python版本: $(python --version)"
+Write-Output "✅ Python版本: $(& $pythonwExe --version)"
 Write-Output ""
 Write-Output "下一步："
 Write-Output "1. 点击启动按钮运行服务"

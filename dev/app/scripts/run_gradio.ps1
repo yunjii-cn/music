@@ -104,6 +104,10 @@ if ($AuthPassword -ne "none") {
 # 统一使用 scripts/.venv（与 install-env.ps1 / main.py 保持一致）
 $venv_dir = Join-Path $PSScriptRoot ".venv"
 $python_exe = Join-Path $venv_dir "Scripts\python.exe"
+# pythonw.exe 无控制台窗口：用它启动 Gradio，避免弹出可见的 python.exe 控制台
+# （同 run_server.ps1 根因：控制台版 python 被隐藏的 powershell 拉起后仍会单独开控制台）。
+$pythonw_exe = Join-Path $venv_dir "Scripts\pythonw.exe"
+if (-not (Test-Path $pythonw_exe)) { $pythonw_exe = $python_exe }
 
 if (-not (Test-Path $python_exe)) {
     Write-Error "Virtual environment not found at $venv_dir. Please run deployment maintenance first."
@@ -113,9 +117,16 @@ if (-not (Test-Path $python_exe)) {
 Write-Output "Starting Gradio UI..."
 Write-Output "Python path: $env:PYTHONPATH"
 Write-Output "Working directory: $(Get-Location)"
-Write-Output "Using Python: $python_exe"
+Write-Output "Using Python: $pythonw_exe"
 
-# Run Gradio UI directly with virtual environment python
-& $python_exe acestep/acestep_v15_pipeline.py $ext_args
+# 用 pythonw（无控制台窗口）启动 Gradio；输出写日志文件后实时 tail 回 stdout，
+# 既隐藏控制台、又不丢日志（主程序通过管道捕获）。
+$logDir = Join-Path $env:TEMP "yunji_logs"
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+$logFile = Join-Path $logDir "gradio.log"
+Start-Process -FilePath $pythonw_exe -ArgumentList @("acestep/acestep_v15_pipeline.py", $ext_args) `
+    -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru | Out-Null
+Start-Sleep -Milliseconds 300
+Get-Content -Path $logFile -Wait
 
 Write-Output "Start finished"

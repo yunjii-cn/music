@@ -42,6 +42,36 @@ import json
 import time
 import subprocess as _subprocess
 
+# ── 调试追踪：记录每一次子进程 spawn（命令 + 调用栈）到 dev/app/_spawn_trace.log，
+#    用于一锤定音定位"弹窗"真实来源。已知：app 的 CREATE_NO_WINDOW 只会作用于它
+#    直接 spawn 的子进程，不会传播到 .ps1 内部再 spawn 的 python/curl/uv（那些会各自
+#    拿到一个可见控制台窗口）。本追踪器能把真正弹窗的源揪出来。
+def _spawn_trace_path():
+    try:
+        import os as _os
+        return _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "_spawn_trace.log")
+    except Exception:
+        return None
+
+def _trace_spawn(label, args, kwargs):
+    try:
+        import os as _os, traceback as _tb
+        p = _spawn_trace_path()
+        if not p:
+            return
+        stack = _tb.extract_stack()
+        callers = []
+        for fr in stack[-8:-1]:
+            callers.append(f"{_os.path.basename(fr.filename)}:{fr.lineno}:{fr.name}")
+        try:
+            a = str(args)[:600]
+        except Exception:
+            a = "<unprintable>"
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(f"[{label}] {a}\n  caller: {' > '.join(callers)}\n")
+    except Exception:
+        pass
+
 if sys.platform == 'win32':
     if not getattr(_subprocess, '_pyi_hidden_patched', False):
         def _ensure_hidden(kwargs):
@@ -60,18 +90,21 @@ if sys.platform == 'win32':
 
         _orig_popen_init = _subprocess.Popen.__init__
         def _patched_popen_init(self, *args, **kwargs):
+            _trace_spawn("Popen", args, kwargs)
             kwargs = _ensure_hidden(kwargs)
             _orig_popen_init(self, *args, **kwargs)
         _subprocess.Popen.__init__ = _patched_popen_init
 
         _orig_run = _subprocess.run
         def _patched_run(*args, **kwargs):
+            _trace_spawn("run", args, kwargs)
             kwargs = _ensure_hidden(kwargs)
             return _orig_run(*args, **kwargs)
         _subprocess.run = _patched_run
 
         _orig_call = _subprocess.call
         def _patched_call(*args, **kwargs):
+            _trace_spawn("call", args, kwargs)
             kwargs = _ensure_hidden(kwargs)
             return _orig_call(*args, **kwargs)
         _subprocess.call = _patched_call
@@ -82,17 +115,55 @@ if sys.platform == 'win32':
 
         _orig_check_call = _subprocess.check_call
         def _patched_check_call(*args, **kwargs):
+            _trace_spawn("check_call", args, kwargs)
             kwargs = _ensure_hidden(kwargs)
             return _orig_check_call(*args, **kwargs)
         _subprocess.check_call = _patched_check_call
 
         _orig_check_output = _subprocess.check_output
         def _patched_check_output(*args, **kwargs):
+            _trace_spawn("check_output", args, kwargs)
             kwargs = _ensure_hidden(kwargs)
             return _orig_check_output(*args, **kwargs)
         _subprocess.check_output = _patched_check_output
 
         _subprocess._pyi_hidden_patched = True
+
+        # os.system / os.popen 不经过 subprocess 模块，上面的 monkeypatch 兜不住，
+        # 是"漏网弹窗"的高危来源（控制台子系统必弹可见窗口）。这里直接把它俩
+        # 重写成隐藏实现：用 subprocess.Popen(..., CREATE_NO_WINDOW) 兜底，
+        # 既记录调用栈（便于定位）又彻底消除可见控制台窗口。
+        if not getattr(os, '_pyi_os_patched', False):
+            _orig_os_system = os.system
+            _orig_os_popen = os.popen
+            def _patched_os_system(cmd, *a, **k):
+                _trace_spawn("os.system", (cmd,), {})
+                try:
+                    p = _subprocess.Popen(
+                        cmd, shell=True,
+                        stdout=_subprocess.DEVNULL, stderr=_subprocess.DEVNULL,
+                        creationflags=_subprocess.CREATE_NO_WINDOW,
+                    )
+                    return p.wait()
+                except Exception:
+                    return _orig_os_system(cmd, *a, **k)
+            os.system = _patched_os_system
+            def _patched_os_popen(cmd, mode='r', *a, **k):
+                _trace_spawn("os.popen", (cmd,), {})
+                try:
+                    read = 'r' in str(mode)
+                    std = _subprocess.PIPE if read else _subprocess.DEVNULL
+                    stdin = _subprocess.DEVNULL if not read else None
+                    p = _subprocess.Popen(
+                        cmd, shell=True,
+                        stdout=std, stdin=stdin,
+                        creationflags=_subprocess.CREATE_NO_WINDOW,
+                    )
+                    return p.stdout if read else p.stdin
+                except Exception:
+                    return _orig_os_popen(cmd, mode, *a, **k)
+            os.popen = _patched_os_popen
+            os._pyi_os_patched = True
 
 import subprocess
 import threading
@@ -3661,11 +3732,35 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(100, self._open_full_version_dialog)
     
     def _open_full_version_dialog(self):
-        """打开完整的版本管理器对话框"""
+        """打开完整的版本管理器对话框（独立窗口）。
+
+        版本页本身是普通 QWidget（HybridVersionManagerDialog 基类已改为 QWidget），
+        内嵌时不会弹窗；这里「查看更多版本」需要独立窗口时，用一层薄 QDialog 包装它。
+        打开即默认「软件版本」本地静态列表，不联网、不弹任何窗口。
+        """
         try:
-            from version_manager import VersionManagerDialog
-            dialog = VersionManagerDialog(self, self.base_dir)
-            dialog.exec()
+            from PyQt6.QtWidgets import QDialog
+            from PyQt6.QtCore import Qt
+            from version_manager import HybridVersionManagerDialog
+            page = HybridVersionManagerDialog(self, self.base_dir, as_widget=True)
+            # 独立窗口也走「本地优先」：默认软件版本、只读内置静态 versions.json。
+            page._git_repo_checked = True
+            page.current_mode = "exe"
+            if hasattr(page, 'mode_buttons_widget'):
+                page.mode_buttons_widget.setVisible(True)
+            page.btn_mode_exe.setChecked(True)
+            page.btn_mode_git.setChecked(False)
+            page._load_versions(force=True, auto_remote=False)
+
+            dlg = QDialog(self)
+            dlg.setWindowTitle("版本管理器")
+            dlg.setMinimumSize(950, 650)
+            dlg.resize(1050, 750)
+            dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
+            lay = QVBoxLayout(dlg)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.addWidget(page)
+            dlg.exec()
         except Exception as e:
             QMessageBox.critical(self, "错误", f"打开版本管理器失败:\n{str(e)}")
     

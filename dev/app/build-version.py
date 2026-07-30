@@ -441,6 +441,15 @@ def build_exe():
     print(f"  payload.zip 大小: {payload_size_mb:.1f} MB")
     pyinstaller_args.extend(["--add-data", f"{str(payload_path)};."])
 
+    # 运行时钩子：在解释器启动最早阶段给 subprocess.Popen/run/call/check_call/
+    # check_output 统一加 CREATE_NO_WINDOW，确保主程序拉起的任何子进程（含未来新增的）
+    # 都不弹控制台窗口。与 main.py 顶部的 monkeypatch 互为双保险（钩子先跑并置标志，
+    # main.py 的 patch 检测到标志后跳过，不重复打）。
+    runtime_hook = ROOT_DIR / "pyi_rth_subprocess.py"
+    if runtime_hook.exists():
+        pyinstaller_args.extend(["--runtime-hook", str(runtime_hook)])
+        print(f"  已添加运行时钩子: {runtime_hook.name}")
+
     pyinstaller_args.append("launcher.py")
     print(f"  使用 launcher.py 作为入口")
 

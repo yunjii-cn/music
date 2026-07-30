@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.07.31.0129",
+    "date": "2026-07-31 01:30",
+    "message": "修复软件更新栏目按钮文字被截断：放宽运行/下载/检查更新/Tab按钮尺寸与padding，9pt字号",
+    "changes": [
+      "修复软件更新栏目按钮文字被截断：放宽运行/下载/检查更新/Tab按钮尺寸与padding，9pt字号"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.0129.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.30.0710",
     "date": "2026-07-30 07:11",
     "message": "根治软件更新页闪窗根因：launcher入口永不重链接导致跑旧exe（_ensure_entry_current按版本号重建硬链接）；版本栏合并两个worker为单个_RemoteFetchThread(纯urlopen,对齐视频创意站)",
