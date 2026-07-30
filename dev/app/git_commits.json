@@ -1,5 +1,13 @@
 [
   {
+    "hash": "9d494a8debe69f568aabe8a6838306167f5ce7fe",
+    "short_hash": "9d494a8",
+    "message": "feat: 发布版本 v2026.07.31.0454",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 04:56:02"
+  },
+  {
     "hash": "edbded5202f344ffb1350734d6af180482385321",
     "short_hash": "edbded5",
     "message": "feat: 发布版本 v2026.07.31.0444",
@@ -470,13 +478,5 @@
     "author": "yunjii",
     "email": "yi@yunjii.cn",
     "date": "2026-07-10 02:19:08"
-  },
-  {
-    "hash": "0d511122b366655182b750fb5524f179b29886ee",
-    "short_hash": "0d51112",
-    "message": "chore: 停止跟踪 exe 文件，改为通过 Release 发布",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-04 05:28:52"
   }
 ]
