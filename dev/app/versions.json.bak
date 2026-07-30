@@ -1,0 +1,1109 @@
+[
+  {
+    "version": "2026.07.31.0146",
+    "date": "2026-07-31 01:47",
+    "message": "新增软件更新栏目详情/列表视图切换：默认详情模式(懒加载10条)，列表模式(懒加载20条)，含加载更多按钮；复刻视频创意站",
+    "changes": [
+      "新增软件更新栏目详情/列表视图切换：默认详情模式(懒加载10条)，列表模式(懒加载20条)，含加载更多按钮；复刻视频创意站"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.0146.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.31.0129",
+    "date": "2026-07-31 01:30",
+    "message": "修复软件更新栏目按钮文字被截断：放宽运行/下载/检查更新/Tab按钮尺寸与padding，9pt字号",
+    "changes": [
+      "修复软件更新栏目按钮文字被截断：放宽运行/下载/检查更新/Tab按钮尺寸与padding，9pt字号"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.0129.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.30.0710",
+    "date": "2026-07-30 07:11",
+    "message": "根治软件更新页闪窗根因：launcher入口永不重链接导致跑旧exe（_ensure_entry_current按版本号重建硬链接）；版本栏合并两个worker为单个_RemoteFetchThread(纯urlopen,对齐视频创意站)",
+    "changes": [
+      "根治软件更新页闪窗根因：launcher入口永不重链接导致跑旧exe（_ensure_entry_current按版本号重建硬链接）；版本栏合并两个worker为单个_RemoteFetchThread(纯urlopen,对齐视频创意站)"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.30.0710.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.30.0605",
+    "date": "2026-07-30 06:06",
+    "message": "根治软件更新页闪窗：打开页改同步读静态列表（零线程零网络零子进程，对齐视频创意站）；修复_get_local_exe_versions方法丢失",
+    "changes": [
+      "根治软件更新页闪窗：打开页改同步读静态列表（零线程零网络零子进程，对齐视频创意站）；修复_get_local_exe_versions方法丢失"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.30.0605.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.30.0526",
+    "date": "2026-07-30 05:27",
+    "message": "修复软件更新页打开即远程拉取+弹窗（默认读本地静态列表、仅点远程获取才联网；对齐视频创意站本地优先）",
+    "changes": [
+      "修复软件更新页打开即远程拉取+弹窗（默认读本地静态列表、仅点远程获取才联网；对齐视频创意站本地优先）"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.30.0526.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.30.0441",
+    "date": "2026-07-30 04:42",
+    "message": "主模型组件独立下载+独立进度条（acestep-v15-turbo/acestep-5Hz-lm-1.7B 独立下载、各自独立进度条、删除按组件精准）",
+    "changes": [
+      "主模型组件独立下载+独立进度条（acestep-v15-turbo/acestep-5Hz-lm-1.7B 独立下载、各自独立进度条、删除按组件精准）"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.30.0441.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.1022",
+    "date": "2026-07-29 10:23",
+    "message": "软件更新模块整体收尾：更新页零弹窗静态秒开（内置versions.json+git_commits.json），远程获取收归手动按钮；默认下载源GitHub镜像ghproxy.net并多源回退（镜像→GitHub→Gitee）；GitHub资产改ASCII名yunji-music-v版本.exe，客户端按源选文件名；修复build-version.py传参模式跳过构建的缩进bug",
+    "changes": [
+      "软件更新模块整体收尾：更新页零弹窗静态秒开（内置versions.json+git_commits.json），远程获取收归手动按钮；默认下载源GitHub镜像ghproxy.net并多源回退（镜像→GitHub→Gitee）；GitHub资产改ASCII名yunji-music-v版本.exe，客户端按源选文件名；修复build-version.py传参模式跳过构建的缩进bug"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.1022.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.1015",
+    "date": "2026-07-29 10:15",
+    "message": "GitHub Releases 资产改用 ASCII 文件名 yunji-music-v版本.exe（GitHub 会静默丢弃中文资产名），客户端下载按源自动选择文件名：GitHub/镜像用 ASCII 名、Gitee 用中文名",
+    "changes": [
+      "GitHub Releases 资产改用 ASCII 文件名 yunji-music-v版本.exe（GitHub 会静默丢弃中文资产名），客户端下载按源自动选择文件名：GitHub/镜像用 ASCII 名、Gitee 用中文名"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.1015.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.0911",
+    "date": "2026-07-29 09:11",
+    "message": "默认下载源切换为 GitHub 镜像（ghproxy.net，替换已失效的 ghgo.xyz），版本清单与 exe 下载均走镜像；下载增加多源自动回退：GitHub镜像→GitHub直连→Gitee，任一源失败自动切换下一源",
+    "changes": [
+      "默认下载源切换为 GitHub 镜像（ghproxy.net，替换已失效的 ghgo.xyz），版本清单与 exe 下载均走镜像；下载增加多源自动回退：GitHub镜像→GitHub直连→Gitee，任一源失败自动切换下一源"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.0911.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.0852",
+    "date": "2026-07-29 08:52",
+    "message": "开发动态页静态化：git 提交历史生成 git_commits.json 内置 exe，打开页面秒出最近60条提交，远程拉取仅通过手动按钮触发（走 Gitee/GitHub commits API，零弹窗）",
+    "changes": [
+      "开发动态页静态化：git 提交历史生成 git_commits.json 内置 exe，打开页面秒出最近60条提交，远程拉取仅通过手动按钮触发（走 Gitee/GitHub commits API，零弹窗）"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.0852.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.29.0748",
+    "date": "2026-07-29 07:48",
+    "message": "修复打开软件更新页面弹出一堆运行窗口：根因是打开即强制切 git 模式触发 git 子进程；改为打开只显示内置静态版本列表秒开，远程拉取收归手动按钮（urlopen 实现，不再调用 git，零弹窗）",
+    "changes": [
+      "修复打开软件更新页面弹出一堆运行窗口：根因是打开即强制切 git 模式触发 git 子进程；改为打开只显示内置静态版本列表秒开，远程拉取收归手动按钮（urlopen 实现，不再调用 git，零弹窗）"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.29.0748.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.28.0843",
+    "date": "2026-07-28 08:45",
+    "message": "彻底修复模型下载进度条卡死与切页才跳99%：根因是主线程阻塞式readline读取子进程stdout且磁盘兜底仅在EOF触发，一旦子进程输出被缓冲readline一直阻塞导致进度条死锁在初始值；改为独立读取线程加队列、主线程按0.3秒超时取行、超时期间用真实磁盘字节驱动进度条（Windows下select不支持管道故采用线程方案），进度条现可实时爬升且不依赖子进程输出实时性",
+    "changes": [
+      "彻底修复模型下载进度条卡死与切页才跳99%：根因是主线程阻塞式readline读取子进程stdout且磁盘兜底仅在EOF触发，一旦子进程输出被缓冲readline一直阻塞导致进度条死锁在初始值；改为独立读取线程加队列、主线程按0.3秒超时取行、超时期间用真实磁盘字节驱动进度条（Windows下select不支持管道故采用线程方案），进度条现可实时爬升且不依赖子进程输出实时性"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0843.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.28.0800",
+    "date": "2026-07-28 08:01",
+    "message": "根除下载/删除子进程经系统shell拉起导致的管道stdout块缓冲：下载与删除均改为Popen直接拉起venv python，传env(PYTHONPATH/PYTHONUNBUFFERED)与cwd，配合python -u；下载进度条DLPROGRESS行与删除日志均改为逐行实时送达，彻底修复进度条全程卡15%、结束时跳99%的问题",
+    "changes": [
+      "根除下载/删除子进程经系统shell拉起导致的管道stdout块缓冲：下载与删除均改为Popen直接拉起venv python，传env(PYTHONPATH/PYTHONUNBUFFERED)与cwd，配合python -u；下载进度条DLPROGRESS行与删除日志均改为逐行实时送达，彻底修复进度条全程卡15%、结束时跳99%的问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0800.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.28.0756",
+    "date": "2026-07-28 07:58",
+    "message": "修复模型下载进度条全程卡15%/结束时跳99%：根因是下载子进程经系统shell拉起导致stdout块缓冲，DLPROGRESS行被攒到进程结束才刷出；改为Popen直接拉起venv python并传env+cwd，配合python -u实现进度逐行实时送达",
+    "changes": [
+      "修复模型下载进度条全程卡15%/结束时跳99%：根因是下载子进程经系统shell拉起导致stdout块缓冲，DLPROGRESS行被攒到进程结束才刷出；改为Popen直接拉起venv python并传env+cwd，配合python -u实现进度逐行实时送达"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0756.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.28.0621",
+    "date": "2026-07-28 06:23",
+    "message": "重新编译前端(dist已更新)并构建新exe；确认build-version.py/launcher.py/main.py/version_manager.py等构建文件未受前端与环境修复影响",
+    "changes": [
+      "重新编译前端(dist已更新)并构建新exe；确认build-version.py/launcher.py/main.py/version_manager.py等构建文件未受前端与环境修复影响"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0621.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.28.0612",
+    "date": "2026-07-28 06:12",
+    "message": "优化和修复",
+    "changes": [
+      "优化和修复"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.28.0612.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.27.1140",
+    "date": "2026-07-27 11:42",
+    "message": "本地化Tailwind(去掉运行时外网CDN依赖:部署时拉取tailwind.js本地文件);修复main.py closeEvent的_debug_log_file未定义崩溃;download-frontend.ps1部署时拉取tailwind.js并补齐server/public",
+    "changes": [
+      "本地化Tailwind(去掉运行时外网CDN依赖:部署时拉取tailwind.js本地文件);修复main.py closeEvent的_debug_log_file未定义崩溃;download-frontend.ps1部署时拉取tailwind.js并补齐server/public"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.27.1140.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.26.2338",
+    "date": "2026-07-26 23:40",
+    "message": "修复：一键部署在环境已就绪时也会自动安装 Web 前端依赖(npm install)",
+    "changes": [
+      "修复：一键部署在环境已就绪时也会自动安装 Web 前端依赖(npm install)",
+      "修复：模型管理器验证结果标签增加『未验证』占位、验证时间标签验证前隐藏"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.26.2338.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.22.0405",
+    "date": "2026-07-22 04:07",
+    "message": "git还原版-去splash",
+    "changes": [
+      "git还原版-去splash"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.22.0405.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.22.0345",
+    "date": "2026-07-22 03:47",
+    "message": "git还原版构建",
+    "changes": [
+      "git还原版构建"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.22.0345.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.20.0530",
+    "date": "2026-07-20 05:32",
+    "message": "优化和修复",
+    "changes": [
+      "优化和修复"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.20.0530.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.03.0635",
+    "date": "2026-07-03 06:37",
+    "message": "修复单实例保护（消除双托盘图标）",
+    "changes": [
+      "修复单实例保护（消除双托盘图标）",
+      "修复gradio SOCKS代理导入崩溃",
+      "修复REQUIRED_DEPS中lycoris_lora模块名",
+      "清理代理环境变量"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.03.0635.exe",
+    "download_url": "https://gitee.com/yunjii/music/releases/download/v2026.07.03.0635/%E4%BA%91%E9%9B%86%E6%99%BA%E8%83%BD%E9%9F%B3%E4%B9%90%E5%88%9B%E6%84%8F%E5%8F%B0-v2026.07.03.0635.exe"
+  },
+  {
+    "version": "2026.05.26.0502",
+    "date": "2026-05-26 05:04",
+    "message": "改用 --console 模式调试闪退问题",
+    "changes": [
+      "改用 --console 模式调试闪退问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0502.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0447",
+    "date": "2026-05-26 04:49",
+    "message": "改用 --hide-console hide-early 替代 --windowed",
+    "changes": [
+      "改用 --hide-console hide-early 替代 --windowed"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0447.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0430",
+    "date": "2026-05-26 04:32",
+    "message": "修复 windowed 模式下 _NullWriter 导致闪退",
+    "changes": [
+      "修复 windowed 模式下 _NullWriter 导致闪退"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0430.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0336",
+    "date": "2026-05-26 03:38",
+    "message": "重构目录结构和路径解析，参考视频创意站三目录原则",
+    "changes": [
+      "重构目录结构和路径解析，参考视频创意站三目录原则"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0336.exe",
+    "download_url": "https://gitee.com/yunjii/music/releases/download/v2026.05.26.0336/云集智能音乐创意台-v2026.05.26.0336.exe"
+  },
+  {
+    "version": "2026.05.26.0133",
+    "date": "2026-05-26 01:34",
+    "message": "修复 base_dir 支持 dev/app/ 兄弟目录查找",
+    "changes": [
+      "修复 base_dir 支持 dev/app/ 兄弟目录查找"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0133.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0131",
+    "date": "2026-05-26 01:31",
+    "message": "修复 base_dir 路径解析优先查找真实源码目录",
+    "changes": [
+      "修复 base_dir 路径解析优先查找真实源码目录"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0131.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0120",
+    "date": "2026-05-26 01:20",
+    "message": "修复 base_dir 路径解析优先查找真实源码目录",
+    "changes": [
+      "修复 base_dir 路径解析优先查找真实源码目录"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0120.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0117",
+    "date": "2026-05-26 01:17",
+    "message": "修复 frozen 模式下脚本找不到和 base_dir 路径解析问题",
+    "changes": [
+      "修复 frozen 模式下脚本找不到和 base_dir 路径解析问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0117.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.26.0043",
+    "date": "2026-05-26 00:43",
+    "message": "修复 qt.conf 缺失导致 Qt 平台插件加载失败",
+    "changes": [
+      "修复 qt.conf 缺失导致 Qt 平台插件加载失败"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.26.0043.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0918",
+    "date": "2026-05-12 09:20",
+    "message": "架构升级：adapter适配层+acestep-sync同步脚本",
+    "changes": [
+      "架构升级：adapter适配层+acestep-sync同步脚本",
+      "添加XL模型支持(acestep-v15-xl-turbo/xl-sft/xl-base)",
+      "前端和启动器统一支持XL模型选择",
+      "长期跟进官方更新机制"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0918.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0813",
+    "date": "2026-05-12 08:15",
+    "message": "部署维护自动化：缺失依赖直接安装不再运行完整脚本",
+    "changes": [
+      "部署维护自动化：缺失依赖直接安装不再运行完整脚本",
+      "统一所有安装路径使用_install_missing_dependencies",
+      "移除uv_sync和install-env.ps1修复方式避免降级"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0813.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0808",
+    "date": "2026-05-12 08:10",
+    "message": "修复pyproject.toml版本冲突(torch2.9.0/移除torchvision/transformers<5.0)",
+    "changes": [
+      "修复pyproject.toml版本冲突(torch2.9.0/移除torchvision/transformers<5.0)",
+      "依赖检测从70秒优化到3秒(单次Python进程)",
+      "移除pyproject.toml安装方式避免降级",
+      "统一version_constraints版本约束"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0808.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0717",
+    "date": "2026-05-12 07:19",
+    "message": "修复Python依赖检测：显示具体缺失依赖名",
+    "changes": [
+      "修复Python依赖检测：显示具体缺失依赖名",
+      "统一venv_python路径查找",
+      "检测不再一失败就break而是检查所有依赖"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0717.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0706",
+    "date": "2026-05-12 07:07",
+    "message": "修复venv_python路径查找统一使用_find_venv_python",
+    "changes": [
+      "修复venv_python路径查找统一使用_find_venv_python"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0706.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0645",
+    "date": "2026-05-12 06:47",
+    "message": "修复非按钮标题文字边框",
+    "changes": [
+      "修复非按钮标题文字边框",
+      "增强环境检测刷新按钮可见性",
+      "移除无用依赖sentencepiece/toml/torchvision",
+      "flash_attn强制安装",
+      "部署维护完成后确保检测清单全绿",
+      "所有项目依赖统一为必须安装"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0645.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0558",
+    "date": "2026-05-12 06:00",
+    "message": "修复非按钮标题文字边框",
+    "changes": [
+      "修复非按钮标题文字边框",
+      "刷新按钮改为文字按钮",
+      "移除4个无用依赖(torchvision/vector-quantize-pytorch/sentencepiece/typer-slim)",
+      "同步REQUIRED_DEPS与ACE_PIP_DEPS"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0558.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0415",
+    "date": "2026-05-12 04:16",
+    "message": "修复Python环境检测venv路径问题",
+    "changes": [
+      "修复Python环境检测venv路径问题",
+      "同步ACE_PIP_DEPS与安装脚本依赖列表",
+      "添加sentencepiece到安装脚本",
+      "增加依赖名称宽度至82px"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0415.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0409",
+    "date": "2026-05-12 04:10",
+    "message": "修复cardFrame内QLabel边框继承问题",
+    "changes": [
+      "修复cardFrame内QLabel边框继承问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0409.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0344",
+    "date": "2026-05-12 03:46",
+    "message": "参考视频创意站重构部署维护页面",
+    "changes": [
+      "参考视频创意站重构部署维护页面",
+      "左右分栏布局：环境检测+依赖版本+目录配置+运行日志",
+      "添加下载源选择(清华/阿里云/官方)",
+      "添加依赖版本锁定检查机制",
+      "添加GPU检测"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0344.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0224",
+    "date": "2026-05-12 02:26",
+    "message": "修复PowerShell检测逻辑",
+    "changes": [
+      "修复PowerShell检测逻辑",
+      "Python依赖添加版本控制",
+      "日志区域添加清空/保存/展开/自动滚动按钮"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0224.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0131",
+    "date": "2026-05-12 01:33",
+    "message": "新增部署维护独立页面",
+    "changes": [
+      "新增部署维护独立页面",
+      "安装步骤依赖清单检测报告",
+      "输出目录定义设置和打开文件夹功能",
+      "维护日志独立区域"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0131.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.12.0016",
+    "date": "2026-05-12 00:17",
+    "message": "统一文件结构-所有运行时文件集中在app目录",
+    "changes": [
+      "统一文件结构-所有运行时文件集中在app目录"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.12.0016.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.11.2305",
+    "date": "2026-05-11 23:06",
+    "message": "单实例控制改用psutil方案-参考编程工作站实现",
+    "changes": [
+      "单实例控制改用psutil方案-参考编程工作站实现"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.11.2305.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.11.2253",
+    "date": "2026-05-11 22:54",
+    "message": "单实例控制改为新进程先启动再优雅关闭旧进程",
+    "changes": [
+      "单实例控制改为新进程先启动再优雅关闭旧进程"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.11.2253.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.11.2246",
+    "date": "2026-05-11 22:47",
+    "message": "添加Windows命名事件单实例控制+按钮配色优化",
+    "changes": [
+      "添加Windows命名事件单实例控制+按钮配色优化"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.11.2246.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.11.2237",
+    "date": "2026-05-11 22:38",
+    "message": "全局按钮配色重新设计-红色主题统一品牌色",
+    "changes": [
+      "全局按钮配色重新设计-红色主题统一品牌色"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.11.2237.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.11.2212",
+    "date": "2026-05-11 22:14",
+    "message": "修改按钮加大变红+编辑态增加保存取消按钮",
+    "changes": [
+      "修改按钮加大变红+编辑态增加保存取消按钮"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.11.2212.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.11.2140",
+    "date": "2026-05-11 21:42",
+    "message": "端口修改改为内联编辑+自动重启生效",
+    "changes": [
+      "端口修改改为内联编辑+自动重启生效"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.11.2140.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.11.2026",
+    "date": "2026-05-11 20:27",
+    "message": "添加服务端口修改功能",
+    "changes": [
+      "添加服务端口修改功能",
+      "修复LoRA被模型切换自动卸载问题",
+      "修复音频下载超时问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.11.2026.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.05.0400",
+    "date": "2026-05-05 04:02",
+    "message": "修复模型管理页面闪退和下载崩溃",
+    "changes": [
+      "修复模型管理页面闪退和下载崩溃",
+      "下载进度条显示在对应模型栏内"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.05.0400.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.05.02.0551",
+    "date": "2026-05-02 05:53",
+    "message": "--desc",
+    "changes": [
+      "--desc",
+      "修复青龙训练器启动问题：移除DETACHED_PROCESS和CREATE_NEW_PROCESS_GROUP标志，ServiceProcess改用-File参数，修复hidden_popen多余逗号bug，psutil添加try/except保护"
+    ],
+    "name": "云集智能音乐创意台-v2026.05.02.0551.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.30.2114",
+    "date": "2026-04-30 21:15",
+    "message": "修复青龙训练器启动问题：删除pyi_rth_subprocess.py中的SetWinEventHook全局钩子（该钩子会拦截PowerShell子进程的控制台窗口创建，导致服务无法正常启动），恢复v0359的简洁subprocess patch方式",
+    "changes": [
+      "修复青龙训练器启动问题：删除pyi_rth_subprocess.py中的SetWinEventHook全局钩子（该钩子会拦截PowerShell子进程的控制台窗口创建，导致服务无法正常启动），恢复v0359的简洁subprocess patch方式"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.2114.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.30.0854",
+    "date": "2026-04-30 08:55",
+    "message": "恢复v0359简洁启动流程：1.去掉SplashScreen和QPropertyAnimation 2.去掉_deferred_init延迟初始化 3.恢复_setup_ui一步到位 4.恢复main()简洁签名 5.去掉launcher.py中pyi_splash.update_text",
+    "changes": [
+      "恢复v0359简洁启动流程：1.去掉SplashScreen和QPropertyAnimation 2.去掉_deferred_init延迟初始化 3.恢复_setup_ui一步到位 4.恢复main()简洁签名 5.去掉launcher.py中pyi_splash.update_text"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.0854.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.30.0806",
+    "date": "2026-04-30 08:07",
+    "message": "修复破坏性修改：1.依赖缺失时优先重跑install-env.ps1而非只装8个包 2.venv损坏时优先重跑install-env.ps1 3._stop_all_services恢复v0359简洁逻辑 4._stop_service恢复netstat+taskkill方式 5.保留有用改进(monitor pause/resume,api_process终止,taskkill /T)",
+    "changes": [
+      "修复破坏性修改：1.依赖缺失时优先重跑install-env.ps1而非只装8个包 2.venv损坏时优先重跑install-env.ps1 3._stop_all_services恢复v0359简洁逻辑 4._stop_service恢复netstat+taskkill方式 5.保留有用改进(monitor pause/resume,api_process终止,taskkill /T)"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.0806.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.30.0733",
+    "date": "2026-04-30 07:34",
+    "message": "完善部署维护自动化：1.自动修复损坏的dist-info包后重试安装 2.扩展依赖检查到15个关键包 3.所有包带版本约束 4.用uv pip install -r pyproject.toml替代uv sync",
+    "changes": [
+      "完善部署维护自动化：1.自动修复损坏的dist-info包后重试安装 2.扩展依赖检查到15个关键包 3.所有包带版本约束 4.用uv pip install -r pyproject.toml替代uv sync"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.0733.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.30.0707",
+    "date": "2026-04-30 07:09",
+    "message": "修复依赖安装：1.用uv pip install -r pyproject.toml替代uv sync安装完整依赖 2.所有依赖包带版本约束 3.扩展依赖检查列表包含fastapi/uvicorn/gradio等 4.设置UV_LINK_MODE=copy避免硬链接问题",
+    "changes": [
+      "修复依赖安装：1.用uv pip install -r pyproject.toml替代uv sync安装完整依赖 2.所有依赖包带版本约束 3.扩展依赖检查列表包含fastapi/uvicorn/gradio等 4.设置UV_LINK_MODE=copy避免硬链接问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.30.0707.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0910",
+    "date": "2026-04-29 09:13",
+    "message": "修复依赖验证：1.peft等依赖超时从10秒增加到30秒 2.transformers 5.x自动降级到4.x兼容版本 3.启动时和快速验证都自动修复transformers版本",
+    "changes": [
+      "修复依赖验证：1.peft等依赖超时从10秒增加到30秒 2.transformers 5.x自动降级到4.x兼容版本 3.启动时和快速验证都自动修复transformers版本"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0910.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0846",
+    "date": "2026-04-29 08:49",
+    "message": "修复弹窗问题：恢复main.py开头的全局subprocess补丁(和v0359一致)，用_pyi_hidden_patched防止重复补丁和递归",
+    "changes": [
+      "修复弹窗问题：恢复main.py开头的全局subprocess补丁(和v0359一致)，用_pyi_hidden_patched防止重复补丁和递归"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0846.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0824",
+    "date": "2026-04-29 08:26",
+    "message": "统一Python健康检查：1.提取_ensure_uv_python_healthy方法 2.智能修复和依赖安装都先检查Python 3.创建venv前先确保Python可用 4.修复uv venv缺少-p参数",
+    "changes": [
+      "统一Python健康检查：1.提取_ensure_uv_python_healthy方法 2.智能修复和依赖安装都先检查Python 3.创建venv前先确保Python可用 4.修复uv venv缺少-p参数"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0824.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0812",
+    "date": "2026-04-29 08:14",
+    "message": "修复Python重装失败：1.重装前先删除损坏的Python目录 2.初始化found_python变量 3.确保uv python install能干净安装",
+    "changes": [
+      "修复Python重装失败：1.重装前先删除损坏的Python目录 2.初始化found_python变量 3.确保uv python install能干净安装"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0812.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0803",
+    "date": "2026-04-29 08:06",
+    "message": "修复Python安装损坏：1.venv重建前先检查uv管理的Python能否运行 2.Python损坏时用uv python install重新安装 3.重建venv后再安装依赖",
+    "changes": [
+      "修复Python安装损坏：1.venv重建前先检查uv管理的Python能否运行 2.Python损坏时用uv python install重新安装 3.重建venv后再安装依赖"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0803.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0753",
+    "date": "2026-04-29 07:54",
+    "message": "修复venv损坏导致依赖无法安装：1.安装前检测venv Python能否运行 2.损坏时自动删除重建venv 3.uv sync加--python指定目标 4.重建后重新安装所有依赖",
+    "changes": [
+      "修复venv损坏导致依赖无法安装：1.安装前检测venv Python能否运行 2.损坏时自动删除重建venv 3.uv sync加--python指定目标 4.重建后重新安装所有依赖"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0753.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0726",
+    "date": "2026-04-29 07:28",
+    "message": "修复依赖安装：1.uv sync加--index-strategy unsafe-best-match解决torchao冲突 2.用uv pip install --python直接指定目标Python 3.PyTorch从cu128索引优先安装 4.安装后验证结果",
+    "changes": [
+      "修复依赖安装：1.uv sync加--index-strategy unsafe-best-match解决torchao冲突 2.用uv pip install --python直接指定目标Python 3.PyTorch从cu128索引优先安装 4.安装后验证结果"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0726.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0705",
+    "date": "2026-04-29 07:06",
+    "message": "修复依赖缺失不自动安装：1._quick_verify_environment发现缺失时自动触发_install_missing_dependencies 2.新增_install_missing_dependencies方法(先uv sync再install-env.ps1最后逐个安装) 3.所有安装命令使用清华镜像源",
+    "changes": [
+      "修复依赖缺失不自动安装：1._quick_verify_environment发现缺失时自动触发_install_missing_dependencies 2.新增_install_missing_dependencies方法(先uv sync再install-env.ps1最后逐个安装) 3.所有安装命令使用清华镜像源"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0705.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0655",
+    "date": "2026-04-29 06:57",
+    "message": "修复RecursionError：1.删除main.py重复的Popen patch 2.launcher.py添加_pyi_hidden_patched防重复patch 3.pyi_rth_subprocess.py添加标记",
+    "changes": [
+      "修复RecursionError：1.删除main.py重复的Popen patch 2.launcher.py添加_pyi_hidden_patched防重复patch 3.pyi_rth_subprocess.py添加标记"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0655.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0630",
+    "date": "2026-04-29 06:32",
+    "message": "修复退出服务闪退+状态恢复：1.ServiceMonitor添加pause/resume 2.停止时暂停监控防止状态被覆盖 3.简化psutil遍历避免crash",
+    "changes": [
+      "修复退出服务闪退+状态恢复：1.ServiceMonitor添加pause/resume 2.停止时暂停监控防止状态被覆盖 3.简化psutil遍历避免crash"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0630.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0619",
+    "date": "2026-04-29 06:21",
+    "message": "用psutil重写停止服务逻辑：1.杀api_process进程树 2.按端口查找并杀进程 3.等待端口释放后更新UI",
+    "changes": [
+      "用psutil重写停止服务逻辑：1.杀api_process进程树 2.按端口查找并杀进程 3.等待端口释放后更新UI"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0619.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0610",
+    "date": "2026-04-29 06:11",
+    "message": "修复退出服务后API状态仍显示运行中：1.终止api_process 2.taskkill加/T杀进程树 3.清除监控缓存并强制更新UI状态",
+    "changes": [
+      "修复退出服务后API状态仍显示运行中：1.终止api_process 2.taskkill加/T杀进程树 3.清除监控缓存并强制更新UI状态"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0610.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0600",
+    "date": "2026-04-29 06:02",
+    "message": "高清icon.png替换icon.ico解决图标模糊+打包icon.png",
+    "changes": [
+      "高清icon.png替换icon.ico解决图标模糊+打包icon.png"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0600.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0547",
+    "date": "2026-04-29 05:49",
+    "message": "修复splash位置：Qt splash居中显示匹配Tk splash位置",
+    "changes": [
+      "修复splash位置：Qt splash居中显示匹配Tk splash位置"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0547.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0527",
+    "date": "2026-04-29 05:29",
+    "message": "PyInstaller Tk splash瞬间显示+Qt动态进度条无缝切换",
+    "changes": [
+      "PyInstaller Tk splash瞬间显示+Qt动态进度条无缝切换"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0527.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0510",
+    "date": "2026-04-29 05:12",
+    "message": "回滚到v0309+启动优化：splash提前到launcher.py创建，点击EXE后更快显示动态进度条",
+    "changes": [
+      "回滚到v0309+启动优化：splash提前到launcher.py创建，点击EXE后更快显示动态进度条"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0510.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0453",
+    "date": "2026-04-29 04:55",
+    "message": "去掉PyInstaller Tk splash，改用Qt QSplashScreen+QTimer动态进度条",
+    "changes": [
+      "去掉PyInstaller Tk splash，改用Qt QSplashScreen+QTimer动态进度条"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0453.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0440",
+    "date": "2026-04-29 04:41",
+    "message": "纯Win32原生splash窗口：自建窗口+消息循环+WM_PAINT绘制，彻底解决Tk覆盖问题",
+    "changes": [
+      "纯Win32原生splash窗口：自建窗口+消息循环+WM_PAINT绘制，彻底解决Tk覆盖问题"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0440.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0411",
+    "date": "2026-04-29 04:13",
+    "message": "动态进度条：后台线程30fps平滑动画",
+    "changes": [
+      "动态进度条：后台线程30fps平滑动画"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0411.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0358",
+    "date": "2026-04-29 04:00",
+    "message": "单窗口进度条：Win32 GDI直接在PyInstaller splash上绘制进度条",
+    "changes": [
+      "单窗口进度条：Win32 GDI直接在PyInstaller splash上绘制进度条"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0358.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0344",
+    "date": "2026-04-29 03:46",
+    "message": "无缝切换：动态splash覆盖静态splash后再关闭",
+    "changes": [
+      "无缝切换：动态splash覆盖静态splash后再关闭"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0344.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0333",
+    "date": "2026-04-29 03:36",
+    "message": "恢复静态splash立即显示+动态进度条无缝过渡",
+    "changes": [
+      "恢复静态splash立即显示+动态进度条无缝过渡"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0333.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0309",
+    "date": "2026-04-29 03:11",
+    "message": "移除静态splash，只保留动态进度条",
+    "changes": [
+      "移除静态splash，只保留动态进度条"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0309.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0300",
+    "date": "2026-04-29 03:02",
+    "message": "动态进度条启动画面+修复封装错误",
+    "changes": [
+      "动态进度条启动画面+修复封装错误"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0300.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0216",
+    "date": "2026-04-29 02:18",
+    "message": "启动优化：先显示窗口框架再延迟加载组件+splash加图标",
+    "changes": [
+      "启动优化：先显示窗口框架再延迟加载组件+splash加图标"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0216.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0201",
+    "date": "2026-04-29 02:02",
+    "message": "PyInstaller启动画面+懒加载优化",
+    "changes": [
+      "PyInstaller启动画面+懒加载优化"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0201.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0140",
+    "date": "2026-04-29 01:42",
+    "message": "启动画面+懒加载优化+默认Git开发版",
+    "changes": [
+      "启动画面+懒加载优化+默认Git开发版"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0140.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0120",
+    "date": "2026-04-29 01:22",
+    "message": "默认显示Git开发版+所有页面先显示再加载",
+    "changes": [
+      "默认显示Git开发版+所有页面先显示再加载"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0120.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0109",
+    "date": "2026-04-29 01:12",
+    "message": "修复版本状态显示+Git异步加载+控制台弹窗抑制",
+    "changes": [
+      "修复版本状态显示+Git异步加载+控制台弹窗抑制"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0109.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0038",
+    "date": "2026-04-29 00:40",
+    "message": "调试版-监控所有进程窗口",
+    "changes": [
+      "调试版-监控所有进程窗口"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0038.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.29.0037",
+    "date": "2026-04-29 00:39",
+    "message": "调试版-监控所有进程窗口",
+    "changes": [
+      "调试版-监控所有进程窗口"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.29.0037.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0853",
+    "date": "2026-04-28 08:55",
+    "message": "调试版-窗口监控追踪弹窗来源",
+    "changes": [
+      "调试版-窗口监控追踪弹窗来源"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0853.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0833",
+    "date": "2026-04-28 08:35",
+    "message": "调试版-追踪subprocess弹窗来源",
+    "changes": [
+      "调试版-追踪subprocess弹窗来源"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0833.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0802",
+    "date": "2026-04-28 08:04",
+    "message": "异步加载EXE版本数据，修复弹窗问题",
+    "changes": [
+      "异步加载EXE版本数据，修复弹窗问题",
+      "添加全部展开/收起按钮",
+      "修复远程版本状态显示",
+      "修复psutil导入错误"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0802.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0733",
+    "date": "2026-04-28 07:34",
+    "message": "回滚到v0359后重新添加：全部展开/收起按钮、远程版本已提供标签、ver目录多路径搜索",
+    "changes": [
+      "回滚到v0359后重新添加：全部展开/收起按钮、远程版本已提供标签、ver目录多路径搜索"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0733.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0700",
+    "date": "2026-04-28 07:02",
+    "message": "修复psutil导入：将_ntuples从排除列表移到hidden-import",
+    "changes": [
+      "修复psutil导入：将_ntuples从排除列表移到hidden-import"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0700.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0641",
+    "date": "2026-04-28 06:43",
+    "message": "修复弹窗：添加--hide-console hide-early，恢复--hidden-import psutil，排除非Windows平台psutil模块",
+    "changes": [
+      "修复弹窗：添加--hide-console hide-early，恢复--hidden-import psutil，排除非Windows平台psutil模块"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0641.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0619",
+    "date": "2026-04-28 06:22",
+    "message": "调试版2：添加subprocess调用日志",
+    "changes": [
+      "调试版2：添加subprocess调用日志"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0619.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0558",
+    "date": "2026-04-28 06:00",
+    "message": "调试版：添加vm_debug.log定位弹窗来源",
+    "changes": [
+      "调试版：添加vm_debug.log定位弹窗来源"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0558.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0534",
+    "date": "2026-04-28 05:36",
+    "message": "修复版本管理器：恢复v0359基础+全部展开收起按钮+远程版本已提供状态+增强ver目录搜索+修复version_history路径",
+    "changes": [
+      "修复版本管理器：恢复v0359基础+全部展开收起按钮+远程版本已提供状态+增强ver目录搜索+修复version_history路径"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0534.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0520",
+    "date": "2026-04-28 05:22",
+    "message": "﻿??v0359??urlopen??????|??ver??????|????????",
+    "changes": [
+      "﻿??v0359??urlopen??????|??ver??????|????????"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0520.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0453",
+    "date": "2026-04-28 04:55",
+    "message": "﻿??psutil C????",
+    "changes": [
+      "﻿??psutil C????"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0453.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0449",
+    "date": "2026-04-28 04:51",
+    "message": "﻿??psutil????",
+    "changes": [
+      "﻿??psutil????"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0449.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0445",
+    "date": "2026-04-28 04:46",
+    "message": "﻿??????????|QThread????????????|??????????|??git_downloader??shutil",
+    "changes": [
+      "﻿??????????|QThread????????????|??????????|??git_downloader??shutil"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0445.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.28.0359",
+    "date": "2026-04-28 04:01",
+    "message": "﻿??EXE???????|??????|??????????|????????",
+    "changes": [
+      "﻿??EXE???????|??????|??????????|????????"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.28.0359.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.27.2237",
+    "date": "2026-04-27 22:38",
+    "message": "Git开发版用Gitee Token访问私有仓库API",
+    "changes": [
+      "Git开发版用Gitee Token访问私有仓库API",
+      "EXE模式改名为EXE稳定版",
+      "添加.gitee_token到PyInstaller打包"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.27.2237.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.27.2108",
+    "date": "2026-04-27 21:10",
+    "message": "Git开发版改用Gitee Commits API获取历史",
+    "changes": [
+      "Git开发版改用Gitee Commits API获取历史",
+      "零subprocess零弹窗",
+      "EXE稳定版+Git开发版双模式"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.27.2108.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.04.27.1853",
+    "date": "2026-04-27 18:54",
+    "message": "﻿??????????????",
+    "changes": [
+      "﻿??????????????",
+      "?HTTP API??git.exe??????",
+      "????????????Git"
+    ],
+    "name": "云集智能音乐创意台-v2026.04.27.1853.exe",
+    "download_url": ""
+  }
+]

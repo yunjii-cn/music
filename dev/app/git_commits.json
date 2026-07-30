@@ -1,5 +1,13 @@
 [
   {
+    "hash": "72ad87abe1f40de4e24f33328c34624f8f9284a5",
+    "short_hash": "72ad87a",
+    "message": "feat: 发布版本 v2026.07.31.0146",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 01:47:50"
+  },
+  {
     "hash": "e17c3c99c42a736c567b547f309fce608a865b8d",
     "short_hash": "e17c3c9",
     "message": "feat: 发布版本 v2026.07.31.0129",
@@ -470,13 +478,5 @@
     "author": "yunjii",
     "email": "yi@yunjii.cn",
     "date": "2026-07-03 06:37:35"
-  },
-  {
-    "hash": "07a04dad5a6389e83e19eafc76e49d33e8e75430",
-    "short_hash": "07a04da",
-    "message": "fix: 修复单实例保护与gradio SOCKS代理问题",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-03 06:33:28"
   }
 ]
