@@ -113,6 +113,14 @@ BTN_GREEN_STYLE = (
     " QPushButton:pressed { background-color: #1B5E20; }"
 )
 
+# 「加载更多」按钮（底部懒加载触发）
+LOAD_MORE_STYLE = (
+    "QPushButton { background-color: #1A1A1A; color: #888888; border: 1px solid #2A2A2A; border-radius: 6px;"
+    " font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; font-size: 9pt; font-weight: bold; }"
+    " QPushButton:hover { background-color: #222222; color: #BBBBBB; border-color: #3A3A3A; }"
+    " QPushButton:pressed { background-color: #151515; }"
+)
+
 
 class VersionCard(QFrame):
     """带悬停发光的高级版本卡片（品牌红微光）。
@@ -436,6 +444,17 @@ class HybridVersionManagerDialog(QWidget):
         self._remote_versions_cache = None
         self.version_history = {}
 
+        # ── 视图模式（详情 / 列表）+ 懒加载分页 ──
+        # 默认详情模式；详情一次 10 条，列表一次 20 条（对齐视频创意站）
+        self._detail_mode = True
+        self._detail_page_size = 10
+        self._list_page_size = 20
+        self._rendered_count = 0
+        self._data_cache = []
+        self._render_is_exe = True
+        self._current_exe_version = None
+        self._load_more_btn = None
+
         self._setup_ui()
         self._load_local_version_history()
 
@@ -681,6 +700,9 @@ class HybridVersionManagerDialog(QWidget):
         tab_layout.addWidget(self.btn_mode_git)
 
         tab_layout.addStretch()
+        # ── 详情 / 列表 视图模式切换（默认详情）──
+        self.view_toggle = self._build_view_toggle()
+        tab_layout.addWidget(self.view_toggle)
         self._status_label = QLabel("")
         self._status_label.setStyleSheet("font-size: 8pt; color: #888; border: none;")
         tab_layout.addWidget(self._status_label)
@@ -716,6 +738,48 @@ class HybridVersionManagerDialog(QWidget):
             self.btn_mode_exe.setStyleSheet(TAB_INACTIVE_STYLE)
         self._load_versions(force=True, auto_remote=False)
 
+    # ───────────────────────── 详情 / 列表 视图模式 ─────────────────────────
+    def _build_view_toggle(self):
+        frame = QFrame()
+        frame.setStyleSheet(
+            "QFrame { background-color: #111113; border: 1px solid #333333; border-radius: 6px; }")
+        layout = QHBoxLayout(frame)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(2)
+        self.btn_detail_mode = QPushButton("详情")
+        self.btn_list_mode = QPushButton("列表")
+        for b in (self.btn_detail_mode, self.btn_list_mode):
+            b.setFixedSize(48, 28)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(self._on_view_mode_changed)
+            layout.addWidget(b)
+        self._apply_view_toggle_style()
+        return frame
+
+    def _apply_view_toggle_style(self):
+        if self._detail_mode:
+            active, inactive = self.btn_detail_mode, self.btn_list_mode
+        else:
+            active, inactive = self.btn_list_mode, self.btn_detail_mode
+        active.setStyleSheet(
+            "QPushButton { background-color: #CC0000; color: #FFFFFF; border: none; border-radius: 4px;"
+            " font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; font-size: 9pt; font-weight: bold; }"
+            " QPushButton:hover { background-color: #FF0000; }")
+        inactive.setStyleSheet(
+            "QPushButton { background-color: transparent; color: #AAAAAA; border: none; border-radius: 4px;"
+            " font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; font-size: 9pt; font-weight: bold; }"
+            " QPushButton:hover { background-color: #222222; color: #DDDDDD; }")
+
+    def _on_view_mode_changed(self):
+        sender = self.sender()
+        new_detail = (sender is self.btn_detail_mode)
+        if new_detail == self._detail_mode:
+            return
+        self._detail_mode = new_detail
+        self._apply_view_toggle_style()
+        # 重新渲染当前 Tab（保留已加载数据，仅按新模式分页）
+        self._load_versions(force=True, auto_remote=False)
+
     def _on_remote_fetch_clicked(self):
         self._load_versions(force=True, auto_remote=True)
 
@@ -741,26 +805,78 @@ class HybridVersionManagerDialog(QWidget):
 
     def _render_exe_local(self):
         current = self._get_current_exe_version()
+        self._current_exe_version = (current or {}).get('version')
         versions = self._get_builtin_versions()
         self._status_label.setText("")
+        self._clear_layout()
+        self._load_more_btn = None
         if not versions:
             self._empty_label("暂无本地版本列表（versions.json 为空）")
+            self._data_cache = []
             return
-        cur = (current or {}).get('version')
-        for v in versions:
-            self._create_exe_card(v, v.get('version') == cur)
+        self._data_cache = versions
+        self._render_is_exe = True
+        self._rendered_count = 0
+        self._render_batch()
         self.current_info_label.setText(
-            f"当前版本: v{cur} ｜ 共 {len(versions)} 个版本（本地静态列表，未联网）")
+            f"当前版本: v{self._current_exe_version} ｜ 共 {len(versions)} 个版本（本地静态列表，未联网）")
 
     def _render_git_local(self):
         commits = self._get_builtin_commits()
         self._status_label.setText("")
+        self._clear_layout()
+        self._load_more_btn = None
         if not commits:
             self._empty_label("暂无本地提交历史（git_commits.json 为空）")
+            self._data_cache = []
             return
-        for c in commits:
-            self._create_commit_card(c)
+        self._data_cache = commits
+        self._render_is_exe = False
+        self._rendered_count = 0
+        self._render_batch()
         self.current_info_label.setText(f"共 {len(commits)} 条提交（本地快照，未联网）")
+
+    def _render_batch(self):
+        if not self._data_cache:
+            return
+        page_size = self._detail_page_size if self._detail_mode else self._list_page_size
+        end = min(self._rendered_count + page_size, len(self._data_cache))
+        for idx in range(self._rendered_count, end):
+            item = self._data_cache[idx]
+            if self._render_is_exe:
+                is_current = (item.get('version') == self._current_exe_version)
+                if self._detail_mode:
+                    self._create_exe_card(item, is_current)
+                else:
+                    self._create_exe_card_compact(item, is_current)
+            else:
+                if self._detail_mode:
+                    self._create_commit_card(item)
+                else:
+                    self._create_commit_card_compact(item)
+        self._rendered_count = end
+        if self._load_more_btn is not None:
+            self.versions_layout.removeWidget(self._load_more_btn)
+            self._load_more_btn.setParent(None)
+            self._load_more_btn.deleteLater()
+            self._load_more_btn = None
+        if end < len(self._data_cache):
+            remaining = len(self._data_cache) - end
+            btn = QPushButton(f"加载更多（{remaining} 条剩余）")
+            btn.setFixedHeight(34)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(LOAD_MORE_STYLE)
+            btn.clicked.connect(self._load_more)
+            self._load_more_btn = btn
+            self.versions_layout.addWidget(btn)
+
+    def _load_more(self):
+        if self._load_more_btn is not None:
+            self.versions_layout.removeWidget(self._load_more_btn)
+            self._load_more_btn.setParent(None)
+            self._load_more_btn.deleteLater()
+            self._load_more_btn = None
+        self._render_batch()
 
     def _empty_label(self, text):
         lbl = QLabel(text)
@@ -884,6 +1000,114 @@ class HybridVersionManagerDialog(QWidget):
         layout.addWidget(a)
         self.versions_layout.addWidget(card)
 
+    # ───────────────────────── 列表模式（紧凑行）─────────────────────────
+    def _create_exe_card_compact(self, v, is_current):
+        ver = v.get('version', '')
+        local_path = v.get('path') or v.get('local_path')
+        has_local = bool(local_path) and os.path.exists(local_path or '')
+        has_url = bool(v.get('download_url'))
+        is_new = (not is_current) and has_url and self._is_newer(ver, self._current_exe_version)
+
+        if is_current:
+            row_bg, border_color = "#1A1A1A", "#333333"
+        elif has_local or has_url:
+            row_bg, border_color = "#141414", "#222222"
+        else:
+            row_bg, border_color = "#111113", "#1A1A1A"
+
+        card = QFrame()
+        card.setStyleSheet(
+            f"QFrame{{ background-color: {row_bg}; border: 1px solid {border_color}; border-radius: 6px; }}")
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(10)
+
+        name = QLabel(f"v{ver}")
+        name.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
+        name.setStyleSheet(f"color: {'#FFFFFF' if is_current else '#DDDDDD'}; border: none;")
+        layout.addWidget(name)
+
+        msg = v.get('message', '') or v.get('name', '')
+        if msg and len(msg) > 46:
+            msg = msg[:46] + '…'
+        ml = QLabel(msg)
+        ml.setStyleSheet("color: #999999; font-size: 10px; border: none;")
+        layout.addWidget(ml, 1)
+
+        right = QHBoxLayout()
+        right.setSpacing(6)
+        right.setAlignment(Qt.AlignmentFlag.AlignRight)
+        if is_current:
+            s_text, s_color = "当前", "#4CAF50"
+        elif is_new:
+            s_text, s_color = "新版本", "#42A5F5"
+        elif has_local:
+            s_text, s_color = "已下载", "#FF9800"
+        elif has_url:
+            s_text, s_color = "可下载", "#888888"
+        else:
+            s_text, s_color = "—", "#555555"
+        status = QLabel(s_text)
+        status.setStyleSheet(f"color: {s_color}; font-size: 9pt; font-weight: bold; border: none;")
+        right.addWidget(status)
+
+        if has_local and not is_current:
+            run = QPushButton("运行")
+            run.setFixedSize(56, 28)
+            run.setCursor(Qt.CursorShape.PointingHandCursor)
+            run.setStyleSheet(BTN_RED_STYLE)
+            run.clicked.connect(lambda checked, p=local_path: self._launch_exe_version(p))
+            right.addWidget(run)
+        if has_url:
+            dl = QPushButton("下载")
+            dl.setFixedSize(56, 28)
+            dl.setCursor(Qt.CursorShape.PointingHandCursor)
+            dl.setStyleSheet(BTN_GREEN_STYLE)
+            dl.clicked.connect(lambda checked, ver=ver, url=v.get('download_url'):
+                               self._download_version(ver, url))
+            right.addWidget(dl)
+        layout.addLayout(right)
+        self.versions_layout.addWidget(card)
+
+    def _create_commit_card_compact(self, c):
+        card = QFrame()
+        card.setStyleSheet("QFrame { background-color: #141414; border: 1px solid #222222; border-radius: 6px; }")
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(10)
+
+        h = c.get('short_hash', '') or c.get('hash', '')
+        if len(h) > 8:
+            h = h[:8]
+        hl = QLabel(h)
+        hl.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
+        hl.setStyleSheet("color: #DDDDDD; border: none;")
+        layout.addWidget(hl)
+
+        m = c.get('message', '')
+        first = m.split('\n')[0] if m else ''
+        if len(first) > 50:
+            first = first[:50] + '…'
+        ml = QLabel(first)
+        ml.setStyleSheet("color: #CCCCCC; font-size: 11px; border: none;")
+        layout.addWidget(ml, 1)
+
+        d = c.get('date', '')
+        if d and 'T' in d:
+            d = d.split('T')[0]
+        elif d and len(d) > 10:
+            d = d[:10]
+        dl = QLabel(d)
+        dl.setStyleSheet("color: #888888; font-size: 10px; border: none;")
+        layout.addWidget(dl)
+
+        a = c.get('author', '')
+        if a:
+            al = QLabel(a)
+            al.setStyleSheet("color: #888888; font-size: 10px; border: none;")
+            layout.addWidget(al)
+        self.versions_layout.addWidget(card)
+
     # ───────────────────────── 远程获取 ─────────────────────────
     def _start_remote_fetch(self):
         self._clear_layout()
@@ -899,18 +1123,31 @@ class HybridVersionManagerDialog(QWidget):
 
     def _on_remote_data_ready(self, mode, current, versions, local, winner):
         self._clear_layout()
+        self._load_more_btn = None
         self._status_label.setText("")
+        self._render_is_exe = (mode == "exe")
         if mode == "exe":
             cur = (current or {}).get('version')
-            for v in (versions or []):
-                self._create_exe_card(v, v.get('version') == cur)
+            self._current_exe_version = cur
+            self._data_cache = versions or []
+            self._rendered_count = 0
+            if not self._data_cache:
+                self._empty_label("远程暂无可用版本")
+                self.current_info_label.setText("远程列表为空")
+                return
+            self._render_batch()
             self.current_info_label.setText(
-                f"当前 v{cur} ｜ 远程共 {len(versions or [])} 个版本（来源: {winner}）")
+                f"当前 v{cur} ｜ 远程共 {len(self._data_cache)} 个版本（来源: {winner}）")
         else:
-            for c in (versions or []):
-                self._create_commit_card(c)
+            self._data_cache = versions or []
+            self._rendered_count = 0
+            if not self._data_cache:
+                self._empty_label("远程暂无提交记录")
+                self.current_info_label.setText("远程提交为空")
+                return
+            self._render_batch()
             self.current_info_label.setText(
-                f"远程共 {len(versions or [])} 条提交（来源: {winner}）")
+                f"远程共 {len(self._data_cache)} 条提交（来源: {winner}）")
 
     def _launch_exe_version(self, path):
         """仅用户点击「运行」时触发；CREATE_NO_WINDOW 隐藏控制台。"""
