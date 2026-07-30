@@ -1180,10 +1180,19 @@ class HybridVersionManagerDialog(QWidget):
         vdir = self._versions_dir()
         local_path = os.path.join(vdir, name) if vdir else None
         has_local = bool(local_path) and os.path.exists(local_path)
-        has_url = True
+        has_url = bool(v.get('download_url'))   # 仅已发布（带 download_url）版本可下载
         is_dl = self._dl_state.get(ver) == 'downloading'
         is_new = (not is_current) and has_url and self._is_newer(
             ver, (self._get_current_exe_version() or {}).get('version'))
+        # 文件大小（本地取真实字节；远程以探测缓存展示，未知显示「未提供」）
+        if has_local:
+            try:
+                size_bytes = os.path.getsize(local_path)
+            except Exception:
+                size_bytes = 0
+        else:
+            size_bytes = self._size_cache.get(ver, 0)
+        size_text = self._format_size(size_bytes)
 
         # 状态着色（对齐视频创意站）
         if is_current:
@@ -1200,13 +1209,21 @@ class HybridVersionManagerDialog(QWidget):
         layout.setContentsMargins(14, 12, 14, 12)
         layout.setSpacing(8)
 
-        # 顶部行：版本号 + 状态（下载中/已下载/可下载） + 操作按钮
+        # 顶部行：版本号 + 大小（同排）+ 状态 + 操作按钮
         top = QHBoxLayout()
         top.setSpacing(10)
         name_lbl = QLabel(f"v{ver}")
         name_lbl.setFont(QFont("Consolas", 13, QFont.Weight.Bold))
         name_lbl.setStyleSheet(f"color: {'#FFFFFF' if is_current else '#EEEEEE'}; border: none;")
-        top.addWidget(name_lbl, 1)
+        top.addWidget(name_lbl)
+
+        # 软件大小与版本号同排显示
+        size_lbl = QLabel(f"大小：{size_text}")
+        size_lbl.setStyleSheet("color: #AAAAAA; font-size: 10px; border: none;")
+        top.addWidget(size_lbl)
+        self._size_widgets[ver] = size_lbl
+
+        top.addStretch(1)
 
         if is_current:
             s_text, s_color = "● 当前版本", "#4CAF50"
@@ -1216,14 +1233,14 @@ class HybridVersionManagerDialog(QWidget):
             s_text, s_color = "🆕 新版本", "#42A5F5"
         elif has_local:
             s_text, s_color = "📦 已下载", "#FF9800"
-        elif has_url:
-            s_text, s_color = "可下载", "#888888"
+        elif not has_url:
+            s_text, s_color = "未提供", "#666666"
         else:
-            s_text, s_color = "—", "#555555"
-        status = QLabel(s_text)
-        status.setStyleSheet(f"color: {s_color}; font-size: 9pt; font-weight: bold; border: none;")
-        top.addWidget(status)
-        top.addStretch(1)
+            s_text, s_color = None, None
+        if s_text:
+            status = QLabel(s_text)
+            status.setStyleSheet(f"color: {s_color}; font-size: 9pt; font-weight: bold; border: none;")
+            top.addWidget(status)
 
         # 非下载状态的操作按钮（右对齐）
         if not is_dl:
@@ -1237,7 +1254,7 @@ class HybridVersionManagerDialog(QWidget):
                 sw.setToolTip("关闭当前版本并启动此已下载版本")
                 sw.clicked.connect(lambda checked, vv=v: self._switch_version(vv))
                 right.addWidget(sw)
-            elif not is_current:
+            elif has_url and not is_current:
                 dl = QPushButton("下载")
                 dl.setFixedSize(84, 32)
                 dl.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1278,27 +1295,6 @@ class HybridVersionManagerDialog(QWidget):
             fnl.setStyleSheet("color: #666666; border: none;")
             layout.addWidget(fnl)
 
-        # 日期
-        sub = v.get('date', '')
-        if sub:
-            sl = QLabel(sub)
-            sl.setStyleSheet("color: #888888; font-size: 10px; border: none;")
-            layout.addWidget(sl)
-
-        # 文件大小（本地已下载取真实字节；远程以探测缓存展示，未知显示「—」）
-        size_bytes = 0
-        if has_local:
-            try:
-                size_bytes = os.path.getsize(local_path)
-            except Exception:
-                size_bytes = 0
-        else:
-            size_bytes = self._size_cache.get(ver, 0)
-        size_lbl = QLabel(f"大小：{self._format_size(size_bytes)}")
-        size_lbl.setStyleSheet("color: #AAAAAA; font-size: 10px; border: none;")
-        layout.addWidget(size_lbl)
-        self._size_widgets[ver] = size_lbl
-
         # 完整版本描述（message 全文 + changes 变更明细，均可换行不截断）
         desc = (v.get('message') or '').strip()
         if desc:
@@ -1329,29 +1325,45 @@ class HybridVersionManagerDialog(QWidget):
         card.setStyleSheet(
             "QFrame { background-color: #141414; border: 1px solid #222222; border-radius: 8px; }")
         layout = QVBoxLayout(card)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
         layout.setContentsMargins(14, 10, 14, 10)
 
+        # 头部：短哈希（高亮）+ 完整哈希 + 日期
         head = QHBoxLayout()
         head.setSpacing(10)
         h = QLabel(c.get('short_hash', ''))
         h.setFont(QFont("Consolas", 12, QFont.Weight.Bold))
-        h.setStyleSheet("color: #DDDDDD; border: none;")
+        h.setStyleSheet("color: #42A5F5; border: none;")
         head.addWidget(h)
+        full = c.get('hash', '')
+        if full and len(full) > 8:
+            fh = QLabel(full)
+            fh.setFont(QFont("Consolas", 10))
+            fh.setStyleSheet("color: #666666; border: none;")
+            head.addWidget(fh)
         head.addStretch(1)
         d = QLabel(c.get('date', ''))
         d.setStyleSheet("color: #888888; font-size: 11px; border: none;")
         head.addWidget(d)
         layout.addLayout(head)
 
-        m = QLabel(c.get('message', ''))
-        m.setStyleSheet("color: #EEEEEE; font-size: 12px; border: none;")
+        # 完整提交信息（body 全文，可换行不截断）
+        body = (c.get('body') or c.get('message') or '').strip()
+        if not body:
+            body = "（无提交说明）"
+        m = QLabel(body)
+        m.setStyleSheet("color: #EEEEEE; font-size: 12px; line-height: 1.5; border: none;")
         m.setWordWrap(True)
         layout.addWidget(m)
 
-        a = QLabel(c.get('author', ''))
-        a.setStyleSheet("color: #888888; font-size: 11px; border: none;")
-        layout.addWidget(a)
+        # 作者 + 邮箱
+        author = c.get('author', '')
+        email = c.get('email', '')
+        a_text = author + (f"  <{email}>" if email else "")
+        if a_text:
+            a = QLabel(a_text)
+            a.setStyleSheet("color: #888888; font-size: 11px; border: none;")
+            layout.addWidget(a)
         self.versions_layout.addWidget(card)
 
     # ───────────────────────── 列表模式（紧凑行）─────────────────────────
@@ -1361,7 +1373,7 @@ class HybridVersionManagerDialog(QWidget):
         vdir = self._versions_dir()
         local_path = os.path.join(vdir, name) if vdir else None
         has_local = bool(local_path) and os.path.exists(local_path)
-        has_url = True
+        has_url = bool(v.get('download_url'))   # 仅已发布（带 download_url）版本可下载
         is_dl = self._dl_state.get(ver) == 'downloading'
         is_new = (not is_current) and has_url and self._is_newer(ver, self._current_exe_version)
 
@@ -1376,26 +1388,28 @@ class HybridVersionManagerDialog(QWidget):
         card.setStyleSheet(
             f"QFrame{{ background-color: {row_bg}; border: 1px solid {border_color}; border-radius: 6px; }}")
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(10)
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         name = QLabel(f"v{ver}")
         name.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         name.setStyleSheet(f"color: {'#FFFFFF' if is_current else '#DDDDDD'}; border: none;")
         layout.addWidget(name)
 
+        # 版本简介：字体适当增大、颜色提亮
         msg = v.get('message', '') or v.get('name', '')
         if msg and len(msg) > 46:
             msg = msg[:46] + '…'
         ml = QLabel(msg)
-        ml.setStyleSheet("color: #999999; font-size: 10px; border: none;")
+        ml.setStyleSheet("color: #BBBBBB; font-size: 11px; border: none;")
         layout.addWidget(ml, 1)
 
         right = QHBoxLayout()
-        right.setSpacing(6)
-        right.setAlignment(Qt.AlignmentFlag.AlignRight)
+        right.setSpacing(8)
+        right.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
-        # 文件大小（紧凑行右侧前置，灰色小字）
+        # 文件大小：字体适当增大、与按钮垂直居中
         size_bytes = 0
         if has_local:
             try:
@@ -1405,8 +1419,8 @@ class HybridVersionManagerDialog(QWidget):
         else:
             size_bytes = self._size_cache.get(ver, 0)
         size_lbl = QLabel(self._format_size(size_bytes))
-        size_lbl.setStyleSheet("color: #777777; font-size: 9pt; border: none; min-width: 56px;")
-        size_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        size_lbl.setStyleSheet("color: #999999; font-size: 11px; border: none; min-width: 56px;")
+        size_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         right.addWidget(size_lbl)
         self._size_widgets[ver] = size_lbl
 
@@ -1418,13 +1432,14 @@ class HybridVersionManagerDialog(QWidget):
             s_text, s_color = "新版本", "#42A5F5"
         elif has_local:
             s_text, s_color = "已下载", "#FF9800"
-        elif has_url:
-            s_text, s_color = "可下载", "#888888"
+        elif not has_url:
+            s_text, s_color = "未提供", "#666666"
         else:
-            s_text, s_color = "—", "#555555"
-        status = QLabel(s_text)
-        status.setStyleSheet(f"color: {s_color}; font-size: 9pt; font-weight: bold; border: none;")
-        right.addWidget(status)
+            s_text, s_color = None, None
+        if s_text:
+            status = QLabel(s_text)
+            status.setStyleSheet(f"color: {s_color}; font-size: 10pt; font-weight: bold; border: none;")
+            right.addWidget(status)
 
         if is_dl:
             bar = QProgressBar()
@@ -1450,7 +1465,7 @@ class HybridVersionManagerDialog(QWidget):
             sw.setToolTip("关闭当前版本并启动此已下载版本")
             sw.clicked.connect(lambda checked, vv=v: self._switch_version(vv))
             right.addWidget(sw)
-        elif not is_current:
+        elif has_url and not is_current:
             dl = QPushButton("下载")
             dl.setFixedSize(64, 28)
             dl.setCursor(Qt.CursorShape.PointingHandCursor)

@@ -1,5 +1,13 @@
 [
   {
+    "hash": "edbded5202f344ffb1350734d6af180482385321",
+    "short_hash": "edbded5",
+    "message": "feat: 发布版本 v2026.07.31.0444",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 04:45:19"
+  },
+  {
     "hash": "3a39b793023c2561e4cfd419128f4a5ecd57191e",
     "short_hash": "3a39b79",
     "message": "feat: 发布版本 v2026.07.31.0432",
@@ -470,13 +478,5 @@
     "author": "yunjii",
     "email": "yi@yunjii.cn",
     "date": "2026-07-04 05:28:52"
-  },
-  {
-    "hash": "3a1f5abe0a75796fc11e4f93bd960b4c1f046ba9",
-    "short_hash": "3a1f5ab",
-    "message": "fix: 修复端口配置、启动脚本和托盘图标名称；点击歌曲开始播放",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-04 05:18:52"
   }
 ]
