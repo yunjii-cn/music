@@ -179,8 +179,9 @@ def update_git_commits_json():
             print("  ⚠ 未找到 .git，跳过生成 git_commits.json（保留现有文件）")
             return
 
-        # 紧凑字段分隔（U+001F）：哈希 / 短哈希 / 标题 / 作者 / 邮箱 / 日期
-        fmt = "%H%x1f%h%x1f%s%x1f%an%x1f%ae%x1f%ad"
+        # 字段分隔（U+001F）：哈希 / 短哈希 / 标题 / 作者 / 邮箱 / 日期 / 正文
+        # 记录分隔（U+001E）：正文可含换行，必须用记录分隔符避免被按行拆散
+        fmt = "%H%x1f%h%x1f%s%x1f%an%x1f%ae%x1f%ad%x1f%b%x1e"
         out = subprocess.run(
             ["git", "-C", str(git_root), "log",
              f"--pretty=format:{fmt}",
@@ -193,14 +194,15 @@ def update_git_commits_json():
             return
 
         commits = []
-        for line in out.stdout.split("\n"):
-            line = line.strip("\r")
-            if not line:
+        for rec in out.stdout.split("\x1e"):
+            rec = rec.strip("\r")
+            if not rec:
                 continue
-            parts = line.split("\x1f")
-            if len(parts) < 6:
+            parts = rec.split("\x1f")
+            if len(parts) < 7:
                 continue
-            h, h_short, subject, author, email, date = parts[:6]
+            h, h_short, subject, author, email, date, body = parts[:7]
+            body = body.strip("\n")
             commits.append({
                 "hash": h,
                 "short_hash": h_short,
@@ -208,6 +210,7 @@ def update_git_commits_json():
                 "author": author,
                 "email": email,
                 "date": date,
+                "body": body,
             })
 
         target = ROOT_DIR / "git_commits.json"

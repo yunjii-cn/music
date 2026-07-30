@@ -1347,14 +1347,22 @@ class HybridVersionManagerDialog(QWidget):
         head.addWidget(d)
         layout.addLayout(head)
 
-        # 完整提交信息（body 全文，可换行不截断）
-        body = (c.get('body') or c.get('message') or '').strip()
-        if not body:
-            body = "（无提交说明）"
-        m = QLabel(body)
-        m.setStyleSheet("color: #EEEEEE; font-size: 12px; line-height: 1.5; border: none;")
-        m.setWordWrap(True)
-        layout.addWidget(m)
+        # 提交标题（subject，始终显示）
+        subject = (c.get('message') or '').strip()
+        if not subject:
+            subject = "（无提交说明）"
+        title = QLabel(subject)
+        title.setStyleSheet("color: #FFFFFF; font-size: 13px; font-weight: bold; line-height: 1.4; border: none;")
+        title.setWordWrap(True)
+        layout.addWidget(title)
+
+        # 提交正文（body 全文，可换行不截断；无 body 时省略，仅显标题）
+        body = (c.get('body') or '').strip()
+        if body:
+            m = QLabel(body)
+            m.setStyleSheet("color: #CCCCCC; font-size: 12px; line-height: 1.5; border: none;")
+            m.setWordWrap(True)
+            layout.addWidget(m)
 
         # 作者 + 邮箱
         author = c.get('author', '')
