@@ -505,7 +505,7 @@ def _run_supervisor():
     # 不再在这里提前收起子进程：交由 main.main() 显示真实进度条后写入
     # progress_ready 触发淡出，与进度条无缝交替（详见 main.py 的 YUNJI_PROGRESS_READY 处理）。
     try:
-        main_mod.main()
+        main_mod.main(child_proc=child)
     except Exception:
         _write_crash("=== main.main 异常 ===")
         raise

@@ -2355,6 +2355,7 @@ class MainWindow(QMainWindow):
             return
         from PyQt6.QtWidgets import QApplication
         app = QApplication.instance()
+        _launch_trace("deferred_init start")
 
         def _pulse(msg, val):
             if self._splash:
@@ -2400,6 +2401,31 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+        # ── 强制作保：打包后若出现”托盘在、界面不显示”，根因是 launcher 拉起的
+        #    独立启动屏子进程(BrandedSplash, WindowStaysOnTopHint)未退场而永久置顶。
+        #    这里在主窗口显示瞬间：① 清掉任何最小化/隐藏态并强制置顶激活；
+        #    ② 直接终止该置顶子进程，杜绝其遮挡。即使它本应靠 sentinel 自行退出，
+        #    此处兜底也保证窗口必然可见。
+        try:
+            self.setWindowState(Qt.WindowState.WindowNoState)
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
+            _app = QApplication.instance()
+            if _app is not None:
+                _app.setActiveWindow(self)
+        except Exception:
+            pass
+        _child = getattr(self, "_child_proc", None)
+        if _child is not None:
+            try:
+                if _child.poll() is None:
+                    _child.terminate()
+                    _launch_trace("terminate splash child")
+            except Exception:
+                pass
+        _launch_trace("window shown")
+
         if self._splash:
             # 让进度条“丝滑”推进到 100%——reached_full 由动画计时器在 _display
             # 真正逼近 1.0 时才发出，此刻再收起启动屏，避免进度条突兀消失。
@@ -2425,7 +2451,9 @@ class MainWindow(QMainWindow):
             return
         try:
             sp.finish(self)
+            _launch_trace("in-process splash finished")
         except Exception:
+            _launch_trace("in-process splash finish err")
             pass
 
     def _populate_home_page(self, _pulse=None):
@@ -9190,6 +9218,31 @@ def _write_crash_log(msg):
         pass
 
 
+def _launch_trace(step):
+    """启动轨迹：记录打包后「窗口是否真正可见」的每一步，写到 %TEMP%/yunji_launch_trace.log。
+    用于一锤定音定位”托盘在、界面不显示”到底卡在哪（无显示环境也能事后读取）。"""
+    try:
+        import os as _os, tempfile as _tf
+        from datetime import datetime as _dt
+        _p = _os.path.join(_tf.gettempdir(), "yunji_launch_trace.log")
+        _vis = "?"
+        try:
+            _w = _dt and None
+            import PyQt6.QtWidgets as _qw
+            _app = _qw.QApplication.instance()
+            if _app is not None:
+                for _w in _app.topLevelWidgets():
+                    if isinstance(_w, _qw.QMainWindow):
+                        _vis = "visible=%s geom=%s" % (_w.isVisible(), _w.geometry())
+                        break
+        except Exception as _e:
+            _vis = "probe_err=%s" % _e
+        with open(_p, "a", encoding="utf-8") as _f:
+            _f.write(_dt.now().strftime("%H:%M:%S.%f") + " [trace] %s | %s\n" % (step, _vis))
+    except Exception:
+        pass
+
+
 def _global_excepthook(exc_type, exc_value, exc_tb):
     """主线程未捕获异常的兜底：记录而非直接崩。"""
     import traceback as _tb
@@ -9198,7 +9251,8 @@ def _global_excepthook(exc_type, exc_value, exc_tb):
     _write_crash_log("[主线程未捕获异常]\n" + _msg)
 
 
-def main(app=None, splash=None):
+def main(app=None, splash=None, child_proc=None):
+    _launch_trace("main() start")
     # 解析自部署清理参数：删除首次运行前的原始（便携）exe
     cleanup_target = None
     for arg in sys.argv[1:]:
@@ -9247,6 +9301,7 @@ def main(app=None, splash=None):
     splash.move(x, y)
     splash.show()
     splash.repaint()
+    _launch_trace("splash shown, sentinel=%s" % bool(os.environ.get("YUNJI_PROGRESS_READY")))
     # 通知独立启动屏子进程：品牌进度条已就位，可以淡出交替。
     # 用 QTimer.singleShot(0) 把哨兵写入推迟到事件循环启动后——此时进度条
     # 真正开始动画（而非刚 show() 的冻结态），「正在自动安装」再淡出，
@@ -9271,6 +9326,10 @@ def main(app=None, splash=None):
     app.processEvents()
 
     window = MainWindow(splash=splash)
+    # 把 launcher 拉起的「独立启动屏子进程」句柄挂到窗口上，供 _deferred_init
+    # 在显示主窗口时强制结束它——避免该子进程的 WindowStaysOnTopHint 窗口
+    # 因 sentinel 未送达而永久置顶遮挡主窗口（打包后”托盘在、界面不显示”的根因之一）。
+    window._child_proc = child_proc
 
     # 此处不显示主窗口、也不关闭启动屏：MainWindow._deferred_init 在事件循环
     # 启动后按真实加载阶段把进度目标从 0.1 推到 0.75，待“软件已充分加载、

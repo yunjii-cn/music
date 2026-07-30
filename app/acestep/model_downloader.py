@@ -1,0 +1,1673 @@
+"""
+ACE-Step Model Downloader
+
+This module provides functionality to download models from HuggingFace Hub or ModelScope.
+It supports automatic downloading when models are not found locally,
+with intelligent fallback between download sources.
+"""
+
+import os
+import sys
+import hashlib
+import shutil
+import argparse
+import threading
+from typing import Optional, List, Dict, Tuple
+from pathlib import Path
+
+from loguru import logger
+
+
+# =============================================================================
+# Model Code File Sync (GitHub repo -> checkpoint directories)
+# =============================================================================
+
+# Mapping from checkpoint directory name to source model variant in acestep/models/
+_CHECKPOINT_TO_VARIANT: Dict[str, str] = {
+    "acestep-v15-turbo": "turbo",
+    "acestep-v15-sft": "sft",
+    "acestep-v15-base": "base",
+    # SFT variants (base-SFT uses the same model code as SFT)
+    "acestep-v15-base-sft-fix-inst": "sft",
+    # Turbo variants all share the turbo model code
+    "acestep-v15-turbo-shift1": "turbo",
+    "acestep-v15-turbo-shift3": "turbo",
+    "acestep-v15-turbo-continuous": "turbo",
+    "acestep-v15-turbo-fix-inst-shift3": "turbo",
+    "acestep-v15-turbo-fix-inst-shift-continous": "turbo",
+    "acestep-v15-turbo-fix-inst-shift-dynamic": "turbo",
+    "acestep-v15-turbo-rl": "turbo",
+    # XL models share the xl model code (4B DiT)
+    "acestep-v15-xl-turbo": "xl_turbo",
+    "acestep-v15-xl-sft": "xl_sft",
+    "acestep-v15-xl-base": "xl_base",
+}
+
+
+def _get_models_source_dir() -> Path:
+    """Get the acestep/models/ directory (authoritative source for model code)."""
+    return Path(__file__).resolve().parent / "models"
+
+
+def _file_hash(filepath: Path) -> str:
+    """Compute SHA-256 hash of a file's contents."""
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _check_code_mismatch(model_name: str, checkpoints_dir) -> List[str]:
+    """
+    Compare .py files in acestep/models/{variant}/ with those in the checkpoint directory.
+
+    Args:
+        model_name: Checkpoint directory name (e.g. "acestep-v15-turbo")
+        checkpoints_dir: Path to the checkpoints root directory
+
+    Returns:
+        List of filenames that differ (empty list if all match or model_name is unknown)
+    """
+    variant = _CHECKPOINT_TO_VARIANT.get(model_name)
+    if variant is None:
+        return []
+
+    source_dir = _get_models_source_dir() / variant
+    if not source_dir.exists():
+        return []
+
+    if isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+    target_dir = checkpoints_dir / model_name
+
+    mismatched = []
+    for src_file in source_dir.glob("*.py"):
+        if src_file.name == "__init__.py":
+            continue
+        dst_file = target_dir / src_file.name
+        if not dst_file.exists():
+            mismatched.append(src_file.name)
+        elif _file_hash(src_file) != _file_hash(dst_file):
+            mismatched.append(src_file.name)
+
+    return mismatched
+
+
+def _sync_model_code_files(model_name: str, checkpoints_dir) -> List[str]:
+    """
+    Copy .py files from acestep/models/{variant}/ into the checkpoint directory,
+    overwriting the HuggingFace-downloaded versions.
+
+    Args:
+        model_name: Checkpoint directory name (e.g. "acestep-v15-turbo")
+        checkpoints_dir: Path to the checkpoints root directory
+
+    Returns:
+        List of filenames that were synced (empty if model_name is unknown or no source)
+    """
+    variant = _CHECKPOINT_TO_VARIANT.get(model_name)
+    if variant is None:
+        return []
+
+    source_dir = _get_models_source_dir() / variant
+    if not source_dir.exists():
+        logger.warning(f"[Model Sync] Source directory not found: {source_dir}")
+        return []
+
+    if isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+    target_dir = checkpoints_dir / model_name
+    if not target_dir.exists():
+        logger.warning(f"[Model Sync] Target directory not found: {target_dir}")
+        return []
+
+    synced = []
+    for src_file in source_dir.glob("*.py"):
+        if src_file.name == "__init__.py":
+            continue
+        dst_file = target_dir / src_file.name
+        shutil.copy2(src_file, dst_file)
+        synced.append(src_file.name)
+        logger.debug(f"[Model Sync] Synced {src_file.name} -> {dst_file}")
+
+    return synced
+
+
+# =============================================================================
+# Network Detection & Smart Download
+# =============================================================================
+
+def _can_access_google(timeout: float = 3.0) -> bool:
+    """
+    Check if Google is accessible (to determine HuggingFace vs ModelScope).
+
+    Args:
+        timeout: Connection timeout in seconds
+
+    Returns:
+        True if Google is accessible, False otherwise
+    """
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(timeout)
+        sock.connect(("www.google.com", 443))
+        return True
+    except (socket.timeout, socket.error, OSError):
+        return False
+    finally:
+        sock.close()
+
+
+def _merge_dir(src, dst):
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            if os.path.isdir(d):
+                _merge_dir(s, d)
+            else:
+                shutil.move(s, d)
+        elif not os.path.exists(d):
+            shutil.move(s, d)
+
+
+def _flatten_nested_models_dir(local_dir):
+    nested_dir = os.path.join(str(local_dir), "models")
+    if not os.path.isdir(nested_dir):
+        return
+    logger.info(f"[Model Download] Flattening nested models directory: {nested_dir} -> {local_dir}")
+    for item in os.listdir(nested_dir):
+        src = os.path.join(nested_dir, item)
+        dst = os.path.join(str(local_dir), item)
+        if os.path.isdir(src):
+            if os.path.isdir(dst):
+                _merge_dir(src, dst)
+                shutil.rmtree(src)
+            else:
+                shutil.move(src, dst)
+        elif not os.path.exists(dst):
+            shutil.move(src, dst)
+    shutil.rmtree(nested_dir)
+
+
+# ---------------------------------------------------------------------------
+# 结构化下载进度上报（供启动器 GUI 精确解析，不再依赖脆弱的 tqdm 文本）
+# 思路：下载器自己把真实进度打印成固定格式行，GUI 用正则 100% 命中：
+#   [DLTARGET] <local_dir>           —— 下载器实际写入目录（路径 100% 正确）
+#   [DLPROGRESS] <pct>               —— 按字节加权的真实总进度百分比（0-99）
+#   [DLDESC] <filename> <pct>%       —— 当前下载文件名 + 单文件进度（供 UI 显示）
+# 任何异常都被吞掉，绝不阻断下载本身。
+# ---------------------------------------------------------------------------
+def _make_hf_progress_reporter(repo_id: str, local_dir=None, allowed_prefixes=None):
+    """返回一个 huggingface_hub 的 progress_callback：按字节加权打印 [DLPROGRESS]。
+
+    allowed_prefixes: 仅下载主仓库某个组件子目录时（allow_patterns）传入，
+    如 ["acestep-v15-turbo/**"]。元数据只统计该组件文件，使总字节=组件大小、
+    进度真实反映组件下载，避免「组件仅几 GB / 主包 18GB」导致进度被严重低估。
+
+    用 HfApi().repo_info(files_metadata=True) 拉取仓库每个文件的 size，
+    按「已完成文件累计字节 + 当前文件字节×单文件进度」/「全部文件总字节」计算真实总进度，
+    彻底消除「9 个小文件几秒下完推到 90%、然后卡住等大文件」的假进度现象。
+
+    同时打印 [DLDESC] 行，让 UI 显示当前下载的文件名 + 单文件进度，
+    满足「实在难以真实实现就同步显示日志进度描述」的兜底需求。
+
+    关键：元数据拉取放在后台守护线程，绝不阻塞 snapshot_download 主流程；
+          拉取失败或超时也只影响进度精度，不影响下载本身。
+    """
+    state = {
+        "completed_bytes": 0,   # 已完成文件累计字节
+        "cur_desc": None,
+        "cur_pct": 0.0,         # 当前文件 0-100 进度
+        "cur_size": 0,          # 当前文件总字节
+        "cur_name": "",         # 当前文件短名（用于 UI 显示）
+        "total_bytes": 0,       # 全部文件总字节
+        "file_sizes": {},       # filename -> size 字典
+        "meta_ready": False,    # 元数据是否就绪
+    }
+
+    # 后台拉取仓库文件元数据（含 LFS size），不阻塞下载主流程
+    def _fetch_meta():
+        try:
+            from huggingface_hub import HfApi
+            # 兼容旧版 huggingface_hub：timeout 参数旧版不支持，用 build_hf_headers 传递
+            try:
+                info = HfApi().repo_info(repo_id, files_metadata=True, timeout=8)
+            except TypeError:
+                # 旧版无 timeout 参数，退回默认调用
+                info = HfApi().repo_info(repo_id, files_metadata=True)
+            siblings = getattr(info, "siblings", []) or []
+            total = 0
+            for sib in siblings:
+                size = getattr(sib, "size", None) or 0
+                name = getattr(sib, "rfilename", "") or ""
+                if size and size > 0 and name:
+                    state["file_sizes"][name] = size
+                    total += size
+            # 只下载主仓库某个组件子目录时（allow_patterns），元数据应只统计该组件
+            # 的文件：否则 total_bytes=整个主仓库、组件实际仅几 GB / 主包 18GB，
+            # 进度会被严重低估（永远卡在个位数）。
+            if allowed_prefixes:
+                _prefixes = [p.replace("**", "").replace("*", "").rstrip("/")
+                             for p in allowed_prefixes]
+                state["file_sizes"] = {
+                    n: s for n, s in state["file_sizes"].items()
+                    if any(n.startswith(pr) for pr in _prefixes)
+                }
+                total = sum(state["file_sizes"].values())
+            state["total_bytes"] = total
+            state["meta_ready"] = True
+        except Exception:
+            # 元数据拉取失败：不影响下载，reporter 退回磁盘兜底
+            state["meta_ready"] = False
+
+    import threading as _th
+    _th.Thread(target=_fetch_meta, daemon=True).start()
+
+    def _match_file_size(desc: str) -> int:
+        """从 desc 中匹配文件大小。desc 可能是文件名、'Downloading <file>' 等。"""
+        if not desc or not state["meta_ready"]:
+            return 0
+        # 直接匹配
+        if desc in state["file_sizes"]:
+            return state["file_sizes"][desc]
+        # 去掉常见前缀后匹配
+        for prefix in ("Downloading ", "Download ", "Fetching ", "Brewing "):
+            if desc.startswith(prefix):
+                name = desc[len(prefix):].strip()
+                if name in state["file_sizes"]:
+                    return state["file_sizes"][name]
+        # 模糊匹配：desc 是文件名一部分
+        for name, size in state["file_sizes"].items():
+            if desc in name or name in desc:
+                return size
+        return 0
+
+    def _short_name(desc: str) -> str:
+        """从 desc 中提取短文件名用于 UI 显示。"""
+        if not desc:
+            return ""
+        name = desc
+        for prefix in ("Downloading ", "Download ", "Fetching ", "Brewing "):
+            if name.startswith(prefix):
+                name = name[len(prefix):].strip()
+                break
+        return name.split("/")[-1]
+
+    def _cb(*args, **kwargs):
+        try:
+            progress = None
+            desc = None
+            # 新版本：ProgressInfo 对象（含 .progress / .desc）
+            if args and hasattr(args[0], "progress"):
+                info = args[0]
+                try:
+                    progress = float(getattr(info, "progress", 0) or 0)
+                except Exception:
+                    progress = None
+                try:
+                    desc = str(getattr(info, "desc", "") or "")
+                except Exception:
+                    desc = ""
+            # 旧版本：(progress:int, total:int, unit:str)
+            elif args and isinstance(args[0], (int, float)) and len(args) >= 2:
+                try:
+                    _total = float(args[1]) if args[1] else 0.0
+                    progress = (float(args[0]) / _total * 100.0) if _total > 0 else 0.0
+                except Exception:
+                    progress = None
+
+            # 文件边界：desc 变化 → 上一个文件下载完成，累加其完整字节
+            if desc and desc != state["cur_desc"]:
+                if state["cur_desc"] is not None:
+                    state["completed_bytes"] += state["cur_size"]
+                state["cur_desc"] = desc
+                state["cur_pct"] = 0.0
+                state["cur_size"] = _match_file_size(desc)
+                state["cur_name"] = _short_name(desc)
+            if progress is not None:
+                state["cur_pct"] = max(0.0, min(100.0, progress))
+
+            # 按字节加权计算总进度；元数据未就绪时退回 0 让磁盘兜底接管
+            if state["meta_ready"] and state["total_bytes"] > 0:
+                if state["cur_size"] > 0:
+                    cur = state["completed_bytes"] + state["cur_size"] * state["cur_pct"] / 100.0
+                else:
+                    # 兜底1：当前文件 size 匹配失败，用平均文件大小估算
+                    file_count = max(1, len(state["file_sizes"]))
+                    avg_file_size = state["total_bytes"] / file_count
+                    cur = state["completed_bytes"] + avg_file_size * state["cur_pct"] / 100.0
+                overall = cur / state["total_bytes"] * 100.0
+            else:
+                overall = 0.0
+            overall = max(0.0, min(99.0, overall))
+            print(f"[DLPROGRESS] {overall:.1f}", flush=True)
+            # 同时输出当前文件下载描述（如 "model.safetensors 45%"）
+            if state["cur_name"]:
+                print(f"[DLDESC] {state['cur_name']} {state['cur_pct']:.0f}%", flush=True)
+        except Exception:
+            pass
+    return _cb
+
+
+def _estimate_repo_size(repo_id: str, fallback: float) -> float:
+    """已知仓库近似大小（字节），用于磁盘进度估算；未知则回退兜底值。
+
+    关键：磁盘监控用此值计算 cur/est*100，若 est 远大于实际大小（如 0.6B 模型
+    实际 1.33GB 但 fallback 15GB），进度会永远卡在个位数；若 est 远小于实际大小，
+    进度会瞬间到 99%。所以必须为每个已知仓库填入准确大小（含 1.2 倍余量）。
+    """
+    _KNOWN = {
+        "ACE-Step/Ace-Step1.5": 18.0e9,
+        "ACE-Step/acestep-5Hz-lm-0.6B": 1.5e9,    # ~1.33GB，留余量
+        "ACE-Step/acestep-5Hz-lm-1.7B": 3.5e9,    # ~3.4GB，留余量
+        "ACE-Step/acestep-5Hz-lm-4B": 8.0e9,      # ~7.5GB，留余量
+        "ACE-Step/acestep-v15-turbo-shift3": 1.8e9,
+        "ACE-Step/acestep-v15-sft": 1.8e9,
+        "ACE-Step/acestep-v15-base": 1.8e9,
+        "ACE-Step/acestep-v15-turbo-shift1": 1.8e9,
+        "ACE-Step/acestep-v15-turbo-continuous": 1.8e9,
+        "ACE-Step/acestep-v15-xl-turbo": 20.0e9,
+        "ACE-Step/acestep-v15-xl-sft": 20.0e9,
+        "ACE-Step/acestep-v15-xl-base": 20.0e9,
+    }
+    if repo_id in _KNOWN:
+        return _KNOWN[repo_id]
+    return fallback
+
+
+def _resolve_cache_dirs(repo_id: str, include_missing: bool = False):
+    """解析 HuggingFace 和 ModelScope 的默认缓存目录。
+
+    下载器实际写入的是缓存目录（如 ~/.cache/huggingface/hub/models--...--.../blobs/），
+    而非 local_dir（最终目录）。下载完成后库才会把文件移动/硬链接到 local_dir。
+    所以磁盘监控必须同时扫描缓存目录，否则进度条永远为 0。
+
+    Args:
+        repo_id: 仓库 ID（如 "ACE-Step/acestep-5Hz-lm-0.6B"）
+        include_missing: True 时返回全部候选路径（即使目录尚不存在）。
+            关键：磁盘监控在下载**开始前**解析缓存目录，此时缓存目录必然
+            还不存在；若按 exists() 过滤会返回空列表，导致监控全程只扫
+            local_dir、进度条一直 0%。监控场景必须传 True——目录不存在时
+            _get_directory_size 返回 0，无副作用。
+
+    返回一个列表，包含缓存目录路径（Path 对象）。
+    """
+    home = Path.home()
+    candidates = []
+
+    # HuggingFace 缓存：<HF_HUB_CACHE 或 HF_HOME/hub>/models--<org>--<repo>/
+    # repo_id 中的 / 替换为 --，如 ACE-Step/acestep-5Hz-lm-0.6B → models--ACE-Step--acestep-5Hz-lm-0.6B
+    hf_home = Path(os.environ.get("HF_HOME", str(home / ".cache" / "huggingface")))
+    hf_hub_cache = Path(os.environ.get("HF_HUB_CACHE", str(hf_home / "hub")))
+    candidates.append(hf_hub_cache / f"models--{repo_id.replace('/', '--')}")
+
+    # ModelScope 缓存（两代路径都要覆盖）：
+    #   旧版：~/.cache/modelscope/hub/<org>/<repo>/
+    #   新版(>=1.18)：~/.cache/modelscope/hub/models/<org>/<repo>/
+    ms_cache = Path(os.environ.get("MODELSCOPE_CACHE", str(home / ".cache" / "modelscope")))
+    candidates.append(ms_cache / "hub" / repo_id)
+    candidates.append(ms_cache / "hub" / "models" / repo_id)
+
+    if include_missing:
+        return candidates
+    return [c for c in candidates if c.exists()]
+
+
+def _start_disk_progress_monitor(local_dir, est_bytes: float, repo_id: str = "", scan_subdir=None):
+    """子进程内守护线程：按磁盘真实已下载字节数打印 [DLPROGRESS] 和 [DLSIZE]。
+
+    关键：同时扫描本地目标目录（最终目录）和缓存目录（下载期间的临时写入目录），
+    取两者大小之和作为已下载字节数。
+
+    HuggingFace/ModelScope 库会先把文件下载到缓存目录（如 ~/.cache/huggingface/hub/），
+    下载完成后才移动/硬链接到 local_dir。如果只读 local_dir，进度条会永远为 0。
+
+    scan_subdir: 组件单独下载时，文件实际落在 local_dir/<组件名>/ 子目录；此时应以
+    该子目录为本地扫描目标（而非整个 local_dir），否则会扫到其它已存在的组件、
+    导致磁盘兜底进度虚高/超 100%。默认等同于 local_dir。
+
+    输出两行结构化进度：
+      [DLPROGRESS] <pct>           —— 已下载/总大小 × 100，0-99
+      [DLSIZE] <downloaded> <total> —— 已下载字节数 + 总字节数，供 UI 显示 "157M/1.33G"
+
+    返回 (stop_event, thread)，调用方在下载结束后 set 停止。"""
+    stop = threading.Event()
+    # 预解析缓存目录候选路径。必须 include_missing=True：监控启动时下载尚未开始、
+    # 缓存目录（如 ~/.cache/huggingface/hub/models--xxx）还不存在，若按 exists()
+    # 过滤会得到空列表且**之后永远不会重新解析** → [DLSIZE] 只统计 local_dir ≈ 0
+    # → 进度条全程 0% 直到下载完成（2026-07-29 用户实测踩中）。
+    # 目录不存在时 _get_directory_size 返回 0，提前加入列表无任何副作用。
+    cache_dirs = _resolve_cache_dirs(repo_id, include_missing=True) if repo_id else []
+    # 本地真实扫描目标：组件下载时为子目录，避免把其它组件算进来
+    _scan_local = scan_subdir if scan_subdir is not None else local_dir
+
+    def _monitor():
+        import time as _t
+        while not stop.is_set():
+            try:
+                # 同时扫描本地目标目录和缓存目录，取大小之和
+                # 下载期间文件在缓存目录，完成后才移动到 local_dir（组件下载时为子目录）
+                cur = _get_directory_size(str(_scan_local))
+                for cd in cache_dirs:
+                    cur += _get_directory_size(str(cd))
+                pct = (cur / est_bytes * 100.0) if est_bytes and est_bytes > 0 else 0.0
+                pct = max(0.0, min(99.0, pct))
+                print(f"[DLPROGRESS] {pct:.1f}", flush=True)
+                # 同时输出已下载/总大小，供 UI 显示大小比描述
+                print(f"[DLSIZE] {int(cur)} {int(est_bytes)}", flush=True)
+            except Exception:
+                pass
+            _t.sleep(1.0)
+
+    t = threading.Thread(target=_monitor, daemon=True)
+    t.start()
+    return stop, t
+
+
+def _download_from_huggingface_internal(
+    repo_id: str,
+    local_dir: Path,
+    token: Optional[str] = None,
+    allow_patterns=None,
+    est_bytes=None,
+    scan_subdir=None,
+) -> None:
+    """
+    Internal function to download from HuggingFace Hub.
+
+    Args:
+        repo_id: HuggingFace repository ID (e.g., "ACE-Step/Ace-Step1.5")
+        local_dir: Local directory to save the model
+        token: HuggingFace token for private repos (optional)
+        allow_patterns: 仅下载匹配的文件（组件单独下载时使用），如 ["acestep-v15-turbo/**"]
+        est_bytes: 进度兜底用的预估总字节（组件下载时传组件自身大小，否则用仓库估值）
+        scan_subdir: 本地真实扫描目标子目录（组件下载时为 local_dir/<组件名>）
+
+    Raises:
+        Exception: If download fails
+    """
+    from huggingface_hub import snapshot_download
+
+    logger.info(f"[Model Download] Downloading from HuggingFace: {repo_id} -> {local_dir}")
+    # 结构化上报：真实扫描目标目录（100% 正确），供 GUI 设置测量目录。
+    # 组件下载时 scan_subdir 指向组件子目录，避免 GUI 磁盘兜底误扫整个 local_dir。
+    _dl_target_dir = scan_subdir if scan_subdir is not None else local_dir
+    print(f"[DLTARGET] {_dl_target_dir}", flush=True)
+
+    reporter = None
+    try:
+        reporter = _make_hf_progress_reporter(repo_id, local_dir, allowed_prefixes=allow_patterns)
+    except Exception:
+        reporter = None
+
+    est = est_bytes if est_bytes else _estimate_repo_size(repo_id, 18.0e9)
+    stop, mon = _start_disk_progress_monitor(_dl_target_dir, est, repo_id)
+    try:
+        # 仅当 snapshot_download 支持 progress_callback 时才传（老版本不支持则回退）
+        try:
+            import inspect
+            _has_cb = "progress_callback" in inspect.signature(snapshot_download).parameters
+        except Exception:
+            _has_cb = True
+        _kwargs = dict(
+            repo_id=repo_id,
+            local_dir=str(local_dir),
+            local_dir_use_symlinks=False,
+            token=token,
+        )
+        if allow_patterns is not None:
+            _kwargs["allow_patterns"] = allow_patterns
+        if _has_cb and reporter is not None:
+            _kwargs["progress_callback"] = reporter
+        snapshot_download(**_kwargs)
+    finally:
+        try:
+            stop.set()
+        except Exception:
+            pass
+
+    _flatten_nested_models_dir(local_dir)
+
+
+def _download_from_modelscope_internal(
+    repo_id: str,
+    local_dir: Path,
+    allow_patterns=None,
+    est_bytes=None,
+    scan_subdir=None,
+) -> None:
+    """
+    Internal function to download from ModelScope.
+
+    Args:
+        repo_id: ModelScope repository ID (e.g., "ACE-Step/Ace-Step1.5")
+        local_dir: Local directory to save the model
+        allow_patterns: 仅下载匹配的文件（组件单独下载时使用）
+        est_bytes: 进度兜底用的预估总字节
+        scan_subdir: 本地真实扫描目标子目录（组件下载时为 local_dir/<组件名>）
+
+    Raises:
+        Exception: If download fails
+    """
+    from modelscope import snapshot_download
+
+    logger.info(f"[Model Download] Downloading from ModelScope: {repo_id} -> {local_dir}")
+    # 结构化上报：真实扫描目标目录（100% 正确）
+    _dl_target_dir = scan_subdir if scan_subdir is not None else local_dir
+    print(f"[DLTARGET] {_dl_target_dir}", flush=True)
+
+    est = est_bytes if est_bytes else _estimate_repo_size(repo_id, 15.0e9)
+    stop, mon = _start_disk_progress_monitor(_dl_target_dir, est, repo_id)
+    try:
+        _kwargs = dict(model_id=repo_id, local_dir=str(local_dir))
+        if allow_patterns is not None:
+            _kwargs["allow_patterns"] = allow_patterns
+        snapshot_download(**_kwargs)
+    finally:
+        try:
+            stop.set()
+        except Exception:
+            pass
+
+    _flatten_nested_models_dir(local_dir)
+
+
+def _smart_download(
+    repo_id: str,
+    local_dir: Path,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+    allow_patterns=None,
+    est_bytes=None,
+    scan_subdir=None,
+) -> Tuple[bool, str]:
+    """
+    Smart download with automatic fallback between HuggingFace and ModelScope.
+
+    Automatically detects network environment and chooses the best download source.
+    If the primary source fails, automatically falls back to the alternative.
+
+    Args:
+        repo_id: Repository ID (same format for both HF and ModelScope)
+        local_dir: Local directory to save the model
+        token: HuggingFace token for private repos (optional)
+        prefer_source: Preferred download source ("huggingface", "modelscope", "huggingface-cn", or None for auto-detect)
+        allow_patterns: 仅下载匹配的文件（组件单独下载时使用）
+        est_bytes: 进度兜底用的预估总字节（组件下载时传组件自身大小）
+        scan_subdir: 本地真实扫描目标子目录（组件下载时为 local_dir/<组件名>）
+
+    Returns:
+        Tuple of (success, message)
+    """
+    # Ensure directory exists
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine primary source
+    if prefer_source == "huggingface":
+        use_huggingface_first = True
+        logger.info("[Model Download] User preference: HuggingFace Hub")
+    elif prefer_source == "modelscope":
+        use_huggingface_first = False
+        logger.info("[Model Download] User preference: ModelScope")
+    elif prefer_source == "huggingface-cn":
+        use_huggingface_first = True
+        logger.info("[Model Download] User preference: HuggingFace Hub (国内镜像)")
+        # 设置国内镜像环境变量
+        import os
+        os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+    else:
+        # Auto-detect network environment
+        can_access_google = _can_access_google()
+        use_huggingface_first = can_access_google
+        logger.info(f"[Model Download] Auto-detected: {'HuggingFace Hub' if can_access_google else 'ModelScope'}")
+        if not can_access_google:
+            # 国内网络环境，使用国内镜像
+            import os
+            os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+            logger.info("[Model Download] Using HuggingFace Hub (国内镜像) for better connectivity")
+
+    if use_huggingface_first:
+        logger.info("[Model Download] Using HuggingFace Hub...")
+        try:
+            _download_from_huggingface_internal(
+                repo_id, local_dir, token,
+                allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+            )
+            return True, f"Successfully downloaded from HuggingFace: {repo_id}"
+        except Exception as e:
+            logger.warning(f"[Model Download] HuggingFace download failed: {e}")
+            logger.info("[Model Download] Falling back to ModelScope...")
+            try:
+                _download_from_modelscope_internal(
+                    repo_id, local_dir,
+                    allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+                )
+                return True, f"Successfully downloaded from ModelScope: {repo_id}"
+            except Exception as e2:
+                error_msg = f"Both HuggingFace and ModelScope downloads failed. HF: {e}, MS: {e2}"
+                logger.error(error_msg)
+                return False, error_msg
+    else:
+        logger.info("[Model Download] Using ModelScope...")
+        try:
+            _download_from_modelscope_internal(
+                repo_id, local_dir,
+                allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+            )
+            return True, f"Successfully downloaded from ModelScope: {repo_id}"
+        except Exception as e:
+            logger.warning(f"[Model Download] ModelScope download failed: {e}")
+            logger.info("[Model Download] Falling back to HuggingFace Hub...")
+            try:
+                _download_from_huggingface_internal(
+                    repo_id, local_dir, token,
+                    allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+                )
+                return True, f"Successfully downloaded from HuggingFace: {repo_id}"
+            except Exception as e2:
+                error_msg = f"Both ModelScope and HuggingFace downloads failed. MS: {e}, HF: {e2}"
+                logger.error(error_msg)
+                return False, error_msg
+
+
+# =============================================================================
+# Model Registry
+# =============================================================================
+# Main model contains core components (vae, text_encoder, default DiT)
+MAIN_MODEL_REPO = "ACE-Step/Ace-Step1.5"
+
+# Sub-models that can be downloaded separately into the checkpoints directory
+SUBMODEL_REGISTRY: Dict[str, str] = {
+    # LM models
+    "acestep-5Hz-lm-0.6B": "ACE-Step/acestep-5Hz-lm-0.6B",
+    "acestep-5Hz-lm-4B": "ACE-Step/acestep-5Hz-lm-4B",
+    # DiT models
+    "acestep-v15-turbo-shift3": "ACE-Step/acestep-v15-turbo-shift3",
+    "acestep-v15-sft": "ACE-Step/acestep-v15-sft",
+    "acestep-v15-base": "ACE-Step/acestep-v15-base",
+    "acestep-v15-turbo-shift1": "ACE-Step/acestep-v15-turbo-shift1",
+    "acestep-v15-turbo-continuous": "ACE-Step/acestep-v15-turbo-continuous",
+    # XL models (4B DiT, requires >=12GB VRAM)
+    "acestep-v15-xl-turbo": "ACE-Step/acestep-v15-xl-turbo",
+    "acestep-v15-xl-sft": "ACE-Step/acestep-v15-xl-sft",
+    "acestep-v15-xl-base": "ACE-Step/acestep-v15-xl-base",
+}
+
+# Components that come from the main model repo (ACE-Step/Ace-Step1.5)
+MAIN_MODEL_COMPONENTS = [
+    "acestep-v15-turbo",      # Default DiT model
+    "vae",                     # VAE for audio encoding/decoding
+    "Qwen3-Embedding-0.6B",    # Text encoder
+    "acestep-5Hz-lm-1.7B",     # Default LM model (1.7B)
+]
+
+# Model file validation information (file lists and approximate sizes)
+# This information should be updated based on official documentation
+MODEL_VALIDATION_INFO = {
+    "acestep-v15-turbo": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"],
+        "min_size": 1.5e9  # ~1.5GB
+    },
+    "vae": {
+        "files": ["config.json", "diffusion_pytorch_model.safetensors"],
+        "min_size": 100e6  # ~100MB
+    },
+    "Qwen3-Embedding-0.6B": {
+        "files": ["config.json", "model.safetensors"],
+        "min_size": 600e6  # ~600MB
+    },
+    "acestep-5Hz-lm-1.7B": {
+        "files": ["config.json", "model.safetensors"],
+        "min_size": 1.7e9  # ~1.7GB
+    },
+    "acestep-5Hz-lm-0.6B": {
+        "files": ["config.json", "model.safetensors"],
+        "min_size": 600e6  # ~600MB
+    },
+    "acestep-5Hz-lm-4B": {
+        "files": ["config.json", "model.safetensors.index.json"],
+        "min_size": 4e9  # ~4GB
+    },
+    "acestep-v15-base": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_base.py"],
+        "min_size": 1.5e9  # ~1.5GB
+    },
+    "acestep-v15-sft": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_base.py"],
+        "min_size": 1.5e9  # ~1.5GB
+    },
+    "acestep-v15-turbo-shift1": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"],
+        "min_size": 1.5e9  # ~1.5GB
+    },
+    "acestep-v15-turbo-shift3": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"],
+        "min_size": 1.5e9  # ~1.5GB
+    },
+    "acestep-v15-turbo-continuous": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_turbo.py"],
+        "min_size": 1.5e9  # ~1.5GB
+    },
+    # XL models (4B DiT, ~18.8GB bf16 weights)
+    "acestep-v15-xl-turbo": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"],
+        "min_size": 15e9  # ~15GB
+    },
+    "acestep-v15-xl-sft": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"],
+        "min_size": 15e9  # ~15GB
+    },
+    "acestep-v15-xl-base": {
+        "files": ["config.json", "model.safetensors", "modeling_acestep_v15_xl.py"],
+        "min_size": 15e9  # ~15GB
+    }
+}
+
+# Default LM model (included in main model)
+DEFAULT_LM_MODEL = "acestep-5Hz-lm-1.7B"
+
+
+def get_project_root() -> Path:
+    """Get the project root directory."""
+    current_file = Path(__file__).resolve()
+    return current_file.parent.parent
+
+
+def _get_directory_size(directory) -> int:
+    """
+    Calculate the total size of a directory in bytes.
+
+    Args:
+        directory: Path to the directory (str or Path)
+
+    Returns:
+        Total size in bytes (0 if directory does not exist)
+
+    注意：必须兼容 str 入参。磁盘进度监控以 _get_directory_size(str(dir)) 调用，
+    若直接对 str 调 .iterdir() 会抛 AttributeError 被吞掉 → 永远返回 0 →
+    进度条全程 0%（2026-07-29 踩中）。
+    """
+    total_size = 0
+    try:
+        if isinstance(directory, str):
+            directory = Path(directory)
+        for item in directory.iterdir():
+            if item.is_file():
+                total_size += item.stat().st_size
+            elif item.is_dir():
+                total_size += _get_directory_size(item)
+    except Exception:
+        pass
+    return total_size
+
+
+def _required_file_present(model_path: Path, required_file: str) -> bool:
+    """Check whether a required file is present, tolerant to real repo layouts.
+
+    The validation manifest lists canonical file names (e.g. "model.safetensors",
+    "modeling_acestep_v15_xl.py"), but real HuggingFace repos may differ:
+
+    * Large models ship *sharded* weights: instead of a single
+      ``model.safetensors`` there are ``model-00001-of-000NN.safetensors`` shards
+      plus a ``model.safetensors.index.json``. Requiring the single-file name
+      would wrongly report the model as incomplete even after a 100% download.
+    * The custom modeling module may be named per-variant
+      (``modeling_acestep_v15_xl_base.py`` vs the manifest's
+      ``modeling_acestep_v15_xl.py``).
+
+    This matcher accepts these equivalent layouts so that a fully-downloaded
+    model is not falsely flagged as "missing files".
+    """
+    # 1) Exact match wins.
+    if (model_path / required_file).exists():
+        return True
+
+    try:
+        # 2) Sharded safetensors: a monolithic "model.safetensors" is satisfied
+        #    by an index.json + at least one shard.
+        if required_file.endswith(".safetensors") and not required_file.endswith(".index.json"):
+            index_json = model_path / (required_file + ".index.json")  # model.safetensors.index.json
+            shards = list(model_path.glob("*-of-*.safetensors"))
+            if index_json.exists() and shards:
+                return True
+            # Any single-part *.safetensors also satisfies a generic weight requirement.
+            if list(model_path.glob("*.safetensors")):
+                return True
+
+        # 3) A required weight index is satisfied by any *.index.json present.
+        if required_file.endswith(".index.json"):
+            if list(model_path.glob("*.index.json")):
+                return True
+
+        # 4) Custom modeling module: accept any modeling_*.py when the exact
+        #    per-variant name differs from the manifest.
+        if required_file.startswith("modeling_") and required_file.endswith(".py"):
+            if list(model_path.glob("modeling_*.py")):
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def get_checkpoints_dir(custom_dir: Optional[str] = None) -> Path:
+    """Get the checkpoints directory path."""
+    if custom_dir:
+        return Path(custom_dir)
+    try:
+        from shared.config_manager import config_manager
+        return Path(config_manager.get_checkpoints_dir())
+    except ImportError:
+        app_dir = Path(__file__).resolve().parent.parent
+        project_root = app_dir.parent
+        return project_root / "data" / "models"
+
+
+def check_main_model_exists(checkpoints_dir: Optional[Path] = None) -> bool:
+    """
+    Check if the main model components exist in the checkpoints directory.
+    
+    Returns:
+        True if all main model components exist, False otherwise.
+    """
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    for component in MAIN_MODEL_COMPONENTS:
+        component_path = checkpoints_dir / component
+        if not component_path.exists():
+            return False
+        
+        # Check if directory contains files (not just an empty directory)
+        try:
+            files = list(component_path.iterdir())
+            if len(files) == 0:
+                return False
+        except:
+            return False
+    return True
+
+
+def check_model_exists(model_name: str, checkpoints_dir: Optional[Path] = None) -> bool:
+    """
+    Check if a specific model exists in the checkpoints directory and is complete.
+    
+    Args:
+        model_name: Name of the model to check
+        checkpoints_dir: Custom checkpoints directory (optional)
+    
+    Returns:
+        True if the model exists and is complete, False otherwise.
+    """
+    if not model_name:
+        logger.warning("[check_model_exists] Empty model_name; treating as missing.")
+        return False
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    model_path = checkpoints_dir / model_name
+    if not model_path.exists():
+        return False
+    
+    # Check if directory contains files (not just an empty directory)
+    try:
+        files = list(model_path.iterdir())
+        if len(files) == 0:
+            return False
+    except:
+        return False
+    
+    # Check if model has validation info
+    if model_name in MODEL_VALIDATION_INFO:
+        validation_info = MODEL_VALIDATION_INFO[model_name]
+        
+        # Check required files (tolerant to sharded weights / per-variant modeling files)
+        for required_file in validation_info.get("files", []):
+            if not _required_file_present(model_path, required_file):
+                logger.warning(f"[check_model_exists] Missing required file: {required_file} for model {model_name}")
+                return False
+        
+        # Check directory size
+        dir_size = _get_directory_size(model_path)
+        min_size = validation_info.get("min_size", 0)
+        if dir_size < min_size:
+            logger.warning(f"[check_model_exists] Model {model_name} size ({dir_size/1e6:.2f}MB) is less than minimum required size ({min_size/1e6:.2f}MB)")
+            return False
+    
+    return True
+
+
+def list_available_models() -> Dict[str, str]:
+    """
+    List all available models for download.
+    
+    Returns:
+        Dictionary mapping local names to HuggingFace repo IDs.
+    """
+    models = {
+        "main": MAIN_MODEL_REPO,
+        **SUBMODEL_REGISTRY
+    }
+    return models
+
+
+def download_main_model(
+    checkpoints_dir: Optional[Path] = None,
+    force: bool = False,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Download the main ACE-Step model from HuggingFace or ModelScope.
+
+    The main model includes:
+    - acestep-v15-turbo (default DiT model)
+    - vae (audio encoder/decoder)
+    - Qwen3-Embedding-0.6B (text encoder)
+    - acestep-5Hz-lm-1.7B (default LM model)
+
+    Args:
+        checkpoints_dir: Custom checkpoints directory (optional)
+        force: Force re-download even if model exists
+        token: HuggingFace token for private repos (optional)
+        prefer_source: Preferred download source ("huggingface", "modelscope", or None for auto-detect)
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    # Ensure checkpoints directory exists
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    if not force and check_main_model_exists(checkpoints_dir):
+        return True, f"Main model already exists at {checkpoints_dir}"
+
+    # 强制重新下载时，先清除不完整/损坏的主模型组件，避免残留文件导致反复失败。
+    # 仍保持完整的组件会被保留，避免无谓的重复下载。
+    if force:
+        for component in MAIN_MODEL_COMPONENTS:
+            component_path = checkpoints_dir / component
+            if component_path.exists() and not check_model_exists(component, checkpoints_dir):
+                try:
+                    if component_path.is_dir():
+                        shutil.rmtree(component_path)
+                    else:
+                        component_path.unlink()
+                    logger.info(f"[Download] 已移除损坏的主模型组件以重新下载: {component}")
+                except Exception as e:
+                    logger.error(f"[Download] 移除主模型组件失败: {component}: {e}")
+
+    print(f"Downloading main model from {MAIN_MODEL_REPO}...")
+    print(f"Destination: {checkpoints_dir}")
+    print("This may take a while depending on your internet connection...")
+
+    # Use smart download with automatic fallback
+    success, msg = _smart_download(MAIN_MODEL_REPO, checkpoints_dir, token, prefer_source)
+    if success:
+        # Sync model code files for all DiT components in the main model
+        for component in MAIN_MODEL_COMPONENTS:
+            if component in _CHECKPOINT_TO_VARIANT:
+                synced = _sync_model_code_files(component, checkpoints_dir)
+                if synced:
+                    logger.info(f"[Model Download] Synced code files for {component}: {synced}")
+    return success, msg
+
+
+def download_submodel(
+    model_name: str,
+    checkpoints_dir: Optional[Path] = None,
+    force: bool = False,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Download a specific sub-model from HuggingFace or ModelScope.
+
+    Args:
+        model_name: Name of the model to download (must be in SUBMODEL_REGISTRY)
+        checkpoints_dir: Custom checkpoints directory (optional)
+        force: Force re-download even if model exists
+        token: HuggingFace token for private repos (optional)
+        prefer_source: Preferred download source ("huggingface", "modelscope", or None for auto-detect)
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if model_name not in SUBMODEL_REGISTRY:
+        available = ", ".join(SUBMODEL_REGISTRY.keys())
+        return False, f"Unknown model '{model_name}'. Available models: {available}"
+
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    # Ensure checkpoints directory exists
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path = checkpoints_dir / model_name
+
+    if not force and check_model_exists(model_name, checkpoints_dir):
+        return True, f"Model '{model_name}' already exists at {model_path}"
+
+    # 强制重新下载时，先删除已存在的（可能不完整/损坏的）模型目录，确保全新下载。
+    if force and model_path.exists():
+        try:
+            if model_path.is_dir():
+                shutil.rmtree(model_path)
+            else:
+                model_path.unlink()
+            logger.info(f"[Download] 已移除现有模型以重新下载: {model_name}")
+        except Exception as e:
+            logger.error(f"[Download] 移除现有模型失败: {model_name}: {e}")
+            return False, f"Failed to remove existing model {model_name}: {e}"
+
+    repo_id = SUBMODEL_REGISTRY[model_name]
+
+    print(f"Downloading {model_name} from {repo_id}...")
+    print(f"Destination: {model_path}")
+
+    # Use smart download with automatic fallback
+    success, msg = _smart_download(repo_id, model_path, token, prefer_source)
+    if success and model_name in _CHECKPOINT_TO_VARIANT:
+        # Sync model code files after successful download
+        synced = _sync_model_code_files(model_name, checkpoints_dir)
+        if synced:
+            logger.info(f"[Model Download] Synced code files for {model_name}: {synced}")
+    return success, msg
+
+
+def download_main_component(
+    component_name: str,
+    checkpoints_dir: Optional[Path] = None,
+    force: bool = False,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    单独下载主模型仓库（ACE-Step/Ace-Step1.5）里的某个组件子目录。
+
+    主模型的若干核心组件（acestep-v15-turbo、acestep-5Hz-lm-1.7B 等）物理上
+    只是主仓库的子目录，并非独立仓库。本函数用 snapshot_download 的 allow_patterns
+    只拉取该组件子目录的文件，实现「组件级独立下载」：
+      - 点击组件「下载」只下载该组件自身（约 1.5~3.5GB），而非整个 18GB 主包；
+      - 进度按该组件自身大小计算，独立显示，不再与主包进度同步；
+      - 多次分别下载不同组件最终等价于下载了完整主包（snapshot_download 幂等，
+        已存在的文件不会重复下载），check_main_model_exists 仍据此判定主模型完整性。
+
+    Args:
+        component_name: MAIN_MODEL_COMPONENTS 中的组件名（如 "acestep-v15-turbo"）
+        checkpoints_dir: 自定义 checkpoints 目录（可选）
+        force: 强制重新下载（先移除不完整的该组件子目录）
+        token: HuggingFace token（可选）
+        prefer_source: 首选下载源（可选）
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if component_name not in MAIN_MODEL_COMPONENTS:
+        return False, f"Unknown main component '{component_name}'. Available: {', '.join(MAIN_MODEL_COMPONENTS)}"
+
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    # Ensure checkpoints directory exists
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path = checkpoints_dir / component_name
+
+    if not force and check_model_exists(component_name, checkpoints_dir):
+        return True, f"Component '{component_name}' already exists at {model_path}"
+
+    # 强制重新下载时，先删除该组件现有（可能不完整/损坏）的子目录，确保全新下载。
+    # 只删本组件，不动其它已下载的组件（与「主包整删」区分开）。
+    if force and model_path.exists():
+        try:
+            if model_path.is_dir():
+                shutil.rmtree(model_path)
+            else:
+                model_path.unlink()
+            logger.info(f"[Download] 已移除现有组件以重新下载: {component_name}")
+        except Exception as e:
+            logger.error(f"[Download] 移除现有组件失败: {component_name}: {e}")
+            return False, f"Failed to remove existing component {component_name}: {e}"
+
+    # 仅下载主仓库里该组件子目录的文件（HF/ModelScope 均支持 allow_patterns）
+    allow_patterns = [f"{component_name}/**", f"{component_name}/*"]
+    # 进度兜底用的预估总大小：组件自身 download_size（无则用验证阈值兜底）
+    comp_info = MODEL_VALIDATION_INFO.get(component_name)
+    est_bytes = _FS_COMPONENT_DOWNLOAD_SIZE.get(component_name) or (comp_info.get("min_size", 1.8e9) if comp_info else 1.8e9)
+    # 本地真实扫描目标：组件子目录（避免磁盘兜底误扫整个 checkpoints 目录）
+    scan_subdir = model_path
+
+    print(f"Downloading main component '{component_name}' from {MAIN_MODEL_REPO}...")
+    print(f"Destination: {model_path}")
+
+    success, msg = _smart_download(
+        MAIN_MODEL_REPO, checkpoints_dir, token, prefer_source,
+        allow_patterns=allow_patterns, est_bytes=est_bytes, scan_subdir=scan_subdir,
+    )
+    if success and component_name in _CHECKPOINT_TO_VARIANT:
+        # Sync model code files after successful download
+        synced = _sync_model_code_files(component_name, checkpoints_dir)
+        if synced:
+            logger.info(f"[Model Download] Synced code files for {component_name}: {synced}")
+    return success, msg
+
+
+# 组件独立下载时的预估总大小（与 main.py 的 _FS_MODEL_DOWNLOAD_SIZE 对应，
+# 仅用于进度兜底；真实进度由下载器的字节加权 reporter 驱动）。
+_FS_COMPONENT_DOWNLOAD_SIZE = {
+    "acestep-v15-turbo": 1.8e9,
+    "vae": 300e6,
+    "Qwen3-Embedding-0.6B": 1.2e9,
+    "acestep-5Hz-lm-1.7B": 3.5e9,
+}
+
+
+def download_all_models(
+    checkpoints_dir: Optional[Path] = None,
+    force: bool = False,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, List[str]]:
+    """
+    Download all available models.
+    
+    Args:
+        checkpoints_dir: Custom checkpoints directory (optional)
+        force: Force re-download even if models exist
+        token: HuggingFace token for private repos (optional)
+        prefer_source: Preferred download source ("huggingface", "modelscope", or None for auto-detect)
+    
+    Returns:
+        Tuple of (all_success, list of messages)
+    """
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    messages = []
+    all_success = True
+    
+    # Download main model first
+    success, msg = download_main_model(checkpoints_dir, force, token, prefer_source)
+    messages.append(msg)
+    if not success:
+        all_success = False
+    
+    # Download all sub-models
+    for model_name in SUBMODEL_REGISTRY:
+        success, msg = download_submodel(model_name, checkpoints_dir, force, token, prefer_source)
+        messages.append(msg)
+        if not success:
+            all_success = False
+    
+    return all_success, messages
+
+
+def ensure_main_model(
+    checkpoints_dir: Optional[Path] = None,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Ensure the main model is available, downloading if necessary.
+
+    This function is designed to be called during initialization.
+    It will only download if the model doesn't exist.
+
+    Args:
+        checkpoints_dir: Custom checkpoints directory (optional)
+        token: HuggingFace token for private repos (optional)
+        prefer_source: Preferred download source ("huggingface", "modelscope", or None for auto-detect)
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+
+    if check_main_model_exists(checkpoints_dir):
+        return True, "Main model is available"
+
+    print("\n" + "=" * 60)
+    print("Main model not found. Starting automatic download...")
+    print("=" * 60 + "\n")
+
+    return download_main_model(checkpoints_dir, token=token, prefer_source=prefer_source)
+
+
+def ensure_lm_model(
+    model_name: Optional[str] = None,
+    checkpoints_dir: Optional[Path] = None,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Ensure an LM model is available, downloading if necessary.
+
+    Args:
+        model_name: Name of the LM model (defaults to DEFAULT_LM_MODEL)
+        checkpoints_dir: Custom checkpoints directory (optional)
+        token: HuggingFace token for private repos (optional)
+        prefer_source: Preferred download source ("huggingface", "modelscope", or None for auto-detect)
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if model_name is None:
+        model_name = DEFAULT_LM_MODEL
+
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    if check_model_exists(model_name, checkpoints_dir):
+        return True, f"LM model '{model_name}' is available"
+
+    # Check if this is a known LM model
+    if model_name not in SUBMODEL_REGISTRY:
+        # Check if it might be a variant name
+        for known_model in SUBMODEL_REGISTRY:
+            if "lm" in known_model.lower() and model_name.lower() in known_model.lower():
+                model_name = known_model
+                break
+        else:
+            return False, f"Unknown LM model: {model_name}"
+
+    print("\n" + "=" * 60)
+    print(f"LM model '{model_name}' not found. Starting automatic download...")
+    print("=" * 60 + "\n")
+
+    return download_submodel(model_name, checkpoints_dir, token=token, prefer_source=prefer_source)
+
+
+def ensure_dit_model(
+    model_name: str,
+    checkpoints_dir: Optional[Path] = None,
+    token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Ensure a DiT model is available, downloading if necessary.
+
+    Args:
+        model_name: Name of the DiT model
+        checkpoints_dir: Custom checkpoints directory (optional)
+        token: HuggingFace token for private repos (optional)
+        prefer_source: Preferred download source ("huggingface", "modelscope", or None for auto-detect)
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+
+    if check_model_exists(model_name, checkpoints_dir):
+        return True, f"DiT model '{model_name}' is available"
+
+    # Check if this is the default turbo model (part of main)
+    if model_name == "acestep-v15-turbo":
+        return ensure_main_model(checkpoints_dir, token, prefer_source)
+
+    # Check if it's a known sub-model
+    if model_name in SUBMODEL_REGISTRY:
+        print("\n" + "=" * 60)
+        print(f"DiT model '{model_name}' not found. Starting automatic download...")
+        print("=" * 60 + "\n")
+        return download_submodel(model_name, checkpoints_dir, token=token, prefer_source=prefer_source)
+
+    if not model_name:
+        return False, "Unknown DiT model: '' (pass None for default or choose a valid model)"
+    return False, f"Unknown DiT model: {model_name}"
+
+
+def print_model_list():
+    """Print formatted list of available models."""
+    print("\nAvailable Models for Download:")
+    print("=" * 60)
+    print("\nSupported Sources: HuggingFace Hub <-> ModelScope (auto-fallback)")
+
+    print("\n[Main Model]")
+    print(f"  main -> {MAIN_MODEL_REPO}")
+    print("  Contains: vae, Qwen3-Embedding-0.6B, acestep-v15-turbo, acestep-5Hz-lm-1.7B")
+
+    print("\n[Optional LM Models]")
+    for name, repo in SUBMODEL_REGISTRY.items():
+        if "lm" in name.lower():
+            print(f"  {name} -> {repo}")
+
+    print("\n[Optional DiT Models]")
+    for name, repo in SUBMODEL_REGISTRY.items():
+        if "lm" not in name.lower():
+            print(f"  {name} -> {repo}")
+
+    print("\n" + "=" * 60)
+
+
+def main():
+    """CLI entry point for model downloading."""
+    parser = argparse.ArgumentParser(
+        description="Download ACE-Step models with automatic fallback (HuggingFace <-> ModelScope)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  acestep-download                          # Download main model (includes LM 1.7B)
+  acestep-download --all                    # Download all available models
+  acestep-download --model acestep-v15-sft  # Download a specific model
+  acestep-download --list                   # List all available models
+
+Network Detection:
+  Automatically detects network environment and chooses the best download source:
+  - Google accessible -> HuggingFace (fallback to ModelScope)
+  - Google blocked -> ModelScope (fallback to HuggingFace)
+
+Alternative using huggingface-cli:
+  huggingface-cli download ACE-Step/Ace-Step1.5 --local-dir ./checkpoints
+  huggingface-cli download ACE-Step/acestep-5Hz-lm-0.6B --local-dir ./checkpoints/acestep-5Hz-lm-0.6B
+        """
+    )
+    
+    parser.add_argument(
+        "--model", "-m",
+        type=str,
+        help="Specific model to download (use --list to see available models)"
+    )
+    parser.add_argument(
+        "--all", "-a",
+        action="store_true",
+        help="Download all available models"
+    )
+    parser.add_argument(
+        "--list", "-l",
+        action="store_true",
+        help="List all available models"
+    )
+    parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        default=None,
+        help="Custom checkpoints directory (default: ./checkpoints)"
+    )
+    parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Force re-download even if model exists"
+    )
+    parser.add_argument(
+        "--token", "-t",
+        type=str,
+        default=None,
+        help="HuggingFace token for private repos"
+    )
+    parser.add_argument(
+        "--skip-main",
+        action="store_true",
+        help="Skip downloading the main model (only download specified sub-model)"
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default=None,
+        choices=["huggingface", "modelscope", "huggingface-cn", "auto"],
+        help="Preferred download source (auto, huggingface, modelscope, huggingface-cn)"
+    )
+    parser.add_argument(
+        "--delete",
+        type=str,
+        default=None,
+        help="Delete a model (specify model name)"
+    )
+    parser.add_argument(
+        "--verify",
+        type=str,
+        default=None,
+        help="Verify a model's integrity (specify model name)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Get checkpoints directory
+    checkpoints_dir = get_checkpoints_dir(args.dir) if args.dir else get_checkpoints_dir()
+    
+    # Handle --delete
+    if args.delete:
+        print(f"Deleting model: {args.delete}")
+        success, msg = delete_model(args.delete, checkpoints_dir)
+        print(msg)
+        return 0 if success else 1
+    
+    # Handle --verify
+    if args.verify:
+        print(f"Verifying model: {args.verify}")
+        success, msg, details = verify_model(args.verify, checkpoints_dir)
+        print(msg)
+        if details:
+            if details["files_found"]:
+                print(f"  Files found: {', '.join(details['files_found'])}")
+            if details["files_missing"]:
+                print(f"  Files missing: {', '.join(details['files_missing'])}")
+            if details["total_size"] > 0:
+                print(f"  Total size: {details['total_size']/1e6:.2f}MB")
+                if details["expected_size"] > 0:
+                    print(f"  Expected size: {details['expected_size']/1e6:.2f}MB")
+        return 0 if success else 1
+    
+    # Handle --list
+    if args.list:
+        print_model_list()
+        return 0
+    
+    print(f"Checkpoints directory: {checkpoints_dir}")
+    
+    # Handle --all
+    if args.all:
+        success, messages = download_all_models(checkpoints_dir, args.force, args.token)
+        for msg in messages:
+            print(msg)
+        return 0 if success else 1
+    
+    # Handle --model
+    if args.model:
+        if args.model == "main":
+            success, msg = download_main_model(checkpoints_dir, args.force, args.token, args.source)
+        elif args.model in SUBMODEL_REGISTRY:
+            # Download main model first if needed (unless --skip-main)
+            if not args.skip_main and not check_main_model_exists(checkpoints_dir):
+                print("Main model not found. Downloading main model first...")
+                main_success, main_msg = download_main_model(checkpoints_dir, args.force, args.token, args.source)
+                print(main_msg)
+                if not main_success:
+                    return 1
+            
+            success, msg = download_submodel(args.model, checkpoints_dir, args.force, args.token, args.source)
+        elif args.model in MAIN_MODEL_COMPONENTS:
+            # 主模型组件（acestep-v15-turbo / acestep-5Hz-lm-1.7B 等）：用 allow_patterns
+            # 只下载主仓库里对应的组件子目录，而非整个 18GB 主包。
+            success, msg = download_main_component(args.model, checkpoints_dir, args.force, args.token, args.source)
+        else:
+            print(f"Unknown model: {args.model}")
+            print("Use --list to see available models")
+            return 1
+        
+        print(msg)
+        return 0 if success else 1
+    
+    # Default: download main model (includes default LM 1.7B)
+    print("Downloading main model (includes vae, text encoder, DiT, and LM 1.7B)...")
+    
+    # Download main model
+    success, msg = download_main_model(checkpoints_dir, args.force, args.token, args.source)
+    print(msg)
+    
+    if success:
+        print("\nDownload complete!")
+        print(f"Models are available at: {checkpoints_dir}")
+    
+    return 0 if success else 1
+
+
+def delete_model(model_name: str, checkpoints_dir: Optional[Path] = None) -> Tuple[bool, str]:
+    """
+    Delete a model from the checkpoints directory.
+    
+    Args:
+        model_name: Name of the model to delete
+        checkpoints_dir: Custom checkpoints directory (optional)
+    
+    Returns:
+        Tuple of (success, message)
+    """
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+    
+    if model_name == "main":
+        # Delete all main model components
+        deleted = []
+        for component in MAIN_MODEL_COMPONENTS:
+            component_path = checkpoints_dir / component
+            if component_path.exists():
+                try:
+                    if component_path.is_dir():
+                        shutil.rmtree(component_path)
+                    else:
+                        component_path.unlink()
+                    deleted.append(component)
+                    logger.info(f"[Delete] Deleted: {component}")
+                except Exception as e:
+                    logger.error(f"[Delete] Failed to delete {component}: {e}")
+                    return False, f"Failed to delete {component}: {e}"
+        return True, f"Deleted main model components: {', '.join(deleted)}"
+    else:
+        # Delete single model
+        model_path = checkpoints_dir / model_name
+        if not model_path.exists():
+            return False, f"Model not found: {model_name}"
+        
+        try:
+            if model_path.is_dir():
+                shutil.rmtree(model_path)
+            else:
+                model_path.unlink()
+            logger.info(f"[Delete] Deleted: {model_name}")
+            return True, f"Successfully deleted: {model_name}"
+        except Exception as e:
+            logger.error(f"[Delete] Failed to delete {model_name}: {e}")
+            return False, f"Failed to delete {model_name}: {e}"
+
+
+def verify_model(model_name: str, checkpoints_dir: Optional[Path] = None) -> Tuple[bool, str, Dict]:
+    """
+    Verify a model's integrity using file list, size, and hash checks.
+    
+    Args:
+        model_name: Name of the model to verify
+        checkpoints_dir: Custom checkpoints directory (optional)
+    
+    Returns:
+        Tuple of (success, message, details_dict)
+    """
+    if checkpoints_dir is None:
+        checkpoints_dir = get_checkpoints_dir()
+    elif isinstance(checkpoints_dir, str):
+        checkpoints_dir = Path(checkpoints_dir)
+    
+    details = {
+        "model_name": model_name,
+        "files_found": [],
+        "files_missing": [],
+        "size_ok": True,
+        "total_size": 0,
+        "expected_size": 0
+    }
+    
+    if model_name == "main":
+        # Verify all main model components
+        all_ok = True
+        messages = []
+        
+        for component in MAIN_MODEL_COMPONENTS:
+            comp_ok, comp_msg, comp_details = verify_model(component, checkpoints_dir)
+            details[component] = comp_details
+            if not comp_ok:
+                all_ok = False
+                messages.append(f"{component}: {comp_msg}")
+        
+        if all_ok:
+            return True, "All main model components verified successfully", details
+        else:
+            return False, "Some components failed verification: " + "; ".join(messages), details
+    
+    # Verify single model
+    model_path = checkpoints_dir / model_name
+    if not model_path.exists():
+        details["files_missing"].append("(model directory)")
+        return False, f"Model directory not found: {model_name}", details
+    
+    # Check if model has validation info
+    if model_name not in MODEL_VALIDATION_INFO:
+        # Basic verification - just check directory not empty
+        try:
+            files = list(model_path.iterdir())
+            if len(files) == 0:
+                return False, f"Model directory is empty: {model_name}", details
+            details["files_found"] = [f.name for f in files]
+            details["total_size"] = _get_directory_size(model_path)
+            return True, f"Model exists and has {len(files)} files", details
+        except Exception as e:
+            return False, f"Error checking model: {e}", details
+    
+    validation_info = MODEL_VALIDATION_INFO[model_name]
+    details["expected_size"] = validation_info.get("min_size", 0)
+    
+    # Check required files
+    all_files_ok = True
+    for required_file in validation_info.get("files", []):
+        if _required_file_present(model_path, required_file):
+            details["files_found"].append(required_file)
+        else:
+            details["files_missing"].append(required_file)
+            all_files_ok = False
+    
+    # Check directory size
+    details["total_size"] = _get_directory_size(model_path)
+    min_size = validation_info.get("min_size", 0)
+    if details["total_size"] < min_size:
+        details["size_ok"] = False
+    
+    # Build result message
+    if all_files_ok and details["size_ok"]:
+        msg = f"✓ {model_name} verified: {len(details['files_found'])} files, {details['total_size']/1e6:.2f}MB"
+        return True, msg, details
+    else:
+        issues = []
+        if not all_files_ok:
+            issues.append(f"missing {len(details['files_missing'])} files")
+        if not details["size_ok"]:
+            issues.append(f"size too small ({details['total_size']/1e6:.2f}MB < {min_size/1e6:.2f}MB)")
+        msg = f"✗ {model_name} issues: {', '.join(issues)}"
+        return False, msg, details
+
+
+if __name__ == "__main__":
+    sys.exit(main())

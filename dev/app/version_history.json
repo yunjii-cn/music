@@ -1389,5 +1389,13 @@
     ],
     "build_time": "2026-07-31T06:01:27.557660",
     "version_number": "2026.07.31.0600"
+  },
+  "云集智能音乐创意台-v2026.07.31.0628": {
+    "version": "云集智能音乐创意台-v2026.07.31.0628",
+    "changes": [
+      "修复打包后主窗口不显示(托盘在但无界面)：将launcher的独立置顶启动屏子进程句柄传给main.main，主窗口显示瞬间强制terminate该子进程(WindowStaysOnTopHint永久遮挡根因)，并强制showNormal/raise/activateWindow/setActiveWindow保证窗口可见激活；新增%TEMP%/yunji_launch_trace.log启动轨迹便于定位"
+    ],
+    "build_time": "2026-07-31T06:29:13.275773",
+    "version_number": "2026.07.31.0628"
   }
 }

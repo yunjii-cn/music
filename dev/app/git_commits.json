@@ -1,6 +1,15 @@
 [
   {
-    "hash": "705bd7ce3cbd849ab50b32bb97399fcb3375c2d4",
+    "hash": "e1bd6b03ec69cfb997a1d8937c75f2460241442c",
+    "short_hash": "e1bd6b0",
+    "message": "feat: 发布版本 v2026.07.31.0600",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 06:01:29",
+    "body": "- 修复主窗口被启动屏置顶遮挡导致界面不显示(托盘在但无窗口、无崩溃日志)：7bc676b将同步show+finish收屏改为仅依赖reached_full异步信号，信号未触发时BrandedSplash(WindowStaysOnTopHint置顶)永久盖住主窗口。MainWindow._deferred_init末尾增加800ms不依赖信号的兜底收屏；main()最后防线由60s缩至10s"
+  },
+  {
+    "hash": "\n705bd7ce3cbd849ab50b32bb97399fcb3375c2d4",
     "short_hash": "705bd7c",
     "message": "feat: 发布版本 v2026.07.31.0518",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-10 04:41:00",
     "body": "根因澄清：封面模式需要 sourceAudioUrl，对应 UI 的「内容参考」(t('cover')) 标签，\n而「风格参考」(t('reference')) 是 reference 槽、翻唱用不上。用户因标签语义不清\n易传错槽，导致 sourceAudioUrl 为空、按钮被禁用却无任何说明 -> 误以为产品故障。\n\n改进（引导而非拦截）：\n1. 选择 cover / audio2audio 时自动切换到「内容参考」(source) 标签\n2. 音频区增加琥珀色引导条：明确提示需在「内容参考」上传源音频\n3. 生成按钮禁用时增加 tooltip 说明原因\n4. 兜底 alert 文案明确指向「内容参考」标签\n\n注：防噪声的核心禁用逻辑保留（缺源音频仍不允许生成），仅补引导说明。"
-  },
-  {
-    "hash": "\n89b6b45b318c775481e818e5ba5342315f93d087",
-    "short_hash": "89b6b45",
-    "message": "fix: 修复翻唱(cover)模式生成杂音——根因源音频未送达",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-10 04:12:25",
-    "body": "真正根因：前端可手动选 cover 模式而不挂源音频，Node 仅在 sourceAudioUrl\n为真才附带 src_audio_path，否则静默省略 -> Python 收 None -> src_latents\n退化为静音潜变量 -> 纯噪声（运行时日志证实 src_audio_path=None）\n\n三层防御：\n1. generate_music_request._prepare_reference_and_source_audio：cover 缺源音频\n   直接返回明确错误，不再静默出噪声\n2. server generate.ts：cover/audio2audio 缺源音频或音频码时返回 400\n3. CreatePanel：cover/audio2audio 无源音频时禁用生成按钮并提示请先上传源音频"
   }
 ]
