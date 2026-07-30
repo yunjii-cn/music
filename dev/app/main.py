@@ -2353,6 +2353,7 @@ class MainWindow(QMainWindow):
     def _deferred_init(self):
         if self._home_loaded:
             return
+        import traceback as _tb
         from PyQt6.QtWidgets import QApplication
         app = QApplication.instance()
         _launch_trace("deferred_init start")
@@ -2363,37 +2364,70 @@ class MainWindow(QMainWindow):
             if app:
                 app.processEvents()
 
-        _pulse("正在加载配置...", 0.65)
-        self.config = ConfigManager(self.base_dir)
+        # ── 加载阶段：全部包进 try/except ──
+        # 历史教训：此前 config / UI 构建 / monitor / resize 等步骤在 self.show()
+        # 之前且未做异常保护；一旦其中任一步抛异常，异常被 SafeApplication.notify
+        # 吞掉（仅写 crash_log.txt），self.show() 被跳过 → 托盘在、界面不显示、
+        # 且无可见崩溃。打包后 base_dir 指向部署目录 app/，配置路径与开发模式不同，
+        # 极易命中坏值（如 ui.window_size 格式异常）触发此问题。
+        # 现改为：加载阶段异常只记录根因，绝不影响后续「强制显示主窗口」。
+        try:
+            _pulse("正在加载配置...", 0.65)
+            self.config = ConfigManager(self.base_dir)
 
-        _pulse("正在检测浏览器...", 0.72)
-        self.browsers = self._detect_browsers()
-        self.selected_browser = self.config.get("browser.default", "system")
-        self.custom_browser_path = self.config.get("browser.custom_path", "")
-        if self.custom_browser_path and os.path.exists(self.custom_browser_path):
-            self.browsers["自定义浏览器"] = self.custom_browser_path
-        self.selected_download_source = self.config.get("download.source", "auto")
+            _pulse("正在检测浏览器...", 0.72)
+            self.browsers = self._detect_browsers()
+            self.selected_browser = self.config.get("browser.default", "system")
+            self.custom_browser_path = self.config.get("browser.custom_path", "")
+            if self.custom_browser_path and os.path.exists(self.custom_browser_path):
+                self.browsers["自定义浏览器"] = self.custom_browser_path
+            self.selected_download_source = self.config.get("download.source", "auto")
 
-        _pulse("正在构建主界面...", 0.8)
+            _pulse("正在构建主界面...", 0.8)
 
-        while self.home_layout.count():
-            item = self.home_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            while self.home_layout.count():
+                item = self.home_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
 
-        self._populate_home_page(_pulse)
+            self._populate_home_page(_pulse)
 
-        _pulse("正在启动监控...", 0.9)
-        self._setup_monitor()
-        self._setup_tray()
+            _pulse("正在启动监控...", 0.9)
+            self._setup_monitor()
+            self._setup_tray()
 
-        size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
-        self.resize(size["width"], size["height"])
+            # resize 容错：ui.window_size 可能存成非 dict（list/tuple/脏数据），
+            # 之前 size["width"] 直接抛 KeyError/TypeError 从而跳过 show()。
+            size = self.config.get("ui.window_size", {"width": 1200, "height": 1100})
+            try:
+                if isinstance(size, dict):
+                    w = int(size.get("width", 1200))
+                    h = int(size.get("height", 1100))
+                elif isinstance(size, (list, tuple)) and len(size) >= 2:
+                    w, h = int(size[0]), int(size[1])
+                else:
+                    w, h = 1200, 1100
+            except Exception:
+                w, h = 1200, 1100
+            self.resize(w, h)
 
-        self._home_loaded = True
+            self._home_loaded = True
+        except Exception as _e:
+            _write_crash_log(
+                "[_deferred_init 加载阶段异常，已兜底显示主窗口] "
+                + "".join(_tb.format_exc())
+            )
+            # 即便加载异常，仍尽量保证托盘/界面基础可用
+            try:
+                if not getattr(self, "tray_icon", None):
+                    self._setup_tray()
+            except Exception:
+                pass
+            self._home_loaded = True
 
-        # 软件已“充分加载、能快速显示”：把主窗口显示出来（在启动屏之下渲染），
-        # “进度到达 100%”的判定标准就是此刻——已充分加载可快速显示。
+        # ── 无论加载是否成功，无条件把主窗口显示出来 ──
+        # 这是「托盘在、界面不显示」的终极兜底：只要 _deferred_init 跑到这里
+        # （托盘已在上方创建），窗口就必然可见激活，不再依赖任何前置步骤成功。
         try:
             self.show()
             self.raise_()
@@ -2401,11 +2435,8 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-        # ── 强制作保：打包后若出现”托盘在、界面不显示”，根因是 launcher 拉起的
-        #    独立启动屏子进程(BrandedSplash, WindowStaysOnTopHint)未退场而永久置顶。
-        #    这里在主窗口显示瞬间：① 清掉任何最小化/隐藏态并强制置顶激活；
-        #    ② 直接终止该置顶子进程，杜绝其遮挡。即使它本应靠 sentinel 自行退出，
-        #    此处兜底也保证窗口必然可见。
+        # 强制作保：清掉任何最小化/隐藏态并强制置顶激活；同时终止 launcher 拉起的
+        # 独立置顶启动屏子进程(BrandedSplash, WindowStaysOnTopHint)，杜绝其遮挡。
         try:
             self.setWindowState(Qt.WindowState.WindowNoState)
             self.showNormal()
@@ -2427,8 +2458,6 @@ class MainWindow(QMainWindow):
         _launch_trace("window shown")
 
         if self._splash:
-            # 让进度条“丝滑”推进到 100%——reached_full 由动画计时器在 _display
-            # 真正逼近 1.0 时才发出，此刻再收起启动屏，避免进度条突兀消失。
             try:
                 self._splash.reached_full.disconnect()
             except Exception:
@@ -2436,10 +2465,6 @@ class MainWindow(QMainWindow):
             self._splash.reached_full.connect(self._finish_splash_once)
             self._splash.set_progress(1.0, "加载完成！")
             # 兜底收屏：不依赖 reached_full 异步信号（7bc676b 引入的脆弱依赖）。
-            # 短延时后强制收起置顶启动屏并显示主窗口，防止该信号因时序/环境差异
-            # 未触发而导致启动屏(WindowStaysOnTopHint)永久遮挡主窗口——
-            # 现象即「托盘有图标、但界面不显示、且无崩溃日志」。reached_full 先到
-            # 则由它收屏，本兜底再触发时 _finished 保护使其无副作用。
             QTimer.singleShot(800, self._finish_splash_once)
         if app:
             app.processEvents()

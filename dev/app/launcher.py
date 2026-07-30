@@ -136,44 +136,74 @@ def _safe_delete(path):
             return
 
 
-def _entry_version(entry_exe):
-    if not os.path.exists(entry_exe):
-        return ""
-    m = VERSIONED_RE.search(os.path.basename(entry_exe))
-    return m.group(1) if m else ""
+def _find_newest_versioned_exe(deploy_dir, current_exe):
+    """在 ver/ 中找出版本号最大的版本号 exe；当前运行的版本号 exe 也参与比较。
+
+    返回该 exe 的绝对路径；未找到任何版本号 exe 时返回 None。
+    """
+    candidates = []
+    ver_dir = os.path.join(deploy_dir, "ver")
+    if os.path.isdir(ver_dir):
+        for name in os.listdir(ver_dir):
+            if name.lower().endswith(".exe") and VERSIONED_RE.search(name):
+                candidates.append((VERSIONED_RE.search(name).group(1),
+                                   os.path.join(ver_dir, name)))
+    cur_m = VERSIONED_RE.search(os.path.basename(current_exe))
+    if cur_m:
+        candidates.append((cur_m.group(1), os.path.abspath(current_exe)))
+    if not candidates:
+        return None
+
+    def _vt(v):
+        try:
+            return tuple(int(x) for x in v.split("."))
+        except Exception:
+            return (0,)
+
+    best = max(candidates, key=lambda c: _vt(c[0]))
+    return best[1]
+
+
+def _entry_points_to(entry_exe, target_exe):
+    """判断 entry_exe 是否已硬链接/指向 target_exe（按 st_dev+st_ino 文件标识）。"""
+    try:
+        s1 = os.stat(entry_exe)
+        s2 = os.stat(target_exe)
+        return (s1.st_dev, s1.st_ino) == (s2.st_dev, s2.st_ino)
+    except Exception:
+        return False
 
 
 def _ensure_entry_current(deploy_dir, current_exe):
-    """确保固定名入口始终硬链接到当前运行的版本 exe。
+    """确保固定名入口始终指向 ver/ 中最新的版本号 exe。
 
-    根因修复：旧逻辑只在「入口不存在」时建硬链接，入口一旦存在就永不更新 →
-    首次部署后入口永远停留在那个旧版本，新构建即便下载了也跑旧代码
-    （表现为「重打包也不生效 / 打开软件更新页仍闪窗」）。
+    根因修复：旧逻辑在「入口路径 == 当前运行路径」时直接 return，导致用户经
+    固定名入口（云集智能音乐创意台.exe）双击启动时，入口永远停留在首次部署的
+    旧版本，新构建下载后也跑旧代码（表现「重打包也不生效」）。
 
-    现策略：只要当前运行的版本号与入口不同，就删旧入口、重建硬链接指向当前 exe。
-    入口不是当前进程，删除安全（硬链接另一引用仍在 ver/ 里，文件数据不会丢）。
+    现策略：在 ver/ 中找出最新版本号 exe，若入口不存在或已指向的旧版本 != 最新，
+    则删旧入口、重建硬链接指向最新版本。调用方(_self_relocate)负责在「当前进程
+    运行的镜像不是最新版」时重新拉起最新版。
     """
     entry_exe = os.path.join(deploy_dir, ENTRY_EXE_NAME)
+    newest = _find_newest_versioned_exe(deploy_dir, current_exe)
+    if newest is None:
+        # 极端情况：没有任何版本号 exe 可指向，保持现状
+        return entry_exe if os.path.exists(entry_exe) else None
+    # 入口已存在且已指向最新版本 -> 无需动作
+    if os.path.exists(entry_exe) and _entry_points_to(entry_exe, newest):
+        return entry_exe
+    # 否则 (重)建入口指向最新版本
     try:
-        if os.path.abspath(entry_exe) == os.path.abspath(current_exe):
-            return entry_exe if os.path.exists(entry_exe) else None
-        cur_v = (VERSIONED_RE.search(os.path.basename(current_exe)) or [None, None])
-        cur_v = cur_v[1] if cur_v else ""
-        ent_v = _entry_version(entry_exe)
-        need_relink = (not os.path.exists(entry_exe)) or (cur_v and cur_v != ent_v)
-        if need_relink:
-            if os.path.exists(entry_exe):
-                _safe_delete(entry_exe)
-            try:
-                os.link(current_exe, entry_exe)
-            except Exception:
-                try:
-                    shutil.copy2(current_exe, entry_exe)
-                except Exception:
-                    return None
-        return entry_exe if os.path.exists(entry_exe) else None
+        if os.path.exists(entry_exe):
+            _safe_delete(entry_exe)
+        try:
+            os.link(newest, entry_exe)
+        except Exception:
+            shutil.copy2(newest, entry_exe)
     except Exception:
-        return entry_exe if os.path.exists(entry_exe) else None
+        pass
+    return entry_exe if os.path.exists(entry_exe) else None
 
 
 def _self_relocate():
@@ -204,9 +234,30 @@ def _self_relocate():
         os.path.join(deploy_dir, VERSION_TXT))
     if already:
         os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
-        # 根因修复：即使已部署，也要让固定名入口指向当前运行的版本，
-        # 否则用户经入口/旧快捷方式启动会一直跑旧代码（重打包也不生效）。
+        newest = _find_newest_versioned_exe(deploy_dir, exe)
+        if newest is None:
+            if cleanup_target:
+                _safe_delete(cleanup_target)
+            return
+        # 判定当前进程是否跑的是最新镜像：比较 sys.executable 实际加载的文件
+        # 标识（st_dev+st_ino）与最新版 exe 是否一致。经「指向旧版的固定名入口」
+        # 启动时，入口虽在运行但镜像仍是旧版本，必须重新拉起最新版，否则重打包
+        # 后用户仍跑旧代码（「重打包也不生效」）。
+        try:
+            _cur = os.stat(exe)
+            _new = os.stat(newest)
+            _running_stale = (_cur.st_dev, _cur.st_ino) != (_new.st_dev, _new.st_ino)
+        except Exception:
+            _running_stale = True
+        # 先确保固定名入口指向最新版（无论是否本进程重拉，入口都应最新）
         _ensure_entry_current(deploy_dir, exe)
+        if _running_stale:
+            # 当前进程跑的是旧镜像：拉起最新版版本号 exe 并退出本旧进程
+            try:
+                subprocess.Popen([newest])
+            except Exception:
+                pass
+            os._exit(0)
         if cleanup_target:
             _safe_delete(cleanup_target)
         return
