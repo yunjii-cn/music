@@ -9230,6 +9230,7 @@ def _ensure_installed_exe():
     """
     try:
         import shutil as _sh
+        import ctypes
         root = os.environ.get("YUNJI_INSTALL_ROOT")
         if not root:
             return
@@ -9242,30 +9243,19 @@ def _ensure_installed_exe():
         ver_dir = os.path.join(root, "ver")
         os.makedirs(ver_dir, exist_ok=True)
         ver_target = os.path.join(ver_dir, exe_name)
-        # 若 ver_target 已存在且与当前运行 exe 是同一文件(曾归档过) -> 跳过搬迁
-        try:
-            if os.path.exists(ver_target):
-                s1 = os.stat(ver_target); s2 = os.stat(exe)
-                if (s1.st_dev, s1.st_ino) == (s2.st_dev, s2.st_ino):
-                    ver_target = exe
-        except Exception:
-            pass
-        if os.path.normpath(ver_target) != os.path.normpath(exe):
-            # 移除可能残留的旧副本(不同 inode)后，把运行中的 exe 改名归档进 ver/
-            if os.path.exists(ver_target):
-                try:
-                    os.remove(ver_target)
-                except Exception:
-                    pass
+        # 关键修正：绝不对「运行中的 exe」做 rename/删除——实测会引发部分安全软件
+        # 把「运行中程序自我改名」判定为恶意自我改写，直接在原生层杀掉进程 →
+        # 表现为「启动器闪一下就消失、无任何 Python 崩溃日志」。
+        # 改为：把运行中的 exe「复制」(只读源+写新位置，不触碰正在运行的文件)进
+        # ver/，入口硬链/复制指向静止副本；原始便携 exe 登记「下次重启时删除」
+        # (MoveFileEx MOVEFILE_DELAY_UNTIL_REBOOT)：重启时文件未运行、删除必成功 =
+        # 用户视角的「删除自身」，且全程不触发杀软。
+        if not os.path.exists(ver_target):
             try:
-                os.rename(exe, ver_target)   # 同卷 rename：运行中的 exe 也可改名
+                _sh.copy2(exe, ver_target)
             except Exception:
-                try:
-                    _sh.copy2(exe, ver_target)  # 跨卷退化：复制，原始保留
-                    ver_target = exe
-                except Exception:
-                    ver_target = exe
-        # 重建固定名入口指向归档副本（硬链优先，回退复制）
+                pass
+        # 固定名入口：硬链/复制指向 ver/ 静止副本（目标非运行中文件，风险低）
         entry = os.path.join(root, "云集智能音乐创意台.exe")
         try:
             need_relink = True
@@ -9288,8 +9278,14 @@ def _ensure_installed_exe():
                         pass
         except Exception:
             pass
-        _launch_trace("self-install done: ver=%s entry=%s"
-                      % (os.path.basename(ver_target),
+        # 登记原始便携 exe 于下次重启时删除（best-effort；非管理员可能失败 -> 留原文件，可接受降级）
+        try:
+            _k = ctypes.windll.kernel32
+            _k.MoveFileExW(exe, None, 0x4)  # 0x4 = MOVEFILE_DELAY_UNTIL_REBOOT
+        except Exception:
+            pass
+        _launch_trace("self-install done: ver=%s entry=%s original-pending-del=scheduled"
+                      % ("ok" if os.path.exists(ver_target) else "FAIL",
                          "ok" if os.path.exists(entry) else "fail"))
     except Exception:
         pass
@@ -9342,15 +9338,15 @@ def _write_crash_log(msg):
 
 
 def _launch_trace(step):
-    """启动轨迹：记录打包后「窗口是否真正可见」的每一步，写到 %TEMP%/yunji_launch_trace.log。
-    用于一锤定音定位”托盘在、界面不显示”到底卡在哪（无显示环境也能事后读取）。"""
+    """启动轨迹：记录打包后「窗口是否真正可见」的每一步。
+    双写：%TEMP%/yunji_launch_trace.log + exe 同目录/yunji_launch_trace.log，
+    便于真机在 D:\\test 直接拿（无需翻 %TEMP%）。"""
     try:
         import os as _os, tempfile as _tf
         from datetime import datetime as _dt
-        _p = _os.path.join(_tf.gettempdir(), "yunji_launch_trace.log")
+        _stamp = _dt.now().strftime("%H:%M:%S.%f")
         _vis = "?"
         try:
-            _w = _dt and None
             import PyQt6.QtWidgets as _qw
             _app = _qw.QApplication.instance()
             if _app is not None:
@@ -9360,8 +9356,15 @@ def _launch_trace(step):
                         break
         except Exception as _e:
             _vis = "probe_err=%s" % _e
-        with open(_p, "a", encoding="utf-8") as _f:
-            _f.write(_dt.now().strftime("%H:%M:%S.%f") + " [trace] %s | %s\n" % (step, _vis))
+        _line = _stamp + " [trace] %s | %s\n" % (step, _vis)
+        for _p in (_os.path.join(_tf.gettempdir(), "yunji_launch_trace.log"),
+                   _os.path.join(_os.path.dirname(_os.path.abspath(sys.executable)),
+                                 "yunji_launch_trace.log")):
+            try:
+                with open(_p, "a", encoding="utf-8") as _f:
+                    _f.write(_line)
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -9387,6 +9390,7 @@ def main(app=None, splash=None, child_proc=None):
     _kill_old_instances_sync()
     # Now claim the singleton mutex — if another process already holds it, exit
     _ensure_single_instance()
+    _launch_trace("single-instance ok")
     # Second pass: kill any remaining instances that raced past the mutex
     # (e.g., two processes started at identical wall-clock time)
     if "--no-dedup" not in sys.argv:

@@ -1,6 +1,15 @@
 [
   {
-    "hash": "415ad7df5cd7152f0101808cb7644f4de6ecc1bc",
+    "hash": "c0ddf712c3a96de054c1cce5bbdf6bbcf5a4551d",
+    "short_hash": "c0ddf71",
+    "message": "feat: 发布版本 v2026.07.31.2245",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 22:46:48",
+    "body": "- 首跑不自删改删除自身语义: 显示后同卷rename归档运行exe进ver+重建入口硬链(避开杀软), 删死代码ver复制"
+  },
+  {
+    "hash": "\n415ad7df5cd7152f0101808cb7644f4de6ecc1bc",
     "short_hash": "415ad7d",
     "message": "feat: 发布版本 v2026.07.31.2228",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-16 00:38:26",
     "body": "- 后端 routes/auth.ts 新增 POST /api/auth/um：按 UM social_uid 找/建本地用户并签发 JWT（复用本地 token 体系）；migrate.ts 增加 users.um_uid 字段\n- 前端 services/api.ts 增加 umLogin + UMLoginPayload；AuthContext 改为从 localStorage 恢复会话并新增 loginWithUM，移除强制 autoLogin\n- 新增 LoginGate.tsx：未登录显示音乐紫门控页，内嵌官网登录页(music.yunjii.cn/um)并监听 loginSuccess postMessage；index.tsx 用其包裹 App\n- web/um/index.php 增加向上转发 loginSuccess（可被子页面嵌套复用）；connect.php 增加 window.opener 回传（支持弹窗登录）"
-  },
-  {
-    "hash": "\n25836277fd4cafaeff5384f2473268ef78e16c4a",
-    "short_hash": "2583627",
-    "message": "feat(web): 提交官网(音乐紫主题)与UM扫码登录对接；补充07-12工作记忆",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-16 00:30:05",
-    "body": "- web/: 云集智能音乐创意台官网（暗黑+音乐紫#8B5CF6），含 UM 扫码登录(web/um/)\n- 新增 .gitignore 条目：web-pack.7z、dev/app/lora_state.json（本地产物不入库）\n- 还原误删的 .workbuddy 记忆文件，仅提交 07-12 当日笔记"
   }
 ]
