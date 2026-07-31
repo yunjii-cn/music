@@ -2480,9 +2480,23 @@ class MainWindow(QMainWindow):
                 pass
             self._home_loaded = True
 
+        # ── 显示前：把窗口居中到主屏可用区，并确保不超过屏幕尺寸 ──
+        # 对齐云集智能视频创意站 proven 实现（其 _deferred_init resize 后 move 居中）。
+        # 修复「isVisible()=True 但用户看不到、只剩托盘」：历史/系统记住的窗口位置
+        # 在分辨率变更或小屏上会落到屏幕外/越界，此处强制拉回主屏可见区。
+        try:
+            _screen = QApplication.primaryScreen()
+            if _screen is not None:
+                _ag = _screen.availableGeometry()
+                if self.width() > _ag.width() or self.height() > _ag.height():
+                    self.resize(min(self.width(), _ag.width() - 20),
+                                min(self.height(), _ag.height() - 20))
+                self.move(_ag.x() + max(0, (_ag.width() - self.width()) // 2),
+                          _ag.y() + max(0, (_ag.height() - self.height()) // 2))
+        except Exception:
+            pass
+
         # ── 无论加载是否成功，无条件把主窗口显示出来 ──
-        # 这是「托盘在、界面不显示」的终极兜底：只要 _deferred_init 跑到这里
-        # （托盘已在上方创建），窗口就必然可见激活，不再依赖任何前置步骤成功。
         try:
             self.show()
             self.raise_()
@@ -2512,7 +2526,6 @@ class MainWindow(QMainWindow):
                 pass
         _launch_trace("window shown")
 
-        # 启动器窗口已确认显示 -> 现在才做首跑收尾
         # 启动器窗口已确认显示 -> 首跑收尾
         # 删除原始便携 exe 由 launcher 的 --cleanup（入口进程立即删）或 .cleanup_pending
         #（下次启动兜底）统一处理，此处不再重复删除，避免双重删除 / 运行中改名触发杀软。
@@ -2520,15 +2533,33 @@ class MainWindow(QMainWindow):
         if _ct:
             _launch_trace("startup cleanup: handled by launcher (--cleanup / .cleanup_pending)")
 
+        # 收起进程内启动屏：对齐视频创意站——show() 后立即 finish+deleteLater+置 None，
+        # 不再依赖 reached_full 异步信号 + 800ms 延迟（延迟期间 WindowStaysOnTopHint
+        # 启动屏仍盖在主窗口之上，是「托盘在、界面不显示」的直观成因之一）。
         if self._splash:
             try:
                 self._splash.reached_full.disconnect()
             except Exception:
                 pass
-            self._splash.reached_full.connect(self._finish_splash_once)
-            self._splash.set_progress(1.0, "加载完成！")
-            # 兜底收屏：不依赖 reached_full 异步信号（7bc676b 引入的脆弱依赖）。
-            QTimer.singleShot(800, self._finish_splash_once)
+            try:
+                self._splash.set_progress(1.0, "加载完成！")
+            except Exception:
+                pass
+            try:
+                self._splash.finish(self)
+                self._splash.deleteLater()
+                _launch_trace("in-process splash finished")
+            except Exception:
+                _launch_trace("in-process splash finish err")
+            self._splash = None
+        # 启动屏刚收起 -> 再次把主窗口拉到最前，避免其停留在启动屏之下的瞬态
+        try:
+            self.raise_()
+            self.activateWindow()
+        except Exception:
+            pass
+        # 15s 兜底：极端情况下窗口仍未可见/被遮挡，强制居中再显示一次
+        QTimer.singleShot(15000, self._force_show_window)
         if app:
             app.processEvents()
     
@@ -2542,6 +2573,34 @@ class MainWindow(QMainWindow):
             _launch_trace("in-process splash finished")
         except Exception:
             _launch_trace("in-process splash finish err")
+            pass
+
+    def _force_show_window(self):
+        """15s 兜底：极端情况下主窗口仍未可见或被启动屏遮挡，强制居中再显示一次。
+        对齐云集智能视频创意站 _splash_fallback 的安全网思路。"""
+        try:
+            if self._splash is not None:
+                try:
+                    self._splash.finish(self)
+                    self._splash.deleteLater()
+                except Exception:
+                    pass
+                self._splash = None
+            _screen = QApplication.primaryScreen()
+            if _screen is not None:
+                _ag = _screen.availableGeometry()
+                if self.width() > _ag.width() or self.height() > _ag.height():
+                    self.resize(min(self.width(), _ag.width() - 20),
+                                min(self.height(), _ag.height() - 20))
+                self.move(_ag.x() + max(0, (_ag.width() - self.width()) // 2),
+                          _ag.y() + max(0, (_ag.height() - self.height()) // 2))
+            self.setWindowState(Qt.WindowState.WindowNoState)
+            self.showNormal()
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            _launch_trace("force_show_window: re-shown+centered")
+        except Exception:
             pass
 
     def _populate_home_page(self, _pulse=None):
