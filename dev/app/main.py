@@ -2458,23 +2458,12 @@ class MainWindow(QMainWindow):
         _launch_trace("window shown")
 
         # 启动器窗口已确认显示 -> 现在才做首跑收尾
+        # 启动器窗口已确认显示 -> 首跑收尾
+        # 删除原始便携 exe 由 launcher 的 --cleanup（入口进程立即删）或 .cleanup_pending
+        #（下次启动兜底）统一处理，此处不再重复删除，避免双重删除 / 运行中改名触发杀软。
         _ct = getattr(self, "_cleanup_target", None)
         if _ct:
-            # 旧模型(--cleanup 触发)：删除首次运行前的原始便携 exe
-            try:
-                _launch_trace("startup cleanup (defer delete original exe)")
-                QTimer.singleShot(300, lambda: _do_startup_cleanup(_ct))
-            except Exception:
-                pass
-        else:
-            # 首跑 fall-through（当前进程即便携 exe）：显示后归档自身进 ver/（安装），
-            # 并派生「删除自身」助手——本进程退出后删除原始便携 exe（无需管理员）。
-            try:
-                _launch_trace("self-install (archive running exe into ver/)")
-                QTimer.singleShot(300, _ensure_installed_exe)
-                _schedule_self_delete()
-            except Exception:
-                pass
+            _launch_trace("startup cleanup: handled by launcher (--cleanup / .cleanup_pending)")
 
         if self._splash:
             try:

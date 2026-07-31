@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.08.01.0057",
+    "date": "2026-08-01 00:58",
+    "message": "首跑删除自身回归f7d9105: already分支无条件删cleanup_target; 首跑入口用os.link简单相对路径(去复杂版本号匹配); 看门狗防黑屏+cleanup_pending兜底; main不再双重删/改名",
+    "changes": [
+      "首跑删除自身回归f7d9105: already分支无条件删cleanup_target; 首跑入口用os.link简单相对路径(去复杂版本号匹配); 看门狗防黑屏+cleanup_pending兜底; main不再双重删/改名"
+    ],
+    "name": "云集智能音乐创意台-v2026.08.01.0057.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.08.01.0019",
     "date": "2026-08-01 00:20",
     "message": "首跑删除自身双保险: 恢复spawn入口+--cleanup立即删(看门狗防黑屏) + .cleanup_pending下次启动兜底删(无需管理员); 移除需管理员的MoveFileEx; 入口创建/ver归档修正",

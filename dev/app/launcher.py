@@ -254,9 +254,13 @@ def _self_relocate():
     if already:
         _launch_trace("entry: _self_relocate already-deployed start")
         os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
-        # 首跑遗留清理：若首次运行记录了待删的原始便携 exe，此处（已部署态、文件
-        # 已不在运行）安全删除 —— 无需管理员、不触发安全软件。覆盖「首跑 entry 被
-        # 杀软拦截、未能立即删除」的场景，下次启动必清。
+        # 入口被拉起：删除原始便携 exe（f7d9105 proven 机制，os.remove 无需管理员）。
+        # 注意：必须无条件执行——之前误改为「仅当 ver/ 中无新版时才删」，导致正常
+        # 升级/首跑后原始便携 exe 永远留在下载目录（用户反馈“能打开但不删自身”）。
+        if cleanup_target:
+            _safe_delete(cleanup_target)
+        # 首跑 fallback 遗留清理：若上次首跑 entry 被杀软拦截未能立即删除，
+        # 此处（已部署态、文件已不在运行）安全删除 —— 无需管理员、不触发杀软。
         _pending = os.path.join(deploy_dir, ".cleanup_pending")
         if os.path.exists(_pending):
             try:
@@ -270,48 +274,6 @@ def _self_relocate():
                     pass
             except Exception:
                 pass
-        ver_dir = os.path.join(deploy_dir, "ver")
-        # 若当前运行的版本号 exe 不在 ver/ 中（从新发布文件夹直接运行升级），
-        # 先归档一份进 ver/，保证入口稳定指向 ver/ 内副本（删除发布文件夹也不致失效）。
-        cur_m = VERSIONED_RE.search(os.path.basename(exe))
-        if cur_m:
-            os.makedirs(ver_dir, exist_ok=True)
-            ver_target = os.path.join(ver_dir, os.path.basename(exe))
-            if not os.path.exists(ver_target):
-                try:
-                    shutil.copy2(exe, ver_target)
-                except Exception:
-                    pass
-        newest = _find_newest_versioned_exe(deploy_dir, exe)
-        if newest is None:
-            if cleanup_target:
-                _safe_delete(cleanup_target)
-            return
-        # 判定当前进程是否跑的是最新镜像：比较 sys.executable 实际加载的文件
-        # 标识（st_dev+st_ino）与最新版 exe 是否一致。经「指向旧版的固定名入口」
-        # 启动时，入口虽在运行但镜像仍是旧版本，必须重新拉起最新版，否则重打包
-        # 后用户仍跑旧代码（「重打包也不生效」）。
-        try:
-            _cur = os.stat(exe)
-            _new = os.stat(newest)
-            _running_stale = (_cur.st_dev, _cur.st_ino) != (_new.st_dev, _new.st_ino)
-        except Exception:
-            _running_stale = True
-        # 先确保固定名入口指向最新版（无论是否本进程重拉，入口都应最新）
-        _ensure_entry_current(deploy_dir, exe)
-        if _running_stale:
-            # 当前进程跑的是旧镜像：拉起最新版版本号 exe 并退出本旧进程
-            try:
-                subprocess.Popen([newest])
-            except Exception:
-                pass
-            os._exit(0)
-        # 注意：此处「删除原始便携 exe」不再同步执行。原因：首次运行若在此处
-        # 删除，原始 exe 会在启动器界面显示之前就被删掉——一旦后续 _extract_payload
-        # / main 初始化在首跑环境出问题，进程静默退出且原始 exe 已消失，用户既看不到
-        # 界面也无法重试，也无从排查。现改为：cleanup_target 透传给 main.main()，
-        # 由 main 在「启动器窗口已确认显示」之后(_deferred_init 中)再删除，确保
-        # 「先确认能打开、再清理自身」。
         return
 
     # ── 尚未部署：便携版本号 exe → 首次自部署 ──
@@ -332,8 +294,17 @@ def _self_relocate():
     except Exception:
         pass
 
-    # 生成固定名入口（硬链接优先，失败回退复制）
-    entry_exe = _ensure_entry_current(deploy_dir, exe)
+    # 生成固定名入口（硬链接优先，失败回退复制）—— 简单直接的相对路径操作，
+    # 与 f7d9105 一致：入口 = 部署目录/品牌名.exe，直接 os.link 便携 exe。
+    entry_exe = os.path.join(deploy_dir, ENTRY_EXE_NAME)
+    if not os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
+        try:
+            os.link(exe, entry_exe)
+        except Exception:
+            try:
+                shutil.copy2(exe, entry_exe)
+            except Exception:
+                entry_exe = None
     # 同时归档一份进 ver/（供 _ensure_entry_current 后续指向最新版、入口稳定）
     ver_dir = os.path.join(deploy_dir, "ver")
     os.makedirs(ver_dir, exist_ok=True)
@@ -355,22 +326,30 @@ def _self_relocate():
         pass
 
     # ── 首跑：分离式拉起固定名入口（携带 --cleanup=<原始便携exe>）──
-    # 历史 proven 机制（f7d9105）：入口显示启动器后负责删除原始便携 exe（os.remove，
-    # 无需管理员）。看门狗：spawn 后等待数秒确认入口已存活；若被外部（安全软件）杀掉，
-    # 则 supervisor 自身 fall-through 显示（保底不黑屏），删除由 .cleanup_pending 在
-    # 下次启动兜底。这样无论杀软是否拦截，都能「既显示又删除自身」。
+    # f7d9105 proven 机制：入口显示启动器前负责删除原始便携 exe（os.remove 无需管理员）。
+    # 看门狗：spawn 后等待数秒确认入口已存活；若被外部（安全软件）杀掉，则本进程自己
+    # 显示 app 保底不黑屏，删除由 .cleanup_pending 在下次启动兜底。无论杀软是否拦截，
+    # 都「既显示又删除自身」。
     if entry_exe and os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
         try:
+            # 注意：此处不能用 CREATE_NO_WINDOW 拉起最终 app 进程！
+            # 该标志会让子进程在部分 Windows 会话下无法打开系统剪贴板
+            #（OpenClipboard 返回 ACCESS_DENIED），导致日志"复制"功能彻底失效。
+            # 保持普通控制台子进程，行为与旧版直接双击运行一致（剪贴板正常）。
             _child = subprocess.Popen([entry_exe, "--cleanup=" + exe])
             _launch_trace("supervisor: spawned entry pid=%d" % _child.pid)
-            if _wait_entry_ready(_child, timeout=4.0):
-                _launch_trace("supervisor: entry confirmed alive -> exit self")
+            try:
+                _child.wait(timeout=4.0)
+                # 子进程在 4 秒内退出 = 被杀（正常应长期运行），走 fallback 显示
+                _launch_trace("supervisor: entry exited early (killed?) -> self fallback")
+            except subprocess.TimeoutExpired:
+                # 子进程仍存活 = 正常，父进程退出，交出入口负责删除+显示
+                _launch_trace("supervisor: entry alive -> exit self")
                 os._exit(0)
-            _launch_trace("supervisor: entry killed before show -> self show fallback")
         except Exception as _e:
             _launch_trace("supervisor: spawn entry FAILED: %r" % _e)
-    # 兜底：未 spawn / 入口未存活 -> 自身继续显示 app（删除自身语义由下次启动兜底）
-    _launch_trace("supervisor: first-run deploy done -> continue in self")
+    # 兜底：入口未拉起/被杀 -> 本进程自己显示 app（删除自身由 .cleanup_pending 下次启动兜底）
+    _launch_trace("supervisor: first-run deploy done -> continue in self (fallback)")
     return
 
 

@@ -1,6 +1,15 @@
 [
   {
-    "hash": "47d876bae588b20e2281b9bf89b9712189840602",
+    "hash": "17d728373a627a3223347f08a08833bf4b52e0d2",
+    "short_hash": "17d7283",
+    "message": "feat: 发布版本 v2026.08.01.0019",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 00:20:47",
+    "body": "- 首跑删除自身双保险: 恢复spawn入口+--cleanup立即删(看门狗防黑屏) + .cleanup_pending下次启动兜底删(无需管理员); 移除需管理员的MoveFileEx; 入口创建/ver归档修正"
+  },
+  {
+    "hash": "\n47d876bae588b20e2281b9bf89b9712189840602",
     "short_hash": "47d876b",
     "message": "feat: 发布版本 v2026.07.31.2359",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-16 00:58:03",
     "body": "- 上一轮误改了 main.py 的 _update_model_management_ui（遗留/未挂载方法）；实际在\n  启动器『📦 模型管理』页面渲染的是 version_manager.py 的 ModelManagerDialog._update_ui，\n  由 main.py:2250 创建、_switch_page:2623 调用。\n- 该 _update_ui 同样存在 elif model[\"exists\"] 外层分支，导致 exists=False && 未安装\n  的模型落入空分支、无下载按钮（首次安装/未下载任何模型时全部缺失）。\n- 修复方式同前：先按 integrity_status==\"missing\" 显示『下载』（覆盖 exists 真假），\n  再按 model[\"exists\"] 处理『删除/重新下载』；提前计算 dl_target/is_main_component。\n- py_compile 通过。"
-  },
-  {
-    "hash": "\n69be4575d71903bcc5cdfdcafe9aa46b7519d7db",
-    "short_hash": "69be457",
-    "message": "fix(model): 修复模型管理栏目『下载』按钮在模型未安装时不显示",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-16 00:52:47",
-    "body": "- 根因：8cc8a89 重构后外层分支改为 elif model[\"exists\"]，导致 exists=False 且\n  integrity_status==\"missing\" 的『完全未安装』模型落入空分支，无任何按钮\n- 修复：先按 integrity_status==\"missing\" 显示『下载』（覆盖 exists 真假两种情况），\n  再按 model[\"exists\"] 处理『删除/重新下载』；并提前计算 dl_target/is_main_component\n- 行为：未安装→下载；不完整→删除+重新下载；完整→删除（主组件额外重下）"
   }
 ]
