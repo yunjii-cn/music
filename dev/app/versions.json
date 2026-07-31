@@ -1,5 +1,38 @@
 [
   {
+    "version": "2026.07.31.1046",
+    "date": "2026-07-31 10:47",
+    "message": "修复打包态主窗口不显示：_deferred_init 加载阶段异常兜底，无条件显示主窗口",
+    "changes": [
+      "修复打包态主窗口不显示：_deferred_init 加载阶段异常兜底，无条件显示主窗口",
+      "修复固定名入口(云集智能音乐创意台.exe)永不自更新：经入口启动自动重链到最新版并重启"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.1046.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.31.0758",
+    "date": "2026-07-31 07:59",
+    "message": "修复打包态主窗口不显示：_deferred_init 加载阶段异常兜底，无条件显示主窗口",
+    "changes": [
+      "修复打包态主窗口不显示：_deferred_init 加载阶段异常兜底，无条件显示主窗口",
+      "修复固定名入口(云集智能音乐创意台.exe)永不自更新：经入口启动自动重链到最新版并重启"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.0758.exe",
+    "download_url": ""
+  },
+  {
+    "version": "2026.07.31.0754",
+    "date": "2026-07-31 07:55",
+    "message": "修复打包态主窗口不显示：_deferred_init 加载阶段异常兜底，无条件显示主窗口",
+    "changes": [
+      "修复打包态主窗口不显示：_deferred_init 加载阶段异常兜底，无条件显示主窗口",
+      "修复固定名入口(云集智能音乐创意台.exe)永不自更新：经入口启动自动重链到最新版并重启"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.0754.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.31.0628",
     "date": "2026-07-31 06:29",
     "message": "修复打包后主窗口不显示(托盘在但无界面)：将launcher的独立置顶启动屏子进程句柄传给main.main，主窗口显示瞬间强制terminate该子进程(WindowStaysOnTopHint永久遮挡根因)，并强制showNormal/raise/activateWindow/setActiveWindow保证窗口可见激活；新增%TEMP%/yunji_launch_trace.log启动轨迹便于定位",

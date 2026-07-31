@@ -1,6 +1,42 @@
 [
   {
-    "hash": "e1bd6b03ec69cfb997a1d8937c75f2460241442c",
+    "hash": "f13c4a3c265b3f4f94d128d801fff1e8132efde8",
+    "short_hash": "f13c4a3",
+    "message": "fix: 首次运行无法显示启动器的两个兜底",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 10:45:53",
+    "body": "- launcher._self_relocate 首次部署分支：入口拉起失败时不再直接\n  os._exit(0) 静默退出（此前若 _ensure_entry_current 因硬链接/复制受权限\n  或杀软限制返回 None，入口没拉起、进程直接退出 -> 首次运行什么都看不到、\n  而手动双击已存在入口走 already=True 分支正常，表现「首跑不显示、手动能显示」）。\n  现改为：入口未成功拉起时当前便携进程直接继续运行 app（_extract_payload +\n  启动屏 + import main 照常），保证首跑至少能显示主窗口。\n- main.main：MainWindow(splash=splash) 同步构造加 try/except 保护；构造\n  失败时写 crash_log、终止启动屏子进程、弹出可见错误对话框，而非让进程静默\n  退出、启动屏空跑、主窗口永远建不出来。"
+  },
+  {
+    "hash": "\n856c6a27692a603613cbb7e2d320cce9ccd39433",
+    "short_hash": "856c6a2",
+    "message": "fix(launcher): 升级时把版本号 exe 归档进 ver/，入口稳定指向 ver/ 内副本",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 07:58:36",
+    "body": "已部署状态下从新发布文件夹直接运行版本号 exe 升级时，原逻辑入口会硬链接到\n发布文件夹里的 exe（删除发布文件夹即失效）。现于 _self_relocate 已部署分支\n先把当前版本号 exe 归档进 ver/，再由 _ensure_entry_current 指向 ver/ 内副本，\n提升升级路径健壮性。"
+  },
+  {
+    "hash": "\n5dbf8cb014222e1f22ab707ec138a2462f8f0fb0",
+    "short_hash": "5dbf8cb",
+    "message": "fix: 修复打包态主窗口不显示 + 固定名入口永不自更新",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 07:54:16",
+    "body": "- main.py MainWindow._deferred_init：加载阶段(config/UI/monitor/resize)全部包进\n  try/except，异常只记录根因(crash_log.txt)；无论加载是否成功都无条件 self.show()/\n  raise_()/activateWindow()，彻底消除「托盘在、界面不显示、无崩溃弹窗」的老漏洞。\n- launcher.py _ensure_entry_current 重写：在 ver/ 中按版本号取最新版本号 exe，\n  固定名入口(云集智能音乐创意台.exe)始终硬链接到最新版；移除「入口路径==当前路径\n  即 return」的早返回（该早返回导致经固定名入口双击启动永远跑首次部署的旧代码，\n  表现为「重打包也不生效」）。\n- _self_relocate 已部署分支：比较当前进程镜像 st_dev+st_ino 与最新版是否一致，\n  不一致则重新拉起最新版版本号 exe 并退出旧进程，确保始终跑新代码。"
+  },
+  {
+    "hash": "\nf78a8a083921934ac63638856ce8b41f2ab0fd1c",
+    "short_hash": "f78a8a0",
+    "message": "feat: 发布版本 v2026.07.31.0628",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 06:29:14",
+    "body": "- 修复打包后主窗口不显示(托盘在但无界面)：将launcher的独立置顶启动屏子进程句柄传给main.main，主窗口显示瞬间强制terminate该子进程(WindowStaysOnTopHint永久遮挡根因)，并强制showNormal/raise/activateWindow/setActiveWindow保证窗口可见激活；新增%TEMP%/yunji_launch_trace.log启动轨迹便于定位"
+  },
+  {
+    "hash": "\ne1bd6b03ec69cfb997a1d8937c75f2460241442c",
     "short_hash": "e1bd6b0",
     "message": "feat: 发布版本 v2026.07.31.0600",
     "author": "yunjii",
@@ -502,41 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-12 03:52:37",
     "body": "- config.js: 集中配置(品牌/配色/UM appid/双镜像下载/5语言)\n- server.js: Express托管 + /login/qr + /login/callback(postMessage) + /download/latest(竞速下载) + /api/site-config(剔除appkey)\n- public: 首页(暗黑+CC0000) + i18n(简繁英日韩) + main.js(多语言/扫码/竞速下载) + logo/favicon\n- .gitignore: 排除 BAK8/、dev/web/node_modules、.next"
-  },
-  {
-    "hash": "\nb285d936f598a01eb6823c5b612c6d3b0327ce60",
-    "short_hash": "b285d93",
-    "message": "feat(training): 新增模型选择器(turbo/sft/base)+简易/标准模式切换",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-11 18:39:07",
-    "body": "训练界面:\n- 训练LoRA标签页增加模型选择器(turbo/sft/base)、简易/标准模式切换\n- 一键训练标签页增加模型选择器\n- 模型选择自动设置对应training_shift\n- 模式选择/模型选择持久化到localStorage\n- startTraining API新增model_variant字段\n\n新增文件:\n- QuickTrainPanel一键训练组件\n- TrainingAdvancedParams高级参数组件\n- quickTrain.ts编排服务\n- uiState.ts UI状态路由\n- persistence.ts持久化服务\n- quick_presets.py训练预设\n- _publish_releases.py发布脚本\n- project.json项目配置\n- train_api_service.py训练API服务\n\n翻唱修复:\n- cover_noise_strength默认0.6->0.3\n- is_cover增加has_audio_signal后备判断\n- 添加诊断日志便于调试"
-  },
-  {
-    "hash": "\n275a507b91b6091d21b27b6aad9654ab4f30968f",
-    "short_hash": "275a507",
-    "message": "fix(browser): 重写浏览器检测，修复仅识别到系统浏览器的缺陷并扩充国产/第三方识别",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-10 05:12:24",
-    "body": "根因：桌面应用为 PyInstaller 打包产物(dist/*.exe)，此前仅扫描注册表\nApp Paths 与少量硬编码路径；而国产/第三方浏览器绝大多数不注册到\nApp Paths（360/QQ/搜狗/UC/猎豹等），导致实际只能识别 Edge/Chrome 两个。\n此外源码改动需重新打包桌面 exe 后方能在打包版生效。\n\n本次重写 _detect_browsers 检测链路（共 6 路，路径+品牌双维度去重）：\n1. 注册表 App Paths（主流浏览器）\n2. 注册表 StartMenuInternet（Windows 标准浏览器注册位，覆盖大量国产浏览器）\n3. 常见安装路径（扩充 360 极速/安全、QQ、UC、搜狗、猎豹、傲游、百度、2345、\n   星愿、115、世界之窗、糖果、枫树等变体）\n4. 用户 AppData 目录（国产浏览器常装于此）\n5. 便携版扫描（常用父目录）\n6. Program Files 模糊扫描兜底\n\n新增品牌关键字兜底(_resolve_brand)：路径/命令含 360/qq/sogou/liebao 等\n即识别，不再依赖固定 exe 文件名。\n\n新增/明确识别：360 极速浏览器、360 安全浏览器、QQ 浏览器、UC 浏览器、\n搜狗浏览器、猎豹浏览器、傲游浏览器、百度浏览器、2345 浏览器、星愿浏览器、\n115 浏览器、世界之窗浏览器、GreenBrowser、糖果浏览器、枫树浏览器，以及\nYandex/Whale/Avast/Comodo Dragon/Falkon/Waterfox/LibreWolf/Zen/Slimjet/\nCocCoc/Epic/Pale Moon/Iridium 等国际/隐私浏览器。\n\n注意：打包版桌面应用需重新打包后方可生效（或开发模式直接运行源码）。"
-  },
-  {
-    "hash": "\n72c8b7b70a69c85a25eba3bdc18c69f14dbf3b6b",
-    "short_hash": "72c8b7b",
-    "message": "成功解决翻唱(cover)模式生成噪音问题；并修复系统浏览器重复识别、增加第三方浏览器识别",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-10 04:52:35",
-    "body": "【翻唱模式生成噪音问题 · 已成功解决】\n根因：翻唱(cover)模式依赖源音频(src_audio)。前端可手动选 cover 却不挂源音频，Node 端\n(generate.ts) 仅在 sourceAudioUrl 为真时才附带 src_audio_path，否则静默省略，导致 Python\n端 src_audio_path=None、src_latents 退化为静音潜变量，最终输出纯噪声。运行时日志已证实\nis_covers=True 但 src_audio_path=None（指令正确，问题在源音频未送达）。\n修复（此前已推送）：①generate_music_request 在 cover 缺源音频时明确报错而非静默出噪声；\n②server generate.ts 对 cover/audio2audio 缺源音频或音频码返回 400；③CreatePanel 在\ncover 无源音频时禁用生成按钮并引导用户到「内容参考」标签上传源音频。现翻唱模式可正常生成。\n\n【浏览器识别 · 修复系统浏览器重复识别】\n原 _detect_browsers 仅按显示名去重：同一浏览器经「注册表 / 常见路径 / 便携扫描」多次命中\n会产生重复下拉项（如 Edge 出现两次，Opera 的 launcher.exe 与 opera.exe 同源重复识别）。\n改为按「可执行文件真实路径 + 品牌」双维度去重，每个浏览器只保留一条，根除重复识别。\n\n【浏览器识别 · 增加更多第三方浏览器】\nbrowser_registry_map 与 common_paths 新增国内外第三方浏览器：百度、2345、星愿、115、\nYandex、Whale、Avast Secure、Comodo Dragon、Falkon、Waterfox、LibreWolf、Zen、Slimjet、\nCocCoc、Epic Privacy、Pale Moon、Iridium。"
-  },
-  {
-    "hash": "\n655d27a602acb655642b92458320099ebd6e3ba1",
-    "short_hash": "655d27a",
-    "message": "fix(ux): 翻唱/音频转音频模式增加源音频引导，避免按钮静默置灰误判产品故障",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-10 04:41:00",
-    "body": "根因澄清：封面模式需要 sourceAudioUrl，对应 UI 的「内容参考」(t('cover')) 标签，\n而「风格参考」(t('reference')) 是 reference 槽、翻唱用不上。用户因标签语义不清\n易传错槽，导致 sourceAudioUrl 为空、按钮被禁用却无任何说明 -> 误以为产品故障。\n\n改进（引导而非拦截）：\n1. 选择 cover / audio2audio 时自动切换到「内容参考」(source) 标签\n2. 音频区增加琥珀色引导条：明确提示需在「内容参考」上传源音频\n3. 生成按钮禁用时增加 tooltip 说明原因\n4. 兜底 alert 文案明确指向「内容参考」标签\n\n注：防噪声的核心禁用逻辑保留（缺源音频仍不允许生成），仅补引导说明。"
   }
 ]
