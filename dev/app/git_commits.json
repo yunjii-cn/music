@@ -1,6 +1,15 @@
 [
   {
-    "hash": "0702a73c851fe7a65d31ea62314074e4619e5dae",
+    "hash": "6c751a67a7977807d874523ad070586f325032c6",
+    "short_hash": "6c751a6",
+    "message": "feat: 发布版本 v2026.07.31.1507",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 15:09:22",
+    "body": "- 首跑诊断: launcher轨迹埋点(删除自身改到窗口显示后) + 启动盲区trace双写exe同目录"
+  },
+  {
+    "hash": "\n0702a73c851fe7a65d31ea62314074e4619e5dae",
     "short_hash": "0702a73",
     "message": "chore: 记录发布版本 v2026.07.31.1046 元数据",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-12 08:25:05",
     "body": "- 最终 exe 改为 云集智能音乐创意台-v2.8.3.exe（保留 -v 标记，单实例/版本解析不失效）\n\n- get_version_from_filename 正则放宽至 3/4 段均接受 v(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)\n\n- 同步 build_exe.ps1($ProjectName)、version_info.txt(OriginalFilename)、release.spec 注释\n\n- 项目打包规范写入 .workbuddy/memory/MEMORY.md\n\nCo-Authored-By: WorkBuddy <workbuddy@tencent.com>"
-  },
-  {
-    "hash": "\n8cc8a8933b4c3f1d4583146373fe945a26230986",
-    "short_hash": "8cc8a89",
-    "message": "fix(model): 修复损坏/不完整模型无法删除与重下载，浏览器设置条改极简扁平",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-12 08:17:46",
-    "body": "- model_downloader: force 重下载先清理无效目录，保证全新安装\n\n- main/version_manager: 按 integrity_status 三态渲染按钮(完整→删除 / 不完整→删除+重新下载 / 缺失→下载)，主组件重下路由到主模型\n\n- ui: 浏览器设置条改为极简扁平(去红条、中性灰配色、与卡片统一)\n\nCo-Authored-By: WorkBuddy <workbuddy@tencent.com>"
   }
 ]

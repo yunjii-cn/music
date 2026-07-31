@@ -324,29 +324,20 @@ def _self_relocate():
     entry_exe = _ensure_entry_current(deploy_dir, exe)
 
     os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
-    # 分离式拉起固定名入口，并删除原始便携 exe
-    _spawned = False
-    if entry_exe and os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
-        try:
-            # 注意：此处不能用 CREATE_NO_WINDOW 拉起最终 app 进程！
-            # 该标志会让子进程在部分 Windows 会话下无法打开系统剪贴板
-            #（OpenClipboard 返回 ACCESS_DENIED），导致日志"复制"功能彻底失效。
-            # 保持普通控制台子进程，行为与旧版直接双击运行一致（剪贴板正常）。
-            _launch_trace("supervisor: spawning entry=%s cleanup=%s"
-                          % (os.path.basename(entry_exe), os.path.basename(exe)))
-            subprocess.Popen(
-                [entry_exe, "--cleanup=" + exe],
-            )
-            _spawned = True
-        except Exception as _e:
-            _launch_trace("supervisor: spawn entry FAILED: %r" % _e)
-            _spawned = False
-    if _spawned:
-        _launch_trace("supervisor: spawned OK, exiting (os._exit)")
-        os._exit(0)
-    # 兜底：入口未能拉起（硬链接/复制受权限或杀软限制、_ensure_entry_current
-    # 返回 None 等），当前便携进程直接继续运行 app，避免首跑"什么都不显示"
-    # 后进程直接退出。已部署态（双击入口）走 already=True 分支不会到此。
+
+    # ── 首跑不 spawn 新进程（根治「首次运行不显示启动器」）──
+    # 原先在此用 subprocess.Popen 拉起固定名入口 entry 并 os._exit，让 entry 跑 app。
+    # 但 D:\test 真机日志证明：安全软件 / EDR 的行为监控会把
+    # 「程序运行时动态生成并立即运行一个新 exe」判定为 dropper / malware 行为，
+    # 直接在 PyInstaller bootloader 阶段拦截 entry —— entry 连 Python __main__ 都进不去
+    #（日志中 entry 的 __main__ / _run_supervisor enter 一行都没有，也无 crash.log），
+    # 表现就是「首跑什么都不显示」，而手动双击 entry（用户主动操作、杀软放行）能跑。
+    # 修复：首跑当次由 supervisor 自身直接 fall-through 进 _extract_payload + import main
+    #（见 _run_supervisor 末尾），不再启动第二个 exe。固定名入口 entry 仍已由上方
+    # _ensure_entry_current 生成，供「升级后下次启动」或「用户直接双击 entry」使用；
+    # 原始便携 exe 也保留（--cleanup 删除自身逻辑仅在 entry 被 spawn 时触发，此处不触发，
+    # 双 exe 并存，但都经用户主动分发 / 双击、均为可信入口，最安全）。
+    _launch_trace("supervisor: first-run deploy done -> continue in self (no spawn)")
     return
 
 

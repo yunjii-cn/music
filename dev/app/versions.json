@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.07.31.2228",
+    "date": "2026-07-31 22:30",
+    "message": "首跑不spawn新进程: supervisor自身fall-through跑app, 根治杀软拦截entry导致首跑无界面",
+    "changes": [
+      "首跑不spawn新进程: supervisor自身fall-through跑app, 根治杀软拦截entry导致首跑无界面"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.2228.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.31.1507",
     "date": "2026-07-31 15:09",
     "message": "首跑诊断: launcher轨迹埋点(删除自身改到窗口显示后) + 启动盲区trace双写exe同目录",
