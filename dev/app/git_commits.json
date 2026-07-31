@@ -1,6 +1,15 @@
 [
   {
-    "hash": "6c751a67a7977807d874523ad070586f325032c6",
+    "hash": "415ad7df5cd7152f0101808cb7644f4de6ecc1bc",
+    "short_hash": "415ad7d",
+    "message": "feat: 发布版本 v2026.07.31.2228",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 22:30:09",
+    "body": "- 首跑不spawn新进程: supervisor自身fall-through跑app, 根治杀软拦截entry导致首跑无界面"
+  },
+  {
+    "hash": "\n6c751a67a7977807d874523ad070586f325032c6",
     "short_hash": "6c751a6",
     "message": "feat: 发布版本 v2026.07.31.1507",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-16 00:30:05",
     "body": "- web/: 云集智能音乐创意台官网（暗黑+音乐紫#8B5CF6），含 UM 扫码登录(web/um/)\n- 新增 .gitignore 条目：web-pack.7z、dev/app/lora_state.json（本地产物不入库）\n- 还原误删的 .workbuddy 记忆文件，仅提交 07-12 当日笔记"
-  },
-  {
-    "hash": "\nfa8e14083e4dc26763a064693160b2f897660577",
-    "short_hash": "fa8e140",
-    "message": "fix(pack): exe 命名为「项目名+版本号」，放宽版本号解析正则",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-12 08:25:05",
-    "body": "- 最终 exe 改为 云集智能音乐创意台-v2.8.3.exe（保留 -v 标记，单实例/版本解析不失效）\n\n- get_version_from_filename 正则放宽至 3/4 段均接受 v(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)\n\n- 同步 build_exe.ps1($ProjectName)、version_info.txt(OriginalFilename)、release.spec 注释\n\n- 项目打包规范写入 .workbuddy/memory/MEMORY.md\n\nCo-Authored-By: WorkBuddy <workbuddy@tencent.com>"
   }
 ]

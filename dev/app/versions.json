@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.07.31.2245",
+    "date": "2026-07-31 22:46",
+    "message": "首跑不自删改删除自身语义: 显示后同卷rename归档运行exe进ver+重建入口硬链(避开杀软), 删死代码ver复制",
+    "changes": [
+      "首跑不自删改删除自身语义: 显示后同卷rename归档运行exe进ver+重建入口硬链(避开杀软), 删死代码ver复制"
+    ],
+    "name": "云集智能音乐创意台-v2026.07.31.2245.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.07.31.2228",
     "date": "2026-07-31 22:30",
     "message": "首跑不spawn新进程: supervisor自身fall-through跑app, 根治杀软拦截entry导致首跑无界面",

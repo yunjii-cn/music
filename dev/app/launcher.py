@@ -303,13 +303,9 @@ def _self_relocate():
     for sub in _DEPLOY_SUBDIRS:
         os.makedirs(os.path.join(deploy_dir, sub), exist_ok=True)
 
-    # 复制自身进 ver/
-    ver_exe = os.path.join(deploy_dir, "ver", exe_name)
-    if not os.path.exists(ver_exe) and os.path.abspath(ver_exe) != exe:
-        try:
-            shutil.copy2(exe, ver_exe)
-        except Exception:
-            pass
+    # 注：不再在此「复制自身进 ver/」（旧逻辑因 ver/ 尚未创建静默失败，且白占
+    # 53MB）。归档进 ver/ 由 main._deferred_init 在窗口显示后用「同卷 rename」完成
+    #（见 _ensure_installed_exe），等价于「删除自身/安装到部署目录」且无新 exe 生成。
 
     # 写 version.txt（仅版本号，main.py 按 ^\d+\.\d+\.\d+(\.\d+)?$ 解析）
     m = VERSIONED_RE.search(exe_name)
@@ -335,8 +331,9 @@ def _self_relocate():
     # 修复：首跑当次由 supervisor 自身直接 fall-through 进 _extract_payload + import main
     #（见 _run_supervisor 末尾），不再启动第二个 exe。固定名入口 entry 仍已由上方
     # _ensure_entry_current 生成，供「升级后下次启动」或「用户直接双击 entry」使用；
-    # 原始便携 exe 也保留（--cleanup 删除自身逻辑仅在 entry 被 spawn 时触发，此处不触发，
-    # 双 exe 并存，但都经用户主动分发 / 双击、均为可信入口，最安全）。
+    # 原始便携 exe 不在此删除——改由 main._deferred_init 在窗口显示后调用
+    # _ensure_installed_exe 把运行中的 exe 同卷 rename 归档进 ver/（用户视角的
+    # 「删除自身」），既不 spawn 新 exe（避开杀软），又完成安装归档。
     _launch_trace("supervisor: first-run deploy done -> continue in self (no spawn)")
     return
 

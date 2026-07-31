@@ -2457,13 +2457,21 @@ class MainWindow(QMainWindow):
                 pass
         _launch_trace("window shown")
 
-        # 启动器窗口已确认显示 -> 现在才放心删除首次运行前的原始便携 exe
-        # （launcher._self_relocate 不再提前删，避免首跑失败即丢失原始 exe）。
+        # 启动器窗口已确认显示 -> 现在才做首跑收尾
         _ct = getattr(self, "_cleanup_target", None)
         if _ct:
+            # 旧模型(--cleanup 触发)：删除首次运行前的原始便携 exe
             try:
                 _launch_trace("startup cleanup (defer delete original exe)")
                 QTimer.singleShot(300, lambda: _do_startup_cleanup(_ct))
+            except Exception:
+                pass
+        else:
+            # 首跑 fall-through（当前进程即便携 exe）：显示后归档自身进 ver/，
+            # 等价于「删除自身/安装到部署目录」，且不 spawn 新 exe（避免杀软拦截）。
+            try:
+                _launch_trace("self-install (relocate running exe into ver/)")
+                QTimer.singleShot(300, _ensure_installed_exe)
             except Exception:
                 pass
 
@@ -9203,6 +9211,86 @@ def _do_startup_cleanup(cleanup_target):
                 os.remove(fp)
             except Exception:
                 pass
+    except Exception:
+        pass
+
+
+def _ensure_installed_exe():
+    """首跑 fall-through 时：把当前运行的便携 exe 归档进部署目录 ver/，并重建
+    固定名入口硬链。等价于历史 --cleanup「删除自身/安装到部署目录」的语义，但用
+    「同卷 rename 进 ver/」实现——Windows 允许给运行中的 exe 改名（不可删除但可
+    改名），原始下载目录里的版本号 exe 名字就此消失 = 用户视角的『删除自身』；
+    同时固定名入口 hardlink 指向归档副本，供后续双击/升级使用。
+    跨卷(rename 不支持)时退化为复制，原始便携 exe 保留（可接受降级）。
+
+    为什么不用「spawn 新 exe + 它来删我」的旧模型：D:\\test 真机轨迹证明安全软件
+    /EDR 会把『程序运行中动态生成并立即运行新 exe』判定为 dropper，在 bootloader
+    阶段直接杀掉被 spawn 的 entry（连 Python __main__ 都进不去），导致首跑全黑。
+    rename 自身不生成新 exe，故不触杀软，首跑必显。
+    """
+    try:
+        import shutil as _sh
+        root = os.environ.get("YUNJI_INSTALL_ROOT")
+        if not root:
+            return
+        exe = os.path.abspath(sys.executable)
+        norm_root = os.path.normpath(root)
+        # 当前 exe 已在部署目录内(ver/ 或入口) -> 无需搬迁（双击入口/已部署态）
+        if os.path.normpath(exe).startswith(norm_root + os.sep):
+            return
+        exe_name = os.path.basename(exe)
+        ver_dir = os.path.join(root, "ver")
+        os.makedirs(ver_dir, exist_ok=True)
+        ver_target = os.path.join(ver_dir, exe_name)
+        # 若 ver_target 已存在且与当前运行 exe 是同一文件(曾归档过) -> 跳过搬迁
+        try:
+            if os.path.exists(ver_target):
+                s1 = os.stat(ver_target); s2 = os.stat(exe)
+                if (s1.st_dev, s1.st_ino) == (s2.st_dev, s2.st_ino):
+                    ver_target = exe
+        except Exception:
+            pass
+        if os.path.normpath(ver_target) != os.path.normpath(exe):
+            # 移除可能残留的旧副本(不同 inode)后，把运行中的 exe 改名归档进 ver/
+            if os.path.exists(ver_target):
+                try:
+                    os.remove(ver_target)
+                except Exception:
+                    pass
+            try:
+                os.rename(exe, ver_target)   # 同卷 rename：运行中的 exe 也可改名
+            except Exception:
+                try:
+                    _sh.copy2(exe, ver_target)  # 跨卷退化：复制，原始保留
+                    ver_target = exe
+                except Exception:
+                    ver_target = exe
+        # 重建固定名入口指向归档副本（硬链优先，回退复制）
+        entry = os.path.join(root, "云集智能音乐创意台.exe")
+        try:
+            need_relink = True
+            if os.path.exists(entry):
+                es = os.stat(entry); vs = os.stat(ver_target)
+                if (es.st_dev, es.st_ino) == (vs.st_dev, vs.st_ino):
+                    need_relink = False
+            if need_relink:
+                if os.path.exists(entry):
+                    try:
+                        os.remove(entry)
+                    except Exception:
+                        pass
+                try:
+                    os.link(ver_target, entry)
+                except Exception:
+                    try:
+                        _sh.copy2(ver_target, entry)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        _launch_trace("self-install done: ver=%s entry=%s"
+                      % (os.path.basename(ver_target),
+                         "ok" if os.path.exists(entry) else "fail"))
     except Exception:
         pass
 
