@@ -1,6 +1,15 @@
 [
   {
-    "hash": "7172675c86953116832f6c43d0705779f316a973",
+    "hash": "bd50eaf9641e43ec1eb9b29544a990a24b7d1360",
+    "short_hash": "bd50eaf",
+    "message": "feat: 发布版本 v2026.08.01.0416",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 04:17:26",
+    "body": "- 启动器首跑架构对齐既定设计：入口进程负责归档版本exe到ver并删除原始exe，增加删除轨迹日志"
+  },
+  {
+    "hash": "\n7172675c86953116832f6c43d0705779f316a973",
     "short_hash": "7172675",
     "message": "feat: 发布版本 v2026.08.01.0057",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-16 01:48:05",
     "body": "- 先澄清：进度条机制已存在（每个模型一行独立 QProgressBar + 通用 progress_bar），\n  无需『新增』；问题是接线缺陷导致点击像『没反应』。\n\n- 修复1(version_manager.py _update_ui)：is_downloading 判定原来只按 model[\"name\"] 比对，\n  但主模型组件以下载目标 \"main\" 进行，main.current_operation_model 为 \"main\"，导致主组件的\n  进度条/暂停按钮永远不显示。改为同时匹配 model[\"name\"] 与 _dl_target。\n- 修复2(version_manager.py _update_ui)：进度条字典的键由 model[\"name\"] 改为 _dl_target，\n  与 main._download_model 中 current_operation_model 的取值对齐，per-row 进度才会真正更新。\n- 修复3(main.py _on_download_finished)：下载失败时原来只写隐藏日志（用户感知为『点击没反应』），\n  现弹 QMessageBox.warning 明确提示失败原因（venv 未就绪 / 网络不通 / 磁盘满等）。\n\n- 根因排查：_download_model -> ModelDownloadThread 实际执行\n  python -m acestep.model_downloader [--model X] [--force]，依赖 base_dir/scripts/.venv 的\n  venv_python；该子进程若失败（venv 缺失 / 网络不通）此前静默返回，进度条一闪即 hide。\n- py_compile 通过。"
-  },
-  {
-    "hash": "\naf06f187a3dfe45b4db71fb915035924e1d2ea99",
-    "short_hash": "af06f18",
-    "message": "fix(model): 修复模型管理页『不完整』模型不显示『重新下载』按钮",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-16 01:07:50",
-    "body": "- 根因：_load_model_list 中不完整模型的 exists 被算为 False（check_model_exists 要求\n  文件齐全+大小达标才返回 True），而 _update_ui 把 incomplete 分支写在\n  `elif model[\"exists\"]` 之下，导致 exists=False 的不完整模型落入空分支、无任何按钮。\n- version_manager.py(ModelManagerDialog._update_ui，实际渲染 UI)：将 incomplete 分支\n  独立为 `elif integrity_status == \"incomplete\"`，不再依赖 model[\"exists\"]。\n- main.py(_update_model_management_ui 遗留方法)：外层 guard 改为\n  `elif model[\"exists\"] or integrity_status == \"incomplete\"`，最小改动保留缩进。\n- 行为：未安装→下载；不完整→删除+重新下载；完整→删除（主组件额外重下）；下载中→暂停。\n- py_compile 通过。"
   }
 ]

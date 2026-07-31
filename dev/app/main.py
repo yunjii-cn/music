@@ -211,6 +211,58 @@ def hidden_popen(*args, **kwargs):
     return subprocess.Popen(*args, **kwargs)
 
 
+def _kill_process_tree(proc):
+    """终止一个进程及其整棵子孙树（先优雅 terminate，超时再强杀 kill）。
+    可接受 psutil.Process 或 subprocess.Popen 对象。用于退出/停止服务时
+    连同 powershell 拉起的 node/python 子进程一并清理，避免残留。"""
+    try:
+        import psutil
+    except ImportError:
+        # 无 psutil：仅对 Popen 对象做 terminate/kill 兜底
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return
+    try:
+        if isinstance(proc, subprocess.Popen):
+            p = psutil.Process(proc.pid)
+        else:
+            p = proc
+    except Exception:
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return
+    try:
+        tree = [p] + p.children(recursive=True)
+    except Exception:
+        tree = [p]
+    for sub in tree:
+        try:
+            sub.terminate()
+        except Exception:
+            pass
+    try:
+        psutil.wait_procs(tree, timeout=3)
+    except Exception:
+        pass
+    for sub in tree:
+        try:
+            sub.kill()
+        except Exception:
+            pass
+
+
 def _gpu_supports_flash_attn():
     """检测当前机器是否支持 flash_attn（需 NVIDIA 显卡，算力 >= SM75 / 7.5）。
 
@@ -595,16 +647,19 @@ class ServiceProcess(QThread):
             self.finished.emit(1, 0)
     
     def terminate(self):
-        """终止进程"""
+        """终止进程（连同其拉起的 node/python 子进程一并清理）"""
         if self.process:
             try:
-                self.process.terminate()
-                self.process.wait(timeout=5)
-            except Exception as e:
+                _kill_process_tree(self.process)
+            except Exception:
                 try:
-                    self.process.kill()
-                except Exception as e:
-                    pass
+                    self.process.terminate()
+                    self.process.wait(timeout=5)
+                except Exception:
+                    try:
+                        self.process.kill()
+                    except Exception:
+                        pass
     
     def state(self):
         """获取进程状态"""
@@ -7309,7 +7364,7 @@ for d in deps:
         
         if hasattr(self, 'api_process') and self.api_process:
             try:
-                self.api_process.kill()
+                _kill_process_tree(self.api_process)
                 self._log("已终止 API 进程")
             except:
                 pass
@@ -8946,6 +9001,33 @@ for d in deps:
                 if hasattr(self, 'model_list_layout'):
                     self.model_list_layout.addWidget(spacer)
     
+    def _kill_child_processes(self):
+        """托盘退出时，精确终止本进程派生的所有服务/子进程（含 powershell 拉起的
+        node/python 孙进程）。改为按「递归进程树」清理，替代原先仅靠
+        'acestep'/'qinglong' 关键字匹配的脆弱扫描（ace-step-ui 带连字符、关键字
+        匹配会漏掉，导致前端 vite 等进程残留）。
+        仅针对 python/node/powershell 等服务型进程——绝不误杀本启动器或升级时
+        拉起的新版 exe（其名非上述几类），因此升级/自更新流程不受影响。"""
+        try:
+            import psutil
+        except ImportError:
+            self._log("[警告] psutil 未安装，跳过进程树清理", "#FF9800")
+            return
+
+        service_names = {"python.exe", "python", "node.exe", "node",
+                         "powershell.exe", "pwsh.exe"}
+        try:
+            me = psutil.Process(os.getpid())
+            for child in me.children(recursive=False):
+                try:
+                    if (child.name() or "").lower() in service_names:
+                        self._log(f"终止子进程: {child.name()} (PID: {child.pid})")
+                        _kill_process_tree(child)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def _exit_all(self):
         """退出所有进程"""
         self._log("========================================")
@@ -8953,23 +9035,10 @@ for d in deps:
         self._log("========================================")
         
         self._stop_all_services()
-        
-        try:
-            import psutil
-            process_names = ["python.exe", "python", "node.exe", "node", "powershell.exe", "pwsh.exe"]
-            
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    if proc.info['name'] in process_names:
-                        cmdline = ' '.join(proc.info['cmdline'] or [])
-                        if 'acestep' in cmdline.lower() or 'qinglong' in cmdline.lower():
-                            self._log(f"终止进程: {proc.info['name']} (PID: {proc.info['pid']})")
-                            proc.terminate()
-                            proc.wait(timeout=3)
-                except:
-                    pass
-        except ImportError:
-            self._log("[警告] psutil 未安装，跳过进程清理", "#FF9800")
+
+        # 精确清理本进程派生的所有服务/子进程（递归进程树），
+        # 替代原先仅靠 'acestep'/'qinglong' 关键字匹配的脆弱扫描。
+        self._kill_child_processes()
         
         self._log("✓ 所有进程已退出")
         

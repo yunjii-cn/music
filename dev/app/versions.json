@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.08.01.0447",
+    "date": "2026-08-01 04:48",
+    "message": "修复托盘退出残留进程：改用递归进程树精确清理所有派生服务/子进程(powershell拉起的node/python孙进程一并杀)，不再依赖acestep/qinglong关键字匹配(ace-step-ui带连字符会漏)；同时强化ServiceProcess.terminate与api_process退出时杀整棵子树",
+    "changes": [
+      "修复托盘退出残留进程：改用递归进程树精确清理所有派生服务/子进程(powershell拉起的node/python孙进程一并杀)，不再依赖acestep/qinglong关键字匹配(ace-step-ui带连字符会漏)；同时强化ServiceProcess.terminate与api_process退出时杀整棵子树"
+    ],
+    "name": "云集智能音乐创意台-v2026.08.01.0447.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.08.01.0416",
     "date": "2026-08-01 04:17",
     "message": "启动器首跑架构对齐既定设计：入口进程负责归档版本exe到ver并删除原始exe，增加删除轨迹日志",

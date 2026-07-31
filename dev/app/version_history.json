@@ -1480,5 +1480,13 @@
     ],
     "build_time": "2026-08-01T04:17:24.717718",
     "version_number": "2026.08.01.0416"
+  },
+  "云集智能音乐创意台-v2026.08.01.0447": {
+    "version": "云集智能音乐创意台-v2026.08.01.0447",
+    "changes": [
+      "修复托盘退出残留进程：改用递归进程树精确清理所有派生服务/子进程(powershell拉起的node/python孙进程一并杀)，不再依赖acestep/qinglong关键字匹配(ace-step-ui带连字符会漏)；同时强化ServiceProcess.terminate与api_process退出时杀整棵子树"
+    ],
+    "build_time": "2026-08-01T04:48:15.329223",
+    "version_number": "2026.08.01.0447"
   }
 }
