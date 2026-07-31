@@ -2467,11 +2467,12 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         else:
-            # 首跑 fall-through（当前进程即便携 exe）：显示后归档自身进 ver/，
-            # 等价于「删除自身/安装到部署目录」，且不 spawn 新 exe（避免杀软拦截）。
+            # 首跑 fall-through（当前进程即便携 exe）：显示后归档自身进 ver/（安装），
+            # 并派生「删除自身」助手——本进程退出后删除原始便携 exe（无需管理员）。
             try:
-                _launch_trace("self-install (relocate running exe into ver/)")
+                _launch_trace("self-install (archive running exe into ver/)")
                 QTimer.singleShot(300, _ensure_installed_exe)
+                _schedule_self_delete()
             except Exception:
                 pass
 
@@ -9216,21 +9217,12 @@ def _do_startup_cleanup(cleanup_target):
 
 
 def _ensure_installed_exe():
-    """首跑 fall-through 时：把当前运行的便携 exe 归档进部署目录 ver/，并重建
-    固定名入口硬链。等价于历史 --cleanup「删除自身/安装到部署目录」的语义，但用
-    「同卷 rename 进 ver/」实现——Windows 允许给运行中的 exe 改名（不可删除但可
-    改名），原始下载目录里的版本号 exe 名字就此消失 = 用户视角的『删除自身』；
-    同时固定名入口 hardlink 指向归档副本，供后续双击/升级使用。
-    跨卷(rename 不支持)时退化为复制，原始便携 exe 保留（可接受降级）。
-
-    为什么不用「spawn 新 exe + 它来删我」的旧模型：D:\\test 真机轨迹证明安全软件
-    /EDR 会把『程序运行中动态生成并立即运行新 exe』判定为 dropper，在 bootloader
-    阶段直接杀掉被 spawn 的 entry（连 Python __main__ 都进不去），导致首跑全黑。
-    rename 自身不生成新 exe，故不触杀软，首跑必显。
-    """
+    """首跑 fall-through（supervisor 自身显示）时：把运行中的便携 exe 复制归档进
+    部署目录 ver/，并重建固定名入口硬链指向该静止副本，使部署后的应用有独立稳定的
+    副本（不依赖原始便携 exe 的生命周期）。原始便携 exe 的「删除自身」由 launcher
+    的 spawn --cleanup（立即）或 .cleanup_pending（下次启动，无需管理员）机制完成。"""
     try:
         import shutil as _sh
-        import ctypes
         root = os.environ.get("YUNJI_INSTALL_ROOT")
         if not root:
             return
@@ -9243,13 +9235,6 @@ def _ensure_installed_exe():
         ver_dir = os.path.join(root, "ver")
         os.makedirs(ver_dir, exist_ok=True)
         ver_target = os.path.join(ver_dir, exe_name)
-        # 关键修正：绝不对「运行中的 exe」做 rename/删除——实测会引发部分安全软件
-        # 把「运行中程序自我改名」判定为恶意自我改写，直接在原生层杀掉进程 →
-        # 表现为「启动器闪一下就消失、无任何 Python 崩溃日志」。
-        # 改为：把运行中的 exe「复制」(只读源+写新位置，不触碰正在运行的文件)进
-        # ver/，入口硬链/复制指向静止副本；原始便携 exe 登记「下次重启时删除」
-        # (MoveFileEx MOVEFILE_DELAY_UNTIL_REBOOT)：重启时文件未运行、删除必成功 =
-        # 用户视角的「删除自身」，且全程不触发杀软。
         if not os.path.exists(ver_target):
             try:
                 _sh.copy2(exe, ver_target)
@@ -9260,9 +9245,12 @@ def _ensure_installed_exe():
         try:
             need_relink = True
             if os.path.exists(entry):
-                es = os.stat(entry); vs = os.stat(ver_target)
-                if (es.st_dev, es.st_ino) == (vs.st_dev, vs.st_ino):
-                    need_relink = False
+                try:
+                    es = os.stat(entry); vs = os.stat(ver_target)
+                    if (es.st_dev, es.st_ino) == (vs.st_dev, vs.st_ino):
+                        need_relink = False
+                except Exception:
+                    pass
             if need_relink:
                 if os.path.exists(entry):
                     try:
@@ -9278,15 +9266,32 @@ def _ensure_installed_exe():
                         pass
         except Exception:
             pass
-        # 登记原始便携 exe 于下次重启时删除（best-effort；非管理员可能失败 -> 留原文件，可接受降级）
-        try:
-            _k = ctypes.windll.kernel32
-            _k.MoveFileExW(exe, None, 0x4)  # 0x4 = MOVEFILE_DELAY_UNTIL_REBOOT
-        except Exception:
-            pass
-        _launch_trace("self-install done: ver=%s entry=%s original-pending-del=scheduled"
+        _launch_trace("self-install done: ver=%s entry=%s"
                       % ("ok" if os.path.exists(ver_target) else "FAIL",
                          "ok" if os.path.exists(entry) else "fail"))
+    except Exception:
+        pass
+
+
+def _schedule_self_delete():
+    """首跑 fallback（supervisor 自身显示、entry 被杀软拦截）时：派生「删除自身」
+    助手（同 exe 的 --self-delete-helper 模式），待本进程退出后删原始便携 exe。
+    此派生发生在窗口已显示之后，即便被安全软件拦截也只损失「立即删除」、
+    不影响已显示的启动器；若被拦截，下次启动的 .cleanup_pending 仍会兜底删除。"""
+    try:
+        import subprocess
+        exe = os.path.abspath(sys.executable)
+        root = os.environ.get("YUNJI_INSTALL_ROOT")
+        if not root:
+            return
+        if os.path.normpath(exe).startswith(os.path.normpath(root) + os.sep):
+            return
+        DETACHED = 0x00000008
+        subprocess.Popen(
+            [exe, "--self-delete-helper", str(os.getpid()), exe],
+            creationflags=DETACHED,
+        )
+        _launch_trace("scheduled self-delete helper (supervisor pid=%d)" % os.getpid())
     except Exception:
         pass
 

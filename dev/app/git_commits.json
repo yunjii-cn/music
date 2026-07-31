@@ -1,6 +1,15 @@
 [
   {
-    "hash": "c0ddf712c3a96de054c1cce5bbdf6bbcf5a4551d",
+    "hash": "47d876bae588b20e2281b9bf89b9712189840602",
+    "short_hash": "47d876b",
+    "message": "feat: 发布版本 v2026.07.31.2359",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 00:00:40",
+    "body": "- 首跑修复: 删除自身改复制进ver+MoveFileEx重启删除(避开杀软杀改名运行中exe导致的闪退); main trace双写到exe同目录"
+  },
+  {
+    "hash": "\nc0ddf712c3a96de054c1cce5bbdf6bbcf5a4551d",
     "short_hash": "c0ddf71",
     "message": "feat: 发布版本 v2026.07.31.2245",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-16 00:52:47",
     "body": "- 根因：8cc8a89 重构后外层分支改为 elif model[\"exists\"]，导致 exists=False 且\n  integrity_status==\"missing\" 的『完全未安装』模型落入空分支，无任何按钮\n- 修复：先按 integrity_status==\"missing\" 显示『下载』（覆盖 exists 真假两种情况），\n  再按 model[\"exists\"] 处理『删除/重新下载』；并提前计算 dl_target/is_main_component\n- 行为：未安装→下载；不完整→删除+重新下载；完整→删除（主组件额外重下）"
-  },
-  {
-    "hash": "\n543d340487021c1259066efec4936a9a8f15d25a",
-    "short_hash": "543d340",
-    "message": "feat(auth): 启动前端网页增加 UM 登录门控，复用官网登录页逻辑",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-16 00:38:26",
-    "body": "- 后端 routes/auth.ts 新增 POST /api/auth/um：按 UM social_uid 找/建本地用户并签发 JWT（复用本地 token 体系）；migrate.ts 增加 users.um_uid 字段\n- 前端 services/api.ts 增加 umLogin + UMLoginPayload；AuthContext 改为从 localStorage 恢复会话并新增 loginWithUM，移除强制 autoLogin\n- 新增 LoginGate.tsx：未登录显示音乐紫门控页，内嵌官网登录页(music.yunjii.cn/um)并监听 loginSuccess postMessage；index.tsx 用其包裹 App\n- web/um/index.php 增加向上转发 loginSuccess（可被子页面嵌套复用）；connect.php 增加 window.opener 回传（支持弹窗登录）"
   }
 ]

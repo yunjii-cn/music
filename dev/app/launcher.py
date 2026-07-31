@@ -254,6 +254,22 @@ def _self_relocate():
     if already:
         _launch_trace("entry: _self_relocate already-deployed start")
         os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
+        # 首跑遗留清理：若首次运行记录了待删的原始便携 exe，此处（已部署态、文件
+        # 已不在运行）安全删除 —— 无需管理员、不触发安全软件。覆盖「首跑 entry 被
+        # 杀软拦截、未能立即删除」的场景，下次启动必清。
+        _pending = os.path.join(deploy_dir, ".cleanup_pending")
+        if os.path.exists(_pending):
+            try:
+                with open(_pending, "r", encoding="utf-8") as _f:
+                    _target = _f.read().strip()
+                if _target and os.path.exists(_target):
+                    _safe_delete(_target)
+                try:
+                    os.remove(_pending)
+                except Exception:
+                    pass
+            except Exception:
+                pass
         ver_dir = os.path.join(deploy_dir, "ver")
         # 若当前运行的版本号 exe 不在 ver/ 中（从新发布文件夹直接运行升级），
         # 先归档一份进 ver/，保证入口稳定指向 ver/ 内副本（删除发布文件夹也不致失效）。
@@ -318,23 +334,43 @@ def _self_relocate():
 
     # 生成固定名入口（硬链接优先，失败回退复制）
     entry_exe = _ensure_entry_current(deploy_dir, exe)
+    # 同时归档一份进 ver/（供 _ensure_entry_current 后续指向最新版、入口稳定）
+    ver_dir = os.path.join(deploy_dir, "ver")
+    os.makedirs(ver_dir, exist_ok=True)
+    ver_target = os.path.join(ver_dir, exe_name)
+    if not os.path.exists(ver_target):
+        try:
+            shutil.copy2(exe, ver_target)
+        except Exception:
+            pass
 
     os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
 
-    # ── 首跑不 spawn 新进程（根治「首次运行不显示启动器」）──
-    # 原先在此用 subprocess.Popen 拉起固定名入口 entry 并 os._exit，让 entry 跑 app。
-    # 但 D:\test 真机日志证明：安全软件 / EDR 的行为监控会把
-    # 「程序运行时动态生成并立即运行一个新 exe」判定为 dropper / malware 行为，
-    # 直接在 PyInstaller bootloader 阶段拦截 entry —— entry 连 Python __main__ 都进不去
-    #（日志中 entry 的 __main__ / _run_supervisor enter 一行都没有，也无 crash.log），
-    # 表现就是「首跑什么都不显示」，而手动双击 entry（用户主动操作、杀软放行）能跑。
-    # 修复：首跑当次由 supervisor 自身直接 fall-through 进 _extract_payload + import main
-    #（见 _run_supervisor 末尾），不再启动第二个 exe。固定名入口 entry 仍已由上方
-    # _ensure_entry_current 生成，供「升级后下次启动」或「用户直接双击 entry」使用；
-    # 原始便携 exe 不在此删除——改由 main._deferred_init 在窗口显示后调用
-    # _ensure_installed_exe 把运行中的 exe 同卷 rename 归档进 ver/（用户视角的
-    # 「删除自身」），既不 spawn 新 exe（避开杀软），又完成安装归档。
-    _launch_trace("supervisor: first-run deploy done -> continue in self (no spawn)")
+    # 记录原始便携 exe 绝对路径，供「下次启动（已部署态）」安全删除。首跑若 entry 被
+    # 安全软件拦截未能立即删除，下次启动由此处兜底清理 —— 无需管理员、不触发杀软。
+    try:
+        with open(os.path.join(deploy_dir, ".cleanup_pending"), "w", encoding="utf-8") as _f:
+            _f.write(exe)
+    except Exception:
+        pass
+
+    # ── 首跑：分离式拉起固定名入口（携带 --cleanup=<原始便携exe>）──
+    # 历史 proven 机制（f7d9105）：入口显示启动器后负责删除原始便携 exe（os.remove，
+    # 无需管理员）。看门狗：spawn 后等待数秒确认入口已存活；若被外部（安全软件）杀掉，
+    # 则 supervisor 自身 fall-through 显示（保底不黑屏），删除由 .cleanup_pending 在
+    # 下次启动兜底。这样无论杀软是否拦截，都能「既显示又删除自身」。
+    if entry_exe and os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
+        try:
+            _child = subprocess.Popen([entry_exe, "--cleanup=" + exe])
+            _launch_trace("supervisor: spawned entry pid=%d" % _child.pid)
+            if _wait_entry_ready(_child, timeout=4.0):
+                _launch_trace("supervisor: entry confirmed alive -> exit self")
+                os._exit(0)
+            _launch_trace("supervisor: entry killed before show -> self show fallback")
+        except Exception as _e:
+            _launch_trace("supervisor: spawn entry FAILED: %r" % _e)
+    # 兜底：未 spawn / 入口未存活 -> 自身继续显示 app（删除自身语义由下次启动兜底）
+    _launch_trace("supervisor: first-run deploy done -> continue in self")
     return
 
 
@@ -528,7 +564,65 @@ def _run_splash_child(progress_ready, ppid):
 # ─────────────────────────────────────────────────────────────────────────────
 # 主进程（supervisor）：自部署 -> 拉起纯启动屏子进程 -> import main -> 运行 app
 # ─────────────────────────────────────────────────────────────────────────────
+def _pid_alive(pid):
+    """探测进程是否仍存活（Windows 用 OpenProcess + GetExitCodeProcess）。"""
+    try:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        h = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        ec = ctypes.c_uint()
+        k32.GetExitCodeProcess(h, ctypes.byref(ec))
+        k32.CloseHandle(h)
+        return ec.value == 259  # STILL_ACTIVE
+    except Exception:
+        return False
+
+
+def _run_self_delete_helper():
+    """轻量「删除自身」助手：由主进程（supervisor）在窗口显示后派生，等待主进程
+    退出后再删原始便携 exe。主进程退出后文件不再被占用，os.remove 即可成功
+    （无需管理员）。此助手在显示之后才派生 —— 即便被安全软件拦截，也只损失
+    「立即删除」、不影响已显示的启动器；若被拦截，下次启动的 .cleanup_pending
+    机制仍会兜底删除。"""
+    try:
+        import time
+        _i = sys.argv.index("--self-delete-helper") + 1
+        _pid = int(sys.argv[_i])
+        _target = sys.argv[_i + 1]
+        _deadline = time.time() + 120
+        while time.time() < _deadline:
+            if not _pid_alive(_pid):
+                break
+            time.sleep(0.3)
+        time.sleep(0.5)
+        if os.path.exists(_target):
+            _safe_delete(_target)
+    except Exception:
+        pass
+    sys.exit(0)
+
+
+def _wait_entry_ready(child, timeout=4.0):
+    """看门狗：等待被 spawn 的入口进程确认存活。存活（未被杀软杀掉）返回 True，
+    否则（已退出/被杀）返回 False。避免「入口被拦杀 -> 父进程已 os._exit -> 全黑」。"""
+    import time
+    _step = 0.2
+    _elapsed = 0.0
+    while _elapsed < timeout:
+        if child.poll() is not None:
+            return False
+        time.sleep(_step)
+        _elapsed += _step
+    return child.poll() is None
+
+
 def _run_supervisor():
+    # 「删除自身」助手模式：不显示界面，仅等待主进程退出后删除原始便携 exe。
+    if "--self-delete-helper" in sys.argv:
+        _run_self_delete_helper()
+        return
     _launch_trace("supervisor: _run_supervisor enter (frozen=%s)" % getattr(sys, 'frozen', False))
     if not getattr(sys, 'frozen', False):
         # 开发模式（未打包）：直接跑，不需要独立启动屏子进程
