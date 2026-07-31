@@ -1496,5 +1496,13 @@
     ],
     "build_time": "2026-08-01T05:11:01.747971",
     "version_number": "2026.08.01.0509"
+  },
+  "云集智能音乐创意台-v2026.08.01.0722": {
+    "version": "云集智能音乐创意台-v2026.08.01.0722",
+    "changes": [
+      "修复首跑「窗口可见但用户看不到」真正根因：入口进程由 supervisor 经 Popen 拉起不继承 Windows 前台权限，activateWindow 被前台锁静默拒绝——这正是「第一次运行失败、第二次手动/开发模式正常」的区别所在。修复：①supervisor spawn 入口后调 AllowSetForegroundWindow(child_pid) 授予前台权；②main 新增 _force_foreground 用 AttachThreadInput+SetForegroundWindow 突破前台锁，在 _deferred_init 显示后立即+500ms 双调用，_force_show_window 也调用"
+    ],
+    "build_time": "2026-08-01T07:24:06.123605",
+    "version_number": "2026.08.01.0722"
   }
 }

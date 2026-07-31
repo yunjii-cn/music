@@ -1,6 +1,15 @@
 [
   {
-    "hash": "f9b8abf10a59b2592abcd458990224eefdaf90a2",
+    "hash": "b98f24d150ea0cc230da2f22a9a569d4446d23f4",
+    "short_hash": "b98f24d",
+    "message": "feat: 发布版本 v2026.08.01.0509",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 05:11:04",
+    "body": "- 修复首跑「托盘在、界面不显示」：对齐视频创意站 proven 实现——_deferred_init 显示前强制把主窗口居中到主屏可用区并夹取不越界(历史/系统记住的位置在分辨率变更或小屏上会落到屏外，致 isVisible=True 但用户看不到)；show()后立即 finish+deleteLater+置_splash=None 收起进程内启动屏(原800ms延迟期间 WindowStaysOnTopHint 启动屏仍盖在主窗之上)；新增15s _force_show_window 兜底强制居中再显示"
+  },
+  {
+    "hash": "\nf9b8abf10a59b2592abcd458990224eefdaf90a2",
     "short_hash": "f9b8abf",
     "message": "feat: 发布版本 v2026.08.01.0447",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-23 18:05:20",
     "body": "- run_*.ps1 / start.ps1 / start-all.ps1: venv 从 data/.venv 改为 scripts/.venv（修复一键部署后无法启动前后端）\n- install-env.ps1: transformers 锁 <4.58.0 避免降级；flash_attn 本地缺失时从 GitHub Releases wheels tag 下载（不再打包进 exe）\n- build-version.py / main.py scripts_to_extract: 移除 wheel 打包（exe 由 272MB 回落 37MB）\n- install-uv-qinglong.ps1: venv 也改为 scripts/.venv，新增 -SkipModels 开关，避免隐藏 PowerShell 下 Read-Host 挂起\n- main.py: 运行/部署日志 自动滚动→滚动 + 复制按钮；自动部署后跳模型管理；install-env 成功后跳过冗余复检；两处调用 install-uv-qinglong 传入 -SkipModels"
-  },
-  {
-    "hash": "\n7bc676b9ef6ff27ccf382170a5ac39fbb4e9de27",
-    "short_hash": "7bc676b",
-    "message": "fix(launcher/splash): 启动屏拆独立进程+进度条出现才淡出；部署维护脚本检查一致性",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-23 00:02:52",
-    "body": "- launcher.py: 启动屏改为独立子进程(只加载PyQt6画动画,绝不import main),\n  彻底绕开GIL争用导致转圈卡顿;子进程轮询进度条就绪哨兵才淡出交替\n- main.py: import main后置顶显示进度条后才回写YUNJI_PROGRESS_READY哨兵;\n  部署维护环境检查脚本列表与解包列表对齐\n- build-version.py: 用--add-data把改过的main.py随exe打包,避免运行时命中旧松文件\n- ace-step-ui: UM登录门控(复用官网登录页)\n- docs: 补充一键部署维护/开发指南\n\nCo-Authored-By: WorkBuddy <workbuddy@tencent.com>"
   }
 ]

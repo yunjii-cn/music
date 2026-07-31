@@ -367,6 +367,16 @@ def _self_relocate():
             # 保持普通控制台子进程，行为与旧版直接双击运行一致（剪贴板正常）。
             _child = subprocess.Popen([entry_exe, "--cleanup=" + exe])
             _launch_trace("supervisor: spawned entry pid=%d" % _child.pid)
+            # 授予入口进程前台权限：Popen 拉起的子进程默认无前台权限，其窗口
+            # 会被 Windows 前台锁拒绝置顶/激活 -> 首跑「窗口 visible=True 但用户
+            # 看不到、只剩托盘」。AllowSetForegroundWindow 是 Win32「父进程授予
+            # 子进程前台权」的标准机制（第二次双击入口由 Explorer 启动则自带前台权，
+            # 故二次正常；本调用专修首跑）。配合 main._force_foreground 的
+            # AttachThreadInput 双保险。
+            try:
+                ctypes.windll.user32.AllowSetForegroundWindow(_child.pid)
+            except Exception:
+                pass
             try:
                 _child.wait(timeout=4.0)
                 # 子进程在 4 秒内退出 = 被杀（正常应长期运行），走 fallback 显示

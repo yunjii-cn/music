@@ -2558,6 +2558,12 @@ class MainWindow(QMainWindow):
             self.activateWindow()
         except Exception:
             pass
+        # 首跑关键修复：入口由 supervisor 经 Popen 拉起、不继承前台权限，
+        # activateWindow() 会被 Windows 前台锁拒绝 -> 窗口 visible=True 但在后台。
+        # _force_foreground 用 AttachThreadInput 突破前台锁，把窗口真正置顶。
+        self._force_foreground()
+        # 再延迟 500ms 强制一次：等窗口完全布局后再抢前台，对慢机更稳
+        QTimer.singleShot(500, self._force_foreground)
         # 15s 兜底：极端情况下窗口仍未可见/被遮挡，强制居中再显示一次
         QTimer.singleShot(15000, self._force_show_window)
         if app:
@@ -2573,6 +2579,44 @@ class MainWindow(QMainWindow):
             _launch_trace("in-process splash finished")
         except Exception:
             _launch_trace("in-process splash finish err")
+            pass
+
+    def _force_foreground(self):
+        """Windows 前台锁绕过：强制把主窗口置顶激活。
+
+        根因（首跑「窗口 visible=True 但用户看不到、只剩托盘」）：首次运行时入口
+        进程由 supervisor 经 Popen 拉起，**不继承前台权限**；其 activateWindow()
+        会被 Windows 前台锁静默拒绝 → 窗口已 show 但停留在后台。第二次双击入口由
+        Explorer 启动自带前台权、开发模式由终端启动也带前台权，故二者正常。
+        用 AttachThreadInput 绑定当前前台线程的输入队列，使 SetForegroundWindow
+        突破前台锁——这是 Win32 公认的「子进程抢前台」标准做法。"""
+        if sys.platform != 'win32':
+            return
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = int(self.winId())
+            if not hwnd:
+                return
+            fg = user32.GetForegroundWindow()
+            if fg == hwnd:
+                return
+            cur_tid = ctypes.windll.kernel32.GetCurrentThreadId()
+            fg_tid = user32.GetWindowThreadProcessId(fg, None) if fg else 0
+            attached = False
+            if fg_tid and fg_tid != cur_tid:
+                attached = bool(user32.AttachThreadInput(cur_tid, fg_tid, True))
+            try:
+                user32.SetForegroundWindow(hwnd)
+                user32.BringWindowToTop(hwnd)
+                user32.ShowWindow(hwnd, 5)  # SW_SHOW
+            finally:
+                if attached:
+                    try:
+                        user32.AttachThreadInput(cur_tid, fg_tid, False)
+                    except Exception:
+                        pass
+        except Exception:
             pass
 
     def _force_show_window(self):
@@ -2599,6 +2643,7 @@ class MainWindow(QMainWindow):
             self.show()
             self.raise_()
             self.activateWindow()
+            self._force_foreground()
             _launch_trace("force_show_window: re-shown+centered")
         except Exception:
             pass
