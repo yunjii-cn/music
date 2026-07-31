@@ -225,6 +225,25 @@ def _ensure_entry_current(deploy_dir, current_exe):
     return entry_exe if os.path.exists(entry_exe) else None
 
 
+def _archive_to_ver(deploy_dir, src_exe):
+    """入口文件职责：把“打包的版本 exe”（--cleanup 指向的原始 exe）复制进
+    ver/ 归档（版本回滚用）。仅在缺失时复制，避免重复 53MB。
+
+    按既定架构：“入口文件会…复制 打包的版本exe到ver”，此步骤由入口进程在
+    删除原始 exe 之前完成，确保 ver/ 始终留有可回滚的版本副本。"""
+    try:
+        if not src_exe or not os.path.exists(src_exe):
+            return
+        ver_dir = os.path.join(deploy_dir, "ver")
+        os.makedirs(ver_dir, exist_ok=True)
+        dst = os.path.join(ver_dir, os.path.basename(src_exe))
+        if not os.path.exists(dst):
+            shutil.copy2(src_exe, dst)
+            _launch_trace("entry: archived %s -> ver/" % os.path.basename(src_exe))
+    except Exception:
+        pass
+
+
 def _self_relocate():
     """首次运行闭环（对应 2309 时代的 launcher._self_relocate）。
 
@@ -254,11 +273,20 @@ def _self_relocate():
     if already:
         _launch_trace("entry: _self_relocate already-deployed start")
         os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
-        # 入口被拉起：删除原始便携 exe（f7d9105 proven 机制，os.remove 无需管理员）。
-        # 注意：必须无条件执行——之前误改为「仅当 ver/ 中无新版时才删」，导致正常
-        # 升级/首跑后原始便携 exe 永远留在下载目录（用户反馈“能打开但不删自身”）。
+        # 幂等补全子目录（防止个别旧部署缺目录导致后续 import 失败）
+        for sub in _DEPLOY_SUBDIRS:
+            try:
+                os.makedirs(os.path.join(deploy_dir, sub), exist_ok=True)
+            except Exception:
+                pass
+        # 入口被拉起：先把“打包的版本 exe”归档进 ver/，再删除最开始的版本 exe 自身
+        # （f7d9105 proven 机制：os.remove 无需管理员、不触发杀软）。
+        # 注意：删除必须无条件执行——之前误改为「仅当 ver/ 中无新版时才删」，导致
+        # 正常升级/首跑后原始便携 exe 永远留在下载目录（用户反馈“能打开但不删自身”）。
         if cleanup_target:
+            _archive_to_ver(deploy_dir, cleanup_target)
             _safe_delete(cleanup_target)
+            _launch_trace("entry: deleted original %s" % cleanup_target)
         # 首跑 fallback 遗留清理：若上次首跑 entry 被杀软拦截未能立即删除，
         # 此处（已部署态、文件已不在运行）安全删除 —— 无需管理员、不触发杀软。
         _pending = os.path.join(deploy_dir, ".cleanup_pending")
@@ -268,6 +296,7 @@ def _self_relocate():
                     _target = _f.read().strip()
                 if _target and os.path.exists(_target):
                     _safe_delete(_target)
+                    _launch_trace("entry: pending-cleanup deleted %s" % _target)
                 try:
                     os.remove(_pending)
                 except Exception:
@@ -281,9 +310,9 @@ def _self_relocate():
     for sub in _DEPLOY_SUBDIRS:
         os.makedirs(os.path.join(deploy_dir, sub), exist_ok=True)
 
-    # 注：不再在此「复制自身进 ver/」（旧逻辑因 ver/ 尚未创建静默失败，且白占
-    # 53MB）。归档进 ver/ 由 main._deferred_init 在窗口显示后用「同卷 rename」完成
-    #（见 _ensure_installed_exe），等价于「删除自身/安装到部署目录」且无新 exe 生成。
+    # 注：原始（打包的版本 exe）首跑负责“建文件夹 + 建入口 + 打开入口”；
+    # ver/ 归档由入口进程 _archive_to_ver 负责（此处仅顺带建好 ver/ 目录，
+    # 归档动作在入口删除原始 exe 前完成，符合既定架构）。
 
     # 写 version.txt（仅版本号，main.py 按 ^\d+\.\d+\.\d+(\.\d+)?$ 解析）
     m = VERSIONED_RE.search(exe_name)

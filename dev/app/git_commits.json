@@ -1,6 +1,15 @@
 [
   {
-    "hash": "17d728373a627a3223347f08a08833bf4b52e0d2",
+    "hash": "7172675c86953116832f6c43d0705779f316a973",
+    "short_hash": "7172675",
+    "message": "feat: 发布版本 v2026.08.01.0057",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 00:58:42",
+    "body": "- 首跑删除自身回归f7d9105: already分支无条件删cleanup_target; 首跑入口用os.link简单相对路径(去复杂版本号匹配); 看门狗防黑屏+cleanup_pending兜底; main不再双重删/改名"
+  },
+  {
+    "hash": "\n17d728373a627a3223347f08a08833bf4b52e0d2",
     "short_hash": "17d7283",
     "message": "feat: 发布版本 v2026.08.01.0019",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-16 01:07:50",
     "body": "- 根因：_load_model_list 中不完整模型的 exists 被算为 False（check_model_exists 要求\n  文件齐全+大小达标才返回 True），而 _update_ui 把 incomplete 分支写在\n  `elif model[\"exists\"]` 之下，导致 exists=False 的不完整模型落入空分支、无任何按钮。\n- version_manager.py(ModelManagerDialog._update_ui，实际渲染 UI)：将 incomplete 分支\n  独立为 `elif integrity_status == \"incomplete\"`，不再依赖 model[\"exists\"]。\n- main.py(_update_model_management_ui 遗留方法)：外层 guard 改为\n  `elif model[\"exists\"] or integrity_status == \"incomplete\"`，最小改动保留缩进。\n- 行为：未安装→下载；不完整→删除+重新下载；完整→删除（主组件额外重下）；下载中→暂停。\n- py_compile 通过。"
-  },
-  {
-    "hash": "\n7f27baf92db5e5df957f901b7afa5428721e9298",
-    "short_hash": "7f27baf",
-    "message": "fix(model): 修复启动器模型管理页『下载』按钮不显示（真正的渲染 UI）",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-16 00:58:03",
-    "body": "- 上一轮误改了 main.py 的 _update_model_management_ui（遗留/未挂载方法）；实际在\n  启动器『📦 模型管理』页面渲染的是 version_manager.py 的 ModelManagerDialog._update_ui，\n  由 main.py:2250 创建、_switch_page:2623 调用。\n- 该 _update_ui 同样存在 elif model[\"exists\"] 外层分支，导致 exists=False && 未安装\n  的模型落入空分支、无下载按钮（首次安装/未下载任何模型时全部缺失）。\n- 修复方式同前：先按 integrity_status==\"missing\" 显示『下载』（覆盖 exists 真假），\n  再按 model[\"exists\"] 处理『删除/重新下载』；提前计算 dl_target/is_main_component。\n- py_compile 通过。"
   }
 ]
