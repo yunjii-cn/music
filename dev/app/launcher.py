@@ -9,6 +9,25 @@ import subprocess
 import tempfile
 from datetime import datetime
 
+def _launch_trace(step):
+    """首跑轨迹：与 main._launch_trace 协同，记录 launcher 自身（supervisor / 入口进程）
+    在 import main 之前的关键步骤——首跑“什么都不显示”往往死在进入 main 之前，此处补盲。
+    双写：%TEMP% 与 exe 同目录（yunji_launch_trace.log），后者用户最易找到。"""
+    try:
+        line = datetime.now().strftime("%H:%M:%S.%f") + " [launcher] %s | exe=%s pid=%d\n" % (
+            step, os.path.basename(os.path.abspath(sys.executable)), os.getpid())
+        for _p in (os.path.join(tempfile.gettempdir(), "yunji_launch_trace.log"),
+                   os.path.join(os.path.dirname(os.path.abspath(sys.executable)),
+                                "yunji_launch_trace.log")):
+            try:
+                with open(_p, "a", encoding="utf-8") as f:
+                    f.write(line)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 if sys.platform == 'win32' and getattr(sys, 'frozen', False):
     class _NullWriter:
         def write(self, *args, **kwargs):
@@ -233,6 +252,7 @@ def _self_relocate():
     already = os.path.isdir(deploy_dir) and os.path.isfile(
         os.path.join(deploy_dir, VERSION_TXT))
     if already:
+        _launch_trace("entry: _self_relocate already-deployed start")
         os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
         ver_dir = os.path.join(deploy_dir, "ver")
         # 若当前运行的版本号 exe 不在 ver/ 中（从新发布文件夹直接运行升级），
@@ -270,8 +290,12 @@ def _self_relocate():
             except Exception:
                 pass
             os._exit(0)
-        if cleanup_target:
-            _safe_delete(cleanup_target)
+        # 注意：此处「删除原始便携 exe」不再同步执行。原因：首次运行若在此处
+        # 删除，原始 exe 会在启动器界面显示之前就被删掉——一旦后续 _extract_payload
+        # / main 初始化在首跑环境出问题，进程静默退出且原始 exe 已消失，用户既看不到
+        # 界面也无法重试，也无从排查。现改为：cleanup_target 透传给 main.main()，
+        # 由 main 在「启动器窗口已确认显示」之后(_deferred_init 中)再删除，确保
+        # 「先确认能打开、再清理自身」。
         return
 
     # ── 尚未部署：便携版本号 exe → 首次自部署 ──
@@ -308,13 +332,17 @@ def _self_relocate():
             # 该标志会让子进程在部分 Windows 会话下无法打开系统剪贴板
             #（OpenClipboard 返回 ACCESS_DENIED），导致日志"复制"功能彻底失效。
             # 保持普通控制台子进程，行为与旧版直接双击运行一致（剪贴板正常）。
+            _launch_trace("supervisor: spawning entry=%s cleanup=%s"
+                          % (os.path.basename(entry_exe), os.path.basename(exe)))
             subprocess.Popen(
                 [entry_exe, "--cleanup=" + exe],
             )
             _spawned = True
-        except Exception:
+        except Exception as _e:
+            _launch_trace("supervisor: spawn entry FAILED: %r" % _e)
             _spawned = False
     if _spawned:
+        _launch_trace("supervisor: spawned OK, exiting (os._exit)")
         os._exit(0)
     # 兜底：入口未能拉起（硬链接/复制受权限或杀软限制、_ensure_entry_current
     # 返回 None 等），当前便携进程直接继续运行 app，避免首跑"什么都不显示"
@@ -513,6 +541,7 @@ def _run_splash_child(progress_ready, ppid):
 # 主进程（supervisor）：自部署 -> 拉起纯启动屏子进程 -> import main -> 运行 app
 # ─────────────────────────────────────────────────────────────────────────────
 def _run_supervisor():
+    _launch_trace("supervisor: _run_supervisor enter (frozen=%s)" % getattr(sys, 'frozen', False))
     if not getattr(sys, 'frozen', False):
         # 开发模式（未打包）：直接跑，不需要独立启动屏子进程
         import main as _m
@@ -530,7 +559,9 @@ def _run_supervisor():
     # 首次运行时从 exe 内解压 acestep/ 和 ace-step-ui/ 到部署目录
     try:
         _extract_payload()
+        _launch_trace("supervisor/entry: payload extracted")
     except Exception:
+        _launch_trace("supervisor/entry: _extract_payload EXCEPTION")
         _write_crash("=== launcher._extract_payload 异常 ===")
 
     exe = os.path.abspath(sys.executable)
@@ -593,4 +624,5 @@ if __name__ == "__main__":
                 _ready = _a.split("=", 1)[1]
         _run_splash_child(_ready, os.getppid())
     else:
+        _launch_trace("__main__: launching supervisor (argv=%s)" % sys.argv[:3])
         _run_supervisor()

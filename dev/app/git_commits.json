@@ -1,6 +1,15 @@
 [
   {
-    "hash": "f13c4a3c265b3f4f94d128d801fff1e8132efde8",
+    "hash": "0702a73c851fe7a65d31ea62314074e4619e5dae",
+    "short_hash": "0702a73",
+    "message": "chore: 记录发布版本 v2026.07.31.1046 元数据",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-07-31 10:54:49",
+    "body": "含首次运行兜底修复(入口拉起失败不再静默退出 + MainWindow 构造失败可见报错)。"
+  },
+  {
+    "hash": "\nf13c4a3c265b3f4f94d128d801fff1e8132efde8",
     "short_hash": "f13c4a3",
     "message": "fix: 首次运行无法显示启动器的两个兜底",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-12 08:17:46",
     "body": "- model_downloader: force 重下载先清理无效目录，保证全新安装\n\n- main/version_manager: 按 integrity_status 三态渲染按钮(完整→删除 / 不完整→删除+重新下载 / 缺失→下载)，主组件重下路由到主模型\n\n- ui: 浏览器设置条改为极简扁平(去红条、中性灰配色、与卡片统一)\n\nCo-Authored-By: WorkBuddy <workbuddy@tencent.com>"
-  },
-  {
-    "hash": "\n4fbf7a1a119bbf8c8717eab084ed750ed636db38",
-    "short_hash": "4fbf7a1",
-    "message": "feat(web): 新增营销官网(dev/web) — 暗黑+CC0000风格、UM扫码登录、竞速下载、多语言(简繁英日韩)",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-12 03:52:37",
-    "body": "- config.js: 集中配置(品牌/配色/UM appid/双镜像下载/5语言)\n- server.js: Express托管 + /login/qr + /login/callback(postMessage) + /download/latest(竞速下载) + /api/site-config(剔除appkey)\n- public: 首页(暗黑+CC0000) + i18n(简繁英日韩) + main.js(多语言/扫码/竞速下载) + logo/favicon\n- .gitignore: 排除 BAK8/、dev/web/node_modules、.next"
   }
 ]

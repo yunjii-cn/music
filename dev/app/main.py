@@ -2457,6 +2457,16 @@ class MainWindow(QMainWindow):
                 pass
         _launch_trace("window shown")
 
+        # 启动器窗口已确认显示 -> 现在才放心删除首次运行前的原始便携 exe
+        # （launcher._self_relocate 不再提前删，避免首跑失败即丢失原始 exe）。
+        _ct = getattr(self, "_cleanup_target", None)
+        if _ct:
+            try:
+                _launch_trace("startup cleanup (defer delete original exe)")
+                QTimer.singleShot(300, lambda: _do_startup_cleanup(_ct))
+            except Exception:
+                pass
+
         if self._splash:
             try:
                 self._splash.reached_full.disconnect()
@@ -9400,7 +9410,12 @@ def main(app=None, splash=None, child_proc=None):
         QTimer.singleShot(10000, lambda: _force_close_splash(window, splash))
 
     if cleanup_target:
-        QTimer.singleShot(1500, lambda: _do_startup_cleanup(cleanup_target))
+        # 删除原始便携 exe 推迟到「启动器窗口已确认显示」之后再做，避免在界面
+        # 尚未出现时就删掉原始 exe（首跑一旦失败，原始 exe 消失且无从排查/重试）。
+        # 具体执行见 MainWindow._deferred_init 中 window shown 之后的触发。
+        window._cleanup_target = cleanup_target
+    else:
+        window._cleanup_target = None
 
     sys.exit(app.exec())
 

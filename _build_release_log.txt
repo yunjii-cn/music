@@ -1,0 +1,133 @@
+231 INFO: PyInstaller: 6.20.0, contrib hooks: 2026.5
+232 INFO: Python: 3.12.10
+302 INFO: Platform: Windows-11-10.0.26100-SP0
+302 INFO: Python environment: D:\Programs\Python312
+303 INFO: wrote E:\软件开发\云集智能音乐创意台\build\_pyinstaller_work\云集智能音乐创意台-v2026.07.31.0754.spec
+310 INFO: Removing temporary files and cleaning cache in C:\Users\Administrator\AppData\Local\pyinstaller
+312 INFO: Module search paths (PYTHONPATH):
+['E:\\软件开发\\云集智能音乐创意台\\dev\\app',
+ 'D:\\Programs\\Python312\\python312.zip',
+ 'D:\\Programs\\Python312\\DLLs',
+ 'D:\\Programs\\Python312\\Lib',
+ 'D:\\Programs\\Python312',
+ 'D:\\Programs\\Python312\\Lib\\site-packages',
+ 'D:\\Programs\\Python312\\Lib\\site-packages\\win32',
+ 'D:\\Programs\\Python312\\Lib\\site-packages\\win32\\lib',
+ 'D:\\Programs\\Python312\\Lib\\site-packages\\pythonwin',
+ 'E:\\软件开发\\云集智能音乐创意台\\dev\\app']
+1067 INFO: Appending 'datas' from .spec
+1069 INFO: checking Analysis
+1069 INFO: Building Analysis because Analysis-00.toc is non existent
+1069 INFO: Looking for Python shared library...
+1069 INFO: Using Python shared library: D:\Programs\Python312\python312.dll
+1069 INFO: Running Analysis Analysis-00.toc
+1069 INFO: Target bytecode optimization level: 0
+1069 INFO: Initializing module dependency graph...
+1071 INFO: Initializing module graph hook caches...
+1090 INFO: Analyzing modules for base_library.zip ...
+3561 INFO: Processing standard module hook 'hook-encodings.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+5405 INFO: Processing standard module hook 'hook-pickle.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+6330 INFO: Processing standard module hook 'hook-heapq.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+6722 INFO: Caching module dependency graph...
+6769 INFO: Analyzing E:\软件开发\云集智能音乐创意台\dev\app\launcher.py
+6813 INFO: Processing standard module hook 'hook-_ctypes.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+6826 INFO: Processing standard module hook 'hook-PyQt6.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+7803 INFO: Processing standard module hook 'hook-PyQt6.QtWidgets.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+11749 INFO: Processing standard module hook 'hook-PyQt6.QtCore.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+18734 INFO: Processing standard module hook 'hook-PyQt6.QtGui.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+48493 INFO: Processing standard module hook 'hook-psutil.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+48635 INFO: Processing standard module hook 'hook-platform.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+48801 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+48935 INFO: Processing standard module hook 'hook-xml.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+49292 INFO: Processing module hooks (post-graph stage)...
+49380 INFO: Performing binary vs. data reclassification (134 entries)
+49425 INFO: Looking for ctypes DLLs
+49554 INFO: Analyzing run-time hooks ...
+49554 INFO: Including custom run-time hook 'E:\\软件开发\\云集智能音乐创意台\\dev\\app\\pyi_rth_subprocess.py'
+49563 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+49567 INFO: Including run-time hook 'pyi_rth_pyqt6.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+49571 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+49575 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks'
+49582 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+49586 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'D:\\Programs\\Python312\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+49604 INFO: Creating base_library.zip...
+49632 INFO: Looking for dynamic libraries
+50161 INFO: Extra DLL search directories (AddDllDirectory): ['D:\\Programs\\Python312\\Lib\\site-packages\\PyQt6\\Qt6\\bin']
+50162 INFO: Extra DLL search directories (PATH): ['D:\\Programs\\Python312\\Lib\\site-packages\\PyQt6\\Qt6\\bin']
+51323 INFO: Warnings written to E:\软件开发\云集智能音乐创意台\build\_pyinstaller_work\云集智能音乐创意台-v2026.07.31.0754\warn-云集智能音乐创意台-v2026.07.31.0754.txt
+51360 INFO: Graph cross-reference written to E:\软件开发\云集智能音乐创意台\build\_pyinstaller_work\云集智能音乐创意台-v2026.07.31.0754\xref-云集智能音乐创意台-v2026.07.31.0754.html
+51392 INFO: checking PYZ
+51392 INFO: Building PYZ because PYZ-00.toc is non existent
+51392 INFO: Building PYZ (ZlibArchive) E:\软件开发\云集智能音乐创意台\build\_pyinstaller_work\云集智能音乐创意台-v2026.07.31.0754\PYZ-00.pyz
+51663 INFO: Building PYZ (ZlibArchive) E:\软件开发\云集智能音乐创意台\build\_pyinstaller_work\云集智能音乐创意台-v2026.07.31.0754\PYZ-00.pyz completed successfully.
+51671 INFO: checking PKG
+51671 INFO: Building PKG because PKG-00.toc is non existent
+51671 INFO: Building PKG (CArchive) 云集智能音乐创意台-v2026.07.31.0754.pkg
+63243 INFO: Building PKG (CArchive) 云集智能音乐创意台-v2026.07.31.0754.pkg completed successfully.
+63248 INFO: Bootloader D:\Programs\Python312\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+63248 INFO: checking EXE
+63248 INFO: Building EXE because EXE-00.toc is non existent
+63248 INFO: Building EXE from EXE-00.toc
+63248 INFO: Copying bootloader EXE to E:\软件开发\云集智能音乐创意台\build\云集智能音乐创意台-v2026.07.31.0754.exe
+63254 INFO: Copying icon to EXE
+63259 INFO: Copying 0 resources to EXE
+63259 INFO: Embedding manifest in EXE
+63262 INFO: Appending PKG archive to EXE
+63311 INFO: Fixing EXE headers
+63599 INFO: Building EXE from EXE-00.toc completed successfully.
+63606 INFO: Build complete! The results are available in: E:\软件开发\云集智能音乐创意台\build
+STEP update_git_commits_json
+  ✓ git_commits.json 已生成（60 条提交）
+STEP build_exe
+  PyInstaller 打包 (v2026.07.31.0754)...
+  已添加图标: E:\软件开发\云集智能音乐创意台\dev\app\icon.ico
+  已打包应用主体: E:\软件开发\云集智能音乐创意台\dev\app\main.py
+  已打包模型管理器: E:\软件开发\云集智能音乐创意台\dev\app\version_manager.py
+  已添加品牌LOGO(ico.png): E:\软件开发\云集智能音乐创意台\dev\app\ico.png
+  已添加Qt配置: E:\软件开发\云集智能音乐创意台\dev\app\qt.conf
+  跳过启动画面（splash.png 存在但已禁用，避免 _PYI_SPLASH_IPC 崩溃）
+  已添加版本历史
+  已打包历史版本列表: E:\软件开发\云集智能音乐创意台\dev\app\versions.json
+  已打包 git 提交历史: E:\软件开发\云集智能音乐创意台\dev\app\git_commits.json
+  ✓ 11 个 .ps1 语法校验通过
+  已添加脚本: acestep-sync.ps1
+  已添加脚本: download-frontend.ps1
+  已添加脚本: install-env.ps1
+  已添加脚本: new_pr_branch.ps1
+  已添加脚本: run_gradio.ps1
+  已添加脚本: run_npmgui.ps1
+  已添加脚本: run_qinglong_backend.ps1
+  已添加脚本: run_qinglong_frontend.ps1
+  已添加脚本: run_server.ps1
+  已添加脚本: start-all.ps1
+  已添加脚本: start.ps1
+  已打包 payload: acestep/
+  已打包 payload: ace-step-ui/ (精简)
+  已打包 payload: scripts/ (仅 .ps1 + 维护小文件)
+  payload.zip 大小: 16.2 MB
+  已添加运行时钩子: pyi_rth_subprocess.py
+  使用 launcher.py 作为入口
+  运行 PyInstaller (--onefile)...
+  ✓ EXE 生成成功: 云集智能音乐创意台-v2026.07.31.0754.exe (53.1 MB)
+GOT_EXE E:\软件开发\云集智能音乐创意台\build\云集智能音乐创意台-v2026.07.31.0754.exe
+STEP post_build
+  打包后处理...
+  ✓ 移动 EXE -> 云集智能音乐创意台-v2026.07.31.0754/
+  ✓ 复制 scripts/ (排除 .venv / lora_data_prepare / 重型二进制)
+  ✓ 复制 acestep/ (排除 __pycache__ / 重型二进制)
+  ✓ 复制 ace-step-ui/ (排除 node_modules / server/public / server/data)
+  ✓ 创建 data/ 目录结构
+  发布目录大小: 95.5 MB
+GOT_RELEASE_DIR E:\软件开发\云集智能音乐创意台\build\云集智能音乐创意台-v2026.07.31.0754
+STEP cleanup
+  清理 PyInstaller 临时文件
+STEP version_history
+STEP update_versions_json
+  ✓ versions.json 已更新
+STEP deploy_to_dev
+  ✓ 复制 EXE: 云集智能音乐创意台-v2026.07.31.0754.exe
+  ✓ 确保 data/ 目录结构存在
+  ✓ 部署完成，EXE 在 E:\软件开发\云集智能音乐创意台\dist
+STEP copy to dev/ver
+  ✓ 复制到 dev/ver/: 云集智能音乐创意台-v2026.07.31.0754.exe
+BUILD_RELEASE_DONE 云集智能音乐创意台-v2026.07.31.0754 VERSION 2026.07.31.0754
