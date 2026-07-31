@@ -9350,7 +9350,39 @@ def main(app=None, splash=None, child_proc=None):
     splash.set_progress(0.5, "正在创建主窗口...")
     app.processEvents()
 
-    window = MainWindow(splash=splash)
+    # MainWindow 构造（同步阶段）若抛异常，此前会让整个进程静默退出、
+    # 启动屏空跑、主窗口永远建不出来（典型表现：首次运行不显示、手动能显示）。
+    # 现加保护：构造失败时留下「可见报错」而非静默消失，并清理启动屏子进程，
+    # 让“什么都不显示”变成“明确错误提示”，便于一锤定音定位首跑环境问题。
+    try:
+        window = MainWindow(splash=splash)
+    except Exception as _wce:
+        import traceback as _tb
+        _write_crash_log("[MainWindow 同步构造失败] " + "".join(_tb.format_exc()))
+        try:
+            if child_proc is not None:
+                try:
+                    if child_proc.poll() is None:
+                        child_proc.terminate()
+                except Exception:
+                    pass
+            if splash is not None:
+                try:
+                    splash.finish(None)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                None, "启动失败",
+                "主窗口初始化失败，软件无法继续：\n\n%s\n\n"
+                "请将此信息连同 %s\\yunji_launch_trace.log 反馈以定位首跑问题。"
+                % (_wce, tempfile.gettempdir()))
+        except Exception:
+            pass
+        raise
     # 把 launcher 拉起的「独立启动屏子进程」句柄挂到窗口上，供 _deferred_init
     # 在显示主窗口时强制结束它——避免该子进程的 WindowStaysOnTopHint 窗口
     # 因 sentinel 未送达而永久置顶遮挡主窗口（打包后”托盘在、界面不显示”的根因之一）。

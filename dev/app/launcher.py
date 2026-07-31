@@ -301,6 +301,7 @@ def _self_relocate():
 
     os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
     # 分离式拉起固定名入口，并删除原始便携 exe
+    _spawned = False
     if entry_exe and os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
         try:
             # 注意：此处不能用 CREATE_NO_WINDOW 拉起最终 app 进程！
@@ -310,9 +311,15 @@ def _self_relocate():
             subprocess.Popen(
                 [entry_exe, "--cleanup=" + exe],
             )
+            _spawned = True
         except Exception:
-            pass
-    os._exit(0)
+            _spawned = False
+    if _spawned:
+        os._exit(0)
+    # 兜底：入口未能拉起（硬链接/复制受权限或杀软限制、_ensure_entry_current
+    # 返回 None 等），当前便携进程直接继续运行 app，避免首跑"什么都不显示"
+    # 后进程直接退出。已部署态（双击入口）走 already=True 分支不会到此。
+    return
 
 
 def _extract_payload():
