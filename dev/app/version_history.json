@@ -1512,5 +1512,13 @@
     ],
     "build_time": "2026-08-01T08:43:48.604586",
     "version_number": "2026.08.01.0842"
+  },
+  "云集智能音乐创意台-v2026.08.01.0901": {
+    "version": "云集智能音乐创意台-v2026.08.01.0901",
+    "changes": [
+      "恢复 f7d9105 proven 删除机制：首跑部署后分离式 spawn 入口(携带 --cleanup=<原始便携exe>) + os._exit 退出自身，由入口在 already 分支用 os.remove 立即删便携 exe（即用户要的「入口启动新 exe 删除自身」）；移除不可靠的 self-delete-helper（它等主进程退出才删、app 运行中永远删不掉）。显示仍由 main._deferred_init 的居中+_force_foreground+15s 兜底保证可见；spawn 失败则兜底本进程跑 main、删除交 .cleanup_pending 下次启动兜底"
+    ],
+    "build_time": "2026-08-01T09:02:35.340069",
+    "version_number": "2026.08.01.0901"
   }
 }
