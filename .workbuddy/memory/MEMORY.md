@@ -23,5 +23,9 @@
 ## 目录约定
 - `dev/app/`=源码(git)；`dev/dist/`=裸 exe(gitignore)；`dev/_build/`=发布文件夹(gitignore)；`dev/data/`=用户数据(gitignore)；`dev/ver/`=待发布版本 exe。`BAK/` 为备份。
 
+## 启动追踪日志策略（2026-08-01 确立）
+- `_launch_trace`（launcher.py + main.py）**默认仅写 %TEMP%/yunji_launch_trace.log**，不污染部署/下载目录（精品发布习惯）。设环境变量 **`YUNJI_TRACE_LOCAL=1`** 时额外双写 exe 同目录（真机排查首跑问题时启用，无需翻 %TEMP%）。
+- `crash.log`（launcher.py `_write_crash` / main.py `_write_crash_log`）仅在未捕获异常时生成，留 exe 同目录（部署目录）作为真崩溃取证，正常流程不出现。
+
 ## 沙箱 / 环境铁律
 - **绝不在沙箱 `/tmp`（映射到 `D:\Temp`）跑 exe 冒烟测试**——曾把约 39GB 部署目录写入 D 盘、且残留清理进程逐文件删（杀软 3 文件/秒）把 D 盘 I/O 占满致整机卡顿。一律改 `E:\_smoke\` 且测完立即清理。D 盘空间紧张（640GB 已用、常剩 <5GB）。
