@@ -39,6 +39,147 @@
         });
     });
 
+    /* --- 下载区：竞速下载 + 版本历史 --- */
+    var RELEASES_JSON = './data/releases.json';
+    var releaseData = null;
+
+    function loadReleases() {
+        fetch(RELEASES_JSON, { cache: 'no-cache' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                releaseData = data;
+                renderLatest();
+                renderVersionHistory();
+            })
+            .catch(function () { /* 静默失败，保留默认文案 */ });
+    }
+
+    function renderLatest() {
+        if (!releaseData || !releaseData.latest) return;
+        var v = releaseData.latest;
+        var verEl = document.getElementById('dlVersion');
+        if (verEl) verEl.textContent = v.version + ' · ' + v.date;
+        // 更新 GitHub / Gitee 备选链接指向具体 release
+        if (v.gh_html) {
+            var gh = document.getElementById('btnGitHub');
+            if (gh) gh.href = v.gh_html;
+        }
+        if (v.ge_html) {
+            var ge = document.getElementById('btnGitee');
+            if (ge) ge.href = v.ge_html;
+        }
+    }
+
+    // 竞速下载：并行 HEAD 探测双镜像延迟，选最快源
+    function raceDownload() {
+        if (!releaseData || !releaseData.latest) {
+            // 数据未加载，降级到 GitHub releases 页
+            window.open('https://github.com/yunjii-cn/music/releases', '_blank');
+            return;
+        }
+        var v = releaseData.latest;
+        var sources = [];
+        if (v.github) sources.push({ name: 'GitHub', url: v.github });
+        if (v.gitee) sources.push({ name: 'Gitee', url: v.gitee });
+        if (sources.length === 0) {
+            window.open('https://github.com/yunjii-cn/music/releases', '_blank');
+            return;
+        }
+
+        var btn = document.getElementById('btnRaceDownload');
+        var status = document.getElementById('downloadStatus');
+        var btnText = document.getElementById('raceBtnText');
+        if (btn) { btn.disabled = true; }
+        if (btnText) { btnText.textContent = '测速中…'; }
+        if (status) { status.textContent = '正在测试镜像延迟…'; }
+
+        var timed = sources.map(function (s) {
+            return new Promise(function (resolve) {
+                var img = new Image();
+                var start = performance.now();
+                var done = false;
+                var finish = function (ok) {
+                    if (done) return; done = true;
+                    resolve({ src: s, ok: ok, cost: performance.now() - start });
+                };
+                img.onload = function () { finish(true); };
+                img.onerror = function () { finish(true); }; // HEAD 探测用图片不一定成功，error 也视为可达
+                setTimeout(function () { finish(false); }, 4000);
+                // 用HEAD探测：通过 fetch 不可行（CORS），用图片加载探测延迟
+                img.src = s.url.split('?')[0] + '?_t=' + Date.now();
+            });
+        });
+
+        Promise.all(timed).then(function (results) {
+            results.sort(function (a, b) {
+                if (a.ok !== b.ok) return a.ok ? -1 : 1;
+                return a.cost - b.cost;
+            });
+            var best = results.find(function (r) { return r.ok; }) || results[0];
+            if (status) {
+                status.textContent = '已选用 ' + best.src.name + ' 镜像（' + Math.round(best.cost) + 'ms），开始下载…';
+            }
+            setTimeout(function () {
+                window.location.href = best.src.url;
+                if (btn) { btn.disabled = false; }
+                if (btnText) { btnText.textContent = '一键竞速下载'; }
+            }, 600);
+        });
+    }
+
+    var raceBtn = document.getElementById('btnRaceDownload');
+    if (raceBtn) raceBtn.addEventListener('click', raceDownload);
+
+    function renderVersionHistory() {
+        if (!releaseData) return;
+        var list = document.getElementById('vhList');
+        var count = document.getElementById('vhCount');
+        if (!list) return;
+        if (count) count.textContent = releaseData.versions.length;
+
+        var html = '';
+        releaseData.versions.slice(0, 12).forEach(function (v, i) {
+            var links = [];
+            if (v.github) links.push('<a href="' + v.github + '" target="_blank" rel="noopener" class="vh-link gh">GitHub</a>');
+            if (v.gitee) links.push('<a href="' + v.gitee + '" target="_blank" rel="noopener" class="vh-link ge">Gitee</a>');
+            var notes = v.notes ? '<p class="vh-notes">' + escapeHtml(v.notes) + '</p>' : '';
+            var latestTag = (i === 0) ? '<span class="vh-latest">最新</span>' : '';
+            html += '<div class="vh-item">' +
+                        '<div class="vh-head">' +
+                            '<span class="vh-ver">' + escapeHtml(v.version) + '</span>' +
+                            latestTag +
+                            '<span class="vh-date">' + escapeHtml(v.date) + '</span>' +
+                        '</div>' +
+                        notes +
+                        '<div class="vh-links">' + links.join('') + '</div>' +
+                    '</div>';
+        });
+        list.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    var vhToggle = document.getElementById('vhToggle');
+    var vhList = document.getElementById('vhList');
+    if (vhToggle && vhList) {
+        vhToggle.addEventListener('click', function () {
+            var hidden = vhList.hasAttribute('hidden');
+            if (hidden) {
+                vhList.removeAttribute('hidden');
+                vhToggle.classList.add('open');
+            } else {
+                vhList.setAttribute('hidden', '');
+                vhToggle.classList.remove('open');
+            }
+        });
+    }
+
+    loadReleases();
+
     /* --- Hero 粒子画布 --- */
     var canvas = document.getElementById('particles');
     if (canvas && canvas.getContext) {
