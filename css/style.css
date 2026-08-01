@@ -1255,12 +1255,44 @@ img {
     margin: 0 8px;
     opacity: 0.3;
 }
-/* 下载区两栏布局 */
+/* 下载区整体卡片式布局 */
 .download-layout {
     display: grid;
     grid-template-columns: 420px 1fr;
-    gap: 28px;
+    gap: 0;
     align-items: stretch;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+/* 左栏：下载区（整体卡片内的子区块，无独立边框） */
+.download-layout > .download-card {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 56px 40px;
+    overflow: visible;
+    text-align: center;
+    position: relative;
+}
+.download-layout > .download-card::after {
+    content: '';
+    position: absolute;
+    top: 32px;
+    bottom: 32px;
+    right: 0;
+    width: 1px;
+    background: var(--border);
+}
+
+/* 右栏：版本时间线（整体卡片内的子区块） */
+.download-layout > .changelog {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 40px 36px;
 }
 
 /* 左栏：下载卡片 */
@@ -1494,7 +1526,15 @@ img {
     .download-layout {
         grid-template-columns: 1fr;
     }
-    .changelog { padding: 20px 18px; }
+    .download-layout > .download-card::after {
+        top: auto;
+        bottom: 0;
+        right: 32px;
+        left: 32px;
+        width: auto;
+        height: 1px;
+    }
+    .download-layout > .changelog { padding: 32px 24px; }
 }
 
 /* --- 页脚 --- */
