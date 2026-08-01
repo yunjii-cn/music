@@ -1,6 +1,15 @@
 [
   {
-    "hash": "e55c76248f97be2b17aba3f91f2e740849201de9",
+    "hash": "e0a72b2e79f922be401e5ba410e239a43b58ea0e",
+    "short_hash": "e0a72b2",
+    "message": "feat: 发布版本 v2026.08.01.1412",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 14:13:55",
+    "body": "- 根治首跑『窗口 visible=True 但用户看不到』真正根因：spawn 出来的 entry 进程无 Windows 前台权限，普通窗口被前台锁压后台；改用与启动屏(BrandedSplash)同一 proven 机制——主窗口启动时短暂 WindowStaysOnTopHint 置顶保证一定可见，2秒后 _drop_topmost 撤掉标志恢复普通窗口。删除仍由 0901 的 spawn entry + --cleanup 机制负责（用户已确认删除正常）。彻底抛弃不可靠的 AttachThreadInput 前台锁 hack"
+  },
+  {
+    "hash": "\ne55c76248f97be2b17aba3f91f2e740849201de9",
     "short_hash": "e55c762",
     "message": "feat: 发布版本 v2026.08.01.0901",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-24 04:24:45",
     "body": "- Gitee 单附件上限 100MB，wheel 250MB 无法整包上传；切成 3 个分卷\n  (part1/part2=90MiB, part3≈59MiB) 上传到 yunjii/music 的 wheels release\n- 新增 Download-GiteeMultipart：流式下载 3 片并以 FileStream 拼接还原，\n  拼接后校验字节数(250851873)防损坏\n- 接入顺序：GitHub 单文件竞速 → bitsadmin 兜底 → 码云分卷兜底 → 跳过\n- 国内用户在 GitHub 镜像也连不上时，仍可经码云分卷还原 wheel\n- 构建 v2026.07.24.0420.exe 验证逻辑已打包(11 项 marker 全 True)\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
-  },
-  {
-    "hash": "\n610a2f3fef34228cb824f15b192de14445592a21",
-    "short_hash": "610a2f3",
-    "message": "docs: install-env.ps1 增加码云(Gitee) 镜像占位模板",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-24 03:23:39",
-    "body": "- 在 $candidates 后加注释模板，说明 wheel 拖入 Gitee wheels release\n  后取消注释该行即可被竞速自动纳入（第 4 候选源）\n- 给出 raw / 附件两种直链格式示例，纯注释不影响运行时\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
   }
 ]

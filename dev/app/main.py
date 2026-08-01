@@ -9530,8 +9530,8 @@ def _write_crash_log(msg):
 
 def _launch_trace(step):
     """启动轨迹：记录打包后「窗口是否真正可见」的每一步。
-    双写：%TEMP%/yunji_launch_trace.log + exe 同目录/yunji_launch_trace.log，
-    便于真机在 D:\\test 直接拿（无需翻 %TEMP%）。"""
+    发布默认仅写 %TEMP%/yunji_launch_trace.log，不污染部署目录（精品发布习惯）。
+    设环境变量 YUNJI_TRACE_LOCAL=1 时额外双写 exe 同目录 —— 真机排查首跑问题时启用。"""
     try:
         import os as _os, tempfile as _tf
         from datetime import datetime as _dt
@@ -9548,9 +9548,11 @@ def _launch_trace(step):
         except Exception as _e:
             _vis = "probe_err=%s" % _e
         _line = _stamp + " [trace] %s | %s\n" % (step, _vis)
-        for _p in (_os.path.join(_tf.gettempdir(), "yunji_launch_trace.log"),
-                   _os.path.join(_os.path.dirname(_os.path.abspath(sys.executable)),
-                                 "yunji_launch_trace.log")):
+        _paths = [_os.path.join(_tf.gettempdir(), "yunji_launch_trace.log")]
+        if _os.environ.get("YUNJI_TRACE_LOCAL") == "1":
+            _paths.append(_os.path.join(_os.path.dirname(_os.path.abspath(sys.executable)),
+                                        "yunji_launch_trace.log"))
+        for _p in _paths:
             try:
                 with open(_p, "a", encoding="utf-8") as _f:
                     _f.write(_line)

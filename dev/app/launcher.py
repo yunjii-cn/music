@@ -12,13 +12,17 @@ from datetime import datetime
 def _launch_trace(step):
     """首跑轨迹：与 main._launch_trace 协同，记录 launcher 自身（supervisor / 入口进程）
     在 import main 之前的关键步骤——首跑“什么都不显示”往往死在进入 main 之前，此处补盲。
-    双写：%TEMP% 与 exe 同目录（yunji_launch_trace.log），后者用户最易找到。"""
+
+    发布默认仅写 %TEMP%/yunji_launch_trace.log，不污染部署/下载目录（精品发布习惯）。
+    设环境变量 YUNJI_TRACE_LOCAL=1 时额外双写 exe 同目录 —— 真机排查首跑问题时启用。"""
     try:
         line = datetime.now().strftime("%H:%M:%S.%f") + " [launcher] %s | exe=%s pid=%d\n" % (
             step, os.path.basename(os.path.abspath(sys.executable)), os.getpid())
-        for _p in (os.path.join(tempfile.gettempdir(), "yunji_launch_trace.log"),
-                   os.path.join(os.path.dirname(os.path.abspath(sys.executable)),
-                                "yunji_launch_trace.log")):
+        _paths = [os.path.join(tempfile.gettempdir(), "yunji_launch_trace.log")]
+        if os.environ.get("YUNJI_TRACE_LOCAL") == "1":
+            _paths.append(os.path.join(os.path.dirname(os.path.abspath(sys.executable)),
+                                       "yunji_launch_trace.log"))
+        for _p in _paths:
             try:
                 with open(_p, "a", encoding="utf-8") as f:
                     f.write(line)
