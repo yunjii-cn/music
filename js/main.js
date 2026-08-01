@@ -135,7 +135,9 @@
         var list = document.getElementById('vhList');
         var count = document.getElementById('vhCount');
         if (!list) return;
-        if (count) count.textContent = releaseData.versions.length;
+        if (count) {
+            count.textContent = releaseData.versions.length + ' 个版本';
+        }
 
         var html = '';
         releaseData.versions.slice(0, 12).forEach(function (v, i) {
@@ -144,14 +146,17 @@
             if (v.gitee) links.push('<a href="' + v.gitee + '" target="_blank" rel="noopener" class="vh-link ge">Gitee</a>');
             var notes = v.notes ? '<p class="vh-notes">' + escapeHtml(v.notes) + '</p>' : '';
             var latestTag = (i === 0) ? '<span class="vh-latest">最新</span>' : '';
-            html += '<div class="vh-item">' +
-                        '<div class="vh-head">' +
-                            '<span class="vh-ver">' + escapeHtml(v.version) + '</span>' +
-                            latestTag +
-                            '<span class="vh-date">' + escapeHtml(v.date) + '</span>' +
+            html += '<div class="vh-item' + (i === 0 ? ' is-latest' : '') + '">' +
+                        '<div class="vh-dot"></div>' +
+                        '<div class="vh-body">' +
+                            '<div class="vh-head">' +
+                                '<span class="vh-ver">' + escapeHtml(v.version) + '</span>' +
+                                latestTag +
+                                '<span class="vh-date">' + escapeHtml(v.date) + '</span>' +
+                            '</div>' +
+                            notes +
+                            (links.length ? '<div class="vh-links">' + links.join('') + '</div>' : '') +
                         '</div>' +
-                        notes +
-                        '<div class="vh-links">' + links.join('') + '</div>' +
                     '</div>';
         });
         list.innerHTML = html;
@@ -160,21 +165,6 @@
     function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-        });
-    }
-
-    var vhToggle = document.getElementById('vhToggle');
-    var vhList = document.getElementById('vhList');
-    if (vhToggle && vhList) {
-        vhToggle.addEventListener('click', function () {
-            var hidden = vhList.hasAttribute('hidden');
-            if (hidden) {
-                vhList.removeAttribute('hidden');
-                vhToggle.classList.add('open');
-            } else {
-                vhList.setAttribute('hidden', '');
-                vhToggle.classList.remove('open');
-            }
         });
     }
 
