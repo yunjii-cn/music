@@ -1504,5 +1504,13 @@
     ],
     "build_time": "2026-08-01T07:24:06.123605",
     "version_number": "2026.08.01.0722"
+  },
+  "云集智能音乐创意台-v2026.08.01.0842": {
+    "version": "云集智能音乐创意台-v2026.08.01.0842",
+    "changes": [
+      "根治首跑不显示根因：首跑不再用 Popen 拉起独立 entry 进程（该子进程不继承 Windows 前台权，导致窗口 visible=True 但用户只看到托盘），改为直接在 Explorer 拉起、带前台权的便携 exe 进程里跑 main()——显示路径与二次双击入口完全一致，根除首跑vs二次差异；便携 exe 自身由 _run_supervisor 末尾的 self-delete-helper 在退出后删除（entry 为硬链接保活数据）"
+    ],
+    "build_time": "2026-08-01T08:43:48.604586",
+    "version_number": "2026.08.01.0842"
   }
 }

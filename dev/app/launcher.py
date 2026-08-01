@@ -250,9 +250,11 @@ def _self_relocate():
     由 main.py 约定（get_install_root / get_version_from_filename）调用：
       - 便携版本号 exe 首次运行 → 在同级建 云集智能音乐创意台/（含 app/data/ver/
         python_embeded/temp）+ version.txt，复制自身进 ver/，生成固定名入口，
-        设 YUNJI_INSTALL_ROOT，分离式拉起入口并删除原便携 exe；
+        设 YUNJI_INSTALL_ROOT，标记 YUNJI_PORTABLE_EXE 后【直接落回 _run_supervisor
+        主流程在本进程（Explorer 拉起、带前台权）里跑 main()】，退出后由
+        self-delete-helper 删便携 exe（entry 硬链接保活数据）；
       - 固定名入口 / 已部署运行 → 解析到品牌目录，设 YUNJI_INSTALL_ROOT，
-        直接落回 import main（不再嵌套）。
+        先归档版本 exe 进 ver/ 再删原始便携 exe，直接落回 import main（不再嵌套）。
     """
     if not getattr(sys, 'frozen', False):
         return
@@ -346,49 +348,29 @@ def _self_relocate():
 
     os.environ["YUNJI_INSTALL_ROOT"] = deploy_dir
 
-    # 记录原始便携 exe 绝对路径，供「下次启动（已部署态）」安全删除。首跑若 entry 被
-    # 安全软件拦截未能立即删除，下次启动由此处兜底清理 —— 无需管理员、不触发杀软。
+    # 记录原始便携 exe 绝对路径，供「首跑 main 成功运行后」由 self-delete-helper 删除。
+    # 若删除失败（杀软拦截），下次启动的 already 分支仍会读 .cleanup_pending 兜底清理。
     try:
         with open(os.path.join(deploy_dir, ".cleanup_pending"), "w", encoding="utf-8") as _f:
             _f.write(exe)
     except Exception:
         pass
 
-    # ── 首跑：分离式拉起固定名入口（携带 --cleanup=<原始便携exe>）──
-    # f7d9105 proven 机制：入口显示启动器前负责删除原始便携 exe（os.remove 无需管理员）。
-    # 看门狗：spawn 后等待数秒确认入口已存活；若被外部（安全软件）杀掉，则本进程自己
-    # 显示 app 保底不黑屏，删除由 .cleanup_pending 在下次启动兜底。无论杀软是否拦截，
-    # 都「既显示又删除自身」。
-    if entry_exe and os.path.exists(entry_exe) and os.path.abspath(entry_exe) != exe:
-        try:
-            # 注意：此处不能用 CREATE_NO_WINDOW 拉起最终 app 进程！
-            # 该标志会让子进程在部分 Windows 会话下无法打开系统剪贴板
-            #（OpenClipboard 返回 ACCESS_DENIED），导致日志"复制"功能彻底失效。
-            # 保持普通控制台子进程，行为与旧版直接双击运行一致（剪贴板正常）。
-            _child = subprocess.Popen([entry_exe, "--cleanup=" + exe])
-            _launch_trace("supervisor: spawned entry pid=%d" % _child.pid)
-            # 授予入口进程前台权限：Popen 拉起的子进程默认无前台权限，其窗口
-            # 会被 Windows 前台锁拒绝置顶/激活 -> 首跑「窗口 visible=True 但用户
-            # 看不到、只剩托盘」。AllowSetForegroundWindow 是 Win32「父进程授予
-            # 子进程前台权」的标准机制（第二次双击入口由 Explorer 启动则自带前台权，
-            # 故二次正常；本调用专修首跑）。配合 main._force_foreground 的
-            # AttachThreadInput 双保险。
-            try:
-                ctypes.windll.user32.AllowSetForegroundWindow(_child.pid)
-            except Exception:
-                pass
-            try:
-                _child.wait(timeout=4.0)
-                # 子进程在 4 秒内退出 = 被杀（正常应长期运行），走 fallback 显示
-                _launch_trace("supervisor: entry exited early (killed?) -> self fallback")
-            except subprocess.TimeoutExpired:
-                # 子进程仍存活 = 正常，父进程退出，交出入口负责删除+显示
-                _launch_trace("supervisor: entry alive -> exit self")
-                os._exit(0)
-        except Exception as _e:
-            _launch_trace("supervisor: spawn entry FAILED: %r" % _e)
-    # 兜底：入口未拉起/被杀 -> 本进程自己显示 app（删除自身由 .cleanup_pending 下次启动兜底）
-    _launch_trace("supervisor: first-run deploy done -> continue in self (fallback)")
+    # ── 首跑关键修复：直接在【拥有前台权的便携 exe 进程】里跑 main() ──
+    # 旧实现（含 f7d9105 及此前各版）首跑用 Popen 拉起独立 entry 进程、再 os._exit
+    # 自身。但 Popen 子进程【不继承前台权限】，其窗口被 Windows 前台锁静默拒绝
+    # 置顶/激活 -> 「Qt 报 visible=True、用户却只看到托盘、看不到窗口」。而二次双击
+    # 入口（Explorer 直接拉起，自带前台权）、开发模式（终端拉起）都带前台权，故正常。
+    # 二者首跑/二次除「进程是否被 Popen 拉起」外代码完全一致 —— 这正是用户观察到的
+    # “第一次不行、第二次就行”的唯一差异。
+    # 现改为：首跑【不 spawn 独立进程】，而是让本进程（Explorer 拉起、带前台权）直接
+    # 落回 _run_supervisor 的「解压→启动屏→import main→main.main」主流程，在【与二次
+    # 运行完全一致的、带前台权的进程】里显示窗口。entry 硬链接仅作未来常驻入口，不在此
+    # 刻运行；便携 exe 自身由 _run_supervisor 末尾的 self-delete-helper 在退出后删除
+    # （entry 为硬链接，删便携 exe 的【文件名】不影响数据，运行中的进程由 entry 名保活，
+    # 与自解压安装器同款做法：无需管理员、不触发杀软）。从此首跑==二次的显示路径，根除差异。
+    os.environ["YUNJI_PORTABLE_EXE"] = exe
+    _launch_trace("first-run: deploy done -> will run main() in THIS (foreground-capable) process")
     return
 
 
@@ -713,6 +695,23 @@ def _run_supervisor():
     finally:
         if child is not None:
             _try_wait(child)
+        # 首跑：main 成功运行完毕后，派生子进程在【自身退出后】删除原始便携 exe。
+        # entry 为硬链接，删便携 exe 的【文件名】不影响数据，运行中的进程由 entry 名
+        # 保活（自解压安装器同款做法）。仅当 main 成功跑完才删 —— 崩溃则不删，保留
+        # 便携 exe 以便重试/排查。删除从【独立子进程、退出后】执行，与旧 --cleanup
+        # 机制等价（无需管理员、不触发杀软）。
+        _portable = os.environ.get("YUNJI_PORTABLE_EXE")
+        if _portable and os.path.exists(_portable):
+            try:
+                subprocess.Popen(
+                    [sys.executable, "--self-delete-helper",
+                     str(os.getpid()), _portable],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                _launch_trace("supervisor: spawned self-delete-helper for %s" % _portable)
+            except Exception as _e:
+                _launch_trace("supervisor: self-delete-helper spawn FAILED: %r" % _e)
 
 
 if __name__ == "__main__":

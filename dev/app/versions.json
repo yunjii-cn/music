@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.08.01.0842",
+    "date": "2026-08-01 08:43",
+    "message": "根治首跑不显示根因：首跑不再用 Popen 拉起独立 entry 进程（该子进程不继承 Windows 前台权，导致窗口 visible=True 但用户只看到托盘），改为直接在 Explorer 拉起、带前台权的便携 exe 进程里跑 main()——显示路径与二次双击入口完全一致，根除首跑vs二次差异；便携 exe 自身由 _run_supervisor 末尾的 self-delete-helper 在退出后删除（entry 为硬链接保活数据）",
+    "changes": [
+      "根治首跑不显示根因：首跑不再用 Popen 拉起独立 entry 进程（该子进程不继承 Windows 前台权，导致窗口 visible=True 但用户只看到托盘），改为直接在 Explorer 拉起、带前台权的便携 exe 进程里跑 main()——显示路径与二次双击入口完全一致，根除首跑vs二次差异；便携 exe 自身由 _run_supervisor 末尾的 self-delete-helper 在退出后删除（entry 为硬链接保活数据）"
+    ],
+    "name": "云集智能音乐创意台-v2026.08.01.0842.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.08.01.0722",
     "date": "2026-08-01 07:24",
     "message": "修复首跑「窗口可见但用户看不到」真正根因：入口进程由 supervisor 经 Popen 拉起不继承 Windows 前台权限，activateWindow 被前台锁静默拒绝——这正是「第一次运行失败、第二次手动/开发模式正常」的区别所在。修复：①supervisor spawn 入口后调 AllowSetForegroundWindow(child_pid) 授予前台权；②main 新增 _force_foreground 用 AttachThreadInput+SetForegroundWindow 突破前台锁，在 _deferred_init 显示后立即+500ms 双调用，_force_show_window 也调用",

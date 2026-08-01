@@ -1,6 +1,15 @@
 [
   {
-    "hash": "b98f24d150ea0cc230da2f22a9a569d4446d23f4",
+    "hash": "9ac95f40cf595e5f738a91452026e49747dff4c8",
+    "short_hash": "9ac95f4",
+    "message": "feat: 发布版本 v2026.08.01.0722",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 07:24:09",
+    "body": "- 修复首跑「窗口可见但用户看不到」真正根因：入口进程由 supervisor 经 Popen 拉起不继承 Windows 前台权限，activateWindow 被前台锁静默拒绝——这正是「第一次运行失败、第二次手动/开发模式正常」的区别所在。修复：①supervisor spawn 入口后调 AllowSetForegroundWindow(child_pid) 授予前台权；②main 新增 _force_foreground 用 AttachThreadInput+SetForegroundWindow 突破前台锁，在 _deferred_init 显示后立即+500ms 双调用，_force_show_window 也调用"
+  },
+  {
+    "hash": "\nb98f24d150ea0cc230da2f22a9a569d4446d23f4",
     "short_hash": "b98f24d",
     "message": "feat: 发布版本 v2026.08.01.0509",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-23 18:30:27",
     "body": "- 删除 install-uv-qinglong.ps1（其唯一非冗余能力已由他处覆盖：ace-step-ui 前端 setup 由 main.py 专用 _install_frontend_deps 跑 npm install 负责；交互式模型下载走模型管理 UI，隐藏调用本就传 -SkipModels 跳过；一键部署 uv/venv/python_deps 步骤本就用 install-env.ps1）\n- install-env.ps1：合并原脚本的中国镜像/HF/CUDA/LFS 环境变量（HF_ENDPOINT=hf-mirror.com、PIP_DISABLE_IP_VERSION_CHECK、GIT_LFS_SKIP_SMUDGE、CUDA_HOME=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.8），保留中国网络友好性\n- main.py：_check_environment(L3417) 与 _install_uv(L5255) 两处调用改指 install-env.ps1 并移除 -SkipModels 参数；scripts_to_extract 列表(L7885) 与文件头注释(L26) 同步移除该脚本\n- 减少脚本冗余，全项目环境安装单一来源（install-env.ps1），不再有创建 data/.venv 死路 venv 或 Read-Host 挂起的独立路径"
-  },
-  {
-    "hash": "\ncf36935f8a87bfb6a588f41d15a9838d7d95a7af",
-    "short_hash": "cf36935",
-    "message": "fix: 统一 venv 路径为 scripts/.venv，flash_attn 改走下载而非打包，install-uv-qinglong 加 -SkipModels 防挂起",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-23 18:05:20",
-    "body": "- run_*.ps1 / start.ps1 / start-all.ps1: venv 从 data/.venv 改为 scripts/.venv（修复一键部署后无法启动前后端）\n- install-env.ps1: transformers 锁 <4.58.0 避免降级；flash_attn 本地缺失时从 GitHub Releases wheels tag 下载（不再打包进 exe）\n- build-version.py / main.py scripts_to_extract: 移除 wheel 打包（exe 由 272MB 回落 37MB）\n- install-uv-qinglong.ps1: venv 也改为 scripts/.venv，新增 -SkipModels 开关，避免隐藏 PowerShell 下 Read-Host 挂起\n- main.py: 运行/部署日志 自动滚动→滚动 + 复制按钮；自动部署后跳模型管理；install-env 成功后跳过冗余复检；两处调用 install-uv-qinglong 传入 -SkipModels"
   }
 ]
