@@ -1,0 +1,11 @@
+# 运行时/敏感文件
+*.log
+*.local
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 临时文件
+*.tmp
+*~

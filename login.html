@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 云集智能音乐创意台</title>
+    <link rel="shortcut icon" href="./favicon.ico">
+    <link rel="stylesheet" href="./css/style.css">
+    <!-- 嵌入模式（软件启动器内嵌网页）：尽早判定，避免顶栏闪现 -->
+    <script>
+        (function () {
+            try {
+                var s = new URLSearchParams(location.search);
+                // embed=1 显式嵌入；或来自软件门控（gate/app）也隐藏顶栏
+                if (s.get('embed') === '1' || s.get('gate') || s.get('app')) {
+                    document.documentElement.classList.add('embed');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <style>
+        :root {
+            --violet: #8B5CF6;
+            --violet-hover: #7c4df0;
+            --violet-soft: rgba(139, 92, 246, 0.15);
+            --violet-glow: rgba(139, 92, 246, 0.45);
+            --bg: #0a0a0f;
+            --card: #14141c;
+            --card-border: #26263a;
+            --text: #ece9f5;
+            --muted: #9a96b3;
+            --radius: 14px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+        body::before {
+            content: "";
+            position: absolute;
+            width: 620px; height: 620px;
+            background: radial-gradient(circle, var(--violet-glow) 0%, transparent 70%);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            filter: blur(40px);
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        /* === 卡片 === */
+        .login-card {
+            position: relative;
+            z-index: 1;
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 40px 36px 36px;
+            width: 380px;
+            max-width: calc(100vw - 32px);
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px var(--violet-soft) inset;
+        }
+        .login-logo {
+            width: 56px; height: 56px;
+            border-radius: 14px;
+            margin: 0 auto 18px;
+            display: block;
+            box-shadow: 0 0 24px var(--violet-glow);
+        }
+        .login-title { font-size: 21px; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px; }
+        .login-title .accent { color: var(--violet); }
+        .login-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+
+        /* === 标签切换 === */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 22px;
+            background: #1c1c28;
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .tab {
+            flex: 1;
+            padding: 8px 0;
+            font-size: 13px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: transparent;
+            color: var(--muted);
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: var(--violet-soft);
+            color: #fff;
+            font-weight: 600;
+        }
+        .tab:hover:not(.active) { color: #d0cce0; }
+
+        .tab-panel { display: none; animation: fadeIn 0.25s ease; }
+        .tab-panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* === 二维码 Tab === */
+        .qrcode-wrap {
+            background: #1c1c28;
+            border: 2px solid var(--violet);
+            border-radius: var(--radius);
+            padding: 14px;
+            display: inline-block;
+            margin-bottom: 16px;
+            box-shadow: 0 0 18px var(--violet-soft);
+            position: relative;
+            line-height: 0;
+        }
+        .qrcode-wrap iframe {
+            border: none;
+            display: block;
+            border-radius: 6px;
+            background: #fff;
+            width: 200px;
+            height: 200px;
+        }
+        .qrcode-loading {
+            position: absolute;
+            inset: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: var(--muted);
+            background: #1c1c28;
+            border-radius: 6px;
+            line-height: 1.6;
+            z-index: 2;
+        }
+        .qr-tip { font-size: 12px; color: #6f6b88; margin-top: 8px; line-height: 1.6; }
+
+        /* === OAuth Tab === */
+        .oauth-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .btn-oauth {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: var(--radius);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--card-border);
+            background: #1c1c28;
+            color: var(--text);
+            font-family: inherit;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-oauth:hover {
+            border-color: var(--violet);
+            background: var(--violet-soft);
+        }
+        .btn-oauth svg { width: 20px; height: 20px; flex-shrink: 0; }
+        .oauth-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            margin: 4px 0;
+        }
+        .oauth-divider::before,
+        .oauth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--card-border);
+        }
+        .oauth-hint {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        /* === 已登录态 / 成功过渡 === */
+        .user-card { text-align: center; }
+        .user-avatar {
+            width: 72px; height: 72px;
+            border-radius: 50%;
+            border: 2px solid var(--violet);
+            object-fit: cover;
+            margin-bottom: 14px;
+            box-shadow: 0 0 20px var(--violet-glow);
+        }
+        .user-nickname { font-size: 19px; font-weight: 700; margin-bottom: 4px; word-break: break-all; }
+        .user-id { font-size: 12px; color: var(--muted); margin-bottom: 24px; word-break: break-all; }
+
+        .btn-primary {
+            display: inline-block;
+            padding: 10px 28px;
+            background: var(--violet);
+            border: none;
+            color: #fff;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            margin: 0 6px;
+        }
+        .btn-primary:hover { background: var(--violet-hover); box-shadow: 0 6px 20px var(--violet-glow); }
+        .btn-logout {
+            display: inline-block;
+            padding: 10px 28px;
+            background: transparent;
+            border: 1px solid var(--violet);
+            color: var(--violet);
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            margin: 0 6px;
+        }
+        .btn-logout:hover { background: var(--violet); color: #fff; }
+
+        .success-icon {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: var(--violet);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px;
+            animation: scaleIn 0.35s ease;
+            box-shadow: 0 0 24px var(--violet-glow);
+        }
+        .success-icon svg { width: 30px; height: 30px; stroke: #fff; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+        @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+        .success-text { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+        .success-hint { font-size: 12px; color: var(--muted); }
+        .hidden { display: none !important; }
+
+        /* 嵌入模式（软件启动器内嵌网页）：隐藏官网顶栏，只保留登录卡片 */
+        html.embed .navbar { display: none !important; }
+
+        .redirect-hint {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 18px;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+        .redirect-hint b { color: var(--violet); font-weight: 600; }
+
+        /* 顶部返回链接 */
+        .back-home {
+            position: absolute;
+            top: 18px; left: 20px;
+            font-size: 13px;
+            color: var(--muted);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+            z-index: 2;
+        }
+        .back-home:hover { color: var(--violet); }
+
+        /* 错误提示 */
+        .login-error {
+            background: rgba(239,68,68,0.12);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 18px;
+            font-size: 12px;
+            color: #f87171;
+            line-height: 1.5;
+            display: none;
+        }
+        .login-error.show { display: block; }
+
+        /* OAuth 回调加载中 */
+        .callback-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 0;
+        }
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid var(--card-border);
+            border-top-color: var(--violet);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 顶栏（与首页一致） -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="./index.html" class="nav-brand">
+                <img src="./favicon.ico" alt="云集" class="nav-logo">
+                <span class="nav-title">云集智能音乐创意台</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="./index.html#features" class="nav-link">核心功能</a>
+                <a href="./index.html#advantages" class="nav-link">为什么选云集</a>
+                <a href="./index.html#showcase" class="nav-link">产品展示</a>
+                <a href="./index.html#tech" class="nav-link">技术架构</a>
+                <a href="./index.html#roadmap" class="nav-link">发展路线</a>
+            </div>
+            <a href="/login" data-login-link class="nav-login">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/></svg>
+                登录
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="菜单">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="login-card">
+        <!-- 错误提示 -->
+        <div class="login-error" id="loginError"></div>
+
+        <!-- OAuth 回调加载中 -->
+        <div class="callback-loading hidden" id="callbackLoading">
+            <div class="spinner"></div>
+            <div style="font-size:13px;color:var(--muted);">正在验证登录信息…</div>
+        </div>
+
+        <!-- ====== 未登录：登录表单 ====== -->
+        <div id="loginBox">
+            <img src="./favicon.ico" alt="云集" class="login-logo">
+            <div class="login-title">登录 <span class="accent">云集智能音乐创意台</span></div>
+            <div class="login-subtitle" id="loginSubtitle">登录后可同步创作数据，解锁更多功能</div>
+
+            <!-- 登录方式 Tab -->
+            <div class="tabs">
+                <button class="tab active" data-tab="qr">微信扫码</button>
+                <button class="tab" data-tab="oauth">账号登录</button>
+            </div>
+
+            <!-- Tab 1: OAuth 2.1 按钮登录 -->
+            <div class="tab-panel" id="panelOauth">
+                <div class="oauth-buttons">
+                    <a class="btn-oauth" id="btnOauthEmail" href="javascript:void(0)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                        邮箱登录
+                    </a>
+                    <a class="btn-oauth" id="btnOauthPassword" href="javascript:void(0)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+                        密码登录
+                    </a>
+                </div>
+                <div class="oauth-hint">通过云集统一用户中心安全授权，不会暴露密码给第三方</div>
+            </div>
+
+            <!-- Tab 2: 微信扫码（默认） -->
+            <div class="tab-panel active" id="panelQr">
+                <div class="qrcode-wrap">
+                    <div class="qrcode-loading" id="qrLoading">二维码生成中…</div>
+                    <iframe id="qrFrame" src="./um/connect.php?type=wx" width="200" height="200" frameborder="0" scrolling="no"></iframe>
+                </div>
+                <div class="qr-tip">微信扫一扫，安全快捷登录</div>
+            </div>
+
+            <div class="qr-tip" style="margin-top: 10px;">
+                扫码即代表同意 <a href="#" style="color:var(--violet);text-decoration:none;">用户协议</a> 和 <a href="#" style="color:var(--violet);text-decoration:none;">隐私政策</a>
+            </div>
+        </div>
+
+        <!-- ====== 已登录：用户信息 ====== -->
+        <div id="userBox" class="user-card hidden">
+            <img class="user-avatar" id="userAvatar" src="./favicon.ico" alt="头像">
+            <div class="user-nickname" id="userNickname">云集用户</div>
+            <div class="user-id" id="userId">ID: -</div>
+            <div class="redirect-hint" id="redirectHint"></div>
+            <a href="#" id="enterBtn" class="btn-primary">进入工作台</a>
+            <a href="./um/logout.php" class="btn-logout" id="logoutBtn">退出登录</a>
+        </div>
+
+        <!-- ====== 登录成功过渡 ====== -->
+        <div id="successBox" class="hidden">
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="success-text" id="successText">登录成功</div>
+            <div class="success-hint" id="successHint">正在进入工作台…</div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        // ============================================================
+        //   配置
+        // ============================================================
+        var UM_AUTHORIZE_URL = 'https://um.yunjii.cn/oauth/authorize.php';
+        var UM_CLIENT_ID    = '1016';   // 与 um/config.php $UM_CONFIG['appid'] 一致
+        var REDIRECT_URI    = 'https://music.yunjii.cn/um/oauth_callback.php';
+        var FALLBACK        = './index.html';
+
+        // 门控模式：深链传递的用户字段
+        var GATE_USER_FIELDS = ['nickname', 'avatar', 'openid', 'username', 'token'];
+
+        // ============================================================
+        //   DOM
+        // ============================================================
+        var loginBox    = document.getElementById('loginBox');
+        var userBox     = document.getElementById('userBox');
+        var successBox  = document.getElementById('successBox');
+        var enterBtn    = document.getElementById('enterBtn');
+        var redirectHint= document.getElementById('redirectHint');
+        var loginError  = document.getElementById('loginError');
+        var callbackLoading = document.getElementById('callbackLoading');
+        var loginSubtitle = document.getElementById('loginSubtitle');
+
+        // ============================================================
+        //   门控 / 回跳 参数解析
+        // ============================================================
+        function parseParams() {
+            var p = {};
+            try { var s = new URLSearchParams(window.location.search);
+                p.redirect = s.get('redirect') || '';
+                p.gate     = s.get('gate') || '';
+                p.app      = s.get('app') || '';
+                p.code     = s.get('code') || '';
+                p.state    = s.get('state') || '';
+                p.error    = s.get('error') || '';
+            } catch(e) {}
+            return p;
+        }
+
+        var PARAMS = parseParams();
+
+        // 判断是否门控模式
+        function isGateMode() {
+            return !!PARAMS.gate || !!(PARAMS.redirect && !isSameOrigin(PARAMS.redirect));
+        }
+
+        function isSameOrigin(url) {
+            try { return new URL(url, location.href).host === location.host; }
+            catch(e) { return false; }
+        }
+
+        // 判断是否为 OAuth 回调返回（URL 上有 ?code=）
+        function isOAuthCallback() {
+            return !!PARAMS.code && !PARAMS.error;
+        }
+
+        // 解析最终回跳地址
+        function getRedirect() {
+            var target = '';
+            var explicit = false;
+
+            // 1. 显式 redirect 参数（最高优先级）
+            if (PARAMS.redirect) {
+                target = PARAMS.redirect;
+                explicit = true;
+            }
+
+            // 2. 同站 referrer
+            if (!target && document.referrer) {
+                try {
+                    var ref = new URL(document.referrer);
+                    if (ref.host === location.host) {
+                        target = document.referrer;
+                        explicit = true;
+                    }
+                } catch(e) {}
+            }
+
+            // 3. 兜底
+            if (!target) { target = FALLBACK; explicit = false; }
+
+            // 禁止回跳到登录页自身
+            try {
+                var u = new URL(target, location.href);
+                if (u.host === location.host && (u.pathname.endsWith('/login.html') || u.pathname.endsWith('/login'))) {
+                    target = FALLBACK;
+                    explicit = false;
+                }
+            } catch(e) {}
+
+            return { url: target, explicit: explicit };
+        }
+
+        var R = getRedirect();
+        var REDIRECT     = R.url;
+        var HAS_REDIRECT = R.explicit;
+        var GATE_MODE    = isGateMode();
+        var currentUser  = null;   // 登录成功后缓存用户数据，供门控深链使用
+
+        // 退出登录链接：与登录收口对称
+        //   - 门控/启动器模式：回跳到启动器原始目标（PARAMS.redirect）
+        //   - 普通网站：回跳到当前页（location.href）
+        (function () {
+            var lb = document.getElementById('logoutBtn');
+            if (!lb) return;
+            var target = (GATE_MODE && PARAMS.redirect) ? PARAMS.redirect : location.href;
+            var url = './um/logout.php?redirect=' + encodeURIComponent(target);
+            if (document.documentElement.classList.contains('embed') || PARAMS.gate || PARAMS.app) {
+                url += '&embed=1';
+            }
+            lb.setAttribute('href', url);
+        })();
+
+        // ============================================================
+        //   显示错误
+        // ============================================================
+        function showError(msg) {
+            loginError.textContent = msg;
+            loginError.classList.add('show');
+        }
+        function clearError() {
+            loginError.classList.remove('show');
+        }
+
+        // ============================================================
+        //   门控模式 UI
+        // ============================================================
+        if (GATE_MODE) {
+            loginSubtitle.textContent = '请登录以继续使用应用程序';
+        }
+
+        // ============================================================
+        //   OAuth 回调返回处理（URL 上有 ?code=）
+        // ============================================================
+        if (isOAuthCallback()) {
+            // 显示加载中动画，等 oauth_callback.php 处理完会种 session
+            // 但此时是 login.html 直接收到了 code——说明回调被 UM 直接发到了 login.html？
+            // 正常情况下 OAuth 回调走 um/oauth_callback.php，不应出现在这里的 code。
+            // 防御性处理：如果出现在这里，手动转发到 oauth_callback.php
+            callbackLoading.classList.remove('hidden');
+            loginBox.classList.add('hidden');
+            // 拼接当前所有参数转发给 callback
+            var cbUrl = './um/oauth_callback.php' + window.location.search;
+            window.location.href = cbUrl;
+            // 这里不继续执行
+            return;
+        }
+
+        // 显示 OAuth 错误（从 oauth_callback.php 返回的 ?error=）
+        if (PARAMS.error) {
+            var errMap = {
+                'no_code': '授权被取消或未获取到授权码',
+                'missing_verifier': '安全校验失败，请重新登录',
+                'token_error': '令牌交换失败，请重试',
+                'no_access_token': '获取访问令牌失败',
+                'userinfo_failed': '获取用户信息失败，请重试',
+                'access_denied': '您取消了授权',
+            };
+            var errMsg = PARAMS.error;
+            for (var k in errMap) {
+                if (errMsg.indexOf(k) === 0) { errMsg = errMap[k]; break; }
+            }
+            showError(errMsg);
+        }
+
+        // ============================================================
+        //   Tab 切换
+        // ============================================================
+        var tabs = document.querySelectorAll('.tab');
+        var panels = document.querySelectorAll('.tab-panel');
+        tabs.forEach(function(t) {
+            t.addEventListener('click', function() {
+                var tabId = t.getAttribute('data-tab');
+                tabs.forEach(function(x) { x.classList.remove('active'); });
+                t.classList.add('active');
+                panels.forEach(function(p) {
+                    p.classList.toggle('active', p.id === ('panel' + tabId.charAt(0).toUpperCase() + tabId.slice(1)));
+                });
+            });
+        });
+
+        // ============================================================
+        //   OAuth 2.1 按钮：PKCE 生成 + 跳转授权页
+        // ============================================================
+        function generatePKCE() {
+            // code_verifier: 43 位随机字符串 [A-Za-z0-9\-._~]
+            var charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+            var verifier = '';
+            var crypto = window.crypto || window.msCrypto;
+            if (crypto && crypto.getRandomValues) {
+                var buf = new Uint8Array(32);
+                crypto.getRandomValues(buf);
+                for (var i = 0; i < buf.length; i++) {
+                    verifier += charset.charAt(buf[i] % charset.length);
+                }
+            } else {
+                for (var i = 0; i < 43; i++) {
+                    verifier += charset.charAt(Math.floor(Math.random() * charset.length));
+                }
+            }
+
+            // code_challenge = base64url(sha256(code_verifier))
+            function base64url(buf) {
+                var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+                return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            }
+
+            // 用 SubtleCrypto 做 SHA256
+            if (crypto && crypto.subtle) {
+                var enc = new TextEncoder();
+                return crypto.subtle.digest('SHA-256', enc.encode(verifier))
+                    .then(function(hash) { return { verifier: verifier, challenge: base64url(hash) }; });
+            }
+
+            // 降级：不做 SHA256，直接传 verifier 作为 challenge（UM 端会兼容）
+            return Promise.resolve({ verifier: verifier, challenge: verifier });
+        }
+
+        function startOAuthLogin(mode) {
+            clearError();
+            generatePKCE().then(function(pkce) {
+                // 种 verifier 到 session（服务端：um/oauth_callback.php 取值校验）
+                fetch('./um/islogin.php?set_verifier=' + encodeURIComponent(pkce.verifier), {
+                    method: 'GET', credentials: 'same-origin'
+                }).catch(function(){});
+
+                // 构建 authorize URL
+                var stateVal = 'oauth_' + Date.now();
+                // 透传业务参数到 state
+                var extra = [];
+                if (PARAMS.redirect) extra.push('r=' + encodeURIComponent(PARAMS.redirect));
+                if (PARAMS.gate)     extra.push('g=' + PARAMS.gate);
+                if (PARAMS.app)      extra.push('a=' + encodeURIComponent(PARAMS.app));
+                if (extra.length) stateVal += '|' + extra.join('&');
+
+                var params = [
+                    'response_type=code',
+                    'client_id=' + encodeURIComponent(UM_CLIENT_ID),
+                    'redirect_uri=' + encodeURIComponent(REDIRECT_URI),
+                    'code_challenge=' + encodeURIComponent(pkce.challenge),
+                    'code_challenge_method=S256',
+                    'state=' + encodeURIComponent(stateVal)
+                ];
+                if (mode === 'email') {
+                    params.push('login_tab=account');  // 提示 UM 授权页默认显示账号/邮箱登录
+                }
+
+                window.location.href = UM_AUTHORIZE_URL + '?' + params.join('&');
+            });
+        }
+
+        document.getElementById('btnOauthEmail').addEventListener('click', function(e) {
+            e.preventDefault();
+            startOAuthLogin('email');
+        });
+        document.getElementById('btnOauthPassword').addEventListener('click', function(e) {
+            e.preventDefault();
+            startOAuthLogin('password');
+        });
+
+        // ============================================================
+        //   二维码 iframe
+        // ============================================================
+        var qrFrame   = document.getElementById('qrFrame');
+        var qrLoading = document.getElementById('qrLoading');
+        if (qrFrame) {
+            qrFrame.addEventListener('load', function () {
+                qrLoading.style.display = 'none';
+            });
+        }
+
+        // ============================================================
+        //   登录态检测
+        // ============================================================
+        function checkLogin() {
+            fetch('./um/islogin.php', { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res && res.code === 1 && res.data) {
+                        currentUser = res.data;
+                        showUser(res.data);
+                    } else {
+                        // 未登录，展示登录表单（默认）
+                    }
+                })
+                .catch(function() {});
+        }
+
+        // ============================================================
+        //   构建软件门控深链（把用户信息编码到回跳 URL）
+        // ============================================================
+        function buildGateRedirect(user) {
+            if (!GATE_MODE || !REDIRECT || REDIRECT === FALLBACK) {
+                return REDIRECT;
+            }
+
+            var payload = {};
+            var fields = GATE_USER_FIELDS;
+            for (var i = 0; i < fields.length; i++) {
+                var f = fields[i];
+                if (user[f]) payload[f] = user[f];
+            }
+            // 映射字段（兼容不同命名）
+            if (!payload.nickname && user.nickname) payload.nickname = user.nickname;
+            if (!payload.openid && user.openid) payload.openid = user.openid;
+
+                var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+                var sep = REDIRECT.indexOf('?') >= 0 ? '&' : '?';
+                var url = REDIRECT + sep + 'yunji_user=' + encodeURIComponent(b64);
+                if (PARAMS.state) {
+                    url += '&state=' + encodeURIComponent(PARAMS.state);
+                }
+                return url;
+            }
+
+            // 桌面软件（弹窗 / webview）监听登录结果：通过 window.opener / window.parent 推送
+            function notifyDesktop(user) {
+                if (!user) return;
+                var msg = {
+                    type: 'loginSuccess',
+                    user: user,
+                    token: user.token || '',
+                    openid: user.openid || '',
+                    state: PARAMS.state || ''
+                };
+                try { if (window.opener && window.opener !== window) window.opener.postMessage(msg, '*'); } catch (e) {}
+                try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); } catch (e) {}
+            }
+
+        // ============================================================
+        //   展示已登录用户
+        // ============================================================
+        function showUser(data) {
+            loginBox.classList.add('hidden');
+            successBox.classList.add('hidden');
+            userBox.classList.remove('hidden');
+            document.getElementById('userAvatar').src   = data.avatar || './favicon.ico';
+            document.getElementById('userNickname').textContent = data.nickname || '云集用户';
+            document.getElementById('userId').textContent = 'ID: ' + (data.openid || data.username || '-');
+
+            // 构建目标跳转 URL
+            var target = buildGateRedirect(data);
+            enterBtn.href = target;
+
+            // 门控模式下自动跳转
+            if (GATE_MODE) {
+                enterBtn.textContent = '启动应用';
+                notifyDesktop(data);
+                if (target && target !== FALLBACK) {
+                    redirectHint.innerHTML = '登录后将自动启动：<b>' +
+                        target.replace(/yunji_user=[^&]*/, 'yunji_user=***').substring(0, 50) + '…</b>';
+                }
+                // 门控模式自动跳转（给用户 1.5 秒看结果）
+                setTimeout(function() {
+                    if (target && target !== FALLBACK) {
+                        window.location.href = target;
+                    }
+                }, 1500);
+            } else {
+                enterBtn.textContent = '进入工作台';
+                if (REDIRECT && REDIRECT !== FALLBACK) {
+                    redirectHint.innerHTML = '登录后将返回：<b>' + REDIRECT.replace(/^https?:\/\//, '') + '</b>';
+                } else {
+                    redirectHint.textContent = '';
+                }
+            }
+        }
+
+        // 兜底点击
+        enterBtn.addEventListener('click', function(e) {
+            if (!enterBtn.getAttribute('href') || enterBtn.getAttribute('href') === '#') {
+                e.preventDefault();
+                window.location.href = GATE_MODE ? buildGateRedirect(currentUser) : REDIRECT;
+            }
+        });
+
+        // ============================================================
+        //   扫码成功处理
+        // ============================================================
+        function afterLogin() {
+            loginBox.classList.add('hidden');
+            userBox.classList.add('hidden');
+            successBox.classList.remove('hidden');
+
+            if (GATE_MODE) {
+                document.getElementById('successText').textContent = '授权成功';
+                document.getElementById('successHint').textContent = '正在启动应用…';
+            }
+
+            notifyDesktop(currentUser);
+
+            // 门控模式延迟跳转（给过渡动画展示）
+            var delay = GATE_MODE ? 1200 : 800;
+            setTimeout(function() {
+                if (GATE_MODE && currentUser) {
+                    window.location.href = buildGateRedirect(currentUser);
+                } else {
+                    window.location.href = REDIRECT;
+                }
+            }, delay);
+        }
+
+        // 监听 iframe 登录成功消息
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'loginSuccess') {
+                fetch('./um/islogin.php', { credentials: 'same-origin' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(res) {
+                        if (res && res.code === 1 && res.data) {
+                            currentUser = res.data;
+                            afterLogin();
+                        } else {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function() { window.location.reload(); });
+            }
+        });
+
+        // ============================================================
+        //   启动
+        // ============================================================
+        checkLogin();
+    })();
+    </script>
+
+    <!-- 顶栏交互：滚动阴影 / 移动端折叠 / 登录态切换为头像菜单 -->
+    <script>
+    (function () {
+        var nav = document.getElementById('navbar');
+        if (nav) {
+            window.addEventListener('scroll', function () {
+                nav.classList.toggle('scrolled', window.scrollY > 20);
+            });
+        }
+        var tgl = document.getElementById('navToggle');
+        var links = document.getElementById('navLinks');
+        if (tgl && links) {
+            tgl.addEventListener('click', function () { links.classList.toggle('open'); });
+        }
+
+        var link = document.querySelector('[data-login-link]');
+        if (!link) return;
+        fetch('./um/islogin.php', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) { if (res && res.code === 1 && res.data) renderUser(res.data); })
+            .catch(function () {});
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+            });
+        }
+        function renderUser(u) {
+            var nick = u.nickname || '云集用户';
+            var avatar = u.avatar || './favicon.ico';
+            var wrap = document.createElement('div');
+            wrap.className = 'nav-user-wrap';
+            wrap.innerHTML =
+                '<button type="button" class="nav-user-btn">' +
+                '<img src="' + escapeHtml(avatar) + '" alt="">' +
+                '<span>' + escapeHtml(nick) + '</span>' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>' +
+                '</button>' +
+                '<div class="nav-user-menu">' +
+                '<a href="/profile">个人资料</a>' +
+                '<a href="/um/logout.php?redirect=' + encodeURIComponent(location.href) + '" class="danger">退出登录</a>' +
+                '</div>';
+            link.parentNode.replaceChild(wrap, link);
+            var btn = wrap.querySelector('.nav-user-btn');
+            var menu = wrap.querySelector('.nav-user-menu');
+            btn.addEventListener('click', function (e) { e.stopPropagation(); menu.style.display = menu.style.display === 'none' ? 'block' : 'none'; });
+            document.addEventListener('click', function () { menu.style.display = 'none'; });
+        }
+    })();
+    </script>
+</body>
+</html>
