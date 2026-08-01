@@ -1,5 +1,15 @@
 [
   {
+    "version": "2026.08.01.1412",
+    "date": "2026-08-01 14:13",
+    "message": "根治首跑『窗口 visible=True 但用户看不到』真正根因：spawn 出来的 entry 进程无 Windows 前台权限，普通窗口被前台锁压后台；改用与启动屏(BrandedSplash)同一 proven 机制——主窗口启动时短暂 WindowStaysOnTopHint 置顶保证一定可见，2秒后 _drop_topmost 撤掉标志恢复普通窗口。删除仍由 0901 的 spawn entry + --cleanup 机制负责（用户已确认删除正常）。彻底抛弃不可靠的 AttachThreadInput 前台锁 hack",
+    "changes": [
+      "根治首跑『窗口 visible=True 但用户看不到』真正根因：spawn 出来的 entry 进程无 Windows 前台权限，普通窗口被前台锁压后台；改用与启动屏(BrandedSplash)同一 proven 机制——主窗口启动时短暂 WindowStaysOnTopHint 置顶保证一定可见，2秒后 _drop_topmost 撤掉标志恢复普通窗口。删除仍由 0901 的 spawn entry + --cleanup 机制负责（用户已确认删除正常）。彻底抛弃不可靠的 AttachThreadInput 前台锁 hack"
+    ],
+    "name": "云集智能音乐创意台-v2026.08.01.1412.exe",
+    "download_url": ""
+  },
+  {
     "version": "2026.08.01.0901",
     "date": "2026-08-01 09:02",
     "message": "恢复 f7d9105 proven 删除机制：首跑部署后分离式 spawn 入口(携带 --cleanup=<原始便携exe>) + os._exit 退出自身，由入口在 already 分支用 os.remove 立即删便携 exe（即用户要的「入口启动新 exe 删除自身」）；移除不可靠的 self-delete-helper（它等主进程退出才删、app 运行中永远删不掉）。显示仍由 main._deferred_init 的居中+_force_foreground+15s 兜底保证可见；spawn 失败则兜底本进程跑 main、删除交 .cleanup_pending 下次启动兜底",

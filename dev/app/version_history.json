@@ -1520,5 +1520,13 @@
     ],
     "build_time": "2026-08-01T09:02:35.340069",
     "version_number": "2026.08.01.0901"
+  },
+  "云集智能音乐创意台-v2026.08.01.1412": {
+    "version": "云集智能音乐创意台-v2026.08.01.1412",
+    "changes": [
+      "根治首跑『窗口 visible=True 但用户看不到』真正根因：spawn 出来的 entry 进程无 Windows 前台权限，普通窗口被前台锁压后台；改用与启动屏(BrandedSplash)同一 proven 机制——主窗口启动时短暂 WindowStaysOnTopHint 置顶保证一定可见，2秒后 _drop_topmost 撤掉标志恢复普通窗口。删除仍由 0901 的 spawn entry + --cleanup 机制负责（用户已确认删除正常）。彻底抛弃不可靠的 AttachThreadInput 前台锁 hack"
+    ],
+    "build_time": "2026-08-01T14:13:54.080974",
+    "version_number": "2026.08.01.1412"
   }
 }

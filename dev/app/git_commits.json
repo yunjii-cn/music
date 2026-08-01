@@ -1,6 +1,15 @@
 [
   {
-    "hash": "750fbe6160e014d9ba211e5d3bc38a62cfebe2be",
+    "hash": "e55c76248f97be2b17aba3f91f2e740849201de9",
+    "short_hash": "e55c762",
+    "message": "feat: 发布版本 v2026.08.01.0901",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 09:02:36",
+    "body": "- 恢复 f7d9105 proven 删除机制：首跑部署后分离式 spawn 入口(携带 --cleanup=<原始便携exe>) + os._exit 退出自身，由入口在 already 分支用 os.remove 立即删便携 exe（即用户要的「入口启动新 exe 删除自身」）；移除不可靠的 self-delete-helper（它等主进程退出才删、app 运行中永远删不掉）。显示仍由 main._deferred_init 的居中+_force_foreground+15s 兜底保证可见；spawn 失败则兜底本进程跑 main、删除交 .cleanup_pending 下次启动兜底"
+  },
+  {
+    "hash": "\n750fbe6160e014d9ba211e5d3bc38a62cfebe2be",
     "short_hash": "750fbe6",
     "message": "feat: 发布版本 v2026.08.01.0842",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-24 03:23:39",
     "body": "- 在 $candidates 后加注释模板，说明 wheel 拖入 Gitee wheels release\n  后取消注释该行即可被竞速自动纳入（第 4 候选源）\n- 给出 raw / 附件两种直链格式示例，纯注释不影响运行时\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
-  },
-  {
-    "hash": "\nffb8cb38b29678ee8aba649dd5b7a7726a353633",
-    "short_hash": "ffb8cb3",
-    "message": "feat: flash_attn 增加 GPU 门控（仅 NVIDIA SM75+ 安装）",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-24 02:54:01",
-    "body": "- 新增 _gpu_supports_flash_attn()：用 nvidia-smi 探测算力，<7.5 跳过\n- main.py 两处安装点（内联兜底 L5416、部署复检 L5905）加门控，不支持时黄字提示用标准推理\n- install-env.ps1 主路径加 $supportsFA 探测，包裹下载+安装块\n- 非 N 卡/老卡/纯 CPU 不再白装废包，一键部署普遍适应性提升\n- 构建 v2026.07.24.0252.exe 验证门控已打包\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
   }
 ]

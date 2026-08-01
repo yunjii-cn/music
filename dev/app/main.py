@@ -2498,9 +2498,17 @@ class MainWindow(QMainWindow):
 
         # ── 无论加载是否成功，无条件把主窗口显示出来 ──
         try:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+            self.setWindowState(Qt.WindowState.WindowNoState)
+            self.showNormal()
             self.show()
             self.raise_()
             self.activateWindow()
+            _app = QApplication.instance()
+            if _app is not None:
+                _app.setActiveWindow(self)
+            QTimer.singleShot(2000, self._drop_topmost)
+            _launch_trace("window shown (topmost-2s)")
         except Exception:
             pass
 
@@ -2616,6 +2624,22 @@ class MainWindow(QMainWindow):
                         user32.AttachThreadInput(cur_tid, fg_tid, False)
                     except Exception:
                         pass
+        except Exception:
+            pass
+
+    def _drop_topmost(self):
+        """启动 2 秒后置顶标志撤除，恢复普通窗口行为（不影响已显示的窗口）。
+
+        与启动屏(BrandedSplash)同一 proven 机制：启动时靠 WindowStaysOnTopHint
+        保证「一定可见」（无视 Windows 前台锁），短暂置顶后撤掉，避免长期盖住用户
+        其他窗口。"""
+        try:
+            if self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint:
+                self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+                self.show()
+                self.raise_()
+                self.activateWindow()
+                _launch_trace("drop topmost -> normal window")
         except Exception:
             pass
 
