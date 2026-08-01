@@ -347,6 +347,9 @@ BAK_*/
 BAK8/
 build-release/
 
+# Local cleanup staging area (files moved here for manual review before deletion)
+清理/
+
 # Version directory - only keep version_history.json, not the packages
 version/*/
 version/*.exe
