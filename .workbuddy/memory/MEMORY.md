@@ -13,6 +13,7 @@
 ## 发布到双仓库下载页（Gitee + GitHub Releases）
 - **构建 ≠ 发布**：`build-version.py` 只打包+git+插 `versions.json`（不写 `download_url`）。发布须另跑 `dev/app/_publish_releases.py`，把 `dev/ver/*.exe` 传 Gitee(`yunjii/music`)+GitHub(`yunjii-cn/music`) 并回写直链。
 - ⚠️ 默认全量发布（glob `dev/ver/*.exe` 全传）。**必须加 `--version <v>` 才只发指定版本**，否则历史 exe 全传。支持 `--exe`、`--skip-gitee/github`、`--dry-run`。前置：`dev/app/.gitee_token`+`.github_token`、需 `requests`。`versions.json` 有 `download_url` 才亮下载按钮（截至 2026-07-31 仅 2 条带链接，其余显示"未提供"=没发布，非 bug）。
+- **里程碑 v2026.08.01.1423 截至 2026-08-02 已构建+进 git，但【尚未发布】到下载页**（versions.json 无其 download_url，_publish_releases.py 未跑）。要上架需执行 `python dev/app/_publish_releases.py --version v2026.08.01.1423`（其 exe 仍在 `dev/ver/`，可直接发）。
 
 ## 登录门控（ace-step-ui）
 - `dev/app/ace-step-ui/LoginGate.tsx`（`<LoginGate><App/></LoginGate>`）。未登录→302 跳 `https://music.yunjii.cn/login?embed=1&redirect=<origin>&state=<rand>`；回跳 URL 带 base64 `yunji_user` → `loginWithUM` → `POST /api/auth/um` 签发 JWT。登录地址由 `UM_LOGIN_URL`（`VITE_UM_LOGIN_URL` 可覆盖）控制。改后须 `vite build` 重建 dist/（Express 3060 服务 dist/）。官网须把本应用 origin 加 redirect 白名单。
@@ -21,7 +22,8 @@
 - wheel = `flash_attn-2.8.3+cu128torch2.9.0cxx11abiTRUE-cp312-cp312-win_amd64.whl`（250MB，不进 exe，走运行时下载）。仅 NVIDIA 且 SM≥75 才装。下载源：GitHub `yunjii-cn/music` wheels → ghproxy 镜像 → 码云分卷兜底（Gitee `attach_files` 端点、单附件 100MB 上限→切 3 片 90+90+59MiB，release id=758333）。
 
 ## 目录约定
-- `dev/app/`=源码(git)；`dev/dist/`=裸 exe(gitignore)；`dev/_build/`=发布文件夹(gitignore)；`dev/data/`=用户数据(gitignore)；`dev/ver/`=待发布版本 exe。`BAK/` 为备份。
+- `dev/app/`=源码(git)；`dev/dist/`=裸 exe(gitignore)；`dev/_build/`=发布文件夹(gitignore)；`dev/data/`=用户数据(gitignore)；`dev/ver/`=待发布版本 exe（**当前仅留里程碑 `v2026.08.01.1423.exe`**，其余测试版于 2026-08-02 清入 `清理/dev_ver_old`）。
+- `BAK/`：**已于 2026-08-02 清理删除**（14GB 冗余备份，含嵌套 BAK/BAK 11GB，整体移入 `清理/BAK` 暂存区待用户手动删）。`清理/` 为本地暂存区（`.gitignore` 已忽略），勿把其中内容当源码。根级 `build/`、`data/`(.uv_cache)、`ver/` 同期清入 `清理/`。
 
 ## 启动追踪日志策略（2026-08-01 确立）
 - `_launch_trace`（launcher.py + main.py）**默认仅写 %TEMP%/yunji_launch_trace.log**，不污染部署/下载目录（精品发布习惯）。设环境变量 **`YUNJI_TRACE_LOCAL=1`** 时额外双写 exe 同目录（真机排查首跑问题时启用，无需翻 %TEMP%）。
