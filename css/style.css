@@ -1255,26 +1255,12 @@ img {
     margin: 0 8px;
     opacity: 0.3;
 }
-.download-notice {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-muted);
-    padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    max-width: 560px;
-    margin-top: 26px;
-}
-
 /* 下载区两栏布局 */
 .download-layout {
     display: grid;
     grid-template-columns: 420px 1fr;
     gap: 28px;
-    align-items: start;
+    align-items: stretch;
 }
 
 /* 左栏：下载卡片 */
@@ -1314,10 +1300,22 @@ img {
 }
 .download-buttons {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
     margin-bottom: 8px;
+}
+.btn-race {
+    width: 100%;
+    justify-content: center;
+}
+.mirror-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.btn-mirror {
+    justify-content: center;
 }
 .btn-download {
     display: inline-flex;
@@ -1362,6 +1360,8 @@ img {
 
 /* 右栏：版本时间线 */
 .changelog {
+    display: flex;
+    flex-direction: column;
     text-align: left;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border);
@@ -1369,6 +1369,7 @@ img {
     padding: 24px 26px;
 }
 .changelog-head {
+    flex: 0 0 auto;
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -1387,9 +1388,24 @@ img {
     color: var(--text-muted);
 }
 .changelog-list {
-    max-height: 380px;
+    flex: 1 1 auto;
     overflow-y: auto;
-    padding-right: 6px;
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) transparent;
+}
+.changelog-list::-webkit-scrollbar {
+    width: 6px;
+}
+.changelog-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.changelog-list::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 999px;
+}
+.changelog-list::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 .vh-item {
     position: relative;
