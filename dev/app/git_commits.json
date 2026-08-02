@@ -1,6 +1,15 @@
 [
   {
-    "hash": "3e8770599247d2f7e9d5e208cbd895545e824948",
+    "hash": "6f5b0098f19159be8a5ae04846c93c58589df58d",
+    "short_hash": "6f5b009",
+    "message": "feat: 发布版本 v2026.08.02.0810",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-02 08:11:15",
+    "body": "- 修复核心API服务与Gradio启动脚本：将ArrayList参数展平为string[]，解决Start-Process无法拉起服务导致启动超时"
+  },
+  {
+    "hash": "\n3e8770599247d2f7e9d5e208cbd895545e824948",
     "short_hash": "3e87705",
     "message": "docs: 更新项目记忆（BAK清理/1423发布状态/清理目录约定）",
     "author": "yunjii",
@@ -529,14 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-26 01:45:56",
     "body": "- 上一提交 bcea938 加固 flash_attn 时 if/try 收尾大括号顺序颠倒，解析期报\n  Try statement is missing its Catch or Finally，脚本一行未执行即返回 1\n- 修正括号配对；build-version.py 增加打包前 .ps1 强制语法校验闸门"
-  },
-  {
-    "hash": "\nf61562b7376e21f8315d98e4fdda6eab64e1c1ea",
-    "short_hash": "f61562b",
-    "message": "feat: XL(4B)底座 LoRA 训练变体注册(P1) — xl/xl-sft/xl-base",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-26 01:28:36",
-    "body": "- model_loader/_VARIANT_DIR + cli/args/VARIANT_DIR_MAP 双映射表注册 XL 三件套\n- model_discovery: detect_base_model 优先匹配 xl 家族(修 xl-turbo 误判为 turbo) + _BASE_DEFAULTS 补 XL\n- quick_presets: VARIANT_DEFAULTS/ALL_VARIANTS/偏好序补 XL；修存量 NameError(tier 未定义)\n- train_api_service: env-profile 变体白名单改用 ALL_VARIANTS(修 XL 下载后不出现在下拉)\n- 前端: 底座选择器加 XL 按钮+四语警示，两份 qualityPresets 镜像同步(原被 gitignore data/ 误伤,已加白名单首次入库)\n- 新增 verify_xl_training.py 冒烟校验脚本(§4.2 判定标准)\n- 待办: 训练机下载 18.8GB 权重后实跑冒烟校验"
   }
 ]
