@@ -7,7 +7,7 @@
       "清理下载页：移除1423(含API启动bug的坏里程碑)与历史残留0635/0336的download_url，重打包使软件内更新页不再显示旧版下载按钮"
     ],
     "name": "云集智能音乐创意台-v2026.08.02.1135.exe",
-    "download_url": ""
+    "download_url": "https://gitee.com/yunjii/music/releases/download/v2026.08.02.1135/云集智能音乐创意台-v2026.08.02.1135.exe"
   },
   {
     "version": "2026.08.02.0810",
