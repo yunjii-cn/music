@@ -124,7 +124,10 @@ Write-Output "Using Python: $pythonw_exe"
 $logDir = Join-Path $env:TEMP "yunji_logs"
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 $logFile = Join-Path $logDir "gradio.log"
-Start-Process -FilePath $pythonw_exe -ArgumentList @("acestep/acestep_v15_pipeline.py", $ext_args) `
+# 展平参数：Start-Process -ArgumentList 只接受 string[]，不能嵌套 ArrayList
+$gradioArgs = @("acestep/acestep_v15_pipeline.py")
+foreach ($a in $ext_args) { $gradioArgs += [string]$a }
+Start-Process -FilePath $pythonw_exe -ArgumentList $gradioArgs `
     -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru | Out-Null
 Start-Sleep -Milliseconds 300
 Get-Content -Path $logFile -Wait

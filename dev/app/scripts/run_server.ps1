@@ -41,6 +41,11 @@ $ext_args = [System.Collections.ArrayList]::new()
 [void]$ext_args.Add("--host")
 [void]$ext_args.Add($ServerHost)
 
+# 展平参数：Start-Process -ArgumentList 只接受 string[]，不能直接塞 ArrayList（否则 PowerShell 5.1
+# 报 Cannot convert 'System.Collections.ArrayList' to 'System.String'，进程根本不启动）
+$apiArgs = @("acestep/api_server.py")
+foreach ($a in $ext_args) { $apiArgs += [string]$a }
+
 # Directly use virtual environment python to avoid uv pyproject.toml checks
 # 统一使用 scripts/.venv（与 install-env.ps1 / main.py 保持一致）
 $venv_dir = Join-Path $PSScriptRoot ".venv"
@@ -84,7 +89,7 @@ if ($LogFile -ne "") {
     $logDir = Split-Path $LogFile -Parent
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
     $errLog = Join-Path $logDir "api_server_stderr.log"
-    Start-Process -FilePath $pythonw_exe -ArgumentList @("acestep/api_server.py", $ext_args) `
+    Start-Process -FilePath $pythonw_exe -ArgumentList $apiArgs `
         -WindowStyle Hidden -RedirectStandardOutput $LogFile -RedirectStandardError $errLog -PassThru | Out-Null
     Start-Sleep -Milliseconds 300
     Get-Content -Path $LogFile -Wait
@@ -92,7 +97,7 @@ if ($LogFile -ne "") {
     $logDir = Join-Path $env:TEMP "yunji_logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
     $logFile = Join-Path $logDir "api_server.log"
-    Start-Process -FilePath $pythonw_exe -ArgumentList @("acestep/api_server.py", $ext_args) `
+    Start-Process -FilePath $pythonw_exe -ArgumentList $apiArgs `
         -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru | Out-Null
     Start-Sleep -Milliseconds 300
     Get-Content -Path $logFile -Wait

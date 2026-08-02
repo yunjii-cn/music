@@ -1,6 +1,51 @@
 [
   {
-    "hash": "e0a72b2e79f922be401e5ba410e239a43b58ea0e",
+    "hash": "3e8770599247d2f7e9d5e208cbd895545e824948",
+    "short_hash": "3e87705",
+    "message": "docs: 更新项目记忆（BAK清理/1423发布状态/清理目录约定）",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-02 01:34:33",
+    "body": ""
+  },
+  {
+    "hash": "\ne1253c46f756f0db3879457bf227b665c38b1832",
+    "short_hash": "e1253c4",
+    "message": "release: 发布里程碑 v2026.08.01.1423 到双仓库下载页(Gitee+GitHub)",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-02 01:34:10",
+    "body": "- _publish_releases.py --version 2026.08.01.1423 已上传 exe 至 Gitee release#771409 / GitHub release#363583963\n- dev/app/versions.json 写入 1423 的 download_url(Gitee+GitHub 直链)，下载页即亮起下载按钮\n- 首跑启动器三大难题(显示/删除自身/退出清理)根治版正式对外发布"
+  },
+  {
+    "hash": "\n180d8096eeee512308768040b58f8e1c613e9fc9",
+    "short_hash": "180d809",
+    "message": "chore: 清理无保留价值产物与BAK冗余备份，移入清理/暂存区待手动删除",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-02 00:13:44",
+    "body": "- BAK/ (14GB 含嵌套 BAK/BAK 11GB)、根级 build/(4.8GB)、data/(uv缓存6GB)、ver/(旧版)、松散 exe 等 gitignore 产物移至 清理/ 暂存\n- dev/ver/ 保留里程碑 v2026.08.01.1423，其余 38 个调试期测试版移入 清理/dev_ver_old\n- .gitignore 忽略 清理/ 本地暂存区；停止跟踪已删除 BAK 中的 build-version.py 副本(实为 dev/app 副本)\n- 源码 app/web/docs/dev 及用户数据 dev/data 均不动"
+  },
+  {
+    "hash": "\n3cad0a42dfbc757065ec01e18c0246f8c0c6f7f2",
+    "short_hash": "3cad0a4",
+    "message": "docs: 新增首跑启动器排查纪要（里程碑 v2026.08.01.1423 三大难题闭环）；更新项目记忆日志策略",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 14:26:54",
+    "body": ""
+  },
+  {
+    "hash": "\n2e18204b52d979e8cafc8a2171add36a9a3317e8",
+    "short_hash": "2e18204",
+    "message": "feat: 发布版本 v2026.08.01.1423",
+    "author": "yunjii",
+    "email": "yi@yunjii.cn",
+    "date": "2026-08-01 14:24:28",
+    "body": "- ★里程碑版本★ 首跑启动器三大难题一次性根治：(1)显示——主窗口启动短暂置顶(topmost)保证100%可见，2秒后恢复普通窗口，彻底抛弃不可靠的前台锁hack；(2)删除自身——恢复f7d9105 proven机制，入口进程spawn时携带--cleanup由os.remove立即删便携exe；(3)退出清理——递归进程树精确清理所有派生服务(node/python/powershell孙进程)，不再关键字漏杀。另将启动追踪日志改为默认仅写系统临时目录(TEMP)，部署目录保持干净；保留 YUNJI_TRACE_LOCAL=1 开关可恢复双写，crash.log仅崩溃时出现仍留部署目录取证。"
+  },
+  {
+    "hash": "\ne0a72b2e79f922be401e5ba410e239a43b58ea0e",
     "short_hash": "e0a72b2",
     "message": "feat: 发布版本 v2026.08.01.1412",
     "author": "yunjii",
@@ -493,50 +538,5 @@
     "email": "yi@yunjii.cn",
     "date": "2026-07-26 01:28:36",
     "body": "- model_loader/_VARIANT_DIR + cli/args/VARIANT_DIR_MAP 双映射表注册 XL 三件套\n- model_discovery: detect_base_model 优先匹配 xl 家族(修 xl-turbo 误判为 turbo) + _BASE_DEFAULTS 补 XL\n- quick_presets: VARIANT_DEFAULTS/ALL_VARIANTS/偏好序补 XL；修存量 NameError(tier 未定义)\n- train_api_service: env-profile 变体白名单改用 ALL_VARIANTS(修 XL 下载后不出现在下拉)\n- 前端: 底座选择器加 XL 按钮+四语警示，两份 qualityPresets 镜像同步(原被 gitignore data/ 误伤,已加白名单首次入库)\n- 新增 verify_xl_training.py 冒烟校验脚本(§4.2 判定标准)\n- 待办: 训练机下载 18.8GB 权重后实跑冒烟校验"
-  },
-  {
-    "hash": "\nbcea938439a2755a7b0b5d0b1304642fdd871c69",
-    "short_hash": "bcea938",
-    "message": "feat: 训练数据一键准备(P0) + flash_attn崩溃根治与venv路径兜底",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-26 01:19:20",
-    "body": "- install-env.ps1: flash_attn 下载/安装全段 try/catch 兜底，任何异常仅警告跳过，脚本显式 exit 0，可选包失败不再拖垮部署\n- main.py: find_venv_python 增加 glob 兜底搜索，修复 relocate 后误判环境未就绪\n- P0 新增: dataPrep.ts 编排服务(扫描→转写→自动打标→预处理) + training.ts 3 路由 + TrainingPanel 一键准备卡片 + api.ts + 四语 i18n"
-  },
-  {
-    "hash": "\n6e17bf2b4a0bc793c279d1df3855b92b7c532ccb",
-    "short_hash": "6e17bf2",
-    "message": "fix: 状态进度条只显示边框无动态内容（换 QLabel 为 QProgressBar）",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-24 06:43:25",
-    "body": "- 根因：下载源与部署按钮之间原是空 QLabel(deploy_progress_label)，\n  从未 setText，占 stretch=1 空间 → 只见卡片边框、中间空白\n- 换成 QProgressBar(deploy_progress_bar)：绿色 chunk + 文字叠加\n- 新增 4 helper：_deploy_progress_start/tick/text/stop，用 QTimer(60ms)\n  让进度值 0→100 循环形成可见滚动填充动画（比不确定态更可靠）\n- 部署开始(_deploy_maintenance)启动动画；结束(_enable_buttons)定格 100%\n- 每条部署日志经 _append_log_to_ui 实时同步为进度条叠加文字\n- 手动/自动部署两条路径均生效；构建 v2026.07.24.0642.exe 校验 9 项全 True\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
-  },
-  {
-    "hash": "\nf35ff58befe633b1d05abde4c961ae0cb0b2b99f",
-    "short_hash": "f35ff58",
-    "message": "fix: 一键部署完成后自动下载完整基础模型包(main)",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-24 05:55:18",
-    "body": "- 原逻辑(_enable_buttons)在初始化后自动部署完成仅跳转模型管理页\n  + 打日志提示用户手动下载，从未调用 _download_model\n- 新增 _auto_download_main_model()：自动部署完成、跳页后延迟触发\n  _download_model(\"main\")（完整基础模型包），仅在主模型缺失且当前\n  无其它模型操作时触发，避免与手动操作冲突；失败仅告警不阻断\n- 已存在则跳过，避免重装重复下载\n- 构建 v2026.07.24.0553.exe 校验 5 项标记全 True\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
-  },
-  {
-    "hash": "\n66be154bf67dce73581fbc19fe9284d9a951d25f",
-    "short_hash": "66be154",
-    "message": "fix: flash_attn 下载兜底顺序修正（码云分卷提到 bitsadmin 之前）",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-24 05:19:07",
-    "body": "- 原顺序 GitHub 竞速 → bitsadmin 直连 GitHub → 码云分卷，导致国内机器\n  在 ghproxy.net 失败后掉进最慢的 bitsadmin 直连 GitHub\n- 改为：GitHub 单文件竞速 → 码云分卷（国内本地源，已验证可下、更快）\n  → bitsadmin 直连 GitHub（绝对兜底，国内可能慢）\n- 探针不再丢弃探测失败源（GitHub 重定向拒 range 请求会被误判为死源）：\n  探测失败仅排到最后，仍参与真实下载尝试\n- 构建 v2026.07.24.0517.exe 校验 7 项标记全 True\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
-  },
-  {
-    "hash": "\n42271d906b86d32a83038b85f564b2026b0ab63b",
-    "short_hash": "42271d9",
-    "message": "feat: 码云(Gitee) 分卷兜底源接入 flash_attn 下载",
-    "author": "yunjii",
-    "email": "yi@yunjii.cn",
-    "date": "2026-07-24 04:24:45",
-    "body": "- Gitee 单附件上限 100MB，wheel 250MB 无法整包上传；切成 3 个分卷\n  (part1/part2=90MiB, part3≈59MiB) 上传到 yunjii/music 的 wheels release\n- 新增 Download-GiteeMultipart：流式下载 3 片并以 FileStream 拼接还原，\n  拼接后校验字节数(250851873)防损坏\n- 接入顺序：GitHub 单文件竞速 → bitsadmin 兜底 → 码云分卷兜底 → 跳过\n- 国内用户在 GitHub 镜像也连不上时，仍可经码云分卷还原 wheel\n- 构建 v2026.07.24.0420.exe 验证逻辑已打包(11 项 marker 全 True)\n\nCo-Authored-By: WorkBuddy <noreply@workbuddy.ai>"
   }
 ]
